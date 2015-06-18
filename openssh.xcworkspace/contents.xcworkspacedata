@@ -1,0 +1,706 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:addrmatch.c">
+   </FileRef>
+   <FileRef
+      location = "group:atomicio.c">
+   </FileRef>
+   <FileRef
+      location = "group:audit-bsm.c">
+   </FileRef>
+   <FileRef
+      location = "group:audit-linux.c">
+   </FileRef>
+   <FileRef
+      location = "group:audit.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-bsdauth.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-chall.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-krb5.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-options.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-pam.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-passwd.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-rh-rsa.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-sia.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-rhosts.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-rsa.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-shadow.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth-skey.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth1.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth2-chall.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth2-gss.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth2-hostbased.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth2-kbdint.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth2-none.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth2-passwd.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth2-pubkey.c">
+   </FileRef>
+   <FileRef
+      location = "group:auth2.c">
+   </FileRef>
+   <FileRef
+      location = "group:authfd.c">
+   </FileRef>
+   <FileRef
+      location = "group:authfile.c">
+   </FileRef>
+   <FileRef
+      location = "group:blocks.c">
+   </FileRef>
+   <FileRef
+      location = "group:bufaux.c">
+   </FileRef>
+   <FileRef
+      location = "group:bufbn.c">
+   </FileRef>
+   <FileRef
+      location = "group:bufec.c">
+   </FileRef>
+   <FileRef
+      location = "group:buffer.c">
+   </FileRef>
+   <FileRef
+      location = "group:canohost.c">
+   </FileRef>
+   <FileRef
+      location = "group:chacha.c">
+   </FileRef>
+   <FileRef
+      location = "group:channels.c">
+   </FileRef>
+   <FileRef
+      location = "group:cipher-3des1.c">
+   </FileRef>
+   <FileRef
+      location = "group:cipher-aes.c">
+   </FileRef>
+   <FileRef
+      location = "group:cipher-bf1.c">
+   </FileRef>
+   <FileRef
+      location = "group:cipher-chachapoly.c">
+   </FileRef>
+   <FileRef
+      location = "group:cipher-ctr.c">
+   </FileRef>
+   <FileRef
+      location = "group:cipher.c">
+   </FileRef>
+   <FileRef
+      location = "group:cleanup.c">
+   </FileRef>
+   <FileRef
+      location = "group:clientloop.c">
+   </FileRef>
+   <FileRef
+      location = "group:compat.c">
+   </FileRef>
+   <FileRef
+      location = "group:compress.c">
+   </FileRef>
+   <FileRef
+      location = "group:crc32.c">
+   </FileRef>
+   <FileRef
+      location = "group:deattack.c">
+   </FileRef>
+   <FileRef
+      location = "group:dh.c">
+   </FileRef>
+   <FileRef
+      location = "group:digest-libc.c">
+   </FileRef>
+   <FileRef
+      location = "group:digest-openssl.c">
+   </FileRef>
+   <FileRef
+      location = "group:digest-wolfssl.c">
+   </FileRef>
+   <FileRef
+      location = "group:dispatch.c">
+   </FileRef>
+   <FileRef
+      location = "group:dns.c">
+   </FileRef>
+   <FileRef
+      location = "group:ed25519.c">
+   </FileRef>
+   <FileRef
+      location = "group:entropy.c">
+   </FileRef>
+   <FileRef
+      location = "group:fatal.c">
+   </FileRef>
+   <FileRef
+      location = "group:fe25519.c">
+   </FileRef>
+   <FileRef
+      location = "group:ge25519.c">
+   </FileRef>
+   <FileRef
+      location = "group:groupaccess.c">
+   </FileRef>
+   <FileRef
+      location = "group:gss-genr.c">
+   </FileRef>
+   <FileRef
+      location = "group:gss-serv-krb5.c">
+   </FileRef>
+   <FileRef
+      location = "group:gss-serv.c">
+   </FileRef>
+   <FileRef
+      location = "group:hash.c">
+   </FileRef>
+   <FileRef
+      location = "group:hmac.c">
+   </FileRef>
+   <FileRef
+      location = "group:hostfile.c">
+   </FileRef>
+   <FileRef
+      location = "group:kex.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexc25519.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexc25519c.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexc25519s.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexdh.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexdhc.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexdhs.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexecdh.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexecdhc.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexecdhs.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexgex.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexgexc.c">
+   </FileRef>
+   <FileRef
+      location = "group:kexgexs.c">
+   </FileRef>
+   <FileRef
+      location = "group:key.c">
+   </FileRef>
+   <FileRef
+      location = "group:krl.c">
+   </FileRef>
+   <FileRef
+      location = "group:log.c">
+   </FileRef>
+   <FileRef
+      location = "group:loginrec.c">
+   </FileRef>
+   <FileRef
+      location = "group:logintest.c">
+   </FileRef>
+   <FileRef
+      location = "group:mac.c">
+   </FileRef>
+   <FileRef
+      location = "group:match.c">
+   </FileRef>
+   <FileRef
+      location = "group:md-sha256.c">
+   </FileRef>
+   <FileRef
+      location = "group:md5crypt.c">
+   </FileRef>
+   <FileRef
+      location = "group:misc.c">
+   </FileRef>
+   <FileRef
+      location = "group:moduli.c">
+   </FileRef>
+   <FileRef
+      location = "group:monitor_fdpass.c">
+   </FileRef>
+   <FileRef
+      location = "group:monitor_mm.c">
+   </FileRef>
+   <FileRef
+      location = "group:monitor_wrap.c">
+   </FileRef>
+   <FileRef
+      location = "group:monitor.c">
+   </FileRef>
+   <FileRef
+      location = "group:msg.c">
+   </FileRef>
+   <FileRef
+      location = "group:mux.c">
+   </FileRef>
+   <FileRef
+      location = "group:nchan.c">
+   </FileRef>
+   <FileRef
+      location = "group:packet.c">
+   </FileRef>
+   <FileRef
+      location = "group:platform.c">
+   </FileRef>
+   <FileRef
+      location = "group:poly1305.c">
+   </FileRef>
+   <FileRef
+      location = "group:progressmeter.c">
+   </FileRef>
+   <FileRef
+      location = "group:readconf.c">
+   </FileRef>
+   <FileRef
+      location = "group:readpass.c">
+   </FileRef>
+   <FileRef
+      location = "group:rijndael.c">
+   </FileRef>
+   <FileRef
+      location = "group:roaming_client.c">
+   </FileRef>
+   <FileRef
+      location = "group:roaming_common.c">
+   </FileRef>
+   <FileRef
+      location = "group:roaming_dummy.c">
+   </FileRef>
+   <FileRef
+      location = "group:roaming_serv.c">
+   </FileRef>
+   <FileRef
+      location = "group:rsa.c">
+   </FileRef>
+   <FileRef
+      location = "group:sandbox-capsicum.c">
+   </FileRef>
+   <FileRef
+      location = "group:sandbox-darwin.c">
+   </FileRef>
+   <FileRef
+      location = "group:sandbox-null.c">
+   </FileRef>
+   <FileRef
+      location = "group:sandbox-rlimit.c">
+   </FileRef>
+   <FileRef
+      location = "group:sandbox-seccomp-filter.c">
+   </FileRef>
+   <FileRef
+      location = "group:sandbox-systrace.c">
+   </FileRef>
+   <FileRef
+      location = "group:sc25519.c">
+   </FileRef>
+   <FileRef
+      location = "group:scp.c">
+   </FileRef>
+   <FileRef
+      location = "group:servconf.c">
+   </FileRef>
+   <FileRef
+      location = "group:serverloop.c">
+   </FileRef>
+   <FileRef
+      location = "group:session.c">
+   </FileRef>
+   <FileRef
+      location = "group:sftp-client.c">
+   </FileRef>
+   <FileRef
+      location = "group:sftp-common.c">
+   </FileRef>
+   <FileRef
+      location = "group:sftp-glob.c">
+   </FileRef>
+   <FileRef
+      location = "group:sftp-server-main.c">
+   </FileRef>
+   <FileRef
+      location = "group:sftp-server.c">
+   </FileRef>
+   <FileRef
+      location = "group:sftp.c">
+   </FileRef>
+   <FileRef
+      location = "group:smult_curve25519_ref.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-add.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-agent.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-dss.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-ecdsa.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-ed25519.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-keygen.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-keyscan.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-keysign.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-pkcs11-client.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-pkcs11-helper.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-pkcs11.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-rsa.c">
+   </FileRef>
+   <FileRef
+      location = "group:ssh.c">
+   </FileRef>
+   <FileRef
+      location = "group:sshconnect.c">
+   </FileRef>
+   <FileRef
+      location = "group:sshconnect1.c">
+   </FileRef>
+   <FileRef
+      location = "group:sshconnect2.c">
+   </FileRef>
+   <FileRef
+      location = "group:sshd.c">
+   </FileRef>
+   <FileRef
+      location = "group:sshlogin.c">
+   </FileRef>
+   <FileRef
+      location = "group:sshpty.c">
+   </FileRef>
+   <FileRef
+      location = "group:sshtty.c">
+   </FileRef>
+   <FileRef
+      location = "group:ttymodes.c">
+   </FileRef>
+   <FileRef
+      location = "group:uidswap.c">
+   </FileRef>
+   <FileRef
+      location = "group:umac.c">
+   </FileRef>
+   <FileRef
+      location = "group:uuencode.c">
+   </FileRef>
+   <FileRef
+      location = "group:verify.c">
+   </FileRef>
+   <FileRef
+      location = "group:xmalloc.c">
+   </FileRef>
+   <FileRef
+      location = "group:atomicio.h">
+   </FileRef>
+   <FileRef
+      location = "group:audit.h">
+   </FileRef>
+   <FileRef
+      location = "group:auth-options.h">
+   </FileRef>
+   <FileRef
+      location = "group:auth-pam.h">
+   </FileRef>
+   <FileRef
+      location = "group:auth-sia.h">
+   </FileRef>
+   <FileRef
+      location = "group:auth.h">
+   </FileRef>
+   <FileRef
+      location = "group:authfd.h">
+   </FileRef>
+   <FileRef
+      location = "group:authfile.h">
+   </FileRef>
+   <FileRef
+      location = "group:buffer.h">
+   </FileRef>
+   <FileRef
+      location = "group:canohost.h">
+   </FileRef>
+   <FileRef
+      location = "group:chacha.h">
+   </FileRef>
+   <FileRef
+      location = "group:channels.h">
+   </FileRef>
+   <FileRef
+      location = "group:cipher-chachapoly.h">
+   </FileRef>
+   <FileRef
+      location = "group:cipher.h">
+   </FileRef>
+   <FileRef
+      location = "group:clientloop.h">
+   </FileRef>
+   <FileRef
+      location = "group:compat.h">
+   </FileRef>
+   <FileRef
+      location = "group:compress.h">
+   </FileRef>
+   <FileRef
+      location = "group:config.h">
+   </FileRef>
+   <FileRef
+      location = "group:crc32.h">
+   </FileRef>
+   <FileRef
+      location = "group:crypto_api.h">
+   </FileRef>
+   <FileRef
+      location = "group:deattack.h">
+   </FileRef>
+   <FileRef
+      location = "group:defines.h">
+   </FileRef>
+   <FileRef
+      location = "group:dh.h">
+   </FileRef>
+   <FileRef
+      location = "group:digest.h">
+   </FileRef>
+   <FileRef
+      location = "group:dispatch.h">
+   </FileRef>
+   <FileRef
+      location = "group:dns.h">
+   </FileRef>
+   <FileRef
+      location = "group:entropy.h">
+   </FileRef>
+   <FileRef
+      location = "group:fe25519.h">
+   </FileRef>
+   <FileRef
+      location = "group:ge25519.h">
+   </FileRef>
+   <FileRef
+      location = "group:groupaccess.h">
+   </FileRef>
+   <FileRef
+      location = "group:hmac.h">
+   </FileRef>
+   <FileRef
+      location = "group:hostfile.h">
+   </FileRef>
+   <FileRef
+      location = "group:includes.h">
+   </FileRef>
+   <FileRef
+      location = "group:kex.h">
+   </FileRef>
+   <FileRef
+      location = "group:key.h">
+   </FileRef>
+   <FileRef
+      location = "group:krl.h">
+   </FileRef>
+   <FileRef
+      location = "group:log.h">
+   </FileRef>
+   <FileRef
+      location = "group:loginrec.h">
+   </FileRef>
+   <FileRef
+      location = "group:mac.h">
+   </FileRef>
+   <FileRef
+      location = "group:match.h">
+   </FileRef>
+   <FileRef
+      location = "group:md5crypt.h">
+   </FileRef>
+   <FileRef
+      location = "group:misc.h">
+   </FileRef>
+   <FileRef
+      location = "group:monitor_fdpass.h">
+   </FileRef>
+   <FileRef
+      location = "group:monitor_mm.h">
+   </FileRef>
+   <FileRef
+      location = "group:monitor_wrap.h">
+   </FileRef>
+   <FileRef
+      location = "group:monitor.h">
+   </FileRef>
+   <FileRef
+      location = "group:msg.h">
+   </FileRef>
+   <FileRef
+      location = "group:myproposal.h">
+   </FileRef>
+   <FileRef
+      location = "group:packet.h">
+   </FileRef>
+   <FileRef
+      location = "group:pathnames.h">
+   </FileRef>
+   <FileRef
+      location = "group:pkcs11.h">
+   </FileRef>
+   <FileRef
+      location = "group:platform.h">
+   </FileRef>
+   <FileRef
+      location = "group:poly1305.h">
+   </FileRef>
+   <FileRef
+      location = "group:progressmeter.h">
+   </FileRef>
+   <FileRef
+      location = "group:readconf.h">
+   </FileRef>
+   <FileRef
+      location = "group:rijndael.h">
+   </FileRef>
+   <FileRef
+      location = "group:roaming.h">
+   </FileRef>
+   <FileRef
+      location = "group:rsa.h">
+   </FileRef>
+   <FileRef
+      location = "group:sc25519.h">
+   </FileRef>
+   <FileRef
+      location = "group:servconf.h">
+   </FileRef>
+   <FileRef
+      location = "group:serverloop.h">
+   </FileRef>
+   <FileRef
+      location = "group:session.h">
+   </FileRef>
+   <FileRef
+      location = "group:sftp-client.h">
+   </FileRef>
+   <FileRef
+      location = "group:sftp-common.h">
+   </FileRef>
+   <FileRef
+      location = "group:sftp.h">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-gss.h">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-pkcs11.h">
+   </FileRef>
+   <FileRef
+      location = "group:ssh-sandbox.h">
+   </FileRef>
+   <FileRef
+      location = "group:ssh.h">
+   </FileRef>
+   <FileRef
+      location = "group:ssh1.h">
+   </FileRef>
+   <FileRef
+      location = "group:ssh2.h">
+   </FileRef>
+   <FileRef
+      location = "group:sshconnect.h">
+   </FileRef>
+   <FileRef
+      location = "group:sshlogin.h">
+   </FileRef>
+   <FileRef
+      location = "group:sshpty.h">
+   </FileRef>
+   <FileRef
+      location = "group:ttymodes.h">
+   </FileRef>
+   <FileRef
+      location = "group:uidswap.h">
+   </FileRef>
+   <FileRef
+      location = "group:umac.h">
+   </FileRef>
+   <FileRef
+      location = "group:uuencode.h">
+   </FileRef>
+   <FileRef
+      location = "group:version.h">
+   </FileRef>
+   <FileRef
+      location = "group:xmalloc.h">
+   </FileRef>
+</Workspace>
