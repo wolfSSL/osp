@@ -121,10 +121,8 @@ void
 buffer_put_ecpoint(Buffer *buffer, const EC_GROUP *curve,
     const EC_POINT *point)
 {
-	buffer_dump(buffer);
 	if (buffer_put_ecpoint_ret(buffer, curve, point) == -1)
 		fatal("%s: buffer error", __func__);
-	buffer_dump(buffer);
 }
 
 int
