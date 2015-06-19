@@ -1748,11 +1748,6 @@ AC_LINK_IFELSE(
 	[AC_DEFINE([HAVE_ISBLANK], [1], [Define if you have isblank(3C).])
 ])
 
-# PKCS#11 support requires dlopen() and co
-AC_SEARCH_LIBS([dlopen], [dl],
-    [AC_DEFINE([ENABLE_PKCS11], [], [Enable for PKCS#11 support])]
-)
-
 # IRIX has a const char return value for gai_strerror()
 AC_CHECK_FUNCS([gai_strerror], [
 	AC_DEFINE([HAVE_GAI_STRERROR])
@@ -2227,6 +2222,70 @@ if test "x$check_for_conflicting_getspnam" = "x1"; then
 fi
 
 AC_FUNC_GETPGRP
+
+# TAO WolfSSL adds
+
+WOLFSSL_URL="http://www.yassl.com/download.html"
+ENABLE_WOLFSSL="no"
+AC_ARG_WITH(wolfssl,
+[  --with-wolfssl=PATH      PATH to wolfssl install (default /usr/local) ],
+[
+if test "x$withval" != "xno" ; then
+if test -d "$withval/lib"; then
+LDFLAGS="$LDFLAGS -L${withval}/lib"
+fi
+if test -d "$withval/include"; then
+CPPFLAGS="$CPPFLAGS -I${withval}/include"
+fi
+fi
+
+AC_MSG_CHECKING([for wolfSSL])
+LIBS="$LIBS -lwolfssl"
+
+AC_TRY_LINK([#include <wolfssl/ssl.h>], [ WolfSSL_Init(); ],
+[ wolfssl_linked=yes ], [ wolfssl_linked=no ])
+
+if test "x$wolfssl_linked" == "xno" ; then
+AC_MSG_ERROR([WolfSSL isn't found.  You can get it from $WOLFSSL_URL
+
+If it's already installed, specify its path using --with-wolfssl=/dir/])
+fi
+
+AC_MSG_RESULT([yes])
+ENABLE_WOLFSSL="yes"
+RAND_MSG="WolfSSL Internal"
+AC_DEFINE([USING_WOLFSSL], [1], [Defined if using WolfSSL])
+AC_DEFINE([WOLFSSL_AES_DIRECT], [1], [Defined if using WolfSSL])
+AC_DEFINE([WOLFSSL_SHA384], [1], [Defined if using WolfSSL])
+AC_DEFINE([WOLFSSL_SHA512], [1], [Defined if using WolfSSL])
+AC_DEFINE([WOLFSSL_RIPEMD], [1], [Defined if using WolfSSL])
+AC_DEFINE([UNSUPPORTED_POSIX_THREADS_HACK], [1], [Defined if using WolfSSL])
+]
+)
+
+AC_SUBST(ENABLE_WOLFSSL)
+
+# Some systems want crypt() from libcrypt, *not* the version in OpenSSL,
+# because the system crypt() is more featureful.
+if test "x$check_for_libcrypt_before" = "x1"; then
+AC_CHECK_LIB(crypt, crypt)
+fi
+
+# Some Linux systems (Slackware) need crypt() from libcrypt, *not* the
+# version in OpenSSL.
+if test "x$check_for_libcrypt_later" = "x1"; then
+AC_CHECK_LIB(crypt, crypt, LIBS="$LIBS -lcrypt")
+fi
+
+if test X"$ENABLE_CYASSL" = Xno; then
+
+# end TAO WolfSSL adds except fi after openssl stuff
+
+# TAO PKCS#11 for OpenSSL only for now
+# PKCS#11 support requires dlopen() and co
+AC_SEARCH_LIBS(dlopen, dl,
+AC_DEFINE([ENABLE_PKCS11], [], [Enable for PKCS#11 support])
+)
 
 # Search for OpenSSL
 saved_CPPFLAGS="$CPPFLAGS"
@@ -2805,6 +2864,10 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
 	RAND_MSG="OpenSSL internal ONLY"
 else
 	AC_MSG_ERROR([OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options])
+fi
+
+
+# TAO cyassl endif for openssl adds
 fi
 
 # Check for PAM libs
@@ -4852,6 +4915,7 @@ echo "           Solaris project support: $SP_MSG"
 echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
 echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
 echo "                  BSD Auth support: $BSD_AUTH_MSG"
+echo "                    WolfSSL support: $ENABLE_WOLFSSL"
 echo "              Random number source: $RAND_MSG"
 echo "             Privsep sandbox style: $SANDBOX_STYLE"
 

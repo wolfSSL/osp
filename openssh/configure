@@ -625,6 +625,7 @@ SSH_PRIVSEP_USER
 COMMENT_OUT_ECC
 TEST_SSH_ECC
 LIBEDIT
+ENABLE_WOLFSSL
 PKGCONFIG
 LD
 PATH_PASSWD_PROG
@@ -730,6 +731,7 @@ with_ldns
 with_libedit
 with_audit
 with_pie
+with_wolfssl
 with_ssl_dir
 with_openssl_header_check
 with_ssl_engine
@@ -1422,6 +1424,7 @@ Optional Packages:
   --with-libedit[=PATH]   Enable libedit support for sftp
   --with-audit=module     Enable audit support (modules=debug,bsm,linux)
   --with-pie           Build Position Independent Executables if possible
+  --with-wolfssl=PATH     PATH to wolfssl install (default /usr/local)
   --with-ssl-dir=PATH     Specify path to OpenSSL installation
   --without-openssl-header-check Disable OpenSSL version consistency check
   --with-ssl-engine       Enable OpenSSL (hardware) ENGINE support
@@ -10489,67 +10492,6 @@ fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 
-# PKCS#11 support requires dlopen() and co
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dlopen" >&5
-$as_echo_n "checking for library containing dlopen... " >&6; }
-if ${ac_cv_search_dlopen+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char dlopen ();
-int
-main ()
-{
-return dlopen ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' dl; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_dlopen=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_dlopen+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_dlopen+:} false; then :
-
-else
-  ac_cv_search_dlopen=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dlopen" >&5
-$as_echo "$ac_cv_search_dlopen" >&6; }
-ac_res=$ac_cv_search_dlopen
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-$as_echo "#define ENABLE_PKCS11 /**/" >>confdefs.h
-
-
-fi
-
-
 # IRIX has a const char return value for gai_strerror()
 for ac_func in gai_strerror
 do :
@@ -11753,6 +11695,308 @@ $as_echo "#define GETPGRP_VOID 1" >>confdefs.h
 fi
 
 
+# TAO WolfSSL adds
+
+WOLFSSL_URL="http://www.wolfssl.com/download.html"
+ENABLE_WOLFSSL="no"
+
+# Check whether --with-wolfssl was given.
+if test "${with_wolfssl+set}" = set; then
+	withval=$with_wolfssl;
+	if test "x$withval" != "xno" ; then
+		if test -d "$withval/lib"; then
+			LDFLAGS="$LDFLAGS -L${withval}/lib"
+		fi
+		if test -d "$withval/include"; then
+			CPPFLAGS="$CPPFLAGS -I${withval}/include"
+		fi
+	fi
+
+	{ echo "$as_me:$LINENO: checking for wolfssl" >&5
+	echo $ECHO_N "checking for wolfssl... $ECHO_C" >&6; }
+	LIBS="$LIBS -lwolfssl"
+
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <wolfssl/ssl.h>
+int
+main ()
+{
+	wolfSSL_Init();
+	return 0;
+}
+_ACEOF
+
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+	*\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+	*) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+	(eval "$ac_link") 2>conftest.er1
+	ac_status=$?
+	grep -v '^ *+' conftest.er1 >conftest.err
+	rm -f conftest.er1
+	cat conftest.err >&5
+	echo "$as_me:$LINENO: \$? = $ac_status" >&5
+	(exit $ac_status); } && {
+		test -z "$ac_c_werror_flag" ||
+		test ! -s conftest.err
+		} && test -s conftest$ac_exeext &&
+		$as_test_x conftest$ac_exeext; then
+	wolfssl_linked=yes
+else
+	echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	wolfssl_linked=no
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+	conftest$ac_exeext conftest.$ac_ext
+
+	if test "x$wolfssl_linked" == "xno" ; then
+		{ { echo "$as_me:$LINENO: error: WolfSSL isn't found.  You can get it from $WOLFSSL_URL
+
+		If it's already installed, specify its path using --with-wolfssl=/dir/" >&5
+echo "$as_me: error: WolfSSL isn't found.  You can get it from $WOLFSSL_URL
+
+		If it's already installed, specify its path using --with-wolfssl=/dir/" >&2;}
+		{ (exit 1); exit 1; }; }
+	fi
+
+	{ echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+	ENABLE_WOLFSSL="yes"
+	RAND_MSG="WolfSSL Internal"
+
+$as_echo "#define USING_WOLFSSL 1" >>confdefs.h
+$as_echo "#define WOLFSSL_AES_DIRECT 1" >>confdefs.h
+$as_echo "#define WOLFSSL_SHA384 1" >>confdefs.h
+$as_echo "#define WOLFSSL_SHA512 1" >>confdefs.h
+$as_echo "#define WOLFSSL_RIPEMD 1" >>confdefs.h
+$as_echo "#define UNSUPPORTED_POSIX_THREADS_HACK 1" >>confdefs.h
+
+fi
+
+
+# Some systems want crypt() from libcrypt, *not* the version in OpenSSL,
+# because the system crypt() is more featureful.
+if test "x$check_for_libcrypt_before" = "x1"; then
+
+{ echo "$as_me:$LINENO: checking for crypt in -lcrypt" >&5
+echo $ECHO_N "checking for crypt in -lcrypt... $ECHO_C" >&6; }
+if test "${ac_cv_lib_crypt_crypt+set}" = set; then
+echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcrypt  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+	Use char because int might match the return type of a GCC
+	builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char crypt ();
+int
+main ()
+{
+	return crypt ();
+	;
+	return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+	*\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+	*) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+	(eval "$ac_link") 2>conftest.er1
+	ac_status=$?
+	grep -v '^ *+' conftest.er1 >conftest.err
+	rm -f conftest.er1
+	cat conftest.err >&5
+	echo "$as_me:$LINENO: \$? = $ac_status" >&5
+	(exit $ac_status); } && {
+		test -z "$ac_c_werror_flag" ||
+		test ! -s conftest.err
+		} && test -s conftest$ac_exeext &&
+		$as_test_x conftest$ac_exeext; then
+	ac_cv_lib_crypt_crypt=yes
+else
+	echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_lib_crypt_crypt=no
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+	conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ echo "$as_me:$LINENO: result: $ac_cv_lib_crypt_crypt" >&5
+echo "${ECHO_T}$ac_cv_lib_crypt_crypt" >&6; }
+if test $ac_cv_lib_crypt_crypt = yes; then
+	cat >>confdefs.h <<_ACEOF
+	#define HAVE_LIBCRYPT 1
+_ACEOF
+
+	LIBS="-lcrypt $LIBS"
+
+fi
+
+fi
+
+# Some Linux systems (Slackware) need crypt() from libcrypt, *not* the
+# version in OpenSSL.
+if test "x$check_for_libcrypt_later" = "x1"; then
+	{ echo "$as_me:$LINENO: checking for crypt in -lcrypt" >&5
+echo $ECHO_N "checking for crypt in -lcrypt... $ECHO_C" >&6; }
+if test "${ac_cv_lib_crypt_crypt+set}" = set; then
+	echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+	ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcrypt  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+	Use char because int might match the return type of a GCC
+	builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char crypt ();
+int
+main ()
+{
+	return crypt ();
+	;
+	return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+	*\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+	*) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+	(eval "$ac_link") 2>conftest.er1
+	ac_status=$?
+	grep -v '^ *+' conftest.er1 >conftest.err
+	rm -f conftest.er1
+	cat conftest.err >&5
+	echo "$as_me:$LINENO: \$? = $ac_status" >&5
+	(exit $ac_status); } && {
+		test -z "$ac_c_werror_flag" ||
+		test ! -s conftest.err
+		} && test -s conftest$ac_exeext &&
+		$as_test_x conftest$ac_exeext; then
+	ac_cv_lib_crypt_crypt=yes
+else
+	echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_lib_crypt_crypt=no
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+	conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ echo "$as_me:$LINENO: result: $ac_cv_lib_crypt_crypt" >&5
+echo "${ECHO_T}$ac_cv_lib_crypt_crypt" >&6; }
+if test $ac_cv_lib_crypt_crypt = yes; then
+	LIBS="$LIBS -lcrypt"
+fi
+
+fi
+
+if test X"$ENABLE_WOLFSSL" = Xno; then
+
+# end TAO WolfSSL adds except fi after openssl stuff
+
+# TAO PKCS#11 for OpenSSL only for now
+# PKCS#11 support requires dlopen() and co
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dlopen" >&5
+$as_echo_n "checking for library containing dlopen... " >&6; }
+if ${ac_cv_search_dlopen+:} false; then :
+$as_echo_n "(cached) " >&6
+else
+ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+Use char because int might match the return type of a GCC
+builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dlopen ();
+int
+main ()
+{
+return dlopen ();
+;
+return 0;
+}
+_ACEOF
+for ac_lib in '' dl; do
+if test -z "$ac_lib"; then
+ac_res="none required"
+else
+ac_res=-l$ac_lib
+LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+fi
+if ac_fn_c_try_link "$LINENO"; then :
+ac_cv_search_dlopen=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+conftest$ac_exeext
+if ${ac_cv_search_dlopen+:} false; then :
+break
+fi
+done
+if ${ac_cv_search_dlopen+:} false; then :
+
+else
+ac_cv_search_dlopen=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dlopen" >&5
+$as_echo "$ac_cv_search_dlopen" >&6; }
+ac_res=$ac_cv_search_dlopen
+if test "$ac_res" != no; then :
+test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+$as_echo "#define ENABLE_PKCS11 /**/" >>confdefs.h
+
+
+fi
+
+
 # Search for OpenSSL
 saved_CPPFLAGS="$CPPFLAGS"
 saved_LDFLAGS="$LDFLAGS"
@@ -12387,6 +12631,7 @@ fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 
+
 # Some systems want crypt() from libcrypt, *not* the version in OpenSSL,
 # because the system crypt() is more featureful.
 if test "x$check_for_libcrypt_before" = "x1"; then
@@ -12927,6 +13172,10 @@ $as_echo "#define OPENSSL_PRNG_ONLY 1" >>confdefs.h
 	RAND_MSG="OpenSSL internal ONLY"
 else
 	as_fn_error $? "OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options" "$LINENO" 5
+fi
+
+
+# TAO wolfssl endif for openssl adds
 fi
 
 # Check for PAM libs
