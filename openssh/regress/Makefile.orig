@@ -14,7 +14,18 @@ clean:
 distclean:	clean
 
 LTESTS=	connect \
+		proxy-connect \
+		connect-privsep \
+		proto-version \
+		proto-mismatch \
+		exit-status \
+		envpass \
+		transfer \
+		banner \
 		rekey \
+		stderr-data \
+		stderr-after-eof \
+		broken-pipe \
 		try-ciphers \
 		yes-head \
 		login-timeout \

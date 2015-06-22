@@ -20,7 +20,7 @@ for j in 0 1 2; do
 		last=$a
 	done
 done
-for p in 1 2; do
+for p in 2; do
 	q=`expr 3 - $p`
 	trace "start forwarding, fork to background"
 	${SSH} -$p -F $OBJ/ssh_config -f $fwd somehost sleep 10
@@ -34,7 +34,7 @@ for p in 1 2; do
 	sleep 10
 done
 
-for p in 1 2; do
+for p in 2; do
 for d in L R; do
 	trace "exit on -$d forward failure, proto $p"
 
@@ -64,7 +64,7 @@ for d in L R; do
 done
 done
 
-for p in 1 2; do
+for p in 2; do
 	trace "simple clear forwarding proto $p"
 	${SSH} -$p -F $OBJ/ssh_config -oClearAllForwardings=yes somehost true
 
@@ -107,7 +107,7 @@ done
 
 echo "LocalForward ${base}01 127.0.0.1:$PORT" >> $OBJ/ssh_config
 echo "RemoteForward ${base}02 127.0.0.1:${base}01" >> $OBJ/ssh_config
-for p in 1 2; do
+for p in 2; do
 	trace "config file: start forwarding, fork to background"
 	${SSH} -$p -F $OBJ/ssh_config -f somehost sleep 10
 

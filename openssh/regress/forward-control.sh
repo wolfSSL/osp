@@ -99,7 +99,7 @@ cp ${OBJ}/sshd_proxy ${OBJ}/sshd_proxy.bak
 cp ${OBJ}/authorized_keys_${USER} ${OBJ}/authorized_keys_${USER}.bak
 
 # Sanity check: ensure the default config allows forwarding
-for p in 1 2 ; do
+for p in 2 ; do
 	check_lfwd $p Y "proto $p, default configuration"
 	check_rfwd $p Y "proto $p, default configuration"
 done

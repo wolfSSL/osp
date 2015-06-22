@@ -18,10 +18,10 @@ host="x86_64-apple-darwin14.3.0"
 AWK="awk"
 CC="gcc"
 CPP="gcc -E"
-CFLAGS="-mmacosx-version-min=10.7 -Qunused-arguments -Wunknown-warning-option -Wall -Wpointer-arith -Wuninitialized -Wsign-compare -Wformat-security -Wsizeof-pointer-memaccess -Wno-pointer-sign -Wno-unused-result -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -ftrapv -fno-builtin-memset -fstack-protector-all -fPIE "
-CPPFLAGS="-I/usr/local/openssl//include "
-LDFLAGS="-L/usr/local/openssl//lib -mmacosx-version-min=10.7 -fstack-protector-all -pie"
-LIBS="-lcrypto -lz  -lresolv"
+CFLAGS="-mmacosx-version-min=10.7 -Qunused-arguments -Wunknown-warning-option -Wall -Wpointer-arith -Wuninitialized -Wsign-compare -Wformat-security -Wsizeof-pointer-memaccess -Wno-pointer-sign -Wno-unused-result -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -ftrapv -fno-builtin-memset -fstack-protector-strong -fPIE "
+CPPFLAGS=" -I/usr/local//include"
+LDFLAGS="-mmacosx-version-min=10.7 -fstack-protector-strong -pie -L/usr/local//lib"
+LIBS="-lz  -lwolfssl -lresolv"
 
 # Note format:
 # identifier: [data] CRCR
