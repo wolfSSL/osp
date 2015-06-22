@@ -59,7 +59,7 @@
 /* #undef BROKEN_SAVED_UIDS */
 
 /* Define if your setregid() is broken */
-#define BROKEN_SETREGID 1
+/* #define BROKEN_SETREGID 1 */
 
 /* Define if your setresgid() is broken */
 /* #undef BROKEN_SETRESGID */
@@ -68,7 +68,7 @@
 /* #undef BROKEN_SETRESUID */
 
 /* Define if your setreuid() is broken */
-#define BROKEN_SETREUID 1
+/* #define BROKEN_SETREUID 1 */
 
 /* LynxOS has broken setvbuf() implementation */
 /* #undef BROKEN_SETVBUF */
@@ -182,16 +182,16 @@
 /* #undef HAVE_ADDR_V6_IN_UTMPX */
 
 /* Define to 1 if you have the `arc4random' function. */
-#define HAVE_ARC4RANDOM 1
+/* #define HAVE_ARC4RANDOM 1 */
 
 /* Define to 1 if you have the `arc4random_buf' function. */
-#define HAVE_ARC4RANDOM_BUF 1
+/* #define HAVE_ARC4RANDOM_BUF 1 */
 
 /* Define to 1 if you have the `arc4random_stir' function. */
-#define HAVE_ARC4RANDOM_STIR 1
+/* #define HAVE_ARC4RANDOM_STIR 1 */
 
 /* Define to 1 if you have the `arc4random_uniform' function. */
-#define HAVE_ARC4RANDOM_UNIFORM 1
+/* #define HAVE_ARC4RANDOM_UNIFORM 1 */
 
 /* Define to 1 if you have the `asprintf' function. */
 #define HAVE_ASPRINTF 1
@@ -404,7 +404,7 @@
 /* #undef HAVE_ETC_DEFAULT_LOGIN */
 
 /* Define if libcrypto has EVP_CIPHER_CTX_ctrl */
-//#define HAVE_EVP_CIPHER_CTX_CTRL 1
+/* #define HAVE_EVP_CIPHER_CTX_CTRL 1 */
 
 /* Define to 1 if you have the `EVP_DigestFinal_ex' function. */
 #define HAVE_EVP_DIGESTFINAL_EX 1
@@ -1463,7 +1463,7 @@
 #define OPENSSL_HAVE_EVPCTR 1
 
 /* libcrypto has EVP AES GCM */
-//#define OPENSSL_HAVE_EVPGCM 1
+/* #define OPENSSL_HAVE_EVPGCM 1 */
 
 /* libcrypto is missing AES 192 and 256 bit functions */
 /* #undef OPENSSL_LOBOTOMISED_AES */

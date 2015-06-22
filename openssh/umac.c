@@ -195,7 +195,7 @@ static void STORE_UINT32_REVERSED(void *ptr, UINT32 x)
 #ifdef USING_WOLFSSL
 typedef Aes aes_int_key[1];
 #define aes_encryption(in,out,int_key)  wc_AesEncryptDirect(int_key, (u_char *)(out),(u_char *)(in))
-#define aes_key_setup(key,int_key)      wc_AesSetKey(int_key, (u_char *)(key),UMAC_KEY_LEN,NULL,AES_ENCRYPTION)
+#define aes_key_setup(key,int_key)      wc_AesSetKeyDirect(int_key, (u_char *)(key),UMAC_KEY_LEN,NULL,AES_ENCRYPTION)
 #else /* USING_WOLFSSL */
 typedef AES_KEY aes_int_key[1];
 #define aes_encryption(in,out,int_key)                  \
