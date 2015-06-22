@@ -1,9 +1,9 @@
 /*
  * WolfSSL digest
  */
-#ifdef USING_WOLFSSL
-
 #include "includes.h"
+
+#ifdef USING_WOLFSSL
 
 #include <sys/types.h>
 #include <limits.h>

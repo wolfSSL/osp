@@ -39,9 +39,9 @@ PATHS= -DSSHDIR=\"$(sysconfdir)\" \
 
 CC=gcc
 LD=gcc
-CFLAGS=-g -mmacosx-version-min=10.7 -Qunused-arguments -Wunknown-warning-option -Wall -Wpointer-arith -Wuninitialized -Wsign-compare -Wformat-security -Wsizeof-pointer-memaccess -Wno-pointer-sign -Wno-unused-result -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -ftrapv -fno-builtin-memset -fstack-protector-all -fPIE -DUSING_WOLFSSL
-CPPFLAGS=-I. -I$(srcdir) -I/usr/local/include $(PATHS) -DHAVE_CONFIG_H -DWOLFSSL_AES_DIRECT -DWOLFSSL_SHA512 -DWOLFSSL_SHA384 -DWOLFSSL_RIPEMD -DUNSUPPORTED_POSIX_THREADS_HACK -DWOLFSSL_AES_COUNTER -DWOLFSSL_ARC4 # -DDEBUG  -DDEBUG_KEXECDH
-LIBS=-lz  -lresolv -lwolfssl
+CFLAGS=-g -mmacosx-version-min=10.7 -Qunused-arguments -Wunknown-warning-option -Wall -Wpointer-arith -Wuninitialized -Wsign-compare -Wformat-security -Wsizeof-pointer-memaccess -Wno-pointer-sign -Wno-unused-result -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -ftrapv -fno-builtin-memset -fstack-protector-all -fPIE
+CPPFLAGS=-I. -I$(srcdir) -I/usr/local/include $(PATHS) -DHAVE_CONFIG_H
+LIBS=-lz  -lresolv -lwolfssl -lpthread
 K5LIBS=
 GSSLIBS=
 SSHLIBS=

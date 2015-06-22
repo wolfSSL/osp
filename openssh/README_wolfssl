@@ -1,12 +1,16 @@
 To add the support of WolfSSL library replacing OpenSSL functions, configure and compile wolfSSL library by doing :
-./configure --enable-dsa --enable-opensslextra --enable-dh --enable-ecc --enable-sha512 --enable-ripemd --enable-fortress --enable-nullcipher
+./configure --enable-dsa --enable-opensslextra --enable-dh --enable-ecc --enable-sha512 --enable-ripemd --enable-fortress --enable-nullcipher --enable-arc4
 make
 make test
 make install
 
 compile OpenSSH from the current configuration using :
-make ssh
-make sshd
+cp openssh-6.6p1-wolfssl_configure configure
+cp openssh-6.6p1-wolfssl_configure.ac configure.ac
+./configure --with-pam --with-wolfssl=<PATH of wolfSSL> --with-ssldir=""
+patch -p0 < openssh-6.6p1-patch-config.h
+patch -p0 < openssh-6.6p1-patch-Makefile
+make
 
 Notes:
   - it is not possible to use the make tests of OpenSSH as the support is not complete at this time

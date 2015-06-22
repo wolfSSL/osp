@@ -1,0 +1,20 @@
+--- Makefile.ope	2015-06-21 05:22:58.149556235 +0200
++++ Makefile	2015-06-21 05:26:31.566539585 +0200
+@@ -43,7 +43,7 @@
+ LD=gcc
+ CFLAGS=-g -O2 -Wall -Wpointer-arith -Wuninitialized -Wsign-compare -Wformat-security -Wsizeof-pointer-memaccess -Wno-pointer-sign -Wno-unused-result -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -ftrapv -fno-builtin-memset -fstack-protector-strong -fPIE 
+ CPPFLAGS=-I. -I$(srcdir)  -I/usr/local/include $(PATHS) -DHAVE_CONFIG_H
+-LIBS=-lutil -lz -lnsl  -lwolfssl -lcrypt -lresolv
++LIBS=-lutil -lz -lnsl  -lwolfssl -lcrypt -lresolv -lpthread
+ K5LIBS=
+ GSSLIBS=
+ SSHLIBS=
+@@ -75,7 +75,7 @@
+ 	msg.o progressmeter.o dns.o entropy.o gss-genr.o umac.o umac128.o \
+ 	ssh-pkcs11.o krl.o smult_curve25519_ref.o \
+ 	kexc25519.o kexc25519c.o poly1305.o chacha.o cipher-chachapoly.o \
+-	ssh-ed25519.o digest-openssl.o hmac.o \
++	ssh-ed25519.o digest-wolfssl.o hmac.o \
+ 	sc25519.o ge25519.o fe25519.o ed25519.o verify.o hash.o blocks.o
+ 
+ SSHOBJS= ssh.o readconf.o clientloop.o sshtty.o \
