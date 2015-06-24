@@ -115,7 +115,7 @@ all_tests() {
 	_permit_rfwd=$7
 	_badfwd=127.0.0.1:22
 	_goodfwd=127.0.0.1:${PORT}
-	for _proto in 1 2 ; do
+	for _proto in 2 ; do
 		cp ${OBJ}/authorized_keys_${USER}.bak \
 		    ${OBJ}/authorized_keys_${USER}
 		_prefix="proto $_proto, AllowTcpForwarding=$_tcpfwd"

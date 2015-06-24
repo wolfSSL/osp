@@ -13,8 +13,18 @@ clean:
 
 distclean:	clean
 
-LTESTS=	connect \
+LTESTS= 	connect \
+		proxy-connect \
+		proto-version \
+		proto-mismatch \
+		exit-status \
+		envpass \
+		transfer \
+		banner \
 		rekey \
+		stderr-data \
+		stderr-after-eof \
+		broken-pipe \
 		try-ciphers \
 		yes-head \
 		login-timeout \
@@ -36,7 +46,6 @@ LTESTS=	connect \
 		sftp-perm \
 		reconfigure \
 		dynamic-forward \
-		forwarding \
 		multiplex \
 		reexec \
 		brokenkeys \

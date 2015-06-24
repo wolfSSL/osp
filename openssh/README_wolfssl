@@ -12,7 +12,11 @@ patch -p0 < openssh-6.6p1-patch-config.h
 patch -p0 < openssh-6.6p1-patch-Makefile
 make
 
+For testing, replace the ssh-keygen with one compiled from the original code with OpenSSL, after call :
+make tests
+
+You must have at the end of the testuite the message 'all tests passed'
+
 Notes:
-  - it is not possible to use the make tests of OpenSSH as the support is not complete at this time
+  - two tests are not working at this time : 'forwarding' and 'connect-privsep'
   - only the protocol version 2 is supported with wolfSSL
-  - some tests can be done using sshd and ssh directly
