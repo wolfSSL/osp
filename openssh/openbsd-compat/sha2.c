@@ -38,7 +38,7 @@
 
 #include "includes.h"
 
-#ifndef USING_WOLFSSL
+#ifdef USING_WOLFSSL
 #include <wolfssl/openssl/opensslv.h>
 #else
 #include <openssl/opensslv.h>
