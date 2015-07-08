@@ -22,6 +22,11 @@
 #include <assert.h>
 
 #ifdef USE_OPENSSL
+
+#  ifdef HAVE_WOLFSSL_SSL_H
+#    include <openssl/pem.h>
+#  endif /*end HAVE_WOLFSSL_SSL_H*/
+
 # include <openssl/ssl.h>
 # include <openssl/err.h>
 # include <openssl/rand.h>
