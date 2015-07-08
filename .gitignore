@@ -18,3 +18,5 @@ lighttpd/lighttpd-1.4.35/src/lighttpd-angel
 lighttpd/lighttpd-1.4.35/src/lemon
 lighttpd/lighttpd-1.4.35/src/proc_open
 lighttpd/lighttpd-1.4.35/src/versionstamp.h
+lighttpd/lighttpd-1.4.35/src/configparser.c
+lighttpd/lighttpd-1.4.35/src/mod_ssi_exprparser.c
