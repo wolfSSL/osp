@@ -2,8 +2,10 @@
 *.lo
 *.a
 *.la
+ltmain.sh
 Makefile
 config.*
+autom4te.cache
 deps
 .deps
 .libs
@@ -11,6 +13,7 @@ stamp-h1
 libtool
 TAO.README
 distribute.sh
+aclocal.m4
 openssh/ssh
 openssh/sshd
 lighttpd/lighttpd-1.4.35/src/lighttpd
