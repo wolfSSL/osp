@@ -14,16 +14,21 @@ You'll have to edit the src/Makefile as follows:
     -I/usr/local/include => -I/usr/local/include -I/usr/local/include/wolfssl
 
 To enable changes we've made to the lighttpd source code, add the following
-line to tdl/config.h (directly under HAVE_OPENSSL_SSL_H):
+define to tdl/config.h (I added it directly under HAVE_OPENSSL_SSL_H):
     #define HAVE_WOLFSSL_SSL_H 1
 
 Now make install from the lighttpd tdl:
     make
     sudo make install
 
-Notes if you have problems with liblightcomp. 
+Notes if you have problems with liblightcomp:
 
-m__append_1 = liblightcomp.la
+Below is a diff of my src/Makefile before and after the changes (all changes
+including the ones mentioned above) I made to get lighttpd to compile against
+wolfssl.  The important thing is to get rid of liblightcomp throughout the
+Makefile, and uncomment the alternative.
+
+< am__append_1 = liblightcomp.la
 < #am__append_2 = $(common_src)
 ---
 > #am__append_1 = liblightcomp.la
