@@ -8,7 +8,6 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
 
-dnl HOW FUCKING BROKEN IS AUTOMAKE...
 dnl serial-tests is not recognized before 1.12, and required for serial tests with 1.13, sane version checks "impossible"
 dnl if you don't use the default (symlinked) automake on your box, set AUTOMAKE to the path you're using
 m4_define([serial_tests], [
