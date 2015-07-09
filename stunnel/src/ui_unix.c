@@ -68,6 +68,10 @@ NOEXPORT int main_unix(int argc, char* argv[]) {
     if(fd==INVALID_SOCKET)
         fatal("Could not open /dev/null");
 #endif
+#ifdef WOLFSSL_DEBUG_ON
+    wolfSSL_Debugging_ON();
+    wolfSSL_SetLoggingCb(&s_log);
+#endif
     main_init();
     if(main_configure(argc>1 ? argv[1] : NULL, argc>2 ? argv[2] : NULL)) {
         close(fd);

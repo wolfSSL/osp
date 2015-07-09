@@ -1096,8 +1096,32 @@ NOEXPORT void crypt_DES(DES_cblock dst, const_DES_cblock src, DES_cblock hash) {
 #endif
 
 NOEXPORT char *base64(int encode, char *in, int len) {
-    BIO *bio, *b64;
     char *out;
+#ifdef WITH_WOLFSSL
+    word32 outLen;
+    if(encode) {
+        outLen = (word32) (len + 2) / 3 * 4;
+        if(outLen < 32)
+            outLen = 32;
+        out=str_alloc(outLen);
+
+        if( Base64_Encode_NoNl((byte*)in, (word32)len,
+                    (byte*)out, &outLen) != 0 ) {
+            return NULL; /* encoding failed */
+        }
+    } else { /* decode */
+        outLen = (word32) (len * 3 + 3) / 4;
+        if(outLen < 32)
+            outLen = 32;
+        out=str_alloc((size_t)outLen);
+
+        if( Base64_Decode((byte*)in, (word32)len,
+                    (byte*)out, &outLen) != 0 ) {
+            return NULL; /* decoding failed */
+        }
+    }
+#else
+    BIO *bio, *b64;
     int n;
 
     b64=BIO_new(BIO_f_base64());
@@ -1130,6 +1154,7 @@ NOEXPORT char *base64(int encode, char *in, int len) {
         return NULL;
     }
     BIO_free_all(bio);
+#endif
     return out;
 }
 

@@ -139,6 +139,12 @@ int verify_init(SERVICE_OPTIONS *section) {
 }
 
 NOEXPORT int load_file_lookup(X509_STORE *store, char *name) {
+#ifdef WITH_WOLFSSL
+    if(wolfSSL_CertManagerLoadCA(store->cm, name, NULL) != SSL_SUCCESS) {
+        sslerror("SSL_CertManagerLoadCA");
+        return 1; /* FAILED */
+    }
+#else
     X509_LOOKUP *lookup;
 
     lookup=X509_STORE_add_lookup(store, X509_LOOKUP_file());
@@ -152,6 +158,7 @@ NOEXPORT int load_file_lookup(X509_STORE *store, char *name) {
         return 1; /* FAILED */
     }
     s_log(LOG_DEBUG, "Loaded %s revocation lookup file", name);
+#endif
     return 0; /* OK */
 }
 
@@ -732,6 +739,15 @@ NOEXPORT X509 *get_current_issuer(X509_STORE_CTX *callback_ctx) {
 
 char *X509_NAME2text(X509_NAME *name) {
     char *text;
+#ifdef WITH_WOLFSSL
+    int sz;
+    sz=wolfSSL_X509_NAME_get_sz(name);
+    if(sz<=0)
+        return str_dup("Invalid X509_NAME");
+    text=str_alloc((size_t)sz+1); /* one byte for '\0' excape */
+    text=wolfSSL_X509_NAME_oneline(name, text, sz);
+    text[sz]='\0';
+#else
     BIO *bio;
     int n;
 
@@ -750,6 +766,7 @@ char *X509_NAME2text(X509_NAME *name) {
     }
     text[n]='\0';
     BIO_free(bio);
+#endif
     return text;
 }
 

@@ -477,6 +477,13 @@ extern char *sys_errlist[];
 STACK_OF(SSL_COMP) *SSL_COMP_get_compression_methods(void);
 #endif /* !defined(OPENSSL_NO_COMP) */
 
+/**************************************** wolfSSL define */
+#ifdef WITH_WOLFSSL
+#include <wolfssl/options.h>
+#include <wolfssl/wolfcrypt/coding.h>
+#include <wolfssl/wolfcrypt/logging.h>
+#endif /* defined(WITH_WOLFSSL) */
+
 /**************************************** other defines */
 
 /* always use IPv4 defaults! */

@@ -469,7 +469,12 @@ NOEXPORT void ssl_start(CLI *c) {
         new_chain(c);
         peer_cert=SSL_get_peer_certificate(c->ssl);
         if(peer_cert) /* c->redirect was set by the callback */
+        #ifdef WITH_WOLFSSL
+            (void)peer_cert;
+        #else
             X509_free(peer_cert);
+        #endif
+
         else if(c->opt->redirect_addr.names)
             c->redirect=REDIRECT_ON;
         SSL_SESSION_set_ex_data(SSL_get_session(c->ssl),
@@ -489,6 +494,43 @@ NOEXPORT void ssl_start(CLI *c) {
 }
 
 NOEXPORT void new_chain(CLI *c) {
+#ifdef WITH_WOLFSSL
+    char* chain;
+    WOLFSSL_X509_CHAIN* certChain;
+    int i, size, sizeRemaining, sizeWritten, idx;
+
+    if(c->opt->chain) /* already cached */
+        return; /* this race condition is safe to ignore */
+
+    certChain = wolfSSL_get_peer_chain(c->ssl);
+    if(!certChain) {
+        s_log(LOG_INFO, "No peer certificate received");
+        return;
+    }
+
+    for(size=0, i=0; i < wolfSSL_get_chain_count(certChain); ++i)
+        size+=wolfSSL_get_chain_length(certChain, i)+54;
+        /* + 54 for PEM header and footer */
+
+    chain=str_alloc_detached((size_t)size+1); /* +1 for '\0' */
+
+    idx = 0;
+    for(i=0; i <wolfSSL_get_chain_count(certChain); ++i) {
+        sizeRemaining = size-idx;
+        if(wolfSSL_get_chain_cert_pem(certChain, i, (unsigned char*)chain+idx,
+                   sizeRemaining, &sizeWritten) != SSL_SUCCESS){
+            s_log(LOG_ERR, "Unable to cache peer cert");
+            str_free(chain);
+            return;
+        }
+        idx+=sizeWritten;
+    }
+    chain[size]='\0';
+    c->opt->chain=chain; /* this race condition is safe to ignore */
+    ui_new_chain(c->opt->section_number);
+    s_log(LOG_DEBUG, "Peer certificate was cached (%d bytes)", size);
+
+#else
     BIO *bio;
     int i, len;
     X509 *peer_cert;
@@ -532,6 +574,7 @@ NOEXPORT void new_chain(CLI *c) {
     c->opt->chain=chain; /* this race condition is safe to ignore */
     ui_new_chain(c->opt->section_number);
     s_log(LOG_DEBUG, "Peer certificate was cached (%d bytes)", len);
+#endif
 }
 
 /****************************** transfer data */

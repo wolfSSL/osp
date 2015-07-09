@@ -41,3 +41,5 @@ stunnel/doc/*
 stunnel/tools/*
 *~
 *.swp
+stunnel
+stunnel3
