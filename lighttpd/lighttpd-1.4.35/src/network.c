@@ -529,8 +529,18 @@ typedef enum {
 
 #ifdef USE_OPENSSL
 static X509* x509_load_pem_file(server *srv, const char *file) {
+    log_error_write(srv, __FILE__, __LINE__, "ss", "",
+					"wolfssl x509_load_pem_file");
+    return wolfSSL_X509_load_certificate_file(file, SSL_FILETYPE_PEM);
+}
+
+/* temp test @TODO
+static X509* x509_load_pem_file(server *srv, const char *file) {
 	BIO *in;
 	X509 *x = NULL;
+
+    log_error_write(srv, __FILE__, __LINE__, "ss", "",
+					"enter x509_load_pem_file");
 
 	in = BIO_new(BIO_s_file());
 	if (NULL == in) {
@@ -542,6 +552,7 @@ static X509* x509_load_pem_file(server *srv, const char *file) {
 		log_error_write(srv, __FILE__, __LINE__, "SSS", "SSL: BIO_read_filename('", file,"') failed");
 		goto error;
 	}
+
 	x = PEM_read_bio_X509(in, NULL, NULL, NULL);
 
 	if (NULL == x) {
@@ -556,7 +567,16 @@ error:
 	if (NULL != in) BIO_free(in);
 	return NULL;
 }
+*/
 
+static EVP_PKEY* evp_pkey_load_pem_file(server *srv, const char *file) {
+    log_error_write(srv, __FILE__, __LINE__, "ss", "",
+					"wolfssl evp_load_pem_file");
+    X509* x509 = wolfSSL_X509_load_certificate_file(file, SSL_FILETYPE_PEM);
+    return wolfSSL_X509_get_pubkey(x509);
+}
+
+/*
 static EVP_PKEY* evp_pkey_load_pem_file(server *srv, const char *file) {
 	BIO *in;
 	EVP_PKEY *x = NULL;
@@ -585,6 +605,7 @@ error:
 	if (NULL != in) BIO_free(in);
 	return NULL;
 }
+*/
 
 static int network_openssl_load_pemfile(server *srv, size_t ndx) {
 	specific_config *s = srv->config_storage[ndx];
@@ -801,6 +822,9 @@ int network_init(server *srv) {
 			}
 		}
 
+        //@TODO
+#define OPENSSL_NO_DH /* don't use DH for testing : temporary since some stubs
+                         not filled out yet */
 #ifndef OPENSSL_NO_DH
 		/* Support for Diffie-Hellman key exchange */
 		if (!buffer_is_empty(s->ssl_dh_file)) {
