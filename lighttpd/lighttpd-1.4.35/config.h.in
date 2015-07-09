@@ -132,6 +132,9 @@
 /* Have libssl */
 #undef HAVE_LIBSSL
 
+/* Define if you have the libwolfssl library. */
+#undef HAVE_LIBWOLFSSL
+
 /* libxml2 */
 #undef HAVE_LIBXML2
 
@@ -366,6 +369,9 @@
 
 /* Define to 1 if you have the <vfork.h> header file. */
 #undef HAVE_VFORK_H
+
+/* Define to 1 if you have the `wolfSSL_Cleanup' function. */
+#undef HAVE_WOLFSSL_CLEANUP
 
 /* Define to 1 if `fork' works. */
 #undef HAVE_WORKING_FORK

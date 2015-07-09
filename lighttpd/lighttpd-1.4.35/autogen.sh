@@ -10,5 +10,7 @@ fi
 
 # old autoreconf/aclocal versions fail hard if m4 doesn't exist
 mkdir -p m4
+# some versions fail if it doesn't exist
+touch ./config.rpath
 autoreconf --force --install
 echo "Now type './configure ...' and 'make' to compile."
