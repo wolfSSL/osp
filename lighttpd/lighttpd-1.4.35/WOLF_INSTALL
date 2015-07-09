@@ -17,6 +17,9 @@ To enable changes we've made to the lighttpd source code, add the following
 define to tdl/config.h (I added it directly under HAVE_OPENSSL_SSL_H):
     #define HAVE_WOLFSSL_SSL_H 1
 
+Also add the following include to lighttpd's: tdl/src/settings.h:
+    #include <wolfssl/options.h>
+
 Now make install from the lighttpd tdl:
     make
     sudo make install
