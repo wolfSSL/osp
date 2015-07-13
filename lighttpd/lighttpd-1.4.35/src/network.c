@@ -822,9 +822,6 @@ int network_init(server *srv) {
 			}
 		}
 
-        //@TODO
-#define OPENSSL_NO_DH /* don't use DH for testing : temporary since some stubs
-                         not filled out yet */
 #ifndef OPENSSL_NO_DH
 		/* Support for Diffie-Hellman key exchange */
 		if (!buffer_is_empty(s->ssl_dh_file)) {
