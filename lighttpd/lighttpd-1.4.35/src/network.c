@@ -919,17 +919,33 @@ int network_init(server *srv) {
 			SSL_CTX_set_verify_depth(s->ssl_ctx, s->ssl_verifyclient_depth);
 		}
 
-		if (SSL_CTX_use_certificate(s->ssl_ctx, s->ssl_pemfile_x509) < 0) {
+#ifdef HAVE_WOLFSSL_SSL_H
+
+        if (SSL_CTX_use_certificate_file(s->ssl_ctx, s->ssl_pemfile->ptr, SSL_FILETYPE_PEM) < 0) {
 			log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
 					ERR_error_string(ERR_get_error(), NULL), s->ssl_pemfile);
 			return -1;
 		}
 
-		if (SSL_CTX_use_PrivateKey(s->ssl_ctx, s->ssl_pemfile_pkey) < 0) {
+		if (SSL_CTX_use_PrivateKey_file(s->ssl_ctx, s->ssl_pemfile->ptr, SSL_FILETYPE_PEM) < 0) {
 			log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
 					ERR_error_string(ERR_get_error(), NULL), s->ssl_pemfile);
 			return -1;
 		}
+
+#else
+        if (SSL_CTX_use_certificate(s->ssl_ctx, s->ssl_pemfile_x509) < 0) {
+            log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
+                    ERR_error_string(ERR_get_error(), NULL), s->ssl_pemfile);
+            return -1;
+        }
+
+        if (SSL_CTX_use_PrivateKey(s->ssl_ctx, s->ssl_pemfile_pkey) < 0) {
+            log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
+                    ERR_error_string(ERR_get_error(), NULL), s->ssl_pemfile);
+            return -1;
+        }
+#endif
 
 		if (SSL_CTX_check_private_key(s->ssl_ctx) != 1) {
 			log_error_write(srv, __FILE__, __LINE__, "sssb", "SSL:",
