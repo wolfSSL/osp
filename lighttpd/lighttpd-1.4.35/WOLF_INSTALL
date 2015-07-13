@@ -1,12 +1,35 @@
 These install instructions are for use of lighttpd with wolfSSL.
 
+To run lighttpd against wolfSSL:
+
 In the wolfSSL tdl:
-    ./configure --disable-shared --enable-opensslextra --enable-fastmath
+    ./configure  --enable-lighty  --enable-debug
     make
     sudo make install
 
 In lighttpd tdl:
     ./configure --with-openssl --with-openssl-includes=/usr/local/include --with-openssl-libs=/usr/local/lib
+
+Debugging:
+To get debug messages from wolfSSL code you must configure with the --enable-debug option:
+    ./configure  --enable-lighty  --enable-debug
+
+To turn on the wolfSSL debigging the following must be added to lighttpd: 
+tld/src/server.c: main() before any wolfSSL functions are called:
+    wolfSSL_Debugging_ON();
+
+After you have done this, wolfSSL debug messages will be printed to stderr.
+
+The following line in the lighttpd.conf will specify the lighttpd log file:
+    server.errorlog = "path/to/file.log"
+
+Prior to the log being opened, log messages will be directed to stderr.
+
+To use lighttpd logging the following function is called with a lighttpd 
+server *srv arguement:
+    log_error_write(srv, __FILE__, __LINE__, "ss", "", "desired message");
+
+Old stuff (we shouldn’t need to do this anymore):
 
 You'll have to edit the src/Makefile as follows:
     SSL_LIB = -lssl -lcrypto => SSL_LIB = -lwolfssl
