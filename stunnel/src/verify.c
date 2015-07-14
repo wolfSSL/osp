@@ -120,11 +120,30 @@ int verify_init(SERVICE_OPTIONS *section) {
         add_dir_lookup(section->revocation_store, section->ca_dir);
     }
 
-    if(section->crl_file)
+    if(section->crl_file) {
+#ifdef WITH_WOLFSSL
+        s_log(LOG_ERR, "CRL_file not supported with wolfSSL.");
+        s_log(LOG_ERR, "Use the CRLDir option instead");
+        return 1; /* FAILED */
+#endif
         if(load_file_lookup(section->revocation_store, section->crl_file))
             return 1; /* FAILED */
+    }
 
     if(section->crl_dir) {
+#ifdef WITH_WOLFSSL
+        /* WOLFSSL handles CRL internally, no need to deal with lookups */
+        if(wolfSSL_CTX_EnableCRL(section->ctx, WOLFSSL_CRL_CHECKALL)
+                                                        != SSL_SUCCESS) {
+            sslerror("SSL_CTX_EnableCRL");
+            return 1; /* FAILED */
+        } else if (wolfSSL_CTX_LoadCRL(section->ctx, section->crl_dir,
+                  SSL_FILETYPE_PEM, 0) != SSL_SUCCESS)
+        {
+            sslerror("SSL_CTX_LoadCRL");
+            return 1; /* FAILED */
+        }
+#endif /* WITH_WOLFSSL */
         section->revocation_store->cache=0; /* don't cache CRLs */
         add_dir_lookup(section->revocation_store, section->crl_dir);
     }
@@ -140,10 +159,10 @@ int verify_init(SERVICE_OPTIONS *section) {
 
 NOEXPORT int load_file_lookup(X509_STORE *store, char *name) {
 #ifdef WITH_WOLFSSL
-    if(wolfSSL_CertManagerLoadCA(store->cm, name, NULL) != SSL_SUCCESS) {
-        sslerror("SSL_CertManagerLoadCA");
-        return 1; /* FAILED */
-    }
+    /* WOLFSSL does not need to explicitly load in CRL to a store.
+       Checking is handled internally with CTX_LoadCRL */
+    (void)store;
+    (void)name;
 #else
     X509_LOOKUP *lookup;
 
@@ -158,7 +177,7 @@ NOEXPORT int load_file_lookup(X509_STORE *store, char *name) {
         return 1; /* FAILED */
     }
     s_log(LOG_DEBUG, "Loaded %s revocation lookup file", name);
-#endif
+#endif /* WITH_WOLFSSL */
     return 0; /* OK */
 }
 
@@ -223,12 +242,16 @@ NOEXPORT int verify_checks(CLI *c,
         str_free(subject);
         return 0; /* reject */
     }
+#ifndef WITH_WOLFSSL
+    /* WOLFSSL does not need extra CRL checking as it is done internally */
     if((c->opt->crl_file || c->opt->crl_dir) &&
             !crl_check(c, callback_ctx)) {
         s_log(LOG_WARNING, "Rejected by CRL at depth=%d: %s", depth, subject);
         str_free(subject);
         return 0; /* reject */
     }
+#endif /* WITH_WOLFSSL */
+
 #ifndef OPENSSL_NO_OCSP
     if((c->opt->ocsp_url || c->opt->option.aia) &&
             !ocsp_check(c, callback_ctx)) {
