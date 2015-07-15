@@ -855,6 +855,7 @@ int network_init(server *srv) {
              */
             wolfSSL_CTX_SetTmpDH_file(s->ssl_ctx, s->ssl_dh_file->ptr,
                                       SSL_FILETYPE_PEM);
+            (void)bio; /* take care of warning when not using BIO pointer */
         #else
 			bio = BIO_new_file((char *) s->ssl_dh_file->ptr, "r");
 			if (bio == NULL) {
