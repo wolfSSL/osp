@@ -402,6 +402,7 @@ extern char *sys_errlist[];
 #include <wolfssl/options.h>
 #include <wolfssl/wolfcrypt/coding.h>
 #include <wolfssl/wolfcrypt/logging.h>
+#include <wolfssl/wolfcrypt/dh.h>
 #endif /* defined(WITH_WOLFSSL) */
 
 

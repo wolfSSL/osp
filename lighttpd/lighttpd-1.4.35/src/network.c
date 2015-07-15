@@ -850,6 +850,15 @@ int network_init(server *srv) {
 		/* Support for Diffie-Hellman key exchange */
 		if (!buffer_is_empty(s->ssl_dh_file)) {
 			/* DH parameters from file */
+
+        #ifdef HAVE_WOLFSSL_SSL_H
+            /* wolfSSL API to read in DH file.
+               Using instead of BIO_new_file function, possibly will implement
+               compatibility for BIO_new_file and functions in future versions
+             */
+            wolfSSL_CTX_SetTmpDH_file(s->ssl_ctx, s->ssl_dh_file->ptr,
+                                      SSL_FILETYPE_PEM);
+        #else
 			bio = BIO_new_file((char *) s->ssl_dh_file->ptr, "r");
 			if (bio == NULL) {
 				log_error_write(srv, __FILE__, __LINE__, "ss", "SSL: Unable to open file", s->ssl_dh_file->ptr);
@@ -861,6 +870,7 @@ int network_init(server *srv) {
 				log_error_write(srv, __FILE__, __LINE__, "ss", "SSL: PEM_read_bio_DHparams failed", s->ssl_dh_file->ptr);
 				return -1;
 			}
+            #endif /* HAVE_WOLFSSL_SSL_H */
 		} else {
 			/* Default DH parameters from RFC5114 */
 			dh = DH_new();
