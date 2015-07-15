@@ -566,9 +566,6 @@ static X509* x509_load_pem_file(server *srv, const char *file) {
 	BIO *in;
 	X509 *x = NULL;
 
-    log_error_write(srv, __FILE__, __LINE__, "ss", "",
-					"enter x509_load_pem_file");
-
 	in = BIO_new(BIO_s_file());
 	if (NULL == in) {
 		log_error_write(srv, __FILE__, __LINE__, "S", "SSL: BIO_new(BIO_s_file()) failed");
