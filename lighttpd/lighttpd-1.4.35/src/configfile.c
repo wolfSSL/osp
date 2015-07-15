@@ -339,8 +339,15 @@ int config_setup_connection(server *srv, connection *con) {
 
 	PATCH(ssl_pemfile);
 #ifdef USE_OPENSSL
-	PATCH(ssl_pemfile_x509);
-	PATCH(ssl_pemfile_pkey);
+	/* Patch is not required for ssl_pemfile_x509 and ssl_pemfile_pkey with
+     * wolfSSL as the fields are not defined.  They were used to temporarily
+     * hold the contents of a file, but now we simply read the file to the
+     * desired location.
+	 */
+	#ifndef HAVE_WOLFSSL_SSL_H
+	    PATCH(ssl_pemfile_x509);
+	    PATCH(ssl_pemfile_pkey);
+	#endif /*HAVE_WOLFSSL_SSL_H*/
 #endif
 	PATCH(ssl_ca_file);
 #ifdef USE_OPENSSL
@@ -413,8 +420,15 @@ int config_patch_connection(server *srv, connection *con, comp_key_t comp) {
 			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN("ssl.pemfile"))) {
 				PATCH(ssl_pemfile);
 #ifdef USE_OPENSSL
+			/* Patch is not required for ssl_pemfile_x509 and ssl_pemfile_pkey
+             * with wolfSSL as the fields are not defined. They were used to
+             * temporarily hold the contents of a file, but now we simply read
+             * the file to the desired location.
+	 		 */
+            #ifndef HAVE_WOLFSSL_SSL_H
 				PATCH(ssl_pemfile_x509);
 				PATCH(ssl_pemfile_pkey);
+			#endif /*HAVE_WOLFSSL_SSL_H*/
 #endif
 			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN("ssl.ca-file"))) {
 				PATCH(ssl_ca_file);

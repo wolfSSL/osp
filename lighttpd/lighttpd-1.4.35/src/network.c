@@ -88,6 +88,7 @@ static handler_t network_server_handle_fdevent(server *srv, void *context, int r
 	return HANDLER_GO_ON;
 }
 
+
 #if defined USE_OPENSSL && ! defined OPENSSL_NO_TLSEXT
 static int network_ssl_servername_callback(SSL *ssl, int *al, server *srv) {
 	const char *servername;
@@ -117,6 +118,29 @@ static int network_ssl_servername_callback(SSL *ssl, int *al, server *srv) {
 	config_patch_connection(srv, con, COMP_HTTP_SCHEME);
 	config_patch_connection(srv, con, COMP_HTTP_HOST);
 
+/* Wolf does not use the ssl_pemfile_x509 and ssl_pemfile_pkey fields to hold
+ * the contents of ssl_pemfile->ptr, rather choosing to read the file directly
+ * to the final location.
+ */
+#ifdef HAVE_WOLFSSL_SSL_H
+
+	/* first set certificate! setting private key checks whether certificate matches it */
+	if (!SSL_use_certificate_file(ssl, con->conf.ssl_pemfile->ptr, SSL_FILETYPE_PEM)) {
+		log_error_write(srv, __FILE__, __LINE__, "ssb:s", "SSL:",
+			"failed to set certificate for TLS server name", con->tlsext_server_name,
+			ERR_error_string(ERR_get_error(), NULL));
+		return SSL_TLSEXT_ERR_ALERT_FATAL;
+	}
+
+	if (!SSL_use_PrivateKey_file(ssl, con->conf.ssl_pemfile->ptr, SSL_FILETYPE_PEM)) {
+		log_error_write(srv, __FILE__, __LINE__, "ssb:s", "SSL:",
+			"failed to set private key for TLS server name", con->tlsext_server_name,
+			ERR_error_string(ERR_get_error(), NULL));
+		return SSL_TLSEXT_ERR_ALERT_FATAL;
+	}
+
+#else
+
 	if (NULL == con->conf.ssl_pemfile_x509 || NULL == con->conf.ssl_pemfile_pkey) {
 		/* x509/pkey available <=> pemfile was set <=> pemfile got patched: so this should never happen, unless you nest $SERVER["socket"] */
 		log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
@@ -138,6 +162,9 @@ static int network_ssl_servername_callback(SSL *ssl, int *al, server *srv) {
 			ERR_error_string(ERR_get_error(), NULL));
 		return SSL_TLSEXT_ERR_ALERT_FATAL;
 	}
+
+#endif /*HAVE_WOLFSSL_SSL_H*/
+
 
 	if (con->conf.ssl_verifyclient) {
 		if (NULL == con->conf.ssl_ca_file_cert_names) {
@@ -528,13 +555,13 @@ typedef enum {
 } network_backend_t;
 
 #ifdef USE_OPENSSL
-static X509* x509_load_pem_file(server *srv, const char *file) {
-    log_error_write(srv, __FILE__, __LINE__, "ss", "",
-					"wolfssl x509_load_pem_file");
-    return wolfSSL_X509_load_certificate_file(file, SSL_FILETYPE_PEM);
-}
 
-/* temp test @TODO
+/* The following functions are not needed with wolfSSL as we
+ * load the file into the SSL_CTX directly.  As a result the
+ * ssl_pemfile_x509 and ssl_pemfile_pkey fields of specific_config
+ * were not needed for the wolfSSL build.
+ */
+#ifndef HAVE_WOLFSSL_SSL_H
 static X509* x509_load_pem_file(server *srv, const char *file) {
 	BIO *in;
 	X509 *x = NULL;
@@ -567,16 +594,7 @@ error:
 	if (NULL != in) BIO_free(in);
 	return NULL;
 }
-*/
 
-static EVP_PKEY* evp_pkey_load_pem_file(server *srv, const char *file) {
-    log_error_write(srv, __FILE__, __LINE__, "ss", "",
-					"wolfssl evp_load_pem_file");
-    X509* x509 = wolfSSL_X509_load_certificate_file(file, SSL_FILETYPE_PEM);
-    return wolfSSL_X509_get_pubkey(x509);
-}
-
-/*
 static EVP_PKEY* evp_pkey_load_pem_file(server *srv, const char *file) {
 	BIO *in;
 	EVP_PKEY *x = NULL;
@@ -605,7 +623,8 @@ error:
 	if (NULL != in) BIO_free(in);
 	return NULL;
 }
-*/
+
+#endif /*HAVE_WOLFSSL_SSL_H*/
 
 static int network_openssl_load_pemfile(server *srv, size_t ndx) {
 	specific_config *s = srv->config_storage[ndx];
@@ -622,6 +641,10 @@ static int network_openssl_load_pemfile(server *srv, size_t ndx) {
 	}
 #endif
 
+/* This is a temporary step in loading the file to ssl_ctx. If using wolf, we simply
+ * load the file to the final destination.
+ */
+#ifndef HAVE_WOLFSSL_SSL_H
 	if (NULL == (s->ssl_pemfile_x509 = x509_load_pem_file(srv, s->ssl_pemfile->ptr))) return -1;
 	if (NULL == (s->ssl_pemfile_pkey = evp_pkey_load_pem_file(srv, s->ssl_pemfile->ptr))) return -1;
 
@@ -632,6 +655,7 @@ static int network_openssl_load_pemfile(server *srv, size_t ndx) {
 				s->ssl_pemfile);
 		return -1;
 	}
+#endif /* HAVE_WOLFSSL_SSL_H */
 
 	return 0;
 }
@@ -916,6 +940,9 @@ int network_init(server *srv) {
 			SSL_CTX_set_verify_depth(s->ssl_ctx, s->ssl_verifyclient_depth);
 		}
 
+/* Here wolfSSL loads the cert and private key from the file directly to the ctx, eliminating the need
+ * for the temporary ssl_pemfile_pkey and ssl_pemfile_x509 fields.
+ */
 #ifdef HAVE_WOLFSSL_SSL_H
 
         if (SSL_CTX_use_certificate_file(s->ssl_ctx, s->ssl_pemfile->ptr, SSL_FILETYPE_PEM) < 0) {
