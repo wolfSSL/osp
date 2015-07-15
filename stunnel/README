@@ -3,7 +3,7 @@ wolfSSL stunnel!
 ###############################################################################
 
 Notes on getting example echoclient running with WolfSSL:
-
+(Tested on machine running ubuntu 14.04)
 I. Make wolfSSL and Start up the TLS echoserver
     1. Since we are connecting on port 11112 for the TLS server, edit srvPort
         in wolfssl/test.h from 11111->11112
@@ -16,6 +16,7 @@ I. Make wolfSSL and Start up the TLS echoserver
     4. ./examples/echoserver/echoserver
 
 II. Building stunnel, starting from a clean clone
+    0. Run autoconf. If this fails with errors, run autoreconf.
     1. To build stunnel, first run configure from the base directory without
        any arguments. This will set up stunnel to look for OpenSSL, and generate
        the Makefiles etc needed.
