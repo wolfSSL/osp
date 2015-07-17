@@ -64,7 +64,9 @@ NOEXPORT OCSP_RESPONSE *ocsp_get_response(CLI *, OCSP_REQUEST *, char *);
 #ifndef OPENSSL_NO_OCSP
 NOEXPORT X509 *get_current_issuer(X509_STORE_CTX *);
 #endif
+#ifndef WITH_WOLFSSL
 NOEXPORT void log_time(const int, const char *, ASN1_TIME *);
+#endif
 
 /**************************************** verify initialization */
 
@@ -242,15 +244,12 @@ NOEXPORT int verify_checks(CLI *c,
         str_free(subject);
         return 0; /* reject */
     }
-#ifndef WITH_WOLFSSL
-    /* WOLFSSL does not need extra CRL checking as it is done internally */
     if((c->opt->crl_file || c->opt->crl_dir) &&
             !crl_check(c, callback_ctx)) {
         s_log(LOG_WARNING, "Rejected by CRL at depth=%d: %s", depth, subject);
         str_free(subject);
         return 0; /* reject */
     }
-#endif /* WITH_WOLFSSL */
 
 #ifndef OPENSSL_NO_OCSP
     if((c->opt->ocsp_url || c->opt->option.aia) &&
@@ -401,6 +400,11 @@ NOEXPORT int compare_pubkeys(X509 *c1, X509 *c2) {
 
 /* based on the BSD-style licensed code of mod_ssl */
 NOEXPORT int crl_check(CLI *c, X509_STORE_CTX *callback_ctx) {
+    /* WOLFSSL does not need extra CRL checking as it is done internally */
+#ifdef WITH_WOLFSSL
+    (void)c; /* unused variable warnigns */
+    (void)callback_ctx;
+#else
     X509_STORE_CTX store_ctx;
     X509_OBJECT obj;
     X509_NAME *subject;
@@ -491,6 +495,7 @@ NOEXPORT int crl_check(CLI *c, X509_STORE_CTX *callback_ctx) {
         }
         X509_OBJECT_free_contents(&obj);
     }
+#endif /* WITH_WOLFSSL */
     return 1; /* accept */
 }
 
@@ -793,6 +798,7 @@ char *X509_NAME2text(X509_NAME *name) {
     return text;
 }
 
+#ifndef WITH_WOLFSSL
 NOEXPORT void log_time(const int level, const char *txt, ASN1_TIME *t) {
     char *cp;
     BIO *bio;
@@ -817,5 +823,5 @@ NOEXPORT void log_time(const int level, const char *txt, ASN1_TIME *t) {
     s_log(level, "%s: %s", txt, cp);
     str_free(cp);
 }
-
+#endif /* WITH_WOLFSSL */
 /* end of verify.c */
