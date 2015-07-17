@@ -389,34 +389,70 @@ check_ssl_dir() { :
     return 1
 }
 
-AC_MSG_CHECKING([for SSL directory])
-AC_ARG_WITH(ssl,
-[  --with-ssl=DIR          location of installed SSL libraries/include files],
-    [
-        check_ssl_dir "$withval"
-    ],
-    [
-        for main_dir in usr/local usr/lib usr/pkg opt/local opt usr ""; do
-            for sub_dir in /ssl /openssl ""; do
-                check_ssl_dir "$SYSROOT$main_dir$sub_dir" && break 2
+AC_ARG_ENABLE([wolfssl],
+    [  --enable-wolfssl Enable stunnel with wolfSSL (default: disabled)],
+    [ ENABLED_WOLFSSL=$enableval ],
+    [Define to 1 if you are using wolfSSL]
+    [ ENABLED_WOLFSSL=$no ])
+
+if test "x$ENABLED_WOLFSSL"="xyes"
+then
+    AM_CFLAGS="-DWITH_WOLFSSL"
+    SSLDIR="/usr/local"
+fi
+
+AC_ARG_ENABLE([wolfssldebug],
+    [  --enable-wolfssldebug Enable wolfSSL debugging information (default: disabled)],
+    [ ENABLED_WOLFSSLDEBUG=$enableval ],
+    [Define to 1 if to enable wolfSSL debug messages]
+    [ ENABLED_WOLFSSLDEBUG=$no ])
+if test "x$ENABLED_WOLFSSLDEBUG"="xyes"
+then
+    AM_CFLAGS="-DWITH_WOLFSSL_DEBUG"
+fi
+
+if test "x$ENABLED_WOLFSSL"="xno"
+then
+    AC_MSG_CHECKING([for SSL directory])
+    AC_ARG_WITH(ssl,
+    [  --with-ssl=DIR          location of installed SSL libraries/include files],
+        [
+            check_ssl_dir "$withval"
+        ],
+        [
+            for main_dir in usr/local usr/lib usr/pkg opt/local opt usr ""; do
+                for sub_dir in /ssl /openssl ""; do
+                    check_ssl_dir "$SYSROOT$main_dir$sub_dir" && break 2
+                done
             done
-        done
-    ]
-)
-if test ! -f "$SSLDIR/include/openssl/ssl.h"; then
-AC_MSG_RESULT([not found])
-AC_MSG_ERROR([
-Could not find your SSL library installation dir
-Use --with-ssl option to fix this problem
-]) 
+        ]
+    )
+
+
+    if test ! -f "$SSLDIR/include/openssl/ssl.h"; then
+    AC_MSG_RESULT([not found])
+    AC_MSG_ERROR([
+    Could not find your SSL library installation dir
+    Use --with-ssl option to fix this problem
+    ])
+    fi
 fi
 AC_MSG_RESULT([$SSLDIR])
 AC_SUBST([SSLDIR])
 AC_DEFINE_UNQUOTED([SSLDIR], ["$SSLDIR"], [SSL directory])
 
+
+if test "x$ENABLED_WOLFSSL"="xyes"
+then
+valid_CPPFLAGS="$CPPFLAGS"; CPPFLAGS="$CPPFLAGS -I$SSLDIR/include -I$SSLDIR/include/wolfssl"
+valid_LIBS="$LIBS"; LIBS="$LIBS -L$SSLDIR/lib64 -L$SSLDIR/lib -lwolfssl"
+else
 valid_CPPFLAGS="$CPPFLAGS"; CPPFLAGS="$CPPFLAGS -I$SSLDIR/include"
 valid_LIBS="$LIBS"; LIBS="$LIBS -L$SSLDIR/lib64 -L$SSLDIR/lib -lssl -lcrypto"
+fi
 
+if x$ENABLED_WOLFSSL = "xno"
+then
 AC_CHECK_HEADER([$SSLDIR/include/openssl/engine.h],
     [AC_DEFINE([HAVE_OSSL_ENGINE_H], [1],
     [Define to 1 if you have <engine.h> header file.])],
@@ -426,6 +462,10 @@ AC_CHECK_HEADER([$SSLDIR/include/openssl/ocsp.h],
     [AC_DEFINE([HAVE_OSSL_OCSP_H], [1],
     [Define to 1 if you have <ocsp.h> header file.])],
     [AC_MSG_WARN([OpenSSL ocsp header not found])])
+else
+    AC_DEFINE([HAVE_OSSL_OCSP_H], [0])
+    AC_DEFINE([HAVE_OSSL_ENGINE_H], [0])
+fi
 
 if test "$use_fips" = "auto"; then
     AC_CHECK_FUNCS(FIPS_mode_set, [
