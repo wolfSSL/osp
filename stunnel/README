@@ -1,96 +1,30 @@
-wolfSSL stunnel!
+stunnel overview
 
-###############################################################################
+Short description
 
-Notes on getting example echoclient running with WolfSSL:
-(Tested on machine running ubuntu 14.04)
-I. Make wolfSSL and Start up the TLS echoserver
-    1. Since we are connecting on port 11112 for the TLS server, edit srvPort
-        in wolfssl/test.h from 11111->11112
-    2. configure wolfssl with:
-            ./configure --enable-stunnel --disable-ecc --enable-crl --enable-debug
-       i. enable-crl is only required if a crl is provided
-       ii. enable-debug is optional
-       iii. disable-ecc is used so the client/server use the right certs
-    3. make clean && make && sudo make install
-    4. ./examples/echoserver/echoserver
+     The stunnel program is designed to work as an SSL encryption
+     wrapper between remote client and local (inetd-startable) or
+     remote servers. The goal is to facilitate SSL encryption and
+     authentication for non-SSL-aware programs.
 
-II. Building stunnel, starting from a clean clone
-    0. Run autoconf. If this fails with errors, run autoreconf.
-    1. To build stunnel, first run configure from the base directory without
-       any arguments. This will set up stunnel to look for OpenSSL, and generate
-       the Makefiles etc needed.
-    2. cd src
-    3. From src, run make clean && make
-    4. Edit the Makefile
-        i.      Need to change $SSLDIR = usr/local
-        ii.     Need to change -lcrypto -lssl -> -lwolfssl
-        iii.    Need to change -I$SSLDIR/include to:
-                            I$SSLDIR/include/ -I$SSLDIR/include/wolfssl
-    5.Edit config.h
-        i.      comment out HAVE_OSSL_ENGINE_H
-        ii.     comment out HAVE_OSSL_OCSP_H
-        iii.    add define WITH_WOLFSSL 1 and WOLFSSL_DEBUG_ON 1(if desired)
-    6. Run make clean && make
-        i.      Make should complete, though there are currently a few warnings
-                    (These warnings are non-vital and mostly related to invalid casts)
+     stunnel can be used to add  SSL  functionality  to  commonly
+     used  inetd  daemons  like  POP-2,  POP-3  and  IMAP servers
+     without any changes in the programs' code.
 
-III. Generate Stunnel configure file
-    1. An example stunnel conf file (conf.conf) is provided below:
-        i. replace path/to/ with the path to the specified file
+Compile instructions
 
-###############################################################################
+     See INSTALL file.
 
-cert = /path/to/server-cert.pem
-key  = /path/to/server-key.pem
-CAfile = path/to/ca-cert.pem
-#CRLpath = path/to/crl/dir/
-debug = 7
-verify = 1
+License
 
-# Service wolfclient
-[stunnel.wolfclient]
-client = yes
-accept = localhost:11111
-connect = localhost:11112
+     See COPYING file.
 
-###############################################################################
+Other files you should read
 
-This configure file will start stunnel to listen on 127.0.0.1:11111 for your
-TCP client connection.
+     Changelog      What I did
+     TODO           What I'm going to do
 
-It will connect this TCP client to an SSL/TLS server on 127.0.0.1:11112.
+Reporting problems and other contacts
 
-It looks for the cert/key pair providied, uses the specified cafile, and the
-crldir if you uncomment it by removing the '#'.
+     See FAQ file.
 
-    2. After generating the .conf file, run stunnel from src with:
-                ./stunnel /path/to/configure.conf
-       which will start stunnel and have it look for connections
-
-IV. start the TCP echoclient
-    1. Download the ssl-tutorial from:
-        http://www.wolfssl.com/documentation/ssl-tutorial-2.2.zip
-    2. Unzip
-    3. Navigate to ssl-tutorial-2.2/origanal_src/echoclient/
-    4. make clean && make
-    5. ./client 127.0.0.1
-
-
-If everything is configured correctly, this should work, allowing messages to be sent
-    1. From TCP client->stunnel (TCP, unencrypted)
-    2. From stunnel->TLS server (SSL encrypted)
-
-    and back.
-
-###############################################################################
-
-Currently, this configuration has been tested with:
-    TCP client -> SSL server
-    and
-    SSL client -> TCP server
-        for this, change the config file so that:
-            client = no
-            accept = localhost:11112
-            connect = localhost:11111
-        and run the SSL echoserver first, and then the TCP echoclient
