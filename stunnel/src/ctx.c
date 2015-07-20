@@ -698,7 +698,7 @@ NOEXPORT SSL_SESSION *sess_get_cb(SSL *ssl,
         return NULL;
     val_tmp=val;
     sess=d2i_SSL_SESSION(NULL,
-#if OPENSSL_VERSION_NUMBER>=0x0090800fL
+#if OPENSSL_VERSION_NUMBER>=0x0090800fL || defined(WITH_WOLFSSL)
         (const unsigned char **)
 #endif /* OpenSSL version >= 0.8.0 */
         &val_tmp, val_len);
