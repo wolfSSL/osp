@@ -1,3 +1,7 @@
+regress/*.dSYM
+regress/modpipe
+regress/setuid-allowed
+openbsd-compat/regress/Makefile
 *.out
 survey.sh
 opensshd.init
