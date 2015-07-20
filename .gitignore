@@ -35,4 +35,8 @@ stunnel/configure
 stunnel/tools/stunnel.conf-sample
 stunnel/tools/stunnel.init
 stunnel/tools/stunnel.service
-
+stunnel/example/echoclient-tcp/echoclient-tcp
+stunnel/example/echoserver-ssl/echoserver-ssl
+!stunnel/example/Makefile
+!stunnel/example/echoclient-tcp/Makefile
+!stunnel/example/echoserver-ssl/Makefile
