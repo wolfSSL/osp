@@ -7,7 +7,7 @@ make install
 compile OpenSSH from the current configuration using :
 cp openssh-6.6p1-wolfssl_configure configure
 cp openssh-6.6p1-wolfssl_configure.ac configure.ac
-./configure --with-pam --with-wolfssl=<PATH of wolfSSL> --with-ssldir=""
+./configure --with-pam --with-wolfssl=<PATH of wolfSSL> --with-ssl-dir=""
 patch -p0 < openssh-6.6p1-patch-config.h
 patch -p0 < openssh-6.6p1-patch-Makefile
 make
