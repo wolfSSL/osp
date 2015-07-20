@@ -45,7 +45,11 @@
 #define LIBWRAP_CLIENTS 5
 
 /* CPU stack size */
-#define DEFAULT_STACK_SIZE 131072
+#ifdef WITH_WOLFSSL
+    #define DEFAULT_STACK_SIZE 131072
+#else
+    #define DEFAULT_STACK_SIZE 65536
+#endif
 /* #define DEBUG_STACK_SIZE */
 
 /* I/O buffer size: 18432 (0x4800) is the maximum size of SSL record payload */

@@ -390,28 +390,34 @@ check_ssl_dir() { :
 }
 
 AC_ARG_ENABLE([wolfssl],
-    [  --enable-wolfssl Enable stunnel with wolfSSL (default: disabled)],
+    [  --enable-wolfssl        Enable stunnel with wolfSSL (default: disabled)],
     [ ENABLED_WOLFSSL=$enableval ],
-    [Define to 1 if you are using wolfSSL]
     [ ENABLED_WOLFSSL=$no ])
 
-if test "x$ENABLED_WOLFSSL"="xyes"
+if test "x$ENABLED_WOLFSSL" = "xyes"
 then
     AM_CFLAGS="-DWITH_WOLFSSL"
     SSLDIR="/usr/local"
+    AC_DEFINE([WITH_WOLFSSL], [1],
+    [Define to 1 if you using WOLFSSL header file.])
 fi
+
+AM_CONDITIONAL([WOLFSSL], test "x$ENABLED_WOLFSSL" = "xyes")
 
 AC_ARG_ENABLE([wolfssldebug],
-    [  --enable-wolfssldebug Enable wolfSSL debugging information (default: disabled)],
+    [  --enable-wolfssldebug   Enable wolfSSL debugging information (default: disabled)],
     [ ENABLED_WOLFSSLDEBUG=$enableval ],
-    [Define to 1 if to enable wolfSSL debug messages]
     [ ENABLED_WOLFSSLDEBUG=$no ])
-if test "x$ENABLED_WOLFSSLDEBUG"="xyes"
+if test "x$ENABLED_WOLFSSLDEBUG" = "xyes"
 then
     AM_CFLAGS="-DWITH_WOLFSSL_DEBUG"
+    AC_DEFINE([WOLFSSL_DEBUG_ON], [1],
+    [Define to 1 to enable WOLFSSL debug messages.])
 fi
 
-if test "x$ENABLED_WOLFSSL"="xno"
+AM_CONDITIONAL([WOLFSSL_DEBUG_ON], test "x$ENABLED_WOLFSSLDEBUG" = "xyes")
+
+if test "x$ENABLED_WOLFSSL" = "xno"
 then
     AC_MSG_CHECKING([for SSL directory])
     AC_ARG_WITH(ssl,
@@ -442,7 +448,7 @@ AC_SUBST([SSLDIR])
 AC_DEFINE_UNQUOTED([SSLDIR], ["$SSLDIR"], [SSL directory])
 
 
-if test "x$ENABLED_WOLFSSL"="xyes"
+if test "x$ENABLED_WOLFSSL" = "xyes"
 then
 valid_CPPFLAGS="$CPPFLAGS"; CPPFLAGS="$CPPFLAGS -I$SSLDIR/include -I$SSLDIR/include/wolfssl"
 valid_LIBS="$LIBS"; LIBS="$LIBS -L$SSLDIR/lib64 -L$SSLDIR/lib -lwolfssl"
@@ -451,7 +457,7 @@ valid_CPPFLAGS="$CPPFLAGS"; CPPFLAGS="$CPPFLAGS -I$SSLDIR/include"
 valid_LIBS="$LIBS"; LIBS="$LIBS -L$SSLDIR/lib64 -L$SSLDIR/lib -lssl -lcrypto"
 fi
 
-if x$ENABLED_WOLFSSL = "xno"
+if test "x$ENABLED_WOLFSSL" = "xno"
 then
 AC_CHECK_HEADER([$SSLDIR/include/openssl/engine.h],
     [AC_DEFINE([HAVE_OSSL_ENGINE_H], [1],
@@ -463,8 +469,10 @@ AC_CHECK_HEADER([$SSLDIR/include/openssl/ocsp.h],
     [Define to 1 if you have <ocsp.h> header file.])],
     [AC_MSG_WARN([OpenSSL ocsp header not found])])
 else
-    AC_DEFINE([HAVE_OSSL_OCSP_H], [0])
-    AC_DEFINE([HAVE_OSSL_ENGINE_H], [0])
+    AC_DEFINE([OPENSSL_NO_OCSP], [1],
+    [Wolfssl does not currently support OCSP with Stunnel])
+    AC_DEFINE([OPENSSL_NO_ENGINE], [1],
+    [Wolfssl does not currently support ENGINE with Stunnel])
 fi
 
 if test "$use_fips" = "auto"; then
