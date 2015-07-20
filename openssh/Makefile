@@ -25,6 +25,7 @@ SSH_PROGRAM=${exec_prefix}/bin/ssh
 ASKPASS_PROGRAM=$(libexecdir)/ssh-askpass
 SFTP_SERVER=$(libexecdir)/sftp-server
 SSH_KEYSIGN=$(libexecdir)/ssh-keysign
+SSH_PKCS11_HELPER=$(libexecdir)/ssh-pkcs11-helper
 PRIVSEP_PATH=/var/empty
 SSH_PRIVSEP_USER=sshd
 STRIP_OPT=-s
@@ -34,14 +35,15 @@ PATHS= -DSSHDIR=\"$(sysconfdir)\" \
 	-D_PATH_SSH_ASKPASS_DEFAULT=\"$(ASKPASS_PROGRAM)\" \
 	-D_PATH_SFTP_SERVER=\"$(SFTP_SERVER)\" \
 	-D_PATH_SSH_KEY_SIGN=\"$(SSH_KEYSIGN)\" \
+	-D_PATH_SSH_PKCS11_HELPER=\"$(SSH_PKCS11_HELPER)\" \
 	-D_PATH_SSH_PIDDIR=\"$(piddir)\" \
 	-D_PATH_PRIVSEP_CHROOT_DIR=\"$(PRIVSEP_PATH)\"
 
 CC=gcc
 LD=gcc
-CFLAGS=-g -mmacosx-version-min=10.7 -Qunused-arguments -Wunknown-warning-option -Wall -Wpointer-arith -Wuninitialized -Wsign-compare -Wformat-security -Wsizeof-pointer-memaccess -Wno-pointer-sign -Wno-unused-result -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -ftrapv -fno-builtin-memset -fstack-protector-all -fPIE
-CPPFLAGS=-I. -I$(srcdir) -I/usr/local/include $(PATHS) -DHAVE_CONFIG_H
-LIBS=-lz  -lresolv -lwolfssl -lpthread
+CFLAGS=-g -O2 -Qunused-arguments -Wunknown-warning-option -Wall -Wpointer-arith -Wuninitialized -Wsign-compare -Wformat-security -Wsizeof-pointer-memaccess -Wno-pointer-sign -Wno-unused-result -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -ftrapv -fno-builtin-memset -fstack-protector-strong -fPIE 
+CPPFLAGS=-I. -I$(srcdir)  -I/usr/local/include $(PATHS) -DHAVE_CONFIG_H
+LIBS=-lz  -lwolfssl -lresolv
 K5LIBS=
 GSSLIBS=
 SSHLIBS=
@@ -50,20 +52,20 @@ LIBEDIT=
 AR=/usr/bin/ar
 AWK=awk
 RANLIB=ranlib
-INSTALL=/usr/bin/install -c
+INSTALL=/usr/local/opt/coreutils/libexec/gnubin/install -c
 PERL=/usr/bin/perl
 SED=/usr/bin/sed
 ENT=
 XAUTH_PATH=/opt/X11/bin/xauth
-LDFLAGS=-L. -Lopenbsd-compat/ -L/usr/local/lib -mmacosx-version-min=10.7 -fstack-protector-all -pie
+LDFLAGS=-L. -Lopenbsd-compat/  -fstack-protector-strong -pie -L/usr/local/lib
 EXEEXT=
 MANFMT=/usr/bin/nroff -mandoc
 
-TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT)
+TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT)
 
 LIBSSH_OBJS=authfd.o authfile.o bufaux.o bufbn.o buffer.o \
 	canohost.o channels.o cipher.o cipher-aes.o \
-	cipher-ctr.o cleanup.o \
+	cipher-bf1.o cipher-ctr.o cipher-3des1.o cleanup.o \
 	compat.o compress.o crc32.o deattack.o fatal.o hostfile.o \
 	log.o match.o md-sha256.o moduli.o nchan.o packet.o \
 	readpass.o rsa.o ttymodes.o xmalloc.o addrmatch.o \
@@ -71,14 +73,14 @@ LIBSSH_OBJS=authfd.o authfile.o bufaux.o bufbn.o buffer.o \
 	monitor_fdpass.o rijndael.o ssh-dss.o ssh-ecdsa.o ssh-rsa.o dh.o \
 	kexdh.o kexgex.o kexdhc.o kexgexc.o bufec.o kexecdh.o kexecdhc.o \
 	msg.o progressmeter.o dns.o entropy.o gss-genr.o umac.o umac128.o \
-	krl.o smult_curve25519_ref.o \
+	ssh-pkcs11.o krl.o smult_curve25519_ref.o \
 	kexc25519.o kexc25519c.o poly1305.o chacha.o cipher-chachapoly.o \
 	ssh-ed25519.o digest-wolfssl.o hmac.o \
 	sc25519.o ge25519.o fe25519.o ed25519.o verify.o hash.o blocks.o
 
 SSHOBJS= ssh.o readconf.o clientloop.o sshtty.o \
 	sshconnect.o sshconnect1.o sshconnect2.o mux.o \
-	roaming_common.o roaming_client.o digest-wolfssl.o
+	roaming_common.o roaming_client.o
 
 SSHDOBJS=sshd.o auth-rhosts.o auth-passwd.o auth-rsa.o auth-rh-rsa.o \
 	audit.o audit-bsm.o audit-linux.o platform.o \
@@ -96,8 +98,8 @@ SSHDOBJS=sshd.o auth-rhosts.o auth-passwd.o auth-rsa.o auth-rh-rsa.o \
 	sandbox-null.o sandbox-rlimit.o sandbox-systrace.o sandbox-darwin.o \
 	sandbox-seccomp-filter.o sandbox-capsicum.o
 
-MANPAGES	= moduli.5.out scp.1.out ssh-add.1.out ssh-agent.1.out ssh-keygen.1.out ssh-keyscan.1.out ssh.1.out sshd.8.out sftp-server.8.out sftp.1.out ssh-keysign.8.out sshd_config.5.out ssh_config.5.out
-MANPAGES_IN	= moduli.5 scp.1 ssh-add.1 ssh-agent.1 ssh-keygen.1 ssh-keyscan.1 ssh.1 sshd.8 sftp-server.8 sftp.1 ssh-keysign.8 sshd_config.5 ssh_config.5
+MANPAGES	= moduli.5.out scp.1.out ssh-add.1.out ssh-agent.1.out ssh-keygen.1.out ssh-keyscan.1.out ssh.1.out sshd.8.out sftp-server.8.out sftp.1.out ssh-keysign.8.out ssh-pkcs11-helper.8.out sshd_config.5.out ssh_config.5.out
+MANPAGES_IN	= moduli.5 scp.1 ssh-add.1 ssh-agent.1 ssh-keygen.1 ssh-keyscan.1 ssh.1 sshd.8 sftp-server.8 sftp.1 ssh-keysign.8 ssh-pkcs11-helper.8 sshd_config.5 ssh_config.5
 MANTYPE		= doc
 
 CONFIGFILES=sshd_config.out ssh_config.out moduli.out
@@ -124,7 +126,7 @@ PATHSUBS	= \
 
 FIXPATHSCMD	= $(SED) $(PATHSUBS)
 FIXALGORITHMSCMD= $(SHELL) $(srcdir)/fixalgorithms $(SED) \
-
+		     
 
 all: $(CONFIGFILES) $(MANPAGES) $(TARGETS)
 
@@ -156,14 +158,17 @@ scp$(EXEEXT): $(LIBCOMPAT) libssh.a scp.o progressmeter.o
 ssh-add$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-add.o
 	$(LD) -o $@ ssh-add.o $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
 
-ssh-agent$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-agent.o
-	$(LD) -o $@ ssh-agent.o $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+ssh-agent$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-agent.o ssh-pkcs11-client.o
+	$(LD) -o $@ ssh-agent.o ssh-pkcs11-client.o $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
 
 ssh-keygen$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-keygen.o
 	$(LD) -o $@ ssh-keygen.o $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
 
 ssh-keysign$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-keysign.o roaming_dummy.o readconf.o
 	$(LD) -o $@ ssh-keysign.o readconf.o roaming_dummy.o $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+
+ssh-pkcs11-helper$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-pkcs11-helper.o ssh-pkcs11.o
+	$(LD) -o $@ ssh-pkcs11-helper.o ssh-pkcs11.o $(LDFLAGS) -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
 
 ssh-keyscan$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-keyscan.o roaming_dummy.o
 	$(LD) -o $@ ssh-keyscan.o roaming_dummy.o $(LDFLAGS) -lssh -lopenbsd-compat -lssh $(LIBS)
@@ -215,7 +220,7 @@ distclean:	regressclean
 	rm -f *.o *.a $(TARGETS) logintest config.cache config.log
 	rm -f *.out core opensshd.init openssh.xml
 	rm -f Makefile buildpkg.sh config.h config.status
-	rm -f survey.sh openbsd-compat/regress/Makefile *~
+	rm -f survey.sh openbsd-compat/regress/Makefile *~ 
 	rm -rf autom4te.cache
 	(cd openbsd-compat && $(MAKE) distclean)
 	if test -d pkg ; then \
@@ -267,6 +272,7 @@ install-files:
 	$(INSTALL) -m 0755 $(STRIP_OPT) ssh-keyscan$(EXEEXT) $(DESTDIR)$(bindir)/ssh-keyscan$(EXEEXT)
 	$(INSTALL) -m 0755 $(STRIP_OPT) sshd$(EXEEXT) $(DESTDIR)$(sbindir)/sshd$(EXEEXT)
 	$(INSTALL) -m 4711 $(STRIP_OPT) ssh-keysign$(EXEEXT) $(DESTDIR)$(SSH_KEYSIGN)$(EXEEXT)
+	$(INSTALL) -m 0755 $(STRIP_OPT) ssh-pkcs11-helper$(EXEEXT) $(DESTDIR)$(SSH_PKCS11_HELPER)$(EXEEXT)
 	$(INSTALL) -m 0755 $(STRIP_OPT) sftp$(EXEEXT) $(DESTDIR)$(bindir)/sftp$(EXEEXT)
 	$(INSTALL) -m 0755 $(STRIP_OPT) sftp-server$(EXEEXT) $(DESTDIR)$(SFTP_SERVER)$(EXEEXT)
 	$(INSTALL) -m 644 ssh.1.out $(DESTDIR)$(mandir)/$(mansubdir)1/ssh.1
@@ -282,6 +288,7 @@ install-files:
 	$(INSTALL) -m 644 sftp.1.out $(DESTDIR)$(mandir)/$(mansubdir)1/sftp.1
 	$(INSTALL) -m 644 sftp-server.8.out $(DESTDIR)$(mandir)/$(mansubdir)8/sftp-server.8
 	$(INSTALL) -m 644 ssh-keysign.8.out $(DESTDIR)$(mandir)/$(mansubdir)8/ssh-keysign.8
+	$(INSTALL) -m 644 ssh-pkcs11-helper.8.out $(DESTDIR)$(mandir)/$(mansubdir)8/ssh-pkcs11-helper.8
 	-rm -f $(DESTDIR)$(bindir)/slogin
 	ln -s ./ssh$(EXEEXT) $(DESTDIR)$(bindir)/slogin
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)1/slogin.1
@@ -373,6 +380,7 @@ uninstall:
 	-rm -f $(DESTDIR)$(sbindir)/sshd$(EXEEXT)
 	-rm -r $(DESTDIR)$(SFTP_SERVER)$(EXEEXT)
 	-rm -f $(DESTDIR)$(SSH_KEYSIGN)$(EXEEXT)
+	-rm -f $(DESTDIR)$(SSH_PKCS11_HELPER)$(EXEEXT)
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)1/ssh.1
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)1/scp.1
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)1/ssh-add.1
@@ -383,6 +391,7 @@ uninstall:
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)8/sshd.8
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)8/sftp-server.8
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)8/ssh-keysign.8
+	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)8/ssh-pkcs11-helper.8
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)1/slogin.1
 
 regress/modpipe$(EXEEXT): $(srcdir)/regress/modpipe.c
@@ -408,6 +417,7 @@ tests interop-tests:	$(TARGETS) regress/modpipe$(EXEEXT) regress/setuid-allowed$
 	TEST_SSH_SSHAGENT="$${BUILDDIR}/ssh-agent"; \
 	TEST_SSH_SSHADD="$${BUILDDIR}/ssh-add"; \
 	TEST_SSH_SSHKEYGEN="$${BUILDDIR}/ssh-keygen"; \
+	TEST_SSH_SSHPKCS11HELPER="$${BUILDDIR}/ssh-pkcs11-helper"; \
 	TEST_SSH_SSHKEYSCAN="$${BUILDDIR}/ssh-keyscan"; \
 	TEST_SSH_SFTP="$${BUILDDIR}/sftp"; \
 	TEST_SSH_SFTPSERVER="$${BUILDDIR}/sftp-server"; \
@@ -415,7 +425,7 @@ tests interop-tests:	$(TARGETS) regress/modpipe$(EXEEXT) regress/setuid-allowed$
 	TEST_SSH_PUTTYGEN="puttygen"; \
 	TEST_SSH_CONCH="conch"; \
 	TEST_SSH_IPV6="yes" ; \
-	TEST_SSH_ECC="yes" ; \
+	TEST_SSH_ECC="" ; \
 	cd $(srcdir)/regress || exit $$?; \
 	$(MAKE) \
 		.OBJDIR="$${BUILDDIR}/regress" \
@@ -431,6 +441,7 @@ tests interop-tests:	$(TARGETS) regress/modpipe$(EXEEXT) regress/setuid-allowed$
 		TEST_SSH_SSHAGENT="$${TEST_SSH_SSHAGENT}" \
 		TEST_SSH_SSHADD="$${TEST_SSH_SSHADD}" \
 		TEST_SSH_SSHKEYGEN="$${TEST_SSH_SSHKEYGEN}" \
+		TEST_SSH_SSHPKCS11HELPER="$${TEST_SSH_SSHPKCS11HELPER}" \
 		TEST_SSH_SSHKEYSCAN="$${TEST_SSH_SSHKEYSCAN}" \
 		TEST_SSH_SFTP="$${TEST_SSH_SFTP}" \
 		TEST_SSH_SFTPSERVER="$${TEST_SSH_SFTPSERVER}" \

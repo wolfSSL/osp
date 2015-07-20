@@ -59,7 +59,7 @@
 /* #undef BROKEN_SAVED_UIDS */
 
 /* Define if your setregid() is broken */
-/* #define BROKEN_SETREGID 1 */
+#define BROKEN_SETREGID 1
 
 /* Define if your setresgid() is broken */
 /* #undef BROKEN_SETRESGID */
@@ -68,7 +68,7 @@
 /* #undef BROKEN_SETRESUID */
 
 /* Define if your setreuid() is broken */
-/* #define BROKEN_SETREUID 1 */
+#define BROKEN_SETREUID 1
 
 /* LynxOS has broken setvbuf() implementation */
 /* #undef BROKEN_SETVBUF */
@@ -134,7 +134,7 @@
 #define DISABLE_WTMPX 1
 
 /* Enable for PKCS#11 support */
-#undef ENABLE_PKCS11
+/* #undef ENABLE_PKCS11 */
 
 /* File names may not contain backslash characters */
 /* #undef FILESYSTEM_NO_BACKSLASH */
@@ -182,16 +182,16 @@
 /* #undef HAVE_ADDR_V6_IN_UTMPX */
 
 /* Define to 1 if you have the `arc4random' function. */
-/* #define HAVE_ARC4RANDOM 1 */
+#define HAVE_ARC4RANDOM 1
 
 /* Define to 1 if you have the `arc4random_buf' function. */
-/* #define HAVE_ARC4RANDOM_BUF 1 */
+#define HAVE_ARC4RANDOM_BUF 1
 
 /* Define to 1 if you have the `arc4random_stir' function. */
-/* #define HAVE_ARC4RANDOM_STIR 1 */
+#define HAVE_ARC4RANDOM_STIR 1
 
 /* Define to 1 if you have the `arc4random_uniform' function. */
-/* #define HAVE_ARC4RANDOM_UNIFORM 1 */
+#define HAVE_ARC4RANDOM_UNIFORM 1
 
 /* Define to 1 if you have the `asprintf' function. */
 #define HAVE_ASPRINTF 1
@@ -404,7 +404,7 @@
 /* #undef HAVE_ETC_DEFAULT_LOGIN */
 
 /* Define if libcrypto has EVP_CIPHER_CTX_ctrl */
-/* #define HAVE_EVP_CIPHER_CTX_CTRL 1 */
+/* #undef HAVE_EVP_CIPHER_CTX_CTRL */
 
 /* Define to 1 if you have the `EVP_DigestFinal_ex' function. */
 #define HAVE_EVP_DIGESTFINAL_EX 1
@@ -415,8 +415,11 @@
 /* Define to 1 if you have the `EVP_MD_CTX_cleanup' function. */
 #define HAVE_EVP_MD_CTX_CLEANUP 1
 
+/* Defined if using WolfSSL */
+#define HAVE_EVP_MD_CTX_COPY 1
+
 /* Define to 1 if you have the `EVP_MD_CTX_copy_ex' function. */
-#define HAVE_EVP_MD_CTX_COPY_EX 1
+/* #undef HAVE_EVP_MD_CTX_COPY_EX */
 
 /* Define to 1 if you have the `EVP_MD_CTX_init' function. */
 #define HAVE_EVP_MD_CTX_INIT 1
@@ -816,7 +819,7 @@
 #define HAVE_OPENPTY 1
 
 /* Define if your ssl headers are included with #include <openssl/header.h> */
-#undef HAVE_OPENSSL
+/* #undef HAVE_OPENSSL */
 
 /* Define if you have Digital Unix Security Integration Architecture */
 /* #undef HAVE_OSF_SIA */
@@ -1450,26 +1453,35 @@
 /* OpenSSL has ECC */
 #define OPENSSL_HAS_ECC 1
 
+/* Defined if using WolfSSL */
+#define OPENSSL_HAS_NIST256 1
+
+/* Defined if using WolfSSL */
+#define OPENSSL_HAS_NIST384 1
+
+/* Defined if using WolfSSL */
+#define OPENSSL_HAS_NIST521 1
+
 /* libcrypto has NID_X9_62_prime256v1 */
-#define OPENSSL_HAS_NISTP256 1
+/* #undef OPENSSL_HAS_NISTP256 */
 
 /* libcrypto has NID_secp384r1 */
-#define OPENSSL_HAS_NISTP384 1
+/* #undef OPENSSL_HAS_NISTP384 */
 
 /* libcrypto has NID_secp521r1 */
-#define OPENSSL_HAS_NISTP521 1
+/* #undef OPENSSL_HAS_NISTP521 */
 
 /* libcrypto has EVP AES CTR */
 #define OPENSSL_HAVE_EVPCTR 1
 
 /* libcrypto has EVP AES GCM */
-/* #define OPENSSL_HAVE_EVPGCM 1 */
+/* #undef OPENSSL_HAVE_EVPGCM */
 
 /* libcrypto is missing AES 192 and 256 bit functions */
 /* #undef OPENSSL_LOBOTOMISED_AES */
 
 /* Define if you want OpenSSL's internally seeded PRNG only */
-#undef OPENSSL_PRNG_ONLY
+/* #undef OPENSSL_PRNG_ONLY */
 
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT "openssh-unix-dev@mindrot.org"
@@ -1611,6 +1623,9 @@
 /* Support passwords > 8 chars */
 /* #undef UNIXWARE_LONG_PASSWORDS */
 
+/* Defined if using WolfSSL */
+#define UNSUPPORTED_POSIX_THREADS_HACK 1
+
 /* Specify default $PATH */
 #define USER_PATH "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin"
 
@@ -1644,13 +1659,8 @@
 /* Define if you have Solaris projects */
 /* #undef USE_SOLARIS_PROJECTS */
 
-/* Define if using WolfSSL */
+/* Defined if using WolfSSL */
 #define USING_WOLFSSL 1
-#define WOLFSSL_AES_DIRECT 1
-#define WOLFSSL_SHA384 1
-#define WOLFSSL_SHA512 1
-#define WOLFSSL_RIPEMD 1
-#define UNSUPPORTED_POSIX_THREADS_HACK 1
 
 /* Define if you shouldn't strip 'tty' from your ttyname in [uw]tmp */
 /* #undef WITH_ABBREV_NO_TTY */
@@ -1674,6 +1684,18 @@
 /* Define if you want SELinux support. */
 /* #undef WITH_SELINUX */
 
+/* Defined if using WolfSSL */
+#define WOLFSSL_AES_DIRECT 1
+
+/* Defined if using WolfSSL */
+#define WOLFSSL_RIPEMD 1
+
+/* Defined if using WolfSSL */
+#define WOLFSSL_SHA384 1
+
+/* Defined if using WolfSSL */
+#define WOLFSSL_SHA512 1
+
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined AC_APPLE_UNIVERSAL_BUILD
@@ -1688,6 +1710,11 @@
 
 /* Define if xauth is found in your path */
 #define XAUTH_PATH "/opt/X11/bin/xauth"
+
+/* Enable large inode numbers on Mac OS X 10.5.  */
+#ifndef _DARWIN_USE_64_BIT_INODE
+# define _DARWIN_USE_64_BIT_INODE 1
+#endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 /* #undef _FILE_OFFSET_BITS */

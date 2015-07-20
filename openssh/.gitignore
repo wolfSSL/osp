@@ -1,0 +1,15 @@
+*.out
+survey.sh
+opensshd.init
+config.status
+
+# build outputs
+scp
+sftp
+sftp-server
+ssh-add
+ssh-agent
+ssh-keygen
+ssh-keyscan
+ssh-keysign
+ssh-pkcs11-helper

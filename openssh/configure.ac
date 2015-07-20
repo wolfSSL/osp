@@ -2242,7 +2242,7 @@ fi
 AC_MSG_CHECKING([for wolfSSL])
 LIBS="$LIBS -lwolfssl"
 
-AC_TRY_LINK([#include <wolfssl/ssl.h>], [ WolfSSL_Init(); ],
+AC_TRY_LINK([#include <wolfssl/ssl.h>], [ wolfSSL_Init(); ],
 [ wolfssl_linked=yes ], [ wolfssl_linked=no ])
 
 if test "x$wolfssl_linked" == "xno" ; then
@@ -2253,6 +2253,8 @@ fi
 
 AC_MSG_RESULT([yes])
 ENABLE_WOLFSSL="yes"
+DIGEST_SSL="digest-wolfssl.o"
+SSL_COMPAT="wolfssl-compat.o"
 RAND_MSG="WolfSSL Internal"
 AC_DEFINE([USING_WOLFSSL], [1], [Defined if using WolfSSL])
 AC_DEFINE([WOLFSSL_AES_DIRECT], [1], [Defined if using WolfSSL])
@@ -2260,10 +2262,29 @@ AC_DEFINE([WOLFSSL_SHA384], [1], [Defined if using WolfSSL])
 AC_DEFINE([WOLFSSL_SHA512], [1], [Defined if using WolfSSL])
 AC_DEFINE([WOLFSSL_RIPEMD], [1], [Defined if using WolfSSL])
 AC_DEFINE([UNSUPPORTED_POSIX_THREADS_HACK], [1], [Defined if using WolfSSL])
-]
-)
+# OpenSSL tests for these. Just assume these are present for wolfSSL.
+AC_DEFINE([HAVE_BN_IS_PRIME_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_SHA256_UPDATE], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_CRYPT], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_DES_CRYPT], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_DSA_GENERATE_PARAMETERS_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_DIGESTFINAL_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_DIGESTINIT_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_MD_CTX_CLEANUP], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_MD_CTX_COPY], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_MD_CTX_INIT], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_SHA256], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_HMAC_CTX_INIT], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_RSA_GENERATE_KEY_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_RSA_GET_DEFAULT_METHOD], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAS_ECC], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAS_NIST256], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAS_NIST384], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAS_NIST521], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAVE_EVPCTR], [1], [Defined if using WolfSSL])
+])
 
-AC_SUBST(ENABLE_WOLFSSL)
+AC_SUBST([ENABLE_WOLFSSL])
 
 # Some systems want crypt() from libcrypt, *not* the version in OpenSSL,
 # because the system crypt() is more featureful.
@@ -2288,6 +2309,8 @@ AC_DEFINE([ENABLE_PKCS11], [], [Enable for PKCS#11 support])
 )
 
 # Search for OpenSSL
+DIGEST_SSL="digest-openssl.o"
+SSL_COMPAT="openssl-compat.o"
 saved_CPPFLAGS="$CPPFLAGS"
 saved_LDFLAGS="$LDFLAGS"
 AC_ARG_WITH([ssl-dir],
@@ -4857,6 +4880,8 @@ AC_CHECK_DECL([BROKEN_GETADDRINFO],  [TEST_SSH_IPV6=no])
 AC_SUBST([TEST_SSH_IPV6], [$TEST_SSH_IPV6])
 AC_SUBST([TEST_MALLOC_OPTIONS], [$TEST_MALLOC_OPTIONS])
 AC_SUBST([UNSUPPORTED_ALGORITHMS], [$unsupported_algorithms])
+AC_SUBST([SSL_COMPAT])
+AC_SUBST([DIGEST_SSL])
 
 AC_EXEEXT
 AC_CONFIG_FILES([Makefile buildpkg.sh opensshd.init openssh.xml \
@@ -4915,7 +4940,7 @@ echo "           Solaris project support: $SP_MSG"
 echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
 echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
 echo "                  BSD Auth support: $BSD_AUTH_MSG"
-echo "                    WolfSSL support: $ENABLE_WOLFSSL"
+echo "                   WolfSSL support: $ENABLE_WOLFSSL"
 echo "              Random number source: $RAND_MSG"
 echo "             Privsep sandbox style: $SANDBOX_STYLE"
 

@@ -414,6 +414,9 @@
 /* Define to 1 if you have the `EVP_MD_CTX_cleanup' function. */
 #undef HAVE_EVP_MD_CTX_CLEANUP
 
+/* Defined if using WolfSSL */
+#undef HAVE_EVP_MD_CTX_COPY
+
 /* Define to 1 if you have the `EVP_MD_CTX_copy_ex' function. */
 #undef HAVE_EVP_MD_CTX_COPY_EX
 
@@ -1449,6 +1452,15 @@
 /* OpenSSL has ECC */
 #undef OPENSSL_HAS_ECC
 
+/* Defined if using WolfSSL */
+#undef OPENSSL_HAS_NIST256
+
+/* Defined if using WolfSSL */
+#undef OPENSSL_HAS_NIST384
+
+/* Defined if using WolfSSL */
+#undef OPENSSL_HAS_NIST521
+
 /* libcrypto has NID_X9_62_prime256v1 */
 #undef OPENSSL_HAS_NISTP256
 
@@ -1610,6 +1622,9 @@
 /* Support passwords > 8 chars */
 #undef UNIXWARE_LONG_PASSWORDS
 
+/* Defined if using WolfSSL */
+#undef UNSUPPORTED_POSIX_THREADS_HACK
+
 /* Specify default $PATH */
 #undef USER_PATH
 
@@ -1643,6 +1658,9 @@
 /* Define if you have Solaris projects */
 #undef USE_SOLARIS_PROJECTS
 
+/* Defined if using WolfSSL */
+#undef USING_WOLFSSL
+
 /* Define if you shouldn't strip 'tty' from your ttyname in [uw]tmp */
 #undef WITH_ABBREV_NO_TTY
 
@@ -1665,6 +1683,18 @@
 /* Define if you want SELinux support. */
 #undef WITH_SELINUX
 
+/* Defined if using WolfSSL */
+#undef WOLFSSL_AES_DIRECT
+
+/* Defined if using WolfSSL */
+#undef WOLFSSL_RIPEMD
+
+/* Defined if using WolfSSL */
+#undef WOLFSSL_SHA384
+
+/* Defined if using WolfSSL */
+#undef WOLFSSL_SHA512
+
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined AC_APPLE_UNIVERSAL_BUILD
@@ -1679,6 +1709,11 @@
 
 /* Define if xauth is found in your path */
 #undef XAUTH_PATH
+
+/* Enable large inode numbers on Mac OS X 10.5.  */
+#ifndef _DARWIN_USE_64_BIT_INODE
+# define _DARWIN_USE_64_BIT_INODE 1
+#endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 #undef _FILE_OFFSET_BITS
