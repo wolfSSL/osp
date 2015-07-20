@@ -1,21 +1,24 @@
-To add the support of WolfSSL library replacing OpenSSL functions, configure and compile wolfSSL library by doing :
-./configure --enable-dsa --enable-opensslextra --enable-dh --enable-ecc --enable-sha512 --enable-ripemd --enable-fortress --enable-nullcipher --enable-arc4
-make
-make test
-make install
+To add the support of WolfSSL library replacing OpenSSL functions, configure
+and compile wolfSSL library by doing:
 
-compile OpenSSH from the current configuration using :
-cp openssh-6.6p1-wolfssl_configure configure
-cp openssh-6.6p1-wolfssl_configure.ac configure.ac
-./configure --with-pam --with-wolfssl=<PATH of wolfSSL> --with-ssl-dir=""
-patch -p0 < openssh-6.6p1-patch-config.h
-patch -p0 < openssh-6.6p1-patch-Makefile
-make
+ $ ./configure --enable-dsa --enable-opensslextra --enable-dh --enable-ecc \
+   --enable-sha512 --enable-ripemd --enable-fortress --enable-nullcipher \
+   --enable-arc4
+ $ make
+ $ make check
+ $ make install
 
-For testing, replace the ssh-keygen with one compiled from the original code with OpenSSL, after call :
-make tests
+Compile OpenSSH from the current configuration using:
 
-You must have at the end of the testuite the message 'all tests passed'
+ $ ./configure --with-pam --with-wolfssl
+ $ make
+
+For testing, replace the ssh-keygen with one compiled from the original code
+with OpenSSL, after call:
+
+ $ make tests
+
+You must have at the end of the testuite the message 'all tests passed'.
 
 Notes:
   - two tests are not working at this time : 'forwarding' and 'connect-privsep'
