@@ -85,7 +85,7 @@ bin_PROGRAMS = stunnel$(EXEEXT)
 # Additional preprocesor definitions
 @WOLFSSL_TRUE@am__append_1 = -I$(SSLDIR)/include  -I$(SSLDIR)/include/wolfssl
 @WOLFSSL_FALSE@am__append_2 = -I$(SSLDIR)/include
-EXTRA_PROGRAMS = stunnel.exe$(EXEEXT) tstunnel.exe$(EXEEXT)
+check_PROGRAMS = stunnel.exe$(EXEEXT) tstunnel.exe$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(srcdir)/config.h.in $(srcdir)/stunnel3.in \
@@ -383,6 +383,13 @@ win32_cli_sources = ui_win_cli.c
 stunnel_SOURCES = $(common_headers) $(common_sources) $(unix_sources)
 bin_SCRIPTS = stunnel3
 
+# Remaining files to be included
+# EXTRA_PROGRAMS = stunnel.exe tstunnel.exe
+# EXTRA_DIST += $(win32_gui_sources) $(win32_cli_sources)
+EXTRA_DIST = stunnel3.in make.bat makece.bat makew32.bat mingw.mak \
+	evc.mak vc.mak os2.mak
+CLEANFILES = stunnel3 stunnel.exe tstunnel.exe
+
 # Unix shared library
 pkglib_LTLIBRARIES = libstunnel.la
 libstunnel_la_SOURCES = $(shared_sources)
@@ -396,33 +403,33 @@ stunnel_CPPFLAGS = -I/usr/kerberos/include $(am__append_1) \
 
 # SSL library
 @WOLFSSL_TRUE@stunnel_LDFLAGS = -L$(SSLDIR)/lib64 -L$(SSLDIR)/lib -lwolfssl
-
-# Win32 executable
-EXTRA_DIST = make.bat makece.bat makew32.bat mingw.mak evc.mak vc.mak \
-	os2.mak
 stunnel_exe_SOURCES = $(common_headers) $(common_sources) $(win32_gui_sources)
 tstunnel_exe_SOURCES = $(common_headers) $(common_sources) $(win32_cli_sources)
 
-# OPENSSLDIR = /usr/src/openssl-0.9.8u-fips
-# WINCPPFLAGS = -I$(OPENSSLDIR)/inc32
-OPENSSLDIR = /usr/src/openssl-1.0.2a-i686
-WINCPPFLAGS = -I$(OPENSSLDIR)/include
-WINCFLAGS = -mthreads -fstack-protector -O2 -Wall -Wextra -Wpedantic \
-	-Wformat=2 -Wconversion -Wno-long-long -D_FORTIFY_SOURCE=2 \
-	-DUNICODE -D_UNICODE
-WINLDFLAGS = -mthreads -fstack-protector -s
-WINCOMMONLIBS = -lws2_32
-WINSSLLIBS = -L$(OPENSSLDIR) -lcrypto -lssl
-WINGUILIBS = $(WINCOMMONLIBS) -lgdi32 -lpsapi $(WINSSLLIBS)
-WINCLILIBS = $(WINCOMMONLIBS) $(WINSSLLIBS)
-WINOBJ = tls.obj str.obj file.obj client.obj log.obj options.obj \
-	protocol.obj network.obj resolver.obj ssl.obj ctx.obj \
-	verify.obj sthreads.obj fd.obj stunnel.obj
-WINGUIOBJ = $(WINOBJ) ui_win_gui.obj resources.obj
-WINCLIOBJ = $(WINOBJ) ui_win_cli.obj
-WINPREFIX = i686-w64-mingw32-
-WINGCC = $(WINPREFIX)gcc
-WINDRES = $(WINPREFIX)windres
+# win32_ssl_dir = /usr/src/openssl-0.9.8u-fips
+# win32_cppflags = -I$(win32_ssl_dir)/inc32
+win32_ssl_dir = /usr/src/openssl-1.0.2d-i686
+win32_cppflags = -I$(win32_ssl_dir)/include
+win32_cflags = -mthreads -fstack-protector -O2 -Wall -Wextra \
+	-Wpedantic -Wformat=2 -Wconversion -Wno-long-long \
+	-D_FORTIFY_SOURCE=2 -DUNICODE -D_UNICODE
+win32_ldflags = -mthreads -fstack-protector -s
+win32_common_libs = -lws2_32
+win32_ssl_libs = -L$(win32_ssl_dir) -lcrypto -lssl
+win32_gui_libs = $(win32_common_libs) -lgdi32 -lpsapi $(win32_ssl_libs)
+win32_cli_libs = $(win32_common_libs) $(win32_ssl_libs)
+win32_common_objs = tls.obj str.obj file.obj client.obj log.obj \
+	options.obj protocol.obj network.obj resolver.obj ssl.obj \
+	ctx.obj verify.obj sthreads.obj fd.obj dhparam.obj stunnel.obj
+win32_gui_objs = ui_win_gui.obj resources.obj
+win32_cli_objs = ui_win_cli.obj
+win32_prefix = i686-w64-mingw32-
+win32_cc = $(win32_prefix)gcc
+win32_windres = $(win32_prefix)windres
+MOSTLYCLEANFILES = $(win32_common_objs) $(win32_gui_objs) $(win32_cli_objs)
+edit = sed \
+	-e 's|@bindir[@]|$(bindir)|g'
+
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -556,6 +563,15 @@ uninstall-binPROGRAMS:
 
 clean-binPROGRAMS:
 	@list='$(bin_PROGRAMS)'; test -n "$$list" || exit 0; \
+	echo " rm -f" $$list; \
+	rm -f $$list || exit $$?; \
+	test -n "$(EXEEXT)" || exit 0; \
+	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
+	echo " rm -f" $$list; \
+	rm -f $$list
+
+clean-checkPROGRAMS:
+	@list='$(check_PROGRAMS)'; test -n "$$list" || exit 0; \
 	echo " rm -f" $$list; \
 	rm -f $$list || exit $$?; \
 	test -n "$(EXEEXT)" || exit 0; \
@@ -1006,10 +1022,8 @@ distdir: $(DISTFILES)
 	    || exit 1; \
 	  fi; \
 	done
-	$(MAKE) $(AM_MAKEFLAGS) \
-	  top_distdir="$(top_distdir)" distdir="$(distdir)" \
-	  dist-hook
 check-am: all-am
+	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-am
 all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(SCRIPTS) config.h
 installdirs:
@@ -1036,8 +1050,10 @@ install-strip:
 	    "INSTALL_PROGRAM_ENV=STRIPPROG='$(STRIP)'" install; \
 	fi
 mostlyclean-generic:
+	-test -z "$(MOSTLYCLEANFILES)" || rm -f $(MOSTLYCLEANFILES)
 
 clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -1048,14 +1064,14 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-binPROGRAMS clean-generic clean-libtool \
-	clean-pkglibLTLIBRARIES mostlyclean-am
+clean-am: clean-binPROGRAMS clean-checkPROGRAMS clean-generic \
+	clean-libtool clean-pkglibLTLIBRARIES mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-hdr distclean-local distclean-tags
+	distclean-hdr distclean-tags
 
 dvi: dvi-am
 
@@ -1106,7 +1122,7 @@ maintainer-clean-am: distclean-am maintainer-clean-generic
 mostlyclean: mostlyclean-am
 
 mostlyclean-am: mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool mostlyclean-local
+	mostlyclean-libtool
 
 pdf: pdf-am
 
@@ -1119,13 +1135,13 @@ ps-am:
 uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	uninstall-pkglibLTLIBRARIES
 
-.MAKE: all install-am install-strip
+.MAKE: all check-am install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean \
-	clean-binPROGRAMS clean-generic clean-libtool \
-	clean-pkglibLTLIBRARIES cscopelist-am ctags ctags-am dist-hook \
-	distclean distclean-compile distclean-generic distclean-hdr \
-	distclean-libtool distclean-local distclean-tags distdir dvi \
+	clean-binPROGRAMS clean-checkPROGRAMS clean-generic \
+	clean-libtool clean-pkglibLTLIBRARIES cscopelist-am ctags \
+	ctags-am distclean distclean-compile distclean-generic \
+	distclean-hdr distclean-libtool distclean-tags distdir dvi \
 	dvi-am html html-am info info-am install install-am \
 	install-binPROGRAMS install-binSCRIPTS install-data \
 	install-data-am install-dvi install-dvi-am install-exec \
@@ -1135,32 +1151,26 @@ uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	install-strip installcheck installcheck-am installdirs \
 	maintainer-clean maintainer-clean-generic mostlyclean \
 	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	mostlyclean-local pdf pdf-am ps ps-am tags tags-am uninstall \
-	uninstall-am uninstall-binPROGRAMS uninstall-binSCRIPTS \
+	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
+	uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	uninstall-pkglibLTLIBRARIES
 
 
-dist-hook: stunnel.exe tstunnel.exe
-
-distclean-local:
-	rm -f stunnel.exe tstunnel.exe
+# dist-hook: stunnel.exe tstunnel.exe
 
 # SUFFIXES = .c .rc .obj
 
-stunnel.exe: $(WINGUIOBJ)
-	$(WINGCC) -mwindows $(WINLDFLAGS) -o stunnel.exe $(WINGUIOBJ) $(WINGUILIBS)
+stunnel.exe: $(win32_common_objs) $(win32_gui_objs)
+	$(win32_cc) -mwindows $(win32_ldflags) -o stunnel.exe $(win32_common_objs) $(win32_gui_objs) $(win32_gui_libs)
 
-tstunnel.exe: $(WINCLIOBJ)
-	$(WINGCC) $(WINLDFLAGS) -o tstunnel.exe $(WINCLIOBJ) $(WINCLILIBS)
+tstunnel.exe: $(win32_common_objs) $(win32_cli_objs)
+	$(win32_cc) $(win32_ldflags) -o tstunnel.exe $(win32_common_objs) $(win32_cli_objs) $(win32_cli_libs)
 
 %.obj: %.c $(common_headers)
-	$(WINGCC) -c $(WINCPPFLAGS) $(WINCFLAGS) -o $@ $<
+	$(win32_cc) -c $(win32_cppflags) $(win32_cflags) -o $@ $<
 
 resources.obj: resources.rc resources.h version.h
-	$(WINDRES) --include-dir $(srcdir) $< $@
-
-mostlyclean-local:
-	-rm -f *.obj
+	$(win32_windres) --include-dir $(srcdir) $< $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
