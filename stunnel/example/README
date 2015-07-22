@@ -1,0 +1,33 @@
+wolfSSL stunnel internal example README
+(Tested on machine running ubuntu 14.04)
+###############################################################################
+
+0. Before beginning, please setup wolfSSL and stunnel according to the setup
+   guide provided to NetScout. In short, that guide will have you configure
+   wolfSSL with --enable-stunnel, make and install, configure stunnel with
+   --enable-wolfssl, and make.
+
+I. Make the example directory.
+    cd to the example directory, and run make
+
+II. Startup stunnel.
+    From the example directory, type ./../src/stunnel conf.conf
+	i. This runs the stunnel executable with the provided configure script.
+	ii. conf.conf is setup to accept a tcp connection from a client on 11111
+	    and negotiate an SSL connection with a SSL server on 11112.
+III. Startup the SSL server.
+    From the example directory, type ./echoserver-ssl/echoserver-ssl
+	i. This starts up the ssl echoserver to listen on port 11112
+IV. Run the echoclient.
+    From the example direcotry, type ./echoclient-tcp/echoclient-tcp
+        i. This runs the echoclient to connect to port 11111.
+
+V. If everything works correctly, the echoserver will echo the client's text
+   back to it.
+   	i. From the echoclient, type break: to terminate the echoclient
+	ii. From the echoclient, type quit: to terminate the echoserver
+
+Note: To enable more helpful debugging information, please see the notes in the
+      setup guide provided to NetScout about enabling wolfSSL debug messaging.
+
+###############################################################################
