@@ -515,12 +515,13 @@ key_private_rsa1_to_blob(Key *key, Buffer *blob, const char *passphrase,
 }
 
 /* convert SSH v2 key in OpenSSL PEM format */
+#ifndef USING_WOLFSSL
 static int
 key_private_pem_to_blob(Key *key, Buffer *blob, const char *_passphrase,
     const char *comment)
 {
-	int success = 0;
-	int blen, len = strlen(_passphrase);
+    int success = 0;
+    int blen, len = strlen(_passphrase);
 	u_char *passphrase = (len > 0) ? (u_char *)_passphrase : NULL;
 #if (OPENSSL_VERSION_NUMBER < 0x00907000L)
 	const EVP_CIPHER *cipher = (len > 0) ? EVP_des_ede3_cbc() : NULL;
@@ -550,8 +551,8 @@ key_private_pem_to_blob(Key *key, Buffer *blob, const char *_passphrase,
 		break;
 #endif
 	case KEY_RSA:
-		success = PEM_write_bio_RSAPrivateKey(bio, key->rsa,
-		    cipher, passphrase, len, NULL, NULL);
+        success = PEM_write_bio_RSAPrivateKey(bio, key->rsa,
+            cipher, passphrase, len, NULL, NULL);
 		break;
 	}
 	if (success) {
@@ -561,8 +562,50 @@ key_private_pem_to_blob(Key *key, Buffer *blob, const char *_passphrase,
 			buffer_append(blob, bptr, blen);
 	}
 	BIO_free(bio);
-	return success;
+    return success;
 }
+#else /* USING_WOLFSSL */
+static int
+key_private_pem_to_blob(Key *key, Buffer *blob, const char *_passphrase,
+                        const char *comment)
+{
+    int success = 0;
+    int bptr_len = 0, blen, len = strlen(_passphrase);
+    u_char *passphrase = (len > 0) ? (u_char *)_passphrase : NULL;
+    const EVP_CIPHER *cipher = (len > 0) ? EVP_aes_128_cbc() : NULL;
+    const u_char *bptr;
+
+    if (len > 0 && len <= 4) {
+        error("passphrase too short: have %d bytes, need > 4", len);
+        return 0;
+    }
+
+    switch (key->type) {
+        case KEY_DSA:
+            success = wolfSSL_PEM_write_mem_DSAPrivateKey(key->dsa, cipher,
+                                                          passphrase, len,
+                                                          &bptr, &bptr_len);
+            break;
+#ifdef OPENSSL_HAS_ECC
+        case KEY_ECDSA:
+            success = wolfSSL_PEM_write_mem_ECPrivateKey(key->ecdsa, cipher,
+                                                         passphrase, len,
+                                                         &bptr, &bptr_len);
+            break;
+#endif
+        case KEY_RSA:
+            success = wolfSSL_PEM_write_mem_RSAPrivateKey(key->rsa, cipher,
+                                                          passphrase, len,
+                                                          &bptr, &bptr_len);
+            break;
+    }
+
+    if (success)
+        buffer_append(blob, bptr, bptr_len);
+
+    return success;
+}
+#endif /* USING_WOLFSSL */
 
 /* Save a key blob to a file */
 static int

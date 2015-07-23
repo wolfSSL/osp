@@ -2233,6 +2233,11 @@ main(int argc, char **argv)
 	__progname = ssh_get_progname(argv[0]);
 
 	OpenSSL_add_all_algorithms();
+
+#ifdef USING_WOLFSSL
+    wolfSSL_Debugging_ON();
+#endif
+
 	log_init(argv[0], SYSLOG_LEVEL_INFO, SYSLOG_FACILITY_USER, 1);
 
 	seed_rng();

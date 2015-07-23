@@ -1401,10 +1401,6 @@ main(int ac, char **av)
 	Authctxt *authctxt;
 	struct connection_info *connection_info = get_connection_info(0, 0);
 
-#ifdef USING_WOLFSSL
-	wolfSSL_Debugging_ON();
-#endif
-
 #ifdef HAVE_SECUREWARE
 	(void)set_auth_parameters(ac, av);
 #endif
