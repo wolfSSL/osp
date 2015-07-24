@@ -497,7 +497,7 @@ NOEXPORT void new_chain(CLI *c) {
 #ifdef WITH_WOLFSSL
     char* chain;
     WOLFSSL_X509_CHAIN* certChain;
-    int i, size, sizeRemaining, sizeWritten, idx;
+    int i, certSz, idx, size;
 
     if(c->opt->chain) /* already cached */
         return; /* this race condition is safe to ignore */
@@ -508,22 +508,22 @@ NOEXPORT void new_chain(CLI *c) {
         return;
     }
 
-    for(size=0, i=0; i < wolfSSL_get_chain_count(certChain); ++i)
-        size+=wolfSSL_get_chain_length(certChain, i)+54;
-        /* + 54 for PEM header and footer */
+    for(size=0, i=0; i < wolfSSL_get_chain_count(certChain); ++i) {
+        wolfSSL_get_chain_cert_pem(certChain, i, NULL, 0, &certSz);
+        size+=certSz;
+    }
 
     chain=str_alloc_detached((size_t)size+1); /* +1 for '\0' */
 
     idx = 0;
     for(i=0; i <wolfSSL_get_chain_count(certChain); ++i) {
-        sizeRemaining = size-idx;
         if(wolfSSL_get_chain_cert_pem(certChain, i, (unsigned char*)chain+idx,
-                   sizeRemaining, &sizeWritten) != SSL_SUCCESS){
+                   size-idx, &certSz) != SSL_SUCCESS){
             s_log(LOG_ERR, "Unable to cache peer cert");
             str_free(chain);
             return;
         }
-        idx+=sizeWritten;
+        idx+=certSz;
     }
     chain[size]='\0';
     c->opt->chain=chain; /* this race condition is safe to ignore */

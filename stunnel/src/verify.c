@@ -270,6 +270,7 @@ NOEXPORT int verify_checks(CLI *c,
 
 NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
         int preverify_ok) {
+    const char* errMsg;
     int depth=X509_STORE_CTX_get_error_depth(callback_ctx);
 
     if(preverify_ok) {
@@ -280,9 +281,12 @@ NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
             return 1; /* accept */
         }
         s_log(LOG_WARNING, "CERT: Pre-verification error: %s",
-            X509_verify_cert_error_string(
-                X509_STORE_CTX_get_error(callback_ctx)));
+            (errMsg = X509_verify_cert_error_string(
+                X509_STORE_CTX_get_error(callback_ctx))));
         /* retain the STORE_CTX error produced by pre-verification */
+#ifdef WITH_WOLFSSL
+        XFREE(errMsg, NULL, 0);
+#endif /*WITH_WOLFSSL*/
         return 0; /* reject */
     }
 
