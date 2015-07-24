@@ -284,9 +284,6 @@ NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
             (errMsg = X509_verify_cert_error_string(
                 X509_STORE_CTX_get_error(callback_ctx))));
         /* retain the STORE_CTX error produced by pre-verification */
-#ifdef WITH_WOLFSSL
-        XFREE(errMsg, NULL, 0);
-#endif /*WITH_WOLFSSL*/
         return 0; /* reject */
     }
 
