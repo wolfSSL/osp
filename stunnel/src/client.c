@@ -506,10 +506,15 @@ NOEXPORT void new_chain(CLI *c) {
     if(!certChain) {
         s_log(LOG_INFO, "No peer certificate received");
         return;
+    return;
     }
 
     for(size=0, i=0; i < wolfSSL_get_chain_count(certChain); ++i) {
-        wolfSSL_get_chain_cert_pem(certChain, i, NULL, 0, &certSz);
+        if(wolfSSL_get_chain_cert_pem(certChain, i, NULL, 0, &certSz)
+                != LENGTH_ONLY_E) {
+            s_log(LOG_ERR, "Unable to cache peer cert");
+            return;
+        }
         size+=certSz;
     }
 
@@ -529,7 +534,6 @@ NOEXPORT void new_chain(CLI *c) {
     c->opt->chain=chain; /* this race condition is safe to ignore */
     ui_new_chain(c->opt->section_number);
     s_log(LOG_DEBUG, "Peer certificate was cached (%d bytes)", size);
-
 #else
     BIO *bio;
     int i, len;
