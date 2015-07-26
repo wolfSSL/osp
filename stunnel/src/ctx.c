@@ -49,7 +49,9 @@ NOEXPORT int matches_wildcard(char *, char *);
 /* DH/ECDH initialization */
 #ifndef OPENSSL_NO_DH
 NOEXPORT int dh_init(SERVICE_OPTIONS *);
+#ifndef WITH_WOLFSSL
 NOEXPORT DH *read_dh(char *);
+#endif /*WITH_WOLFSSL*/
 NOEXPORT DH *get_dh2048(void);
 #endif /* OPENSSL_NO_DH */
 #ifndef OPENSSL_NO_ECDH
@@ -268,15 +270,16 @@ NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
     s_log(LOG_DEBUG, "DH initialization");
 
 #ifdef WITH_WOLFSSL
-    read_dh(NULL); /* Squash unused function warnings */
     if(wolfSSL_CTX_SetTmpDH_file(section->ctx, section->cert,
-               SSL_FILETYPE_ASN1) == 0) { /* DH file loading failed */
+               SSL_FILETYPE_ASN1) != SSL_SUCCESS) { /* DH file loading failed */
         s_log(LOG_DEBUG, "Error loading DH params from file: %s", section->cert);
+        /* file dh failed, use pre-defd dh params */
         dh=get_dh2048();
         if(!dh) {
             s_log(LOG_NOTICE, "DH initialization failed");
             return 1; /* FAILED */
         } else {
+            s_log(LOG_DEBUG, "DH initialized with %d-bit key", 8*DH_size(dh));
             if(SSL_CTX_set_tmp_dh(section->ctx,dh) != SSL_SUCCESS)
             {
                 DH_free(dh);
@@ -300,12 +303,13 @@ NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
         return 1; /* FAILED */
     }
     SSL_CTX_set_tmp_dh(section->ctx, dh);
-#endif
     s_log(LOG_DEBUG, "DH initialized with %d-bit key", 8*DH_size(dh));
     DH_free(dh);
     return 0; /* OK */
+#endif /* WITH_WOLFSSL */
 }
 
+#ifndef WITH_WOLFSSL
 NOEXPORT DH *read_dh(char *cert) {
     DH *dh;
     BIO *bio;
@@ -330,6 +334,7 @@ NOEXPORT DH *read_dh(char *cert) {
     s_log(LOG_DEBUG, "Using DH parameters from %s", cert);
     return dh;
 }
+#endif /* WITH_WOLFSSL */
 
 NOEXPORT DH *get_dh2048() {
     static unsigned char dh2048_p[]={ /* OpenSSL DH parameters */

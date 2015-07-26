@@ -405,8 +405,11 @@ extern char *sys_errlist[];
 #ifdef WITH_WOLFSSL
 #include <wolfssl/options.h>
 #include <wolfssl/wolfcrypt/coding.h>
+#ifdef WOLFSSL_DEBUG_ON
 #include <wolfssl/wolfcrypt/logging.h>
+#endif /* WOLFSSL_DEBUG_ON */
 #include <wolfssl/wolfcrypt/dh.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
 #endif /* defined(WITH_WOLFSSL) */
 
 
