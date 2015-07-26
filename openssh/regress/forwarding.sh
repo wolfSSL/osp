@@ -21,12 +21,11 @@ for j in 0 1 2; do
 	done
 done
 for p in 2; do
-	q=`expr 3 - $p`
 	trace "start forwarding, fork to background"
 	${SSH} -$p -F $OBJ/ssh_config -f $fwd somehost sleep 10
 
 	trace "transfer over forwarded channels and check result"
-	${SSH} -$q -F $OBJ/ssh_config -p$last -o 'ConnectionAttempts=4' \
+	${SSH} -$p -F $OBJ/ssh_config -p$last -o 'ConnectionAttempts=4' \
 		somehost cat ${DATA} > ${COPY}
 	test -f ${COPY}		|| fail "failed copy of ${DATA}"
 	cmp ${DATA} ${COPY}	|| fail "corrupted copy of ${DATA}"

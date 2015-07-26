@@ -46,6 +46,7 @@ LTESTS= 	connect \
 		sftp-perm \
 		reconfigure \
 		dynamic-forward \
+		forwarding \
 		multiplex \
 		reexec \
 		brokenkeys \
