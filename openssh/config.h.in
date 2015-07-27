@@ -1452,15 +1452,6 @@
 /* OpenSSL has ECC */
 #undef OPENSSL_HAS_ECC
 
-/* Defined if using WolfSSL */
-#undef OPENSSL_HAS_NIST256
-
-/* Defined if using WolfSSL */
-#undef OPENSSL_HAS_NIST384
-
-/* Defined if using WolfSSL */
-#undef OPENSSL_HAS_NIST521
-
 /* libcrypto has NID_X9_62_prime256v1 */
 #undef OPENSSL_HAS_NISTP256
 
