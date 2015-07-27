@@ -718,12 +718,18 @@ privsep_preauth(Authctxt *authctxt)
 		set_log_handler(mm_log_handler, pmonitor);
 
 		/* Demote the child */
+#ifdef APPLE_SANDBOX_NAMED_EXTERNAL
+		/* We need to do this before we chroot() so we can read sshd.sb */
+		if (box != NULL)
+			ssh_sandbox_child(box);
+#endif
 		if (getuid() == 0 || geteuid() == 0)
 			privsep_preauth_child();
 		setproctitle("%s", "[net]");
+#ifndef APPLE_SANDBOX_NAMED_EXTERNAL
 		if (box != NULL)
 			ssh_sandbox_child(box);
-
+#endif
 		return 0;
 	}
 }

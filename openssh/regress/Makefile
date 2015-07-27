@@ -13,8 +13,9 @@ clean:
 
 distclean:	clean
 
-LTESTS= 	connect \
+LTESTS=	connect \
 		proxy-connect \
+		connect-privsep \
 		proto-version \
 		proto-mismatch \
 		exit-status \

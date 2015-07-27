@@ -33,6 +33,17 @@
 #include "sandbox.h"
 #include "xmalloc.h"
 
+#ifdef APPLE_SANDBOX_NAMED_EXTERNAL
+
+#define APPLE_SANDBOX_FILE_NAME \
+    "/System/Library/Sandbox/Profiles/org.openssh.sshd.sb"
+
+#ifndef SANDBOX_NAMED_EXTERNAL
+    #define SANDBOX_NAMED_EXTERNAL (0x3)
+#endif
+
+#endif /* APPLE_SANDBOX_NAMED_EXTERNAL */
+
 /* Darwin/OS X sandbox */
 
 struct ssh_sandbox {
@@ -62,9 +73,15 @@ ssh_sandbox_child(struct ssh_sandbox *box)
 	struct rlimit rl_zero;
 
 	debug3("%s: starting Darwin sandbox", __func__);
-	if (sandbox_init(kSBXProfilePureComputation, SANDBOX_NAMED,
-	    &errmsg) == -1)
+#ifdef APPLE_SANDBOX_NAMED_EXTERNAL
+    if (sandbox_init(APPLE_SANDBOX_FILE_NAME,
+                     SANDBOX_NAMED_EXTERNAL, &errmsg) == -1)
+		fatal("%s: sandbox_init (apple): %s", __func__, errmsg);
+#else /* APPLE_SANDBOX_NAMED_EXTERNAL */
+    if (sandbox_init(kSBXProfilePureComputation, SANDBOX_NAMED,
+                     &errmsg) == -1)
 		fatal("%s: sandbox_init: %s", __func__, errmsg);
+#endif /* APPLE_SANDBOX_NAMED_EXTERNAL */
 
 	/*
 	 * The kSBXProfilePureComputation still allows sockets, so
