@@ -1,6 +1,7 @@
 wolfSSL stunnel internal example README
 (Tested on machine running ubuntu 14.04)
 ###############################################################################
+Instructions for conf1.conf
 
 0. Before beginning, please setup wolfSSL and stunnel according to the setup
    guide provided to NetScout. In short, that guide will have you configure
@@ -13,7 +14,7 @@ I. Make the example directory.
 II. Startup stunnel.
     From the example directory, type ./../src/stunnel conf.conf
 	i. This runs the stunnel executable with the provided configure script.
-	ii. conf.conf is setup to accept a tcp connection from a client on 11111
+	ii. conf1.conf is setup to accept a tcp connection from a client on 11111
 	    and negotiate an SSL connection with a SSL server on 11112.
 III. Startup the SSL server.
     From the example directory, type ./echoserver-ssl/echoserver-ssl
@@ -29,5 +30,22 @@ V. If everything works correctly, the echoserver will echo the client's text
 
 Note: To enable more helpful debugging information, please see the notes in the
       setup guide provided to NetScout about enabling wolfSSL debug messaging.
+
+Instructions for conf2.conf and conf2.conf: These run against google.com using
+google's OCSP server.
+
+0. conf2.conf: This runs a positive test, although you can expect a 404, the
+   connection was successfully established: meaning that OCSP passed.
+    a. Follow steps 0, I, and II from Instructions for conf1.conf,
+       with conf2.conf
+    b. In your browser navigate to http://localhost:11111, which should show a
+       google 404.
+
+I. conf2.conf: This runs a negative test, the server's cert should be revoked.
+     a. Follow steps 0, I, and II from Instructions for conf1.conf,
+        with conf3.conf.
+     b. In your browser navigate to http://localhost:11111, which should show a
+        page not avaliable.  A look at the stunnel log output should show some
+        indication that the cert was revoked. (e.g. OCSP Cert revoked)
 
 ###############################################################################
