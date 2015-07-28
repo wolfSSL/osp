@@ -211,9 +211,6 @@
 /* Wolfssl does not currently support ENGINE with Stunnel */
 #undef OPENSSL_NO_ENGINE
 
-/* Wolfssl does not currently support OCSP with Stunnel */
-#undef OPENSSL_NO_OCSP
-
 /* Name of package */
 #undef PACKAGE
 

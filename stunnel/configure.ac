@@ -469,8 +469,8 @@ AC_CHECK_HEADER([$SSLDIR/include/openssl/ocsp.h],
     [Define to 1 if you have <ocsp.h> header file.])],
     [AC_MSG_WARN([OpenSSL ocsp header not found])])
 else
-    AC_DEFINE([OPENSSL_NO_OCSP], [1],
-    [Wolfssl does not currently support OCSP with Stunnel])
+    AC_DEFINE([HAVE_OSSL_OCSP_H], [1],
+    [Define to 1 if you have <ocsp.h> header file.])
     AC_DEFINE([OPENSSL_NO_ENGINE], [1],
     [Wolfssl does not currently support ENGINE with Stunnel])
 fi
