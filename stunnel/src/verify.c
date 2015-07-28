@@ -64,9 +64,7 @@ NOEXPORT OCSP_RESPONSE *ocsp_get_response(CLI *, OCSP_REQUEST *, char *);
 #ifndef OPENSSL_NO_OCSP
 NOEXPORT X509 *get_current_issuer(X509_STORE_CTX *);
 #endif
-#ifndef WITH_WOLFSSL
 NOEXPORT void log_time(const int, const char *, ASN1_TIME *);
-#endif
 
 /**************************************** verify initialization */
 
@@ -798,7 +796,6 @@ char *X509_NAME2text(X509_NAME *name) {
     return text;
 }
 
-#ifndef WITH_WOLFSSL
 NOEXPORT void log_time(const int level, const char *txt, ASN1_TIME *t) {
     char *cp;
     BIO *bio;
@@ -823,5 +820,4 @@ NOEXPORT void log_time(const int level, const char *txt, ASN1_TIME *t) {
     s_log(level, "%s: %s", txt, cp);
     str_free(cp);
 }
-#endif /* WITH_WOLFSSL */
 /* end of verify.c */
