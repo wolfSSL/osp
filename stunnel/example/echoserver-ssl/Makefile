@@ -7,7 +7,7 @@ OBJ = echoserver.o
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 echoserver-ssl: echoserver-ssl.c
-	$(CC) -o echoserver-ssl echoserver-ssl.c -I ../include -I/usr/local/include -lwolfssl
+	$(CC) -o echoserver-ssl echoserver-ssl.c -I ../include -I/usr/local/include -lwolfssl -L/usr/local/lib -lwolfssl
 	
 .PHONY: clean
 
