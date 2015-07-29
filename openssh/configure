@@ -11822,9 +11822,6 @@ $as_echo "#define HAVE_EVP_DIGESTINIT_EX 1" >>confdefs.h
 $as_echo "#define HAVE_EVP_MD_CTX_CLEANUP 1" >>confdefs.h
 
 
-$as_echo "#define HAVE_EVP_MD_CTX_COPY 1" >>confdefs.h
-
-
 $as_echo "#define HAVE_EVP_MD_CTX_INIT 1" >>confdefs.h
 
 

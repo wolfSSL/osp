@@ -96,14 +96,6 @@ ssh_EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *d, unsigned int cnt)
 }
 #endif
 
-#ifndef HAVE_EVP_MD_CTX_COPY_EX
-int
-EVP_MD_CTX_copy_ex(EVP_MD_CTX *out, const EVP_MD_CTX *in)
-{
-	return EVP_MD_CTX_copy(out, in);
-}
-#endif
-
 #ifndef HAVE_BN_IS_PRIME_EX
 int
 BN_is_prime_ex(const BIGNUM *p, int nchecks, BN_CTX *ctx, void *cb)
@@ -165,18 +157,5 @@ RSA_METHOD *
 RSA_get_default_method(void)
 {
 	return RSA_PKCS1_SSLeay();
-}
-#endif
-
-#ifdef	USE_OPENSSL_ENGINE
-void
-ssh_OpenSSL_add_all_algorithms(void)
-{
-	OpenSSL_add_all_algorithms();
-
-	/* Enable use of crypto hardware */
-	ENGINE_load_builtin_engines();
-	ENGINE_register_all_complete();
-	OPENSSL_config(NULL);
 }
 #endif

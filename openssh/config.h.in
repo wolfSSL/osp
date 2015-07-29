@@ -414,9 +414,6 @@
 /* Define to 1 if you have the `EVP_MD_CTX_cleanup' function. */
 #undef HAVE_EVP_MD_CTX_CLEANUP
 
-/* Defined if using WolfSSL */
-#undef HAVE_EVP_MD_CTX_COPY
-
 /* Define to 1 if you have the `EVP_MD_CTX_copy_ex' function. */
 #undef HAVE_EVP_MD_CTX_COPY_EX
 

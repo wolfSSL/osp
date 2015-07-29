@@ -72,10 +72,6 @@ int EVP_DigestInit_ex(EVP_MD_CTX *, const EVP_MD *, void *);
 int EVP_DigestFinal_ex(EVP_MD_CTX *, unsigned char *, unsigned int *);
 # endif
 
-# ifndef EVP_MD_CTX_COPY_EX
-int EVP_MD_CTX_copy_ex(EVP_MD_CTX *, const EVP_MD_CTX *);
-# endif
-
 int ssh_EVP_CipherInit(EVP_CIPHER_CTX *, const EVP_CIPHER *, unsigned char *,
     unsigned char *, int);
 int ssh_EVP_Cipher(EVP_CIPHER_CTX *, char *, char *, int);
