@@ -434,7 +434,7 @@ extern char *sys_errlist[];
 #endif /* OpenSSL older than 0.9.8 */
 
 /* non-blocking OCSP API is not available before OpenSSL 0.9.8h */
-#if OPENSSL_VERSION_NUMBER<0x00908080L
+#if OPENSSL_VERSION_NUMBER<0x00908080L && !defined(WITH_WOLFSSL)
 #ifndef OPENSSL_NO_OCSP
 #define OPENSSL_NO_OCSP
 #endif /* !defined(OPENSSL_NO_OCSP) */
