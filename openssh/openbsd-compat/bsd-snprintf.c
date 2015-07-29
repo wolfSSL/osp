@@ -553,10 +553,10 @@ fmtstr(char *buffer, size_t *currlen, size_t maxlen,
 
 static int
 fmtint(char *buffer, size_t *currlen, size_t maxlen,
-		    LLONG value, int base, int min, int max, int flags)
+		    intmax_t value, int base, int min, int max, int flags)
 {
 	int signvalue = 0;
-	unsigned LLONG uvalue;
+	unsigned intmax_t uvalue;
 	char convert[20];
 	int place = 0;
 	int spadlen = 0; /* amount to space pad */
