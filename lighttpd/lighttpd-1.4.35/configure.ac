@@ -95,8 +95,6 @@ AC_FUNC_STAT
 AC_FUNC_STRFTIME
 AC_CHECK_FUNCS([issetugid inet_pton])
 
-WOLF_REQUIRE_LIBWOLFSSL
-
 if test -z "$PKG_CONFIG"; then
   AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
 fi
@@ -536,7 +534,10 @@ AC_ARG_ENABLE(lfs,
 AC_MSG_RESULT($enableval)
 
 AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(off_t)
+
+WOLF_REQUIRE_LIBWOLFSSL
 
 if test "x$ac_cv_func_sendfile" = xyes; then
 	dnl check if sendfile works

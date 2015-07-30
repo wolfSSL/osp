@@ -170,6 +170,20 @@ int verify_init(SERVICE_OPTIONS *section) {
         }
         s_log(LOG_DEBUG, "Enabled OCSP at URL: %s", section->ocsp_url);
     }
+    if(section->option.aia==1)
+    {
+        if(section->ocsp_url) {
+            s_log(LOG_ERR, "Error: Cannot set ocsp lookup url with aia.");
+            s_log(LOG_ERR,"Please choose one. Error enabling OCSP");
+            sslerror("wolfSSL_CTX_EnableOCSP");
+        }
+        if(wolfSSL_CTX_EnableOCSP(section->ctx, 0) != SSL_SUCCESS) {
+            s_log(LOG_ERR, "Error enabling OCSP");
+            sslerror("wolfSSL_CTX_EnableOCSP");
+            return 1; /* FAILED */
+        }
+        s_log(LOG_INFO, "Enabled OCSP with aia extension.");
+    }
 #endif /* !defined(WITH_WOLFSSL) && !defined(OPENSSL_NO_OCSP)*/
 
     if(section->verify_level>=2 && !section->redirect_addr.names)
