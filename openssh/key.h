@@ -104,6 +104,7 @@ struct Key {
 
 #define	ED25519_SK_SZ	crypto_sign_ed25519_SECRETKEYBYTES
 #define	ED25519_PK_SZ	crypto_sign_ed25519_PUBLICKEYBYTES
+#define	ED25519_SIG_SZ  crypto_sign_ed25519_BYTES
 
 Key		*key_new(int);
 void		 key_add_private(Key *);

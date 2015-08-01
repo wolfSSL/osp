@@ -570,10 +570,10 @@ key_private_pem_to_blob(Key *key, Buffer *blob, const char *_passphrase,
                         const char *comment)
 {
     int success = 0;
-    int bptr_len = 0, blen, len = strlen(_passphrase);
+    int bptr_len = 0, len = strlen(_passphrase);
     u_char *passphrase = (len > 0) ? (u_char *)_passphrase : NULL;
     const EVP_CIPHER *cipher = (len > 0) ? EVP_aes_128_cbc() : NULL;
-    const u_char *bptr;
+    u_char *bptr;
 
     if (len > 0 && len <= 4) {
         error("passphrase too short: have %d bytes, need > 4", len);
