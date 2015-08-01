@@ -20,7 +20,7 @@ else
 	fi
 	trace "overwrite authorized keys"
 	printf '' > $OBJ/authorized_keys_$USER
-	for t in ed25519 rsa rsa1; do
+	for t in ed25519 rsa; do
 		# generate user key for agent
 		rm -f $OBJ/$t-agent
 		${SSHKEYGEN} -q -N '' -t $t -f $OBJ/$t-agent ||\

@@ -430,6 +430,7 @@ SPC_MSG="no"
 SP_MSG="no"
 
 # Check for some target-specific stuff
+APPLE_SANDBOX_MSG="no"
 case "$host" in
 *-*-aix*)
 	# Some versions of VAC won't allow macro redefinitions at
@@ -561,6 +562,7 @@ case "$host" in
 	case $host in
 	*-apple-darwin*)
 		CPPFLAGS="$CPPFLAGS -DAPPLE_SANDBOX_NAMED_EXTERNAL"
+        APPLE_SANDBOX_MSG="yes"
 		;;
 	esac
 	use_pie=auto
@@ -4949,7 +4951,6 @@ echo "              Random number source: $RAND_MSG"
 echo "             Privsep sandbox style: $SANDBOX_STYLE"
 
 echo ""
-
 echo "              Host: ${host}"
 echo "          Compiler: ${CC}"
 echo "    Compiler flags: ${CFLAGS}"
@@ -4991,4 +4992,21 @@ fi
 if test "$AUDIT_MODULE" = "bsm" ; then
 	echo "WARNING: BSM audit support is currently considered EXPERIMENTAL."
 	echo "See the Solaris section in README.platform for details."
+fi
+
+if test "x$ENABLE_WOLFSSL" = "xyes" && test "x$APPLE_SANDBOX_MSG" = "xyes"
+then
+    echo ""
+    echo "---"
+    echo "WARNING : The OS X sandbox for renderer processes does not allow "
+    echo "/dev/urandom to be opened. wolfSSL relies on /dev/urandom for entropy"
+    echo ", including the generation of keys used for the peer-to-peer SSH "
+    echo "negotiation/session establishment. If you would use the sandboxing "
+    echo "mechanism, you must enable the access on /dev/urandom by adding "
+    echo "the two lines below at the end of the OS X system file "
+    echo "/System/Library/Sandbox/Profiles/org.openssh.sshd.sb :"
+    echo "(allow file-read* (literal \"/dev/random\")"
+    echo "                  (literal \"/dev/urandom\"))"
+    echo "---"
+    echo ""
 fi

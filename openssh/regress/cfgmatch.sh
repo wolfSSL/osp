@@ -76,8 +76,6 @@ done
 # Retry previous with key option, should also be denied.
 printf 'permitopen="127.0.0.1:'$PORT'" ' >$OBJ/authorized_keys_$USER
 cat $OBJ/rsa.pub >> $OBJ/authorized_keys_$USER
-printf 'permitopen="127.0.0.1:'$PORT'" ' >>$OBJ/authorized_keys_$USER
-cat $OBJ/rsa1.pub >> $OBJ/authorized_keys_$USER
 for p in 2; do
 	trace "match permitopen proxy w/key opts proto $p"
 	start_client -F $OBJ/ssh_proxy
