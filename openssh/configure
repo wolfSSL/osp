@@ -6772,6 +6772,7 @@ SP_MSG="no"
 
 # Check for some target-specific stuff
 APPLE_SANDBOX_MSG="no"
+WOLFSSL_ADD_LIBPTHREAD_SSHD=0
 case "$host" in
 *-*-aix*)
 	# Some versions of VAC won't allow macro redefinitions at
@@ -7476,6 +7477,7 @@ $as_echo "#define USE_BTMP 1" >>confdefs.h
 	use_pie=auto
 	check_for_libcrypt_later=1
 	check_for_openpty_ctty_bug=1
+    WOLFSSL_ADD_LIBPTHREAD_SSHD=1
 
 $as_echo "#define PAM_TTY_KLUDGE 1" >>confdefs.h
 
@@ -13333,7 +13335,10 @@ done
 
 			PAM_MSG="yes"
 
-			SSHDLIBS="$SSHDLIBS -lpam"
+            SSHDLIBS="$SSHDLIBS -lpam"
+            if test "x$WOLFSSL_ADD_LIBPTHREAD_SSHD" = "x1" ; then
+                SSHDLIBS="$SSHDLIBS -lpthread"
+            fi
 
 $as_echo "#define USE_PAM 1" >>confdefs.h
 

@@ -27,6 +27,13 @@ static void get_hram(unsigned char *hram, const unsigned char *sm, const unsigne
 
   crypto_hash_sha512(hram,playground,smlen);
 }
+#else
+/* only for compilation issue: cross reference of crypto_hash_sha512 in
+ * libssh and libopenbsd-compat */
+void wolfssl_unused()
+{
+    crypto_hash_sha512(NULL,NULL,0);
+}
 #endif
 
 

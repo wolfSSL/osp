@@ -431,6 +431,7 @@ SP_MSG="no"
 
 # Check for some target-specific stuff
 APPLE_SANDBOX_MSG="no"
+WOLFSSL_ADD_LIBPTHREAD_SSHD=0
 case "$host" in
 *-*-aix*)
 	# Some versions of VAC won't allow macro redefinitions at
@@ -707,6 +708,7 @@ main() { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
 	use_pie=auto
 	check_for_libcrypt_later=1
 	check_for_openpty_ctty_bug=1
+    WOLFSSL_ADD_LIBPTHREAD_SSHD=1
 	AC_DEFINE([PAM_TTY_KLUDGE], [1],
 		[Work around problematic Linux PAM modules handling of PAM_TTY])
 	AC_DEFINE([LOCKED_PASSWD_PREFIX], ["!"],
@@ -2919,7 +2921,10 @@ AC_ARG_WITH([pam],
 
 			PAM_MSG="yes"
 
-			SSHDLIBS="$SSHDLIBS -lpam"
+            SSHDLIBS="$SSHDLIBS -lpam"
+            if test "x$WOLFSSL_ADD_LIBPTHREAD_SSHD" = "x1" ; then
+                SSHDLIBS="$SSHDLIBS -lpthread"
+            fi
 			AC_DEFINE([USE_PAM], [1],
 				[Define if you want to enable PAM support])
 

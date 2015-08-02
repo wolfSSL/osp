@@ -5,7 +5,7 @@ tid="disallow agent ptrace attach"
 
 if have_prog uname ; then
 	case `uname` in
-	AIX|CYGWIN*|OSF1|Darwin)
+	AIX|CYGWIN*|OSF1|Darwin|Linux)
 		echo "skipped (not supported on this platform)"
 		exit 0
 		;;
