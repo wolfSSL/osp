@@ -40,3 +40,6 @@ stunnel/example/echoserver-ssl/echoserver-ssl
 !stunnel/example/Makefile
 !stunnel/example/echoclient-tcp/Makefile
 !stunnel/example/echoserver-ssl/Makefile
+openssh/buildpkg.sh
+openssh/configure
+openssh/regress/sshd_proxy.orig
