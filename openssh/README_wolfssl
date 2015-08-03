@@ -11,7 +11,7 @@ I. Make wolfSSL with the support of extra functions
     2. compile the library:
         make clean && make
     3. do the test suite:
-        make test
+		make test
     4. install the library:
         sudo make install
 
@@ -21,7 +21,8 @@ II. Make OpenSSH with the support of wolfSSL in replacement of OpenSSL
     2. compile ssh tools:
         make clean && make
     3. do the test suite:
-        make tests
+        a. to activate tests that used SUDO, uncomment the line #SUDO=`which sudo` in regress/test-exec.sh
+		b. make tests
     4. install the tools (optionnal)
         sudo make install
 
@@ -64,6 +65,7 @@ II. Make OpenSSH with the support of wolfSSL in replacement of OpenSSL
     2. compile ssh tools:
         make clean && make
     3. do the test suite:
-        make tests
+        a. to activate tests that used SUDO, uncomment the line #SUDO=`which sudo` in regress/test-exec.sh
+		b. make tests
     4. install the tools (optionnal)
         sudo make install

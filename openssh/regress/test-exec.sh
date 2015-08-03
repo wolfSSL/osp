@@ -1,7 +1,7 @@
 #	$OpenBSD: test-exec.sh,v 1.47 2013/11/09 05:41:34 dtucker Exp $
 #	Placed in the Public Domain.
 
-SUDO=`which sudo`
+#SUDO=`which sudo`
 
 # Unbreak GNU head(1)
 _POSIX2_VERSION=199209
