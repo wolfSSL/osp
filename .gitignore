@@ -14,8 +14,6 @@ libtool
 TAO.README
 distribute.sh
 aclocal.m4
-openssh/ssh
-openssh/sshd
 lighttpd/lighttpd-1.4.35/src/lighttpd
 lighttpd/lighttpd-1.4.35/src/lighttpd-angel
 lighttpd/lighttpd-1.4.35/src/lemon
@@ -40,6 +38,11 @@ stunnel/example/echoserver-ssl/echoserver-ssl
 !stunnel/example/Makefile
 !stunnel/example/echoclient-tcp/Makefile
 !stunnel/example/echoserver-ssl/Makefile
+openssh/ssh
+openssh/sshd
 openssh/buildpkg.sh
 openssh/configure
 openssh/regress/sshd_proxy.orig
+openssh/regress/modpipe.dSYM*
+openssh/regress/setutid-allowed.dSYM*
+openssh/regress/authorized_keys*
