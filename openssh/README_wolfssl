@@ -7,7 +7,8 @@ MAC OS X, Fedora 32bits
 -----------------------
 I. Make wolfSSL with the support of extra functions
     1. configure wolfSSL:
-        ./configure --enable-openssh --prefix=/usr/local
+		a. ./autogen.sh
+        b. ./configure --enable-openssh --prefix=/usr/local
     2. compile the library:
         make clean && make
     3. do the test suite:
@@ -17,7 +18,8 @@ I. Make wolfSSL with the support of extra functions
 
 II. Make OpenSSH with the support of wolfSSL in replacement of OpenSSL
     1. configure OpenSSH:
-        ./configure --with-wolfssl=/usr/local --with-pam
+        a. autoreconf
+		b. ./configure --with-wolfssl=/usr/local --with-pam
     2. compile ssh tools:
         make clean && make
     3. do the test suite:
@@ -51,7 +53,8 @@ specifiy the library installation directory because the default one is not
 included in the LIBRARY_PATH of Fedora 64 bits
 
     1. configure wolfSSL:
-        ./configure --enable-openssh --prefix=/usr/local --libdir=/lib64
+		a. ./autogen.sh
+        b. ./configure --enable-openssh --prefix=/usr/local --libdir=/lib64
     2. compile the library:
         make clean && make
     3. do the test suite:
@@ -61,7 +64,8 @@ included in the LIBRARY_PATH of Fedora 64 bits
 
 II. Make OpenSSH with the support of wolfSSL in replacement of OpenSSL
     1. configure OpenSSH:
-        ./configure --with-wolfssl=/usr/local --with-pam
+        a. autoreconf
+		b. ./configure --with-wolfssl=/usr/local --with-pam
     2. compile ssh tools:
         make clean && make
     3. do the test suite:
