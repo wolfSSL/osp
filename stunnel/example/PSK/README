@@ -1,0 +1,24 @@
+How to run everything:
+Install wolf as per instructions
+install open as per instructions
+
+Make in the wolfExamples directory
+in same run tcp client thus:
+./client-tcp 127.0.0.1
+and server:
+./server-tcp
+
+(list ports these things connect to)
+
+
+
+Another thing: the key is read in as a string, so if you go back to 
+wolfssl-examples, you have to do a strcopy, rather than using bytes.
+
+Tutorial taken from here: https://www.stunnel.org/auth.html
+
+To enable psk: enable with wolf, and also comment out this line in stunnel
+src/common.h: #define OPENSSL_NO_PSK then everything should run.
+
+This might also be useful:
+    https://www.stunnel.org/static/stunnel.html
