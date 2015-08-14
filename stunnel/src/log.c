@@ -212,6 +212,13 @@ void s_log(int level, const char *format, ...) {
     set_last_socket_error(socket_error);
 }
 
+#ifdef WOLFSSL_DEBUG_ON
+void wolfSSL_s_log(int level, const char *format)
+{
+    s_log(level+3,  "%s", format);
+}
+#endif
+
 NOEXPORT void log_raw(const SERVICE_OPTIONS *opt,
         const int level, const char *stamp,
         const char *id, const char *text) {

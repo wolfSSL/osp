@@ -442,7 +442,7 @@ extern char *sys_errlist[];
 
 #if OPENSSL_VERSION_NUMBER<0x10000000L && !defined(WITH_WOLFSSL)
 #define OPENSSL_NO_TLSEXT
-#define OPENSSL_NO_PSK
+//#define OPENSSL_NO_PSK
 #endif /* OpenSSL older than 1.0.0 */
 
 #if (OPENSSL_VERSION_NUMBER<0x10001000L || defined(OPENSSL_NO_TLS1)) && !defined(WITH_WOLFSSL)
