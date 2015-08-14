@@ -165,10 +165,17 @@ int context_init(SERVICE_OPTIONS *section) { /* init SSL context */
 
     /* ciphers, options, mode */
     if(section->cipher_list)
+     #ifdef WITH_WOLFSSL
+        if(!SSL_CTX_set_cipher_list(section->ctx, "PSK-AES128-CBC-SHA")) {
+             sslerror("SSL_CTX_set_cipher_list");
+             return 1; /* FAILED */
+        }
+     #else
         if(!SSL_CTX_set_cipher_list(section->ctx, section->cipher_list)) {
             sslerror("SSL_CTX_set_cipher_list");
             return 1; /* FAILED */
         }
+    #endif
     SSL_CTX_set_options(section->ctx, section->ssl_options_set);
 #if OPENSSL_VERSION_NUMBER>=0x009080dfL
     SSL_CTX_clear_options(section->ctx, section->ssl_options_clear);
@@ -411,6 +418,7 @@ NOEXPORT int auth_init(SERVICE_OPTIONS *section) {
         if(section->option.client)
             SSL_CTX_set_psk_client_callback(section->ctx, psk_client_cb);
         else
+        //    SSL_CTX_use_psk_identity_hint(section->ctx, "wolfssl server");
             SSL_CTX_set_psk_server_callback(section->ctx, psk_server_cb);
         result=0;
     }

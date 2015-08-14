@@ -35,8 +35,6 @@
 /*
  *psk client set up.
  */
-
-
 static inline unsigned int my_Psk_Client_Cb(WOLFSSL* ssl, const char* hint,
         char* identity, unsigned int id_max_len, unsigned char* key, 
         unsigned int key_max_len)
@@ -44,7 +42,6 @@ static inline unsigned int my_Psk_Client_Cb(WOLFSSL* ssl, const char* hint,
     (void)ssl;
     (void)hint;
     (void)key_max_len;
-    
     char* keyToBe = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d";
     int   keyLen  = strlen(keyToBe);
 
@@ -125,7 +122,6 @@ int main(int argc, char **argv)
     
     /* set up pre shared keys */
     wolfSSL_CTX_set_psk_client_callback(ctx, my_Psk_Client_Cb);
-	
     /* attempts to make a connection on a socket */
     ret = connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
     

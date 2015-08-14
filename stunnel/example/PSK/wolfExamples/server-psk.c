@@ -63,7 +63,6 @@ int respond(WOLFSSL* ssl)
 /*
  * Identify which psk key to use.
  */
-
 static unsigned int my_psk_server_cb(WOLFSSL* ssl, const char* identity, unsigned char* key,
                               unsigned int key_max_len)
 {
@@ -73,11 +72,9 @@ static unsigned int my_psk_server_cb(WOLFSSL* ssl, const char* identity, unsigne
     if (strncmp(identity, "Client_identity", 15) != 0)
         return 0;
 
-    
     char* keyToBe = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d";
     int   keyLen  = strlen(keyToBe);
     strncpy((char*)key, keyToBe, keyLen);
-
     return keyLen;
 }
 
