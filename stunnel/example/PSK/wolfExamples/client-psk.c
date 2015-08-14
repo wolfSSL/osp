@@ -153,6 +153,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+    ret = wolfSSL_shutdown(ssl);
+
     /* cleanup */
     wolfSSL_free(ssl);
 
