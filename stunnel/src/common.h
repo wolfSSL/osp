@@ -440,21 +440,27 @@ extern char *sys_errlist[];
 #endif /* !defined(OPENSSL_NO_OCSP) */
 #endif /* OpenSSL older than 0.9.8h */
 
-#if OPENSSL_VERSION_NUMBER<0x10000000L
+#if OPENSSL_VERSION_NUMBER<0x10000000L && !defined(WITH_WOLFSSL)
 #define OPENSSL_NO_TLSEXT
 #define OPENSSL_NO_PSK
 #endif /* OpenSSL older than 1.0.0 */
 
-#if OPENSSL_VERSION_NUMBER<0x10001000L || defined(OPENSSL_NO_TLS1)
+#if (OPENSSL_VERSION_NUMBER<0x10001000L || defined(OPENSSL_NO_TLS1)) && !defined(WITH_WOLFSSL)
 #define OPENSSL_NO_TLS1_1
 #define OPENSSL_NO_TLS1_2
-#endif /* OpenSSL older than 1.0.1 || defined(OPENSSL_NO_TLS1) */
+#endif /* (OpenSSL older than 1.0.1 || defined(OPENSSL_NO_TLS1)) && !defined(WITH_WOLFSSL) */
 
-#if OPENSSL_VERSION_NUMBER>=0x10100000L
+#if OPENSSL_VERSION_NUMBER>=0x10100000L || defined(WITH_WOLFSSL)
 #ifndef OPENSSL_NO_SSL2
 #define OPENSSL_NO_SSL2
 #endif /* !defined(OPENSSL_NO_SSL2) */
 #endif /* OpenSSL 1.1.0 or newer */
+
+#ifdef WITH_WOLFSSL
+#ifndef OPENSSL_NO_SSL3
+#define OPENSSL_NO_SSL3
+#endif /* !defined(OPENSSL_NO_SSL3) */
+#endif /* def WITH_WOLFSSL*/
 
 #if !defined(HAVE_OSSL_ENGINE_H) && !defined(OPENSSL_NO_ENGINE)
 #define OPENSSL_NO_ENGINE

@@ -46,3 +46,4 @@ openssh/regress/sshd_proxy.orig
 openssh/regress/modpipe.dSYM*
 openssh/regress/setutid-allowed.dSYM*
 openssh/regress/authorized_keys*
+stunnel/example/echoserver/echoserver*
