@@ -1,24 +1,71 @@
-How to run everything:
-Install wolf as per instructions
-install open as per instructions
+INTRO:
+The stunnel/example/PSK directory contains some simple
+tests for verifying that Stunnel is working with PSK.
 
-Make in the wolfExamples directory
-in same run tcp client thus:
-./client-tcp 127.0.0.1
-and server:
-./server-tcp
+The stunnel/example/PSK directory contains the .conf
+and associated files for running an stunnel PSK proxy.
+The simple TCP client/server or PSK client/server(running 
+wolfSSL), may be found in stunnel/example/PSK/wolfExamples.
 
-(list ports these things connect to)
+client1.conf:
+ 1. Accepts a TCP connection on port 11111
+ 2. Connects to port 11112 using PSK
+ 3. The client ID and key are in psk1.txt
+    and read in as a string.
+
+server.conf:
+ 1. accepts an incoming PSK connection on 11112
+ 2. connects to a TCP server running on 11113
+ 3. ciphers = PSK-AES128-CBC-SHA256:PSK-AES128-CBC-SHA
+    specifies in order of preference the cipher suites
+    to chose from those supported by the client.
+ 4. The client ID and associated key are in psk.txt
+    and read in as a string.
 
 
+GETTING STARTED:
+Install wolfSSL (in the root wolfSSL directory):
+    ./configure --enable-stunnel
+    make
+    sudo make install
 
-Another thing: the key is read in as a string, so if you go back to 
-wolfssl-examples, you have to do a strcopy, rather than using bytes.
+Install stunnel against wolfSSL (in the root 
+Stunnel directory):
+   ./configure --enable-wolfssl
+   make
+   sudo make install
 
-Tutorial taken from here: https://www.stunnel.org/auth.html
+In the stunnel/example/PSK/wolfExamples:
+   make
 
-To enable psk: enable with wolf, and also comment out this line in stunnel
-src/common.h: #define OPENSSL_NO_PSK then everything should run.
 
-This might also be useful:
-    https://www.stunnel.org/static/stunnel.html
+RUNNING THE TESTS:
+The examples may be run in the following combinations
+(order of execution for the programs is important):
+
+0. To test wolfs stunnel against itself:
+    In the stunnel/example/PSK directory:
+	stunnel server.conf
+	stunnel client1.conf
+    In the stunnel/example/PSK/wolfExamples directory:
+        ./server-tcp
+	./client-tcp 127.0.0.1
+
+1. To test wolfs stunnel against wolf server-psk example:
+    In the stunnel/example/PSK directory:
+	stunnel client1.conf
+    In the stunnel/example/PSK/wolfExamples directory:
+        ./server-psk
+	./client-tcp 127.0.0.1
+
+2. To test wolfs stunnel against wolf client-psk example:
+    In the stunnel/example/PSK directory:
+	stunnel server.conf
+    In the stunnel/example/PSK/wolfExamples directory:
+        ./server-tcp
+	./client-psk 127.0.0.1
+
+Finally, it is possible to test wolf-Stunnel against
+open-Stunnel using the directions provided for dual
+installation, and test 0, using wolf-Stunnel for the 
+client/server and open-Stunnel for the other.
