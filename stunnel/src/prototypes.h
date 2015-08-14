@@ -439,6 +439,11 @@ void s_log(int, const char *, ...)
 #else
     ;
 #endif
+
+#ifdef WOLFSSL_DEBUG_ON
+void wolfSSL_s_log(int , const char *);
+#endif
+
 char *log_id(CLI *);
 void fatal_debug(char *, const char *, int);
 #define fatal(a) fatal_debug((a), __FILE__, __LINE__)

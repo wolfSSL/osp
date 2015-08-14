@@ -70,7 +70,7 @@ NOEXPORT int main_unix(int argc, char* argv[]) {
 #endif
 #ifdef WOLFSSL_DEBUG_ON
     wolfSSL_Debugging_ON();
-    wolfSSL_SetLoggingCb((wolfSSL_Logging_cb)&s_log);
+    wolfSSL_SetLoggingCb((wolfSSL_Logging_cb)&wolfSSL_s_log);
 #endif
     main_init();
     if(main_configure(argc>1 ? argv[1] : NULL, argc>2 ? argv[2] : NULL)) {
