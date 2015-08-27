@@ -371,6 +371,20 @@ AC_ARG_ENABLE(libwrap,
 
 AC_MSG_NOTICE([**************************************** SSL])
 
+AC_ARG_ENABLE([sslv3],
+    [  --enable-sslv3 Enable sslv3. This is turned off by default when using wolfSSL],
+    [ ENABLED_SSL3=$enableval ],
+    [ ENABLED_SSL3=$no ])
+
+if test "x$ENABLED_SSL3" = "xyes"
+then
+    AM_CFLAGS="$AM_CFLAGS -DENABLE_SSL3"
+    AC_DEFINE([ENABLE_SSL3], [1],
+    [Define to 1 to enable SSL3 (Disabled by default with wolfSSL).])
+fi
+
+AM_CONDITIONAL([SSL3], test "x$ENABLED_SSL3" = "xyes")
+
 AC_MSG_CHECKING([for compiler sysroot])
 if test "$GCC" = yes; then
     SYSROOT=`$CC --print-sysroot 2>/dev/null`
@@ -396,7 +410,7 @@ AC_ARG_ENABLE([wolfssl],
 
 if test "x$ENABLED_WOLFSSL" = "xyes"
 then
-    AM_CFLAGS="-DWITH_WOLFSSL"
+    AM_CFLAGS="$AM_CFLAGS -DWITH_WOLFSSL"
     SSLDIR="/usr/local"
     AC_DEFINE([WITH_WOLFSSL], [1],
     [Define to 1 if you using WOLFSSL header file.])
@@ -410,7 +424,7 @@ AC_ARG_ENABLE([wolfssldebug],
     [ ENABLED_WOLFSSLDEBUG=$no ])
 if test "x$ENABLED_WOLFSSLDEBUG" = "xyes"
 then
-    AM_CFLAGS="-DWITH_WOLFSSL_DEBUG"
+    AM_CFLAGS="$AM_CFLAGS -DWITH_WOLFSSL_DEBUG"
     AC_DEFINE([WOLFSSL_DEBUG_ON], [1],
     [Define to 1 to enable WOLFSSL debug messages.])
 fi

@@ -6,6 +6,9 @@
 /* Entropy Gathering Daemon socket path */
 #undef EGD_SOCKET
 
+/* Define to 1 to enable SSL3 (Disabled by default with wolfSSL). */
+#undef ENABLE_SSL3
+
 /* Define to 1 if you have the `accept4' function. */
 #undef HAVE_ACCEPT4
 
