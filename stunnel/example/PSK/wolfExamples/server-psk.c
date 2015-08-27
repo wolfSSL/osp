@@ -99,12 +99,17 @@ int main()
     /* use psk suite for security */ 
     wolfSSL_CTX_set_psk_server_callback(ctx, my_psk_server_cb);
     wolfSSL_CTX_use_psk_identity_hint(ctx, "wolfssl server");
-    if (wolfSSL_CTX_set_cipher_list(ctx, "PSK-AES128-CBC-SHA")
+    if (wolfSSL_CTX_set_cipher_list(ctx, "DHE-PSK-AES128-CBC-SHA256")
                                    != SSL_SUCCESS) {
         printf("Fatal error : server can't set cipher list\n");
         return 1;
     }
 
+    if (wolfSSL_CTX_SetTmpDH_file(ctx, "../../certs/dh2048.pem",
+                SSL_FILETYPE_PEM) != SSL_SUCCESS){
+        printf("Fatal error : server can't initialize DH params\n");
+        return 1;
+    }
 
     /* set up server address and port */
     memset(&servAddr, 0, sizeof(servAddr));
