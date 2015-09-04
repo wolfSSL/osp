@@ -775,6 +775,7 @@ int network_init(server *srv) {
 		}
 
 
+#ifndef HAVE_WOLFSSL_SSL_H
 		if (!buffer_is_empty(s->ssl_ca_file)) {
 			s->ssl_ca_file_cert_names = SSL_load_client_CA_file(s->ssl_ca_file->ptr);
 			if (NULL == s->ssl_ca_file_cert_names) {
@@ -782,6 +783,7 @@ int network_init(server *srv) {
 						ERR_error_string(ERR_get_error(), NULL), s->ssl_ca_file);
 			}
 		}
+#endif /*HAVE_WOLFSSL_SSL_H*/
 
 		if (buffer_is_empty(s->ssl_pemfile) || !s->ssl_enabled) continue;
 
@@ -932,9 +934,14 @@ int network_init(server *srv) {
 			}
 		}
 
-		if (s->ssl_verifyclient) {
+
+        if (s->ssl_verifyclient) {
+#ifdef HAVE_WOLFSSL_SSL_H
+            if (NULL == s->ssl_ca_file->ptr) {
+#else
 			if (NULL == s->ssl_ca_file_cert_names) {
-				log_error_write(srv, __FILE__, __LINE__, "s",
+#endif
+                log_error_write(srv, __FILE__, __LINE__, "s",
 					"SSL: You specified ssl.verifyclient.activate but no ca_file"
 				);
 				return -1;
