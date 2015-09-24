@@ -207,9 +207,7 @@ static void https_add_ssl_entries(connection *con) {
 			array_insert_unique(con->environment, (data_unset *)envds);
 		}
 	}
-#ifndef HAVE_WOLFSSL_SSL_H
     X509_free(xs);
-#endif /* HAVE_WOLFSSL_SSL_H */
 }
 #endif
 
