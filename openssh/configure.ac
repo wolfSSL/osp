@@ -2290,6 +2290,27 @@ AC_DEFINE([OPENSSL_HAS_NISTP256], [1], [Defined if using WolfSSL])
 AC_DEFINE([OPENSSL_HAS_NISTP384], [1], [Defined if using WolfSSL])
 AC_DEFINE([OPENSSL_HAS_NISTP521], [1], [Defined if using WolfSSL])
 AC_DEFINE([OPENSSL_HAVE_EVPCTR], [1], [Defined if using WolfSSL])
+
+AC_CHECK_LIB([wolfssl], [wc_wolfHasAesni], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+
+if test "x$wolf_has_aesni" == "xyes" ; then
+    AC_MSG_CHECKING([is gcc compiler detected])
+    if test "$GCC" = "yes"
+    then
+        AC_MSG_RESULT([yes])
+        AC_MSG_CHECKING([is compiler set to icc])
+        if test "$CC" != "icc"
+        then
+            AC_MSG_RESULT([not icc, add flags -maes and -msse4])
+            CFLAGS="$CFLAGS -maes -msse4"
+        else
+            AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
+        fi
+    else
+        AC_MSG_RESULT([no gcc])
+    fi
+fi
+
 ])
 
 AC_SUBST([ENABLE_WOLFSSL])
