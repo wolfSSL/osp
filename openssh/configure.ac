@@ -2291,9 +2291,20 @@ AC_DEFINE([OPENSSL_HAS_NISTP384], [1], [Defined if using WolfSSL])
 AC_DEFINE([OPENSSL_HAS_NISTP521], [1], [Defined if using WolfSSL])
 AC_DEFINE([OPENSSL_HAVE_EVPCTR], [1], [Defined if using WolfSSL])
 
-AC_CHECK_LIB([wolfssl], [wc_wolfHasAesni], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+# Leave in place in case we use this in the future, AC_COMPILE_IFELSE works
+# for now.
+#AC_CHECK_LIB([wolfssl], [wc_wolfHasAesni], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+
+AC_MSG_CHECKING([is wolfssl configured with aesni])
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+#include <wolfssl/options.h>
+#ifndef WOLFSSL_AESNI
+# error macro not defined
+#endif
+]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
 
 if test "x$wolf_has_aesni" == "xyes" ; then
+    AC_MSG_RESULT([yes])
     AC_MSG_CHECKING([is gcc compiler detected])
     if test "$GCC" = "yes"
     then
@@ -2309,6 +2320,8 @@ if test "x$wolf_has_aesni" == "xyes" ; then
     else
         AC_MSG_RESULT([no gcc])
     fi
+else
+    AC_MSG_RESULT([no])
 fi
 
 ])
