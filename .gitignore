@@ -83,6 +83,10 @@ build-android.sh
 *~
 *.swp
 stunnel3
+stunnel/Makefile.in
+stunnel/doc/Makefile.in
+stunnel/src/Makefile.in
+stunnel/tools/Makefile.in
 stunnel/src/stunnel
 stunnel/configure
 !stunnel/auto/*
