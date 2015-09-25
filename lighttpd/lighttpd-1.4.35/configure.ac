@@ -537,7 +537,37 @@ AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(off_t)
 
-WOLF_REQUIRE_LIBWOLFSSL
+TAO_REQUIRE_LIBWOLFSSL
+
+AC_MSG_CHECKING([is wolfssl configured with aesni])
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+#include <wolfssl/options.h>
+#ifndef WOLFSSL_AESNI
+# error macro not defined
+#endif
+]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+
+if test "x$wolf_has_aesni" == "xyes" ; then
+    AC_MSG_RESULT([yes])
+    AC_MSG_CHECKING([is gcc compiler detected])
+    if test "$GCC" = "yes"
+    then
+        AC_MSG_RESULT([yes])
+        AC_MSG_CHECKING([is compiler set to icc])
+        if test "$CC" != "icc"
+        then
+            AC_MSG_RESULT([not icc, add flags -maes and -msse4])
+            CFLAGS="$CFLAGS -maes -msse4"
+        else
+            AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
+        fi
+    else
+        AC_MSG_RESULT([no gcc])
+    fi
+else
+    AC_MSG_RESULT([no])
+fi
+
 
 if test "x$ac_cv_func_sendfile" = xyes; then
 	dnl check if sendfile works
