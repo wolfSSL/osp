@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <wolfssl/options.h>
 #include <wolfssl/wolfcrypt/md5.h>
 #include <wolfssl/wolfcrypt/ripemd.h>
 #include <wolfssl/wolfcrypt/sha.h>
