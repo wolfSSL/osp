@@ -2232,102 +2232,6 @@ fi
 
 AC_FUNC_GETPGRP
 
-# TAO WolfSSL adds
-
-WOLFSSL_URL="http://www.yassl.com/download.html"
-ENABLE_WOLFSSL="no"
-AC_ARG_WITH(wolfssl,
-[  --with-wolfssl=PATH      PATH to wolfssl install (default /usr/local) ],
-[
-if test "x$withval" != "xno" ; then
-if test -d "$withval/lib"; then
-LDFLAGS="$LDFLAGS -L${withval}/lib"
-fi
-if test -d "$withval/include"; then
-CPPFLAGS="$CPPFLAGS -I${withval}/include"
-fi
-fi
-
-AC_MSG_CHECKING([for wolfSSL])
-LIBS="$LIBS -lwolfssl"
-
-AC_TRY_LINK([#include <wolfssl/ssl.h>], [ wolfSSL_Init(); ],
-[ wolfssl_linked=yes ], [ wolfssl_linked=no ])
-
-if test "x$wolfssl_linked" == "xno" ; then
-AC_MSG_ERROR([WolfSSL isn't found.  You can get it from $WOLFSSL_URL
-
-If it's already installed, specify its path using --with-wolfssl=/dir/])
-fi
-
-AC_MSG_RESULT([yes])
-ENABLE_WOLFSSL="yes"
-DIGEST_SSL="digest-wolfssl.o"
-SSL_COMPAT="wolfssl-compat.o"
-RAND_MSG="WolfSSL Internal"
-AC_DEFINE([USING_WOLFSSL], [1], [Defined if using WolfSSL])
-AC_DEFINE([WOLFSSL_AES_DIRECT], [1], [Defined if using WolfSSL])
-AC_DEFINE([WOLFSSL_SHA384], [1], [Defined if using WolfSSL])
-AC_DEFINE([WOLFSSL_SHA512], [1], [Defined if using WolfSSL])
-AC_DEFINE([WOLFSSL_RIPEMD], [1], [Defined if using WolfSSL])
-AC_DEFINE([UNSUPPORTED_POSIX_THREADS_HACK], [1], [Defined if using WolfSSL])
-# OpenSSL tests for these. Just assume these are present for wolfSSL.
-AC_DEFINE([HAVE_BN_IS_PRIME_EX], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_SHA256_UPDATE], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_CRYPT], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_DES_CRYPT], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_DSA_GENERATE_PARAMETERS_EX], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_EVP_DIGESTFINAL_EX], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_EVP_DIGESTINIT_EX], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_EVP_MD_CTX_CLEANUP], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_EVP_MD_CTX_INIT], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_EVP_SHA256], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_HMAC_CTX_INIT], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_RSA_GENERATE_KEY_EX], [1], [Defined if using WolfSSL])
-AC_DEFINE([HAVE_RSA_GET_DEFAULT_METHOD], [1], [Defined if using WolfSSL])
-AC_DEFINE([OPENSSL_HAS_ECC], [1], [Defined if using WolfSSL])
-AC_DEFINE([OPENSSL_HAS_NISTP256], [1], [Defined if using WolfSSL])
-AC_DEFINE([OPENSSL_HAS_NISTP384], [1], [Defined if using WolfSSL])
-AC_DEFINE([OPENSSL_HAS_NISTP521], [1], [Defined if using WolfSSL])
-AC_DEFINE([OPENSSL_HAVE_EVPCTR], [1], [Defined if using WolfSSL])
-
-# Leave in place in case we use this in the future, AC_COMPILE_IFELSE works
-# for now.
-#AC_CHECK_LIB([wolfssl], [wc_wolfHasAesni], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
-
-AC_MSG_CHECKING([is wolfssl configured with aesni])
-AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
-#include <wolfssl/options.h>
-#ifndef WOLFSSL_AESNI
-# error macro not defined
-#endif
-]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
-
-if test "x$wolf_has_aesni" == "xyes" ; then
-    AC_MSG_RESULT([yes])
-    AC_MSG_CHECKING([is gcc compiler detected])
-    if test "$GCC" = "yes"
-    then
-        AC_MSG_RESULT([yes])
-        AC_MSG_CHECKING([is compiler set to icc])
-        if test "$CC" != "icc"
-        then
-            AC_MSG_RESULT([not icc, add flags -maes and -msse4])
-            CFLAGS="$CFLAGS -maes -msse4"
-        else
-            AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
-        fi
-    else
-        AC_MSG_RESULT([no gcc])
-    fi
-else
-    AC_MSG_RESULT([no])
-fi
-
-])
-
-AC_SUBST([ENABLE_WOLFSSL])
-
 # Some systems want crypt() from libcrypt, *not* the version in OpenSSL,
 # because the system crypt() is more featureful.
 if test "x$check_for_libcrypt_before" = "x1"; then
@@ -3709,6 +3613,109 @@ main() { exit(0); }
 		AC_MSG_WARN([cross compiling: Assuming working snprintf()])
 	)
 fi
+
+# TAO WolfSSL adds
+
+WOLFSSL_URL="http://www.yassl.com/download.html"
+ENABLE_WOLFSSL="no"
+AC_ARG_WITH(wolfssl,
+[  --with-wolfssl=PATH      PATH to wolfssl install (default /usr/local) ],
+[
+if test "x$withval" != "xno" ; then
+if test -d "$withval/lib"; then
+LDFLAGS="$LDFLAGS -L${withval}/lib"
+LD="$LD -Wl,-rpath,${withval}/lib"
+fi
+if test -d "$withval/include"; then
+CPPFLAGS="$CPPFLAGS -I${withval}/include"
+fi
+fi
+
+if test "x$withval" == "xyes" ; then
+LDFLAGS="-L/usr/local/lib $LDFLAGS"
+CPPFLAGS="-I/usr/local/include $CPPFLAGS"
+LD="$LD -Wl,-rpath,/usr/local/lib"
+fi
+
+AC_MSG_CHECKING([for wolfSSL])
+LIBS="$LIBS -lwolfssl"
+
+AC_TRY_LINK([#include <wolfssl/ssl.h>], [ wolfSSL_Init(); ],
+[ wolfssl_linked=yes ], [ wolfssl_linked=no ])
+
+if test "x$wolfssl_linked" == "xno" ; then
+AC_MSG_ERROR([WolfSSL isn't found.  You can get it from $WOLFSSL_URL
+
+If it's already installed, specify its path using --with-wolfssl=/dir/])
+fi
+
+AC_MSG_RESULT([yes])
+ENABLE_WOLFSSL="yes"
+DIGEST_SSL="digest-wolfssl.o"
+SSL_COMPAT="wolfssl-compat.o"
+RAND_MSG="WolfSSL Internal"
+AC_DEFINE([USING_WOLFSSL], [1], [Defined if using WolfSSL])
+AC_DEFINE([WOLFSSL_AES_DIRECT], [1], [Defined if using WolfSSL])
+AC_DEFINE([WOLFSSL_SHA384], [1], [Defined if using WolfSSL])
+AC_DEFINE([WOLFSSL_SHA512], [1], [Defined if using WolfSSL])
+AC_DEFINE([WOLFSSL_RIPEMD], [1], [Defined if using WolfSSL])
+AC_DEFINE([UNSUPPORTED_POSIX_THREADS_HACK], [1], [Defined if using WolfSSL])
+# OpenSSL tests for these. Just assume these are present for wolfSSL.
+AC_DEFINE([HAVE_BN_IS_PRIME_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_SHA256_UPDATE], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_CRYPT], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_DES_CRYPT], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_DSA_GENERATE_PARAMETERS_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_DIGESTFINAL_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_DIGESTINIT_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_MD_CTX_CLEANUP], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_MD_CTX_INIT], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_EVP_SHA256], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_HMAC_CTX_INIT], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_RSA_GENERATE_KEY_EX], [1], [Defined if using WolfSSL])
+AC_DEFINE([HAVE_RSA_GET_DEFAULT_METHOD], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAS_ECC], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAS_NISTP256], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAS_NISTP384], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAS_NISTP521], [1], [Defined if using WolfSSL])
+AC_DEFINE([OPENSSL_HAVE_EVPCTR], [1], [Defined if using WolfSSL])
+
+# Leave in place in case we use this in the future, AC_COMPILE_IFELSE works
+# for now.
+#AC_CHECK_LIB([wolfssl], [wc_wolfHasAesni], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+
+AC_MSG_CHECKING([is wolfssl configured with aesni])
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+#include <wolfssl/options.h>
+#ifndef WOLFSSL_AESNI
+# error macro not defined
+#endif
+]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+
+if test "x$wolf_has_aesni" == "xyes" ; then
+    AC_MSG_RESULT([yes])
+    AC_MSG_CHECKING([is gcc compiler detected])
+    if test "$GCC" = "yes"
+    then
+        AC_MSG_RESULT([yes])
+        AC_MSG_CHECKING([is compiler set to icc])
+        if test "$CC" != "icc"
+        then
+            AC_MSG_RESULT([not icc, add flags -maes and -msse4])
+            CFLAGS="$CFLAGS -maes -msse4"
+        else
+            AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
+        fi
+    else
+        AC_MSG_RESULT([no gcc])
+    fi
+else
+    AC_MSG_RESULT([no])
+fi
+
+])
+
+AC_SUBST([ENABLE_WOLFSSL])
 
 dnl Checks for structure members
 OSSH_CHECK_HEADER_FOR_FIELD([ut_host], [utmp.h], [HAVE_HOST_IN_UTMP])
