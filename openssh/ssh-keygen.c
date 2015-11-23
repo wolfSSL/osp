@@ -1537,6 +1537,7 @@ prepare_options_buf(Buffer *c, int which)
 		add_string_option(c, "source-address", certflags_src_addr);
 }
 
+#ifndef USING_WOLFSSL
 static Key *
 load_pkcs11_key(char *path)
 {
@@ -1565,6 +1566,7 @@ load_pkcs11_key(char *path)
 	fatal("no pkcs11 support");
 #endif /* ENABLE_PKCS11 */
 }
+#endif /* USING_WOLFSSL */
 
 static void
 do_ca_sign(struct passwd *pw, int argc, char **argv)
