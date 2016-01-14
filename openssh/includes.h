@@ -167,6 +167,7 @@
 #endif
 
 #ifdef USING_WOLFSSL
+#include <wolfssl/options.h>
 #include <wolfssl/openssl/opensslv.h>
 #else
 #include <openssl/opensslv.h> /* For OPENSSL_VERSION_NUMBER */
