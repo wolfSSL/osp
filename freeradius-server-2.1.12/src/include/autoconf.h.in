@@ -33,6 +33,18 @@
 /* Define to 1 if you have the `ctime_r' function. */
 #undef HAVE_CTIME_R
 
+/* Define to 1 if you have the <cyassl/ctaocrypt/md4.h> header file. */
+#undef HAVE_CYASSL_CTAOCRYPT_MD4_H
+
+/* Define to 1 if you have the <cyassl/ctaocrypt/md5.h> header file. */
+#undef HAVE_CYASSL_CTAOCRYPT_MD5_H
+
+/* Define to 1 if you have the <cyassl/ctaocrypt/sha.h> header file. */
+#undef HAVE_CYASSL_CTAOCRYPT_SHA_H
+
+/* Define to 1 if you have the <cyassl/ssl.h> header file. */
+#undef HAVE_CYASSL_SSL_H
+
 /* Define to 1 if you have the declaration of `gethostbyaddr_r', and to 0 if
    you don't. */
 #undef HAVE_DECL_GETHOSTBYADDR_R
@@ -110,13 +122,16 @@
 /* define if you have IP_PKTINFO (Linux) */
 #undef HAVE_IP_PKTINFO
 
-/* Define to 1 if you have the `crypto' library (-lcrypto). */
+/* Define to 1 if you have the 'crypto' library (-lcrypto). */
 #undef HAVE_LIBCRYPTO
+
+/* Define to 1 if you have the 'cyassl' library (-lcyassl). */
+#undef HAVE_LIBCYASSL
 
 /* Define to 1 if you have the `nsl' library (-lnsl). */
 #undef HAVE_LIBNSL
 
-/* Define to 1 if you have the `pcap' library (-lpcap). */
+/* Define to 1 if you have the 'pcap' library (-lpcap). */
 #undef HAVE_LIBPCAP
 
 /* Define if you have a readline compatible library */
@@ -128,7 +143,7 @@
 /* Define to 1 if you have the `socket' library (-lsocket). */
 #undef HAVE_LIBSOCKET
 
-/* Define to 1 if you have the `ssl' library (-lssl). */
+/* Define to 1 if you have the 'ssl' library (-lssl). */
 #undef HAVE_LIBSSL
 
 /* Define to 1 if you have the `ws2_32' library (-lws2_32). */

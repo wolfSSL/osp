@@ -105,7 +105,9 @@ int eaptls_start(EAP_DS *eap_ds, int peap_flag)
 int eaptls_success(EAP_HANDLER *handler, int peap_flag)
 {
 	EAPTLS_PACKET	reply;
+#ifndef NO_OPENSSL
 	VALUE_PAIR *vp, *vps = NULL;
+#endif
 	REQUEST *request = handler->request;
 	tls_session_t *tls_session = handler->opaque;
 
@@ -116,6 +118,9 @@ int eaptls_success(EAP_HANDLER *handler, int peap_flag)
 	reply.data = NULL;
 	reply.dlen = 0;
 
+#ifndef NO_OPENSSL
+	/*  CyaSSL doesn't handle associative data on the session
+	 *  structure. We'll see what we're really missing later. XXX */
 	/*
 	 *	If there's no session resumption, delete the entry
 	 *	from the cache.  This means either it's disabled
@@ -189,6 +194,7 @@ int eaptls_success(EAP_HANDLER *handler, int peap_flag)
 			if (vp) pairadd(&request->packet->vps, vp);
 		}
 	}
+#endif
 
 	/*
 	 *	Call compose AFTER checking for cached data.
@@ -211,7 +217,9 @@ int eaptls_success(EAP_HANDLER *handler, int peap_flag)
 int eaptls_fail(EAP_HANDLER *handler, int peap_flag)
 {
 	EAPTLS_PACKET	reply;
+#ifndef NO_OPENSSL
 	tls_session_t *tls_session = handler->opaque;
+#endif
 
 	handler->finished = TRUE;
 	reply.code = EAPTLS_FAIL;
@@ -220,10 +228,12 @@ int eaptls_fail(EAP_HANDLER *handler, int peap_flag)
 	reply.data = NULL;
 	reply.dlen = 0;
 
+#ifndef NO_OPENSSL
 	/*
 	 *	Force the session to NOT be cached.
 	 */
 	SSL_CTX_remove_session(tls_session->ctx, tls_session->ssl->session);
+#endif
 
 	eaptls_compose(handler->eap_ds, &reply);
 
@@ -323,6 +333,7 @@ static eaptls_status_t eaptls_ack_handler(EAP_HANDLER *handler)
 		radlog_request(L_ERR, 0, request, "FAIL: Unexpected ACK received.  Could not obtain session information.");
 		return EAPTLS_FAIL;
 	}
+#ifndef NO_OPENSSL
 	if (tls_session->info.initialized == 0) {
 		RDEBUG("No SSL info available. Waiting for more SSL data.");
 		return EAPTLS_REQUEST;
@@ -371,6 +382,21 @@ static eaptls_status_t eaptls_ack_handler(EAP_HANDLER *handler)
 		       tls_session->info.content_type);
 		return EAPTLS_FAIL;
 	}
+#endif
+#ifndef NO_CYASSL
+	if (CyaSSL_is_init_finished(tls_session->ssl) &&
+		tls_session->dirty_out.used == 0)
+	{
+		RDEBUG2("ACK handshake is finished");
+		return EAPTLS_SUCCESS;
+	}
+	else
+	{
+		RDEBUG2("ACK handshake fragment handler");
+		return EAPTLS_REQUEST;
+	}
+#endif
+
 }
 
 /*
@@ -787,8 +813,12 @@ static eaptls_status_t eaptls_operation(eaptls_status_t status,
 	 *	handshake is finished, then return a
 	 *	EPTLS_SUCCESS
 	 */
-	
+#ifndef NO_OPENSSL
 	if (SSL_is_init_finished(tls_session->ssl)) {
+#endif
+#ifndef NO_CYASSL
+	if (CyaSSL_is_init_finished(tls_session->ssl)) {
+#endif
 		/*
 		 *	Init is finished.  The rest is
 		 *	application data.
@@ -923,7 +953,12 @@ eaptls_status_t eaptls_process(EAP_HANDLER *handler)
 	 *
 	 *	The TLS data will be in the tls_session structure.
 	 */
+#ifndef NO_OPENSSL
 	if (SSL_is_init_finished(tls_session->ssl)) {
+#endif
+#ifndef NO_CYASSL
+	if (CyaSSL_is_init_finished(tls_session->ssl)) {
+#endif
 		int err;
 
 		/*
@@ -943,7 +978,7 @@ eaptls_status_t eaptls_process(EAP_HANDLER *handler)
 			RDEBUG2("Init is done, but tunneled data is fragmented");
 			return EAPTLS_HANDLED;
 		}
-
+#ifndef NO_OPENSSL
 		/*	
 		 *	Decrypt the complete record.
 		 */
@@ -964,11 +999,29 @@ eaptls_status_t eaptls_process(EAP_HANDLER *handler)
 		 */
 		err = SSL_read(tls_session->ssl, tls_session->clean_out.data,
 			       sizeof(tls_session->clean_out.data));
+#endif
+#ifndef NO_CYASSL
+		(tls_session->record_init)(&tls_session->clean_out);
+		err = CyaSSL_read(tls_session->ssl, tls_session->clean_out.data,
+					sizeof(tls_session->clean_out.data));
+
+		/* 
+		 * CyaSSL_read() calls the recv_callback() which does the
+		 * copies the dirty_in data into CyaSSL's instream, and then
+	     * is processed and copied into read()'s buffer. The dirty_in
+		 * buffer can now be cleaned.
+		 */
+		(tls_session->record_init)(&tls_session->dirty_in);
+#endif
 
 		if (err < 0) {
 			RDEBUG("SSL_read Error");
-
+#ifndef NO_OPENSSL
 			switch (SSL_get_error(tls_session->ssl, err)) {
+#endif
+#ifndef NO_CYASSL
+			switch (CyaSSL_get_error(tls_session->ssl, err)) {
+#endif		
 			case SSL_ERROR_WANT_READ:
 			case SSL_ERROR_WANT_WRITE:
 				RDEBUG("Error in fragmentation logic");

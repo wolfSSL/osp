@@ -35,6 +35,7 @@ static unsigned int 	record_plus(record_t *buf, const void *ptr,
 static unsigned int 	record_minus(record_t *buf, void *ptr,
 				     unsigned int size);
 
+#ifndef NO_OPENSSL
 tls_session_t *eaptls_new_session(SSL_CTX *ssl_ctx, int client_cert)
 {
 	tls_session_t *state = NULL;
@@ -95,10 +96,50 @@ tls_session_t *eaptls_new_session(SSL_CTX *ssl_ctx, int client_cert)
 
 	return state;
 }
+#endif
+#ifndef NO_CYASSL
+tls_session_t *eaptls_new_session(CYASSL_CTX *ssl_ctx, int client_cert)
+{
+	tls_session_t *state = NULL;
+	CYASSL *new_tls = NULL;
+
+	client_cert = client_cert; /* -Wunused.  See bug #350 */
+
+	if ((new_tls = CyaSSL_new(ssl_ctx)) == NULL) {
+		radlog(L_ERR, "SSL: Error creating new SSL");
+		return NULL;
+	}
+
+	state = (tls_session_t *)malloc(sizeof(*state));
+	memset(state, 0, sizeof(*state));
+	session_init(state);
+
+	state->ctx = ssl_ctx;
+	state->ssl = new_tls;
+
+	/*
+	 *	Initialize callbacks
+	 */
+	state->record_init = record_init;
+	state->record_close = record_close;
+	state->record_plus = record_plus;
+	state->record_minus = record_minus;
+
+	CyaSSL_SetIOReadCtx(new_tls, state);
+	CyaSSL_SetIOWriteCtx(new_tls, state);
+	/*
+	 *	In Server mode we only accept.
+	 */
+	CyaSSL_set_accept_state(state->ssl);
+
+	return state;
+}
+#endif
 
 /*
  *	Print out some text describing the error.
  */
+#ifndef NO_OPENSSL
 static int int_ssl_check(REQUEST *request, SSL *s, int ret, const char *text)
 {
 	int e;
@@ -165,7 +206,59 @@ static int int_ssl_check(REQUEST *request, SSL *s, int ret, const char *text)
 
 	return 1;
 }
+#endif
+#ifndef NO_CYASSL
+static int int_ssl_check(REQUEST *request, CYASSL *s, int ret, const char *text)
+{
+	int e;
 
+	if (ret < 0) {
+		char errstr[80];
+		VALUE_PAIR *vp;
+
+		CyaSSL_ERR_error_string_n(ret, errstr, sizeof(errstr));
+		radlog(L_ERR, "rlm_eap: SSL error %s", errstr);
+
+		if (request) {
+			vp = pairmake("Module-Failure-Message", errstr, T_OP_ADD);
+			if (vp) pairadd(&request->packet->vps, vp);
+		}
+	}
+
+	e = CyaSSL_get_error(s, ret);
+
+	switch (e)
+	{
+		case SSL_ERROR_NONE:
+		case SSL_ERROR_WANT_READ:
+		case SSL_ERROR_WANT_WRITE:
+		case SSL_ERROR_WANT_X509_LOOKUP:
+		case SSL_ERROR_ZERO_RETURN:
+			break;
+
+		case SSL_ERROR_SYSCALL:
+			radlog(L_ERR, "SSL: %s failed in a system call (%d), TLS session fails.",
+			       text, ret);
+			return 0;
+			break;
+	
+		case SSL_ERROR_SSL:
+			radlog(L_ERR, "SSL: %s failed inside of TLS (%d), TLS session fails.",
+			       text, ret);
+			return 0;
+			break;
+	
+		default:
+			radlog(L_ERR, "SSL: FATAL SSL error ..... %d\n", e);
+			return 0;
+			break;
+	}
+
+	return 1;
+}
+#endif
+
+#ifndef NO_OPENSSL
 /*
  * We are the server, we always get the dirty data
  * (Handshake data is also considered as dirty data)
@@ -241,11 +334,65 @@ int tls_handshake_recv(REQUEST *request, tls_session_t *ssn)
 	record_init(&ssn->dirty_in);
 	return 1;
 }
+#endif
+#ifndef NO_CYASSL
+/*
+ * We are the server, we always get the dirty data
+ * (Handshake data is also considered as dirty data)
+ * During handshake, since SSL API handles itself,
+ * After clean-up, dirty_out will be filled with
+ * the data required for handshaking. So we check
+ * if dirty_out is empty then we simply send it back.
+ * As of now, if handshake is successful, then it is EAP-Success
+ * or else EAP-failure should be sent
+ *
+ * Fill the Bio with the dirty data to clean it
+ * Get the cleaned data from SSL, if it is not Handshake data
+ */
+int tls_handshake_recv(REQUEST *request, tls_session_t *ssn)
+{
+	int err;
+
+
+	err = CyaSSL_read(ssn->ssl, ssn->clean_out.data + ssn->clean_out.used,
+		       sizeof(ssn->clean_out.data) - ssn->clean_out.used);
+	if (err > 0) {
+		ssn->clean_out.used += err;
+		record_init(&ssn->dirty_in);
+		return 1;
+	}
+
+	if (!int_ssl_check(request, ssn->ssl, err, "SSL_read")) {
+		return 0;
+	}
+
+	/* We are done with dirty_in, reinitialize it */
+	record_init(&ssn->dirty_in);
+	return 1;
+}
+
+int cbtls_cyassl_io_read(char *buf, int sz, void *ctx)
+{
+	int result = 0;
+
+	if (ctx != NULL)
+	{
+		tls_session_t *ssn = (tls_session_t*)ctx;
+
+		result = record_minus(&ssn->dirty_in, buf, sz);
+		if (result <= 0)
+			result = -2;
+	}
+
+	return result;
+}
+#endif
 
 /*
  *	Take clear-text user data, and encrypt it into the output buffer,
  *	to send to the client at the other end of the SSL connection.
  */
+#ifndef NO_OPENSSL
 int tls_handshake_send(REQUEST *request, tls_session_t *ssn)
 {
 	int err;
@@ -277,11 +424,56 @@ int tls_handshake_send(REQUEST *request, tls_session_t *ssn)
 
 	return 1;
 }
+#endif
+#ifndef NO_CYASSL
+int tls_handshake_send(REQUEST *request, tls_session_t *ssn)
+{
+	 /*
+	 ** If there is unencrypted data in 'clean_in', write it to
+	 ** the SSL session. The write callback will transfer the 
+	 ** encrypted data from the SSL session into a buffer which
+	 ** we can then package into an EAP packet.
+	 **
+	 ** Based on the Server's logic this clean_in is expected to
+	 ** contain the data to send to the client.
+	 */
+	if (ssn->clean_in.used > 0) {
+		int written;
+
+		written = CyaSSL_write(ssn->ssl, ssn->clean_in.data, ssn->clean_in.used);
+		if (written > 0) {
+			record_minus(&ssn->clean_in, NULL, written);
+		} else {
+			int_ssl_check(request, ssn->ssl, written, "handshake_send");
+		}
+	}
+
+	return 1;
+}
+
+int cbtls_cyassl_io_write(char *buf, int sz, void *ctx)
+{
+	int result = 0;
+
+	if (ctx != NULL)
+	{
+		tls_session_t *ssn = (tls_session_t*)ctx;
+
+		result = record_plus(&ssn->dirty_out, buf, sz);
+		if (result <= 0)
+			result = -2;
+	}
+
+	return result;
+}
+#endif
 
 void session_init(tls_session_t *ssn)
 {
 	ssn->ssl = NULL;
+#ifndef NO_OPENSSL
 	ssn->into_ssl = ssn->from_ssl = NULL;
+#endif
 	record_init(&ssn->clean_in);
 	record_init(&ssn->clean_out);
 	record_init(&ssn->dirty_in);
@@ -299,6 +491,7 @@ void session_init(tls_session_t *ssn)
 
 void session_close(tls_session_t *ssn)
 {	
+#ifndef NO_OPENSSL
 	SSL_set_quiet_shutdown(ssn->ssl, 1);
 	SSL_shutdown(ssn->ssl);
 
@@ -313,6 +506,15 @@ void session_close(tls_session_t *ssn)
 		BIO_free(ssn->into_ssl);
 	if(ssn->from_ssl)
 		BIO_free(ssn->from_ssl);
+#endif
+#endif
+#ifndef NO_CYASSL
+	if (ssn->ssl)
+	{
+		CyaSSL_set_quiet_shutdown(ssn->ssl, 1);
+		CyaSSL_shutdown(ssn->ssl);
+		CyaSSL_free(ssn->ssl);
+	}
 #endif
 	record_close(&ssn->clean_in);
 	record_close(&ssn->clean_out);
@@ -393,6 +595,7 @@ static unsigned int record_minus(record_t *rec, void *ptr,
 	return taken;
 }
 
+#ifndef NO_OPENSSL
 void tls_session_information(tls_session_t *tls_session)
 {
 	const char *str_write_p, *str_version, *str_content_type = "";
@@ -591,3 +794,5 @@ void tls_session_information(tls_session_t *tls_session)
 
 	RDEBUG2("%s\n", tls_session->info.info_description);
 }
+#endif
+

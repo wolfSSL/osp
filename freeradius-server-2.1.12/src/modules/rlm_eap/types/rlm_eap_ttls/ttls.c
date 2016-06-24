@@ -187,8 +187,14 @@ static int diameter_verify(REQUEST *request,
 /*
  *	Convert diameter attributes to our VALUE_PAIR's
  */
+#ifndef NO_OPENSSL
 static VALUE_PAIR *diameter2vp(REQUEST *request, SSL *ssl,
 			       const uint8_t *data, size_t data_len)
+#endif
+#ifndef NO_CYASSL
+static VALUE_PAIR *diameter2vp(REQUEST *request, CYASSL *ssl,
+			       const uint8_t *data, size_t data_len)
+#endif
 {
 	uint32_t	attr;
 	uint32_t	length;

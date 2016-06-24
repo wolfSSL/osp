@@ -25,7 +25,9 @@
 #include <freeradius-devel/ident.h>
 RCSID("$Id$")
 
+#ifndef NO_OPENSSL
 #include <openssl/hmac.h>
+
 #include "eap_tls.h"
 
 /*
@@ -182,3 +184,179 @@ void eapttls_gen_challenge(SSL *s, uint8_t *buffer, size_t size)
 
 	memcpy(buffer, out, size);
 }
+#endif
+
+#ifndef NO_CYASSL
+#include <cyassl/ctaocrypt/hmac.h>
+
+#include "eap_tls.h"
+
+/*
+ * Add value pair to reply
+ */
+static void add_reply(VALUE_PAIR** vp,
+		      const char* name, const uint8_t * value, int len)
+{
+	VALUE_PAIR *reply_attr;
+	reply_attr = pairmake(name, "", T_OP_EQ);
+	if (!reply_attr) {
+		DEBUG("rlm_eap_tls: "
+		      "add_reply failed to create attribute %s: %s\n",
+		      name, fr_strerror());
+		return;
+	}
+
+	memcpy(reply_attr->vp_octets, value, len);
+	reply_attr->length = len;
+	pairadd(vp, reply_attr);
+}
+
+/*
+ * TLS PRF from RFC 2246
+ */
+static void P_hash(const int hmac_type,
+		   const unsigned char *secret, unsigned int secret_len,
+		   const unsigned char *seed,   unsigned int seed_len,
+		   unsigned char *out, unsigned int out_len)
+{
+	Hmac ctx_a, ctx_out;
+	unsigned char a[SHA_DIGEST_SIZE];
+	unsigned int size;
+
+	HmacSetKey(&ctx_a, hmac_type, secret, secret_len);
+	HmacSetKey(&ctx_out, hmac_type, secret, secret_len);
+
+	size = (hmac_type == MD5) ? MD5_DIGEST_SIZE : SHA_DIGEST_SIZE;
+
+	/* Calculate A(1) */
+	HmacUpdate(&ctx_a, seed, seed_len);
+	HmacFinal(&ctx_a, a);
+
+	while (1) {
+		/* Calculate next part of output */
+		HmacUpdate(&ctx_out, a, size);
+		HmacUpdate(&ctx_out, seed, seed_len);
+
+		/* Check if last part */
+		if (out_len < size) {
+			HmacFinal(&ctx_out, a);
+			memcpy(out, a, out_len);
+			break;
+		}
+
+		/* Place digest in output buffer */
+		HmacFinal(&ctx_out, out);
+		out += size;
+		out_len -= size;
+
+		/* Calculate next A(i) */
+		HmacUpdate(&ctx_a, a, size);
+		HmacFinal(&ctx_a, a);
+	}
+
+	memset(&ctx_a, 0, sizeof(ctx_a));
+	memset(&ctx_out, 0, sizeof(ctx_out));
+	memset(a, 0, sizeof(a));
+}
+
+static void PRF(const unsigned char *secret, unsigned int secret_len,
+		const unsigned char *seed,   unsigned int seed_len,
+		unsigned char *out, unsigned char *buf, unsigned int out_len)
+{
+        unsigned int i;
+        unsigned int len = (secret_len + 1) / 2;
+	const unsigned char *s1 = secret;
+	const unsigned char *s2 = secret + (secret_len - len);
+
+	P_hash(MD5, s1, len, seed, seed_len, out, out_len);
+	P_hash(SHA, s2, len, seed, seed_len, buf, out_len);
+
+	for (i=0; i < out_len; i++) {
+	        out[i] ^= buf[i];
+	}
+}
+
+#define EAPTLS_MPPE_KEY_LEN     32
+#define RANDOM_SIZE				32
+#define SECRET_LEN				48
+
+#define EAPTLS_PRF_LABEL "ttls keying material"
+
+/*
+ *	Generate keys according to RFC 2716 and add to reply
+ */
+void eaptls_gen_mppe_keys(VALUE_PAIR **reply_vps, CYASSL *s,
+			  const char *prf_label)
+{
+	unsigned char out[4*EAPTLS_MPPE_KEY_LEN], buf[4*EAPTLS_MPPE_KEY_LEN];
+	unsigned char seed[64 + 2*RANDOM_SIZE];
+	unsigned char *p = seed;
+	size_t prf_size;
+	unsigned char *masterSecret, *clientRandom, *serverRandom;
+	unsigned int msLen, crLen, srLen;
+
+	prf_size = strlen(prf_label);
+
+	memcpy(p, prf_label, prf_size);
+	p += prf_size;
+
+	CyaSSL_get_keys(s,
+			&masterSecret, &msLen,
+			&serverRandom, &srLen,
+			&clientRandom, &crLen);
+
+	memcpy(p, clientRandom, crLen);
+	p += crLen;
+	prf_size += crLen;
+
+	memcpy(p, serverRandom, srLen);
+	prf_size += srLen;
+
+	PRF(masterSecret, msLen,
+	    seed, prf_size, out, buf, sizeof(out));
+
+	p = out;
+	add_reply(reply_vps, "MS-MPPE-Recv-Key", p, EAPTLS_MPPE_KEY_LEN);
+	p += EAPTLS_MPPE_KEY_LEN;
+	add_reply(reply_vps, "MS-MPPE-Send-Key", p, EAPTLS_MPPE_KEY_LEN);
+
+	add_reply(reply_vps, "EAP-MSK", out, 64);
+	add_reply(reply_vps, "EAP-EMSK", out + 64, 64);
+}
+
+
+#define EAPTLS_PRF_CHALLENGE        "ttls challenge"
+
+/*
+ *	Generate the TTLS challenge
+ *
+ *	It's in the TLS module simply because it's only a few lines
+ *	of code, and it needs access to the TLS PRF functions.
+ */
+void eapttls_gen_challenge(CYASSL *s, uint8_t *buffer, size_t size)
+{
+	uint8_t out[32], buf[32];
+	uint8_t seed[sizeof(EAPTLS_PRF_CHALLENGE)-1 + 2*EAPTLS_MPPE_KEY_LEN];
+	uint8_t *p = seed;
+	unsigned char *masterSecret, *clientRandom, *serverRandom;
+	unsigned int msLen, crLen, srLen;
+
+	CyaSSL_get_keys(s,
+			&masterSecret, &msLen,
+			&serverRandom, &srLen,
+			&clientRandom, &crLen);
+
+	memcpy(p, EAPTLS_PRF_CHALLENGE, sizeof(EAPTLS_PRF_CHALLENGE)-1);
+	p += sizeof(EAPTLS_PRF_CHALLENGE)-1;
+	memcpy(p, clientRandom, crLen);
+	p += crLen;
+	memcpy(p, serverRandom, srLen);
+
+	PRF(masterSecret, msLen,
+	    seed, sizeof(seed), out, buf, sizeof(out));
+
+	memcpy(buffer, out, size);
+}
+
+#endif
+

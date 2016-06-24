@@ -8,6 +8,7 @@
 *.lai
 .libs
 .depends
+.*.swp
 config.log
 config.status
 Make.inc
@@ -17,3 +18,14 @@ src/include/build-radpaths-h
 src/include/radpaths.h
 src/include/stamp-h
 autom4te.cache
+tags
+err
+libltdl/Makefile
+src/modules/lib/
+src/modules/rlm_eap/Makefile
+src/modules/rlm_eap/types/rlm_eap_ikev2/Makefile
+src/modules/rlm_eap/types/rlm_eap_peap/config.h
+src/modules/rlm_eap/types/rlm_eap_tls/Makefile
+src/modules/rlm_eap/types/rlm_eap_tls/config.h
+src/modules/rlm_eap/types/rlm_eap_tnc/Makefile
+src/modules/rlm_eap/types/rlm_eap_ttls/config.h

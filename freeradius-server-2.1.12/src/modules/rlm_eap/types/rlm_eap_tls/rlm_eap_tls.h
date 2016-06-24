@@ -37,17 +37,21 @@ typedef struct eap_tls_conf {
 	char		*private_key_password;
 	char		*private_key_file;
 	char		*certificate_file;
+#ifndef NO_OPENSSL
 	char		*random_file;
+#endif
 	char		*ca_path;
 	char		*ca_file;
 	char		*dh_file;
 	char		*rsa_file;
 	char		*make_cert_command;
+#ifndef NO_OPENSSL
 	int		rsa_key;
 	int		dh_key;
 	int		rsa_key_length;
 	int		dh_key_length;
 	int		verify_depth;
+#endif
 	int		file_type;
 	int		include_length;
 
@@ -55,44 +59,53 @@ typedef struct eap_tls_conf {
 	 *	Always < 4096 (due to radius limit), 0 by default = 2048
 	 */
 	int		fragment_size;
+#ifndef NO_OPENSSL
 	int		check_crl;
 	int		allow_expired_crl;
+	char		*check_cert_issuer;
+#endif
 	char		*check_cert_cn;
 	char		*cipher_list;
-	char		*check_cert_issuer;
 
-        int     	session_cache_enable;
-        int     	session_timeout;
-        int     	session_cache_size;
-	char		*session_id_name;
+	int     	session_cache_enable;
+	int     	session_timeout;
+#ifndef NO_OPENSSL
+    int     	session_cache_size;
+    char		*session_id_name;
 	char		session_context_id[128];
 	time_t		session_last_flushed;
-
+	
 	char		*verify_tmp_dir;
 	char		*verify_client_cert_cmd;
-
-#ifdef HAVE_OPENSSL_OCSP_H
-	/*
-	 * OCSP Configuration
-	 */
-	int		ocsp_enable;
-	int		ocsp_override_url;
-	char		*ocsp_url;
-#endif
 
 #if OPENSSL_VERSION_NUMBER >= 0x0090800fL
 #ifndef OPENSSL_NO_ECDH
 	char		*ecdh_curve;
 #endif
 #endif
+#endif /* ifndef NO_OPENSSL */
+
+	/*
+	 * OCSP Configuration
+	 */
+	int		ocsp_enable;
+	int		ocsp_override_url;
+	char		*ocsp_url;
 } EAP_TLS_CONF;
 
 /* This structure gets stored in arg */
 typedef struct _eap_tls_t {
 	EAP_TLS_CONF 	*conf;
+
+#ifndef NO_OPENSSL
 	SSL_CTX		*ctx;
 #ifdef HAVE_OPENSSL_OCSP_H
 	X509_STORE	*store; /* OCSP Revocation Store */
+#endif
+#endif
+
+#ifndef NO_CYASSL
+	CYASSL_CTX	*ctx;
 #endif
 } eap_tls_t;
 

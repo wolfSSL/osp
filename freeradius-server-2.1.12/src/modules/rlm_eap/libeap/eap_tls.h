@@ -65,6 +65,11 @@ RCSIDH(eap_tls_h, "$Id$")
 #include <openssl/ssl.h>
 #endif /* !defined(NO_OPENSSL) */
 
+#ifndef NO_CYASSL
+#include <cyassl/ssl.h>
+#endif
+
+
 #include "eap.h"
 
 typedef enum {
@@ -139,12 +144,19 @@ typedef struct _tls_info_t {
  * 					if set to no then only the first fragment contains length
  */
 typedef struct _tls_session_t {
+#ifndef NO_OPENSSL
 	SSL_CTX		*ctx;
 	SSL 		*ssl;
-	tls_info_t	info;
-
 	BIO 		*into_ssl;
 	BIO 		*from_ssl;
+#endif
+#ifndef NO_CYASSL
+	CYASSL_CTX	*ctx;
+	CYASSL		*ssl;
+#endif
+
+	tls_info_t	info;
+
 	record_t 	clean_in;
 	record_t 	clean_out;
 	record_t 	dirty_in;
@@ -191,9 +203,16 @@ int 		eaptls_request(EAP_DS *eap_ds, tls_session_t *ssn);
 
 
 /* MPPE key generation */
+#ifndef NO_OPENSSL
 void            eaptls_gen_mppe_keys(VALUE_PAIR **reply_vps, SSL *s,
 				     const char *prf_label);
 void		eapttls_gen_challenge(SSL *s, uint8_t *buffer, size_t size);
+#endif
+#ifndef NO_CYASSL
+void            eaptls_gen_mppe_keys(VALUE_PAIR **reply_vps, CYASSL *s,
+				     const char *prf_label);
+void		eapttls_gen_challenge(CYASSL *s, uint8_t *buffer, size_t size);
+#endif
 
 #define BUFFER_SIZE 1024
 
@@ -323,7 +342,7 @@ enum HandshakeType {
       The TLS data consists of the encapsulated TLS packet in TLS record
       format.
  *
- * The data structures present here
+ 
  * maps only to the typedata in the EAP packet
  *
  * Based on the L bit flag, first 4 bytes of data indicate the length
@@ -353,12 +372,26 @@ int 		eaptls_compose(EAP_DS *eap_ds, EAPTLS_PACKET *reply);
 
 /* Callbacks */
 int 		cbtls_password(char *buf, int num, int rwflag, void *userdata);
+#ifndef NO_OPENSSL
 void 		cbtls_info(const SSL *s, int where, int ret);
 void 		cbtls_msg(int write_p, int msg_version, int content_type,
 	       		const void *buf, size_t len, SSL *ssl, void *arg);
+#endif
+#ifndef NO_CYASSL
+void 		cbtls_info(const CYASSL *s, int where, int ret);
+void 		cbtls_msg(int write_p, int msg_version, int content_type,
+	       		const void *buf, size_t len, CYASSL *ssl, void *arg);
+int cbtls_cyassl_io_read(char *buf, int sz, void *ctx);
+int cbtls_cyassl_io_write(char *buf, int sz, void *ctx);
+#endif
 
 /* TLS */
-tls_session_t 	*eaptls_new_session(SSL_CTX *ssl_ctx, int client_cert);
+#ifndef NO_OPENSSL
+tls_session_t 	*eaptls_new_session(SSL_CTX *ctx, int client_cert);
+#endif
+#ifndef NO_CYASSL
+tls_session_t 	*eaptls_new_session(CYASSL_CTX *ctx, int client_cert);
+#endif
 int 		tls_handshake_recv(REQUEST *, tls_session_t *ssn);
 int 		tls_handshake_send(REQUEST *,tls_session_t *ssn);
 void 		tls_session_information(tls_session_t *tls_session);

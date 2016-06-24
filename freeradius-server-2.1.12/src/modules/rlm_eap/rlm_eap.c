@@ -168,15 +168,15 @@ static int eap_instantiate(CONF_SECTION *cs, void **instance)
 			return -1;
 		}
 
-#ifndef HAVE_OPENSSL_SSL_H
+#if !(defined(HAVE_OPENSSL_SSL_H) || defined(HAVE_CYASSL_SSL_H))
 		/*
 		 *	This allows the default configuration to be
 		 *	shipped with EAP-TLS, etc. enabled.  If the
-		 *	system doesn't have OpenSSL, they will be
-		 *	ignored.
+		 *	system doesn't have OpenSSL or CyaSSL, they
+		 *	will be ignored.
 		 *
-		 *	If the system does have OpenSSL, then this
-		 *	code will not be used.  The administrator will
+		 *	If the system does have OpenSSL or CyaSSL, then this
+		 *	this code will not be used.  The administrator will
 		 *	then have to delete the tls,
 		 *	etc. configurations from eap.conf in order to
 		 *	have EAP without the TLS types.
@@ -184,7 +184,7 @@ static int eap_instantiate(CONF_SECTION *cs, void **instance)
 		if ((eap_type == PW_EAP_TLS) ||
 		    (eap_type == PW_EAP_TTLS) ||
 		    (eap_type == PW_EAP_PEAP)) {
-			DEBUG2("Ignoring EAP-Type/%s because we do not have OpenSSL support.", auth_type);
+			DEBUG2("Ignoring EAP-Type/%s because we do not have SSL support.", auth_type);
 			continue;
 		}
 #endif

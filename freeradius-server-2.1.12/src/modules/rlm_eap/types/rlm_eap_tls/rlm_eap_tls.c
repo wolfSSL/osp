@@ -26,6 +26,10 @@
 #include <freeradius-devel/ident.h>
 RCSID("$Id$")
 
+#include "rlm_eap_tls.h"
+
+#ifndef NO_OPENSSL
+
 #include <freeradius-devel/autoconf.h>
 
 #ifdef HAVE_OPENSSL_RAND_H
@@ -1604,6 +1608,641 @@ static int eaptls_authenticate(void *arg, EAP_HANDLER *handler)
 	 */
 	return eaptls_success(handler, 0);
 }
+
+#endif /* ifndef NO_OPENSSL */
+
+#ifndef NO_CYASSL
+
+#include <freeradius-devel/autoconf.h>
+#include <sys/stat.h>
+#include <cyassl/ssl.h>
+#include "rlm_eap_tls.h"
+#include "config.h"
+
+static CONF_PARSER cache_config[] = {
+	{ "enable", PW_TYPE_BOOLEAN,
+	  offsetof(EAP_TLS_CONF, session_cache_enable), NULL, "no" },
+	{ "lifetime", PW_TYPE_INTEGER,
+	  offsetof(EAP_TLS_CONF, session_timeout), NULL, "24" },
+ 	{ NULL, -1, 0, NULL, NULL }           /* end the list */
+};
+
+static CONF_PARSER ocsp_config[] = {
+	{ "enable", PW_TYPE_BOOLEAN,
+	  offsetof(EAP_TLS_CONF, ocsp_enable), NULL, "no"},
+	{ "override_cert_url", PW_TYPE_BOOLEAN,
+	  offsetof(EAP_TLS_CONF, ocsp_override_url), NULL, "yes"},
+	{ "url", PW_TYPE_STRING_PTR,
+	  offsetof(EAP_TLS_CONF, ocsp_url), NULL, NULL },
+ 	{ NULL, -1, 0, NULL, NULL }           /* end the list */
+};
+
+static CONF_PARSER module_config[] = {
+	{ "CA_path", PW_TYPE_FILENAME,
+	  offsetof(EAP_TLS_CONF, ca_path), NULL, NULL },
+	{ "pem_file_type", PW_TYPE_BOOLEAN,
+	  offsetof(EAP_TLS_CONF, file_type), NULL, "yes" },
+	{ "private_key_file", PW_TYPE_FILENAME,
+	  offsetof(EAP_TLS_CONF, private_key_file), NULL, NULL },
+	{ "certificate_file", PW_TYPE_FILENAME,
+	  offsetof(EAP_TLS_CONF, certificate_file), NULL, NULL },
+	{ "CA_file", PW_TYPE_FILENAME,
+	  offsetof(EAP_TLS_CONF, ca_file), NULL, NULL },
+	{ "private_key_password", PW_TYPE_STRING_PTR,
+	  offsetof(EAP_TLS_CONF, private_key_password), NULL, NULL },
+	{ "dh_file", PW_TYPE_STRING_PTR,
+	  offsetof(EAP_TLS_CONF, dh_file), NULL, NULL },
+	{ "fragment_size", PW_TYPE_INTEGER,
+	  offsetof(EAP_TLS_CONF, fragment_size), NULL, "1024" },
+	{ "include_length", PW_TYPE_BOOLEAN,
+	  offsetof(EAP_TLS_CONF, include_length), NULL, "yes" },
+//	{ "check_crl", PW_TYPE_BOOLEAN,
+//	  offsetof(EAP_TLS_CONF, check_crl), NULL, "no"},
+//	{ "allow_expired_crl", PW_TYPE_BOOLEAN,
+//	  offsetof(EAP_TLS_CONF, allow_expired_crl), NULL, NULL},
+	{ "check_cert_cn", PW_TYPE_STRING_PTR,
+	  offsetof(EAP_TLS_CONF, check_cert_cn), NULL, NULL},
+	{ "cipher_list", PW_TYPE_STRING_PTR,
+	  offsetof(EAP_TLS_CONF, cipher_list), NULL, NULL},
+	{ "make_cert_command", PW_TYPE_STRING_PTR,
+	  offsetof(EAP_TLS_CONF, make_cert_command), NULL, NULL},
+
+	{ "cache", PW_TYPE_SUBSECTION, 0, NULL, (const void *) cache_config },
+	{ "ocsp", PW_TYPE_SUBSECTION, 0, NULL, (const void *) ocsp_config },
+
+ 	{ NULL, -1, 0, NULL, NULL }           /* end the list */
+};
+
+
+/*
+ *	Create Global context SSL and use it in every new session
+ *
+ *	- Load the trusted CAs
+ *	- Load the Private key & the certificate
+ *	- Set the Context options & Verify options
+ */
+static CYASSL_CTX *init_tls_ctx(EAP_TLS_CONF *conf)
+{
+	CYASSL_METHOD *meth;
+	CYASSL_CTX *ctx;
+	int verify_mode = SSL_VERIFY_NONE;
+	int type;
+
+	/*
+	 *	Add all the default ciphers and message digests
+	 *	Create our context.
+	 */
+	CyaSSL_Init();
+	if (debug_flag > 0)
+		CyaSSL_Debugging_ON();
+
+	meth = CyaSSLv23_server_method();
+	ctx = CyaSSL_CTX_new(meth);
+
+	/*
+	 * Identify the type of certificates that needs to be loaded
+	 */
+	if (conf->file_type) {
+		type = SSL_FILETYPE_PEM;
+	} else {
+		type = SSL_FILETYPE_ASN1;
+	}
+
+	/*
+	 * Set the password to load private key
+	 */
+	if (conf->private_key_password) {
+#ifdef __APPLE__
+		/*
+		 * We don't want to put the private key password in eap.conf, so  check
+		 * for our special string which indicates we should get the password
+		 * programmatically. 
+		 */
+		const char* special_string = "Apple:UseCertAdmin";
+		if (strncmp(conf->private_key_password,
+					special_string,
+					strlen(special_string)) == 0)
+		{
+			char cmd[256];
+			const long max_password_len = 128;
+			snprintf(cmd, sizeof(cmd) - 1,
+					 "/usr/sbin/certadmin --get-private-key-passphrase \"%s\"",
+					 conf->private_key_file);
+
+			DEBUG2("rlm_eap: Getting private key passphrase using command \"%s\"", cmd);
+
+			FILE* cmd_pipe = popen(cmd, "r");
+			if (!cmd_pipe) {
+				radlog(L_ERR, "rlm_eap: %s command failed.	Unable to get private_key_password", cmd);
+				radlog(L_ERR, "rlm_eap: Error reading private_key_file %s", conf->private_key_file);
+				return NULL;
+			}
+
+			free(conf->private_key_password);
+			conf->private_key_password = malloc(max_password_len * sizeof(char));
+			if (!conf->private_key_password) {
+				radlog(L_ERR, "rlm_eap: Can't malloc space for private_key_password");
+				radlog(L_ERR, "rlm_eap: Error reading private_key_file %s", conf->private_key_file);
+				pclose(cmd_pipe);
+				return NULL;
+			}
+
+			fgets(conf->private_key_password, max_password_len, cmd_pipe);
+			pclose(cmd_pipe);
+
+			/* Get rid of newline at end of password. */
+			conf->private_key_password[strlen(conf->private_key_password) - 1] = '\0';
+			DEBUG2("rlm_eap:  Password from command = \"%s\"", conf->private_key_password);
+		}
+#endif
+		CyaSSL_CTX_set_default_passwd_cb_userdata(ctx, conf->private_key_password);
+		CyaSSL_CTX_set_default_passwd_cb(ctx, cbtls_password);
+	}
+
+	/*
+	 *	Load our keys and certificates
+	 *
+	 *	If certificates are of type PEM then we can make use
+	 *	of cert chain authentication using openssl api call
+	 *	SSL_CTX_use_certificate_chain_file.  Please see how
+	 *	the cert chain needs to be given in PEM from
+	 *	openSSL.org
+	 */
+	 {
+	 	int error;
+		char label[80];
+		if (type == SSL_FILETYPE_PEM) {
+			error = CyaSSL_CTX_use_certificate_chain_file(ctx, conf->certificate_file);
+		} else {
+			error = CyaSSL_CTX_use_certificate_file(ctx, conf->certificate_file, type); 
+		}
+
+		if (error != SSL_SUCCESS) {
+			radlog(L_ERR, "rlm_eap: SSL error %s", CyaSSL_ERR_error_string(error, label));
+			radlog(L_ERR, "rlm_eap_tls: Error reading certificate file %s", conf->certificate_file);
+			return NULL;
+		}
+	
+		/* Load the CAs we trust */
+		if (conf->ca_file || conf->ca_path) {
+			error = CyaSSL_CTX_load_verify_locations(ctx, conf->ca_file, conf->ca_path);
+			if (error != SSL_SUCCESS) {
+				radlog(L_ERR, "rlm_eap: SSL error %s", CyaSSL_ERR_error_string(error, label));
+				radlog(L_ERR, "rlm_eap_tls: Error reading Trusted root CA list %s",conf->ca_file );
+				return NULL;
+			}
+		}
+		error = CyaSSL_CTX_use_PrivateKey_file(ctx, conf->private_key_file, type); 
+		if (error != SSL_SUCCESS) {
+			radlog(L_ERR, "rlm_eap: SSL error %s", CyaSSL_ERR_error_string(error, label));
+			radlog(L_ERR, "rlm_eap_tls: Error reading private key file %s", conf->private_key_file);
+			return NULL;
+		}
+	}
+
+	/*
+	 *	Set verify modes
+	 *	Always verify the peer certificate
+	 */
+	verify_mode |= SSL_VERIFY_PEER;
+	verify_mode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+	verify_mode |= SSL_VERIFY_CLIENT_ONCE;
+	CyaSSL_CTX_set_verify(ctx, verify_mode, NULL);
+
+	/*
+	 * Set the ECDH size, 48 yields 384 bits
+	 */
+	CyaSSL_CTX_SetTmpEC_DHE_Sz(ctx, 48);
+
+	/*
+	 * Set the cipher list if we were told to
+	 */
+	if (conf->cipher_list) {
+		if (!CyaSSL_CTX_set_cipher_list(ctx, conf->cipher_list)) {
+			radlog(L_ERR, "rlm_eap_tls: Error setting cipher list");
+			return NULL;
+		}
+	}
+
+	/*
+	 * OCSP Settings
+	 */
+	if (conf->ocsp_enable) {
+		long ocsp_options;
+
+		if (conf->ocsp_override_url)
+		{
+			ocsp_options = (CYASSL_OCSP_ENABLE | CYASSL_OCSP_URL_OVERRIDE);
+			CyaSSL_CTX_OCSP_set_override_url(ctx, conf->ocsp_url);
+		}
+		else
+			ocsp_options = CYASSL_OCSP_ENABLE;
+
+		CyaSSL_CTX_OCSP_set_options(ctx, ocsp_options);
+	}
+
+	/*
+	 *  Setup the read and write callbacks
+	 */
+	CyaSSL_SetIORecv(ctx, cbtls_cyassl_io_read);
+	CyaSSL_SetIOSend(ctx, cbtls_cyassl_io_write);
+
+	/*
+	 *	Setup session caching
+	 */
+	if (conf->session_cache_enable) {
+		/*
+		 *	Cache it, and DON'T auto-clear it.
+		 */
+		CyaSSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_NO_AUTO_CLEAR);
+		/*
+		 *	Our timeout is in hours, this is in seconds.
+		 */
+		CyaSSL_CTX_set_timeout(ctx, conf->session_timeout * 3600);
+	} else {
+		CyaSSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
+	}
+
+
+	return ctx;
+}
+
+
+/*
+ *	Detach the EAP-TLS module.
+ */
+static int eaptls_detach(void *arg)
+{
+	EAP_TLS_CONF	 *conf;
+	eap_tls_t 	 *inst;
+
+	inst = (eap_tls_t *) arg;
+	conf = inst->conf;
+
+	if (conf) {
+		memset(conf, 0, sizeof(*conf));
+		free(inst->conf);
+		inst->conf = NULL;
+	}
+
+	if (inst->ctx) CyaSSL_CTX_free(inst->ctx);
+	inst->ctx = NULL;
+
+	free(inst);
+
+	return 0;
+}
+
+
+/*
+ *	Attach the EAP-TLS module.
+ */
+static int eaptls_attach(CONF_SECTION *cs, void **instance)
+{
+	EAP_TLS_CONF	 *conf;
+	eap_tls_t 	 *inst;
+
+	/* Store all these values in the data structure for later references */
+	inst = (eap_tls_t *)malloc(sizeof(*inst));
+	if (!inst) {
+		radlog(L_ERR, "rlm_eap_tls: out of memory");
+		return -1;
+	}
+	memset(inst, 0, sizeof(*inst));
+
+	/*
+	 *	Parse the config file & get all the configured values
+	 */
+	conf = (EAP_TLS_CONF *)malloc(sizeof(*conf));
+	if (conf == NULL) {
+		free(inst);
+		radlog(L_ERR, "rlm_eap_tls: out of memory");
+		return -1;
+	}
+	memset(conf, 0, sizeof(*conf));
+
+	inst->conf = conf;
+	if (cf_section_parse(cs, conf, module_config) < 0) {
+		eaptls_detach(inst);
+		return -1;
+	}
+
+	/*
+	 *	The EAP RFC's say 1020, but we're less picky.
+	 */
+	if (conf->fragment_size < 100) {
+		radlog(L_ERR, "rlm_eap_tls: Fragment size is too small.");
+		eaptls_detach(inst);
+		return -1;
+	}
+
+	/*
+	 *	The maximum size for a RADIUS packet is 4096,
+	 *	minus the header (20), Message-Authenticator (18),
+	 *	and State (18), etc. results in about 4000 bytes of data
+	 *	that can be devoted *solely* to EAP.
+	 */
+	if (conf->fragment_size > 4000) {
+		radlog(L_ERR, "rlm_eap_tls: Fragment size is too large.");
+		eaptls_detach(inst);
+		return -1;
+	}
+
+	/*
+	 *	Account for the EAP header (4), and the EAP-TLS header
+	 *	(6), as per Section 4.2 of RFC 2716.  What's left is
+	 *	the maximum amount of data we read from a TLS buffer.
+	 */
+	conf->fragment_size -= 10;
+
+	/*
+	 *	This magic makes the administrators life HUGELY easier
+	 *	on initial deployments.
+	 *
+	 *	If the server starts up in debugging mode, AND the
+	 *	bootstrap command is configured, AND it exists, AND
+	 *	there is no server certificate
+	 */
+	if (conf->make_cert_command && (debug_flag >= 2)) {
+		struct stat buf;
+
+		if ((stat(conf->make_cert_command, &buf) == 0) &&
+		    (stat(conf->certificate_file, &buf) < 0) &&
+		    (errno == ENOENT) &&
+		    (radius_exec_program(conf->make_cert_command, NULL, 1,
+					 NULL, 0, NULL, NULL, 0) != 0)) {
+			eaptls_detach(inst);
+			return -1;
+		}
+	}
+
+
+	/*
+	 *	Initialize TLS
+	 */
+	inst->ctx = init_tls_ctx(conf);
+	if (inst->ctx == NULL) {
+		eaptls_detach(inst);
+		return -1;
+	}
+
+	if (CyaSSL_CTX_SetTmpDH_file(inst->ctx, conf->dh_file, conf->file_type) < 0) {
+		radlog(L_DBG, "warning: rlm_eap_tls: unable to set dh parameters.  dh cipher suites may not work!");
+		radlog(L_DBG, "warning: fix this by running the openssl command listed in eap.conf");
+		eaptls_detach(inst);
+		return -1;
+	}
+
+	*instance = inst;
+
+	return 0;
+}
+
+
+/*
+ *	Send an initial eap-tls request to the peer.
+ *
+ *	Frame eap reply packet.
+ *	len = header + type + tls_typedata
+ *	tls_typedata = flags(Start (S) bit set, and no data)
+ *
+ *	Once having received the peer's Identity, the EAP server MUST
+ *	respond with an EAP-TLS/Start packet, which is an
+ *	EAP-Request packet with EAP-Type=EAP-TLS, the Start (S) bit
+ *	set, and no data.  The EAP-TLS conversation will then begin,
+ *	with the peer sending an EAP-Response packet with
+ *	EAP-Type = EAP-TLS.  The data field of that packet will
+ *	be the TLS data.
+ *
+ *	Fragment length is Framed-MTU - 4.
+ *
+ *	http://mail.frascone.com/pipermail/public/eap/2003-July/001426.html
+ */
+static int eaptls_initiate(void *type_arg, EAP_HANDLER *handler)
+{
+	int		status;
+	tls_session_t	*ssn;
+	eap_tls_t	*inst;
+	VALUE_PAIR	*vp;
+	int		client_cert = TRUE;
+	int		verify_mode = 0;
+	REQUEST		*request = handler->request;
+
+	inst = (eap_tls_t *)type_arg;
+
+	handler->tls = TRUE;
+	handler->finished = FALSE;
+
+	/*
+	 *	If we're TTLS or PEAP, then do NOT require a client
+	 *	certificate.
+	 *
+	 *	FIXME: This should be more configurable.
+	 */
+	if (handler->eap_type != PW_EAP_TLS) {
+		vp = pairfind(handler->request->config_items,
+			      PW_EAP_TLS_REQUIRE_CLIENT_CERT);
+		if (!vp) {
+			client_cert = FALSE;
+		} else {
+			client_cert = vp->vp_integer;
+		}
+	}
+
+	/*
+	 *	Every new session is started only from EAP-TLS-START.
+	 *	Before Sending EAP-TLS-START, open a new SSL session.
+	 *	Create all the required data structures & store them
+	 *	in Opaque.  So that we can use these data structures
+	 *	when we get the response
+	 */
+	ssn = eaptls_new_session(inst->ctx, client_cert);
+	if (!ssn) {
+		return 0;
+	}
+
+	/*
+	 *	Verify the peer certificate, if asked.
+	 */
+	if (client_cert) {
+		RDEBUG2("Requiring client certificate");
+		verify_mode = SSL_VERIFY_PEER;
+		verify_mode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+		verify_mode |= SSL_VERIFY_CLIENT_ONCE;
+	}
+	CyaSSL_set_verify(ssn->ssl, verify_mode, NULL);
+
+	ssn->length_flag = inst->conf->include_length;
+
+	/*
+	 *	We use default fragment size, unless the Framed-MTU
+	 *	tells us it's too big.  Note that we do NOT account
+	 *	for the EAP-TLS headers if conf->fragment_size is
+	 *	large, because that config item looks to be confusing.
+	 *
+	 *	i.e. it should REALLY be called MTU, and the code here
+	 *	should figure out what that means for TLS fragment size.
+	 *	asking the administrator to know the internal details
+	 *	of EAP-TLS in order to calculate fragment sizes is
+	 *	just too much.
+	 */
+	ssn->offset = inst->conf->fragment_size;
+	vp = pairfind(handler->request->packet->vps, PW_FRAMED_MTU);
+	if (vp && ((vp->vp_integer - 14) < ssn->offset)) {
+		/*
+		 *	Discount the Framed-MTU by:
+		 *	 4 : EAPOL header
+		 *	 4 : EAP header (code + id + length)
+		 *	 1 : EAP type == EAP-TLS
+		 *	 1 : EAP-TLS Flags
+		 *	 4 : EAP-TLS Message length
+		 *	    (even if conf->include_length == 0,
+		 *	     just to be lazy).
+		 *	---
+		 *	14
+		 */
+		ssn->offset = vp->vp_integer - 14;
+	}
+
+	handler->opaque = ((void *)ssn);
+	handler->free_opaque = session_free;
+
+	RDEBUG2("Initiate");
+
+	/*
+	 *	Set up type-specific information.
+	 */
+	switch (handler->eap_type) {
+	case PW_EAP_TLS:
+	default:
+		ssn->prf_label = "client EAP encryption";
+		break;
+
+	case PW_EAP_TTLS:
+		ssn->prf_label = "ttls keying material";
+		break;
+
+		/*
+		 *	PEAP-specific breakage.
+		 */
+	case PW_EAP_PEAP:
+		/*
+		 *	As it is a poorly designed protocol, PEAP uses
+		 *	bits in the TLS header to indicate PEAP
+		 *	version numbers.  For now, we only support
+		 *	PEAP version 0, so it doesn't matter too much.
+		 *	However, if we support later versions of PEAP,
+		 *	we will need this flag to indicate which
+		 *	version we're currently dealing with.
+		 */
+		ssn->peap_flag = 0x00;
+
+		/*
+		 *	PEAP version 0 requires 'include_length = no',
+		 *	so rather than hoping the user figures it out,
+		 *	we force it here.
+		 */
+		ssn->length_flag = 0;
+
+		ssn->prf_label = "client EAP encryption";
+		break;
+	}
+
+	if (inst->conf->session_cache_enable) {
+		ssn->allow_session_resumption = 1; /* otherwise it's zero */
+	}
+
+	/*
+	 *	TLS session initialization is over.  Now handle TLS
+	 *	related handshaking or application data.
+	 */
+	status = eaptls_start(handler->eap_ds, ssn->peap_flag);
+	RDEBUG2("Start returned %d", status);
+	if (status == 0)
+		return 0;
+
+	/*
+	 *	The next stage to process the packet.
+	 */
+	handler->stage = AUTHENTICATE;
+
+	return 1;
+}
+
+/*
+ *	Do authentication, by letting EAP-TLS do most of the work.
+ */
+static int eaptls_authenticate(void *arg, EAP_HANDLER *handler)
+{
+	eaptls_status_t	status;
+	tls_session_t *tls_session = (tls_session_t *) handler->opaque;
+	REQUEST *request = handler->request;
+
+	RDEBUG2("Authenticate");
+
+	(void)arg;
+	status = eaptls_process(handler);
+	RDEBUG2("eaptls_process returned %d\n", status);
+	switch (status) {
+		/*
+		 *	EAP-TLS handshake was successful, return an
+		 *	EAP-TLS-Success packet here.
+		 */
+	case EAPTLS_SUCCESS:
+		break;
+
+		/*
+		 *	The TLS code is still working on the TLS
+		 *	exchange, and it's a valid TLS request.
+		 *	do nothing.
+		 */
+	case EAPTLS_HANDLED:
+		return 1;
+
+		/*
+		 *	Handshake is done, proceed with decoding tunneled
+		 *	data.
+		 */
+	case EAPTLS_OK:
+		RDEBUG2("Received unexpected tunneled data after successful handshake.");
+#ifndef NDEBUG
+		if ((debug_flag > 2) && fr_log_fp) {
+			unsigned int i;
+			unsigned int data_len;
+			unsigned char buffer[1024];
+
+			data_len = (tls_session->record_minus)(&tls_session->dirty_in,
+						buffer, sizeof(buffer));
+			log_debug("  Tunneled data (%u bytes)\n", data_len);
+			for (i = 0; i < data_len; i++) {
+				if ((i & 0x0f) == 0x00) fprintf(fr_log_fp, "  %x: ", i);
+				if ((i & 0x0f) == 0x0f) fprintf(fr_log_fp, "\n");
+
+				fprintf(fr_log_fp, "%02x ", buffer[i]);
+			}
+			fprintf(fr_log_fp, "\n");
+		}
+#endif
+
+		eaptls_fail(handler, 0);
+		return 0;
+		break;
+
+		/*
+		 *	Anything else: fail.
+		 */
+	default:
+		return 0;
+	}
+
+	/*
+	 *	Success: Automatically return MPPE keys.
+	 */
+	return eaptls_success(handler, 0);
+}
+
+#endif /* ifndef NO_CYASSL */
+
 
 /*
  *	The module name should be the only globally exported symbol.

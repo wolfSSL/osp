@@ -1,0 +1,11 @@
+Build CyaSSL v2.2.2 with the commands:
+
+    $ ./configure --enable-fortress --enable-ocsp
+    $ make
+    $ sudo make install
+
+Build FreeRADIUS with the commands:
+
+    $ ./configure --with-cyassl --without-openssl
+    $ make
+    $ sudo make install

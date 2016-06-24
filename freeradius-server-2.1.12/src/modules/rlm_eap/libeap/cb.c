@@ -26,6 +26,11 @@ RCSID("$Id$")
 
 #include "eap_tls.h"
 
+/*
+** Most of this file are callbacks for OpenSSL. The password callback
+** is used by both OpenSSL and CyaSSL.
+*/
+
 #ifndef NO_OPENSSL
 
 void cbtls_info(const SSL *s, int where, int ret)
@@ -121,6 +126,7 @@ void cbtls_msg(int write_p, int msg_version, int content_type,
 	}
 	tls_session_information(state);
 }
+#endif /* !defined(NO_OPENSSL) */
 
 int cbtls_password(char *buf,
 		   int num UNUSED,
@@ -131,6 +137,7 @@ int cbtls_password(char *buf,
 	return(strlen((char *)userdata));
 }
 
+#ifndef NO_OPENSSL
 /*
  *	For callbacks
  */
