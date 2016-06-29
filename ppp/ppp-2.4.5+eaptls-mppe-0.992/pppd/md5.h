@@ -65,4 +65,13 @@ void MD5_Final (unsigned char hash[], MD5_CTX *mdContext);
 #define __MD5_INCLUDE__
 #endif /* __MD5_INCLUDE__ */
 
+#else /* USE_EAPTLS */
+
+#include <cyassl/ctaocrypt/md5.h>
+
+typedef Md5 MD5_CTX;
+#define MD5_Init InitMd5
+#define MD5_Update Md5Update
+#define MD5_Final(x,y) Md5Final((y), (x))
+
 #endif /* USE_EAPTLS */

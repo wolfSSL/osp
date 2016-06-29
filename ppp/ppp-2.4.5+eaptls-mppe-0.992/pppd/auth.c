@@ -251,6 +251,8 @@ char *cacert_file  = NULL;	/* CA certificate file (pem format) */
 char *cert_file    = NULL;	/* client certificate file (pem format) */
 char *privkey_file = NULL;	/* client private key file (pem format) */
 char *crl_dir      = NULL;	/* directory containing CRL files */
+char *dh_params    = NULL;
+char *suite_list   = NULL;
 bool need_peer_eap = 0;			/* Require peer to authenticate us */
 #endif
 
@@ -434,6 +436,8 @@ option_t auth_options[] = {
     { "cert", o_string, &cert_file,   "EAP-TLS client certificate in PEM format" },
     { "key", o_string, &privkey_file, "EAP-TLS client private key in PEM format" },
     { "crl-dir", o_string, &crl_dir,  "Use CRLs in directory" },
+    { "dh-params", o_string, &dh_params, "DH params" },
+    { "cipher-suites", o_string, &suite_list, "EAP-TLS Cipher suite list" },
     { "need-peer-eap", o_bool, &need_peer_eap,
       "Require the peer to authenticate us", 1 },
 #endif /* USE_EAPTLS */
@@ -2464,8 +2468,7 @@ have_eaptls_secret_server(client, server, need_ip, lacks_ipp)
 
     ret =
 	scan_authfile_eaptls(f, client, server, clicertfile, servcertfile,
-			     cacertfile, pkfile, &addrs, NULL, filename,
-			     0);
+			     cacertfile, pkfile, &addrs, NULL, filename, 0);
 
     fclose(f);
 
@@ -2516,8 +2519,7 @@ have_eaptls_secret_client(client, server)
 
     ret =
 	scan_authfile_eaptls(f, client, server, clicertfile, servcertfile,
-			     cacertfile, pkfile, &addrs, NULL, filename,
-			     0);
+			     cacertfile, pkfile, &addrs, NULL, filename, 0);
     fclose(f);
 
 /*
@@ -2642,7 +2644,6 @@ scan_authfile_eaptls(f, client, server, cli_cert, serv_cert, ca_cert, pk,
 	if (newline)
 	    continue;
 	strlcpy(pk, word, MAXWORDLEN);
-
 
 	/*
 	 * Now read address authorization info and make a wordlist.

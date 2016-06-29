@@ -68,10 +68,10 @@
 #include "pppd.h"
 #include "pathnames.h"
 #include "eap.h"
+#include "md5.h"
 #ifdef USE_EAPTLS
 #include "eap-tls.h"
 #else
-#include "md5.h"
 #endif /* USE_EAPTLS */
 
 #ifdef USE_SRP
@@ -628,7 +628,7 @@ int status;
 	case eapTlsSend:
 		ets = (struct eaptls_session *) esp->es_server.ea_session;
 
-		if(SSL_is_init_finished(ets->ssl)) {
+		if(CyaSSL_is_init_finished(ets->ssl)) {
 			esp->es_server.ea_state = eapTlsRecvClient; 
 			break;
 		}
@@ -1757,7 +1757,7 @@ int len;
 			}
 
 			/* Check if TLS handshake is finished */
-			if(SSL_is_init_finished(ets->ssl)){
+			if(CyaSSL_is_init_finished(ets->ssl)){
 #ifdef MPPE
  				eaptls_gen_mppe_keys( ets, "client EAP encryption", 1 );
 #endif

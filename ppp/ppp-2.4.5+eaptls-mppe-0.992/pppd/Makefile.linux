@@ -4,7 +4,7 @@
 #
 
 # Default installation locations
-DESTDIR = $(INSTROOT)@DESTDIR@
+DESTDIR = $(INSTROOT)/usr/local
 BINDIR = $(DESTDIR)/sbin
 MANDIR = $(DESTDIR)/share/man/man8
 INCDIR = $(DESTDIR)/include
@@ -82,7 +82,7 @@ INCLUDE_DIRS= -I../include
 
 COMPILE_FLAGS= -DHAVE_PATHS_H -DIPX_CHANGE -DHAVE_MMAP
 
-CFLAGS= $(COPTS) $(COMPILE_FLAGS) $(INCLUDE_DIRS) '-DDESTDIR="@DESTDIR@"'
+CFLAGS= $(COPTS) $(COMPILE_FLAGS) $(INCLUDE_DIRS) '-DDESTDIR="/usr/local"'
 
 ifdef CHAPMS
 CFLAGS   += -DCHAPMS=1
@@ -117,8 +117,8 @@ endif
 
 # EAP-TLS
 ifdef USE_EAPTLS
-CFLAGS += -DUSE_EAPTLS=1 -I/usr/kerberos/include
-LIBS += -lssl -lcrypto
+CFLAGS += -DUSE_EAPTLS=1
+LIBS += -lcyassl 
 PPPDSRC += eap-tls.c
 HEADERS += eap-tls.h
 PPPDOBJS += eap-tls.o

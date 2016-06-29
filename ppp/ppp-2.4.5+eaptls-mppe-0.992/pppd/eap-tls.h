@@ -34,27 +34,28 @@
 
 #include "eap.h"
 
-#include <openssl/ssl.h>
-#include <openssl/bio.h>
-#include <openssl/md5.h>
+#include <cyassl/ssl.h>
 
-#define EAP_TLS_FLAGS_LI        128	/* length included flag */
-#define EAP_TLS_FLAGS_MF        64	/* more fragments flag */
-#define EAP_TLS_FLAGS_START     32	/* start flag */
+#define EAP_TLS_FLAGS_LI	128	/* length included flag */
+#define EAP_TLS_FLAGS_MF	64	/* more fragments flag */
+#define EAP_TLS_FLAGS_START	32	/* start flag */
 
-#define EAP_TLS_MAX_LEN         65536	/* max eap tls packet size */
+#define EAP_TLS_MAX_LEN		65536	/* max eap tls packet size */
+
+#define EAP_TLS_NONE_STATE	0
+#define EAP_TLS_READ_STATE	1
+#define EAP_TLS_WRITE_STATE	2
 
 struct eaptls_session
 {
 	u_char *data;		/* buffered data */
 	int datalen;		/* buffered data len */
+	int dataused;		/* buffered data used */
 	int offset;		/* from where to send */
 	int tlslen;		/* total length of tls data */
 	bool frag;		/* packet is fragmented */
-	SSL_CTX *ctx;
-	SSL *ssl;		/* ssl connection */
-	BIO *from_ssl;
-	BIO *into_ssl;
+	CYASSL_CTX *ctx;
+	CYASSL *ssl;		/* ssl connection */
 	char peer[MAXWORDLEN];	/* peer name */
 	char peercertfile[MAXWORDLEN];
 	bool alert_sent;
@@ -64,6 +65,7 @@ struct eaptls_session
 	char rtx[65536];	/* retransmission buffer */
 	int rtx_len;
 	int mtu;		/* unit mtu */
+	int rwstate;
 };
 
 typedef struct pw_cb_data
@@ -73,15 +75,8 @@ typedef struct pw_cb_data
 } PW_CB_DATA;
 
 
-int ssl_verify_callback(int, X509_STORE_CTX *);
-void ssl_msg_callback(int write_p, int version, int ct, const void *buf,
-		      size_t len, SSL * ssl, void *arg);
-
-X509 *get_X509_from_file(char *filename);
-int ssl_cmp_certs(char *filename, X509 * a);
-
-SSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
-            char *certfile, char *peer_certfile, char *privkeyfile);
+CYASSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
+	char *certfile, char *peer_certfile, char *privkeyfile);
 int eaptls_init_ssl_server(eap_state * esp);
 int eaptls_init_ssl_client(eap_state * esp);
 void eaptls_free_session(struct eaptls_session *ets);
@@ -91,8 +86,8 @@ int eaptls_send(struct eaptls_session *ets, u_char ** outp);
 void eaptls_retransmit(struct eaptls_session *ets, u_char ** outp);
 
 int get_eaptls_secret(int unit, char *client, char *server,
-		      char *clicertfile, char *servcertfile, char *cacertfile,
-		      char *pkfile, int am_server);
+	char *clicertfile, char *servcertfile, char *cacertfile,
+	char *pkfile, int am_server);
 
 #ifdef MPPE
 #include "mppe.h"   /* MPPE_MAX_KEY_LEN */
