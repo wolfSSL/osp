@@ -1,6 +1,6 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
@@ -50,7 +50,6 @@ NOEXPORT void signal_handler(int);
 
 int main(int argc, char* argv[]) { /* execution begins here 8-) */
     int retval;
-
 #ifdef M_MMAP_THRESHOLD
     mallopt(M_MMAP_THRESHOLD, 4096);
 #endif
@@ -61,6 +60,8 @@ int main(int argc, char* argv[]) { /* execution begins here 8-) */
 }
 
 NOEXPORT int main_unix(int argc, char* argv[]) {
+    int configure_status;
+
 #if !defined(__vms) && !defined(USE_OS2)
     int fd;
 
@@ -73,9 +74,15 @@ NOEXPORT int main_unix(int argc, char* argv[]) {
     wolfSSL_SetLoggingCb((wolfSSL_Logging_cb)&wolfSSL_s_log);
 #endif
     main_init();
-    if(main_configure(argc>1 ? argv[1] : NULL, argc>2 ? argv[2] : NULL)) {
+    configure_status=main_configure(argc>1 ? argv[1] : NULL,
+        argc>2 ? argv[2] : NULL);
+    switch(configure_status) {
+    case 1: /* error -> exit with 1 to indicate error */
         close(fd);
         return 1;
+    case 2: /* information printed -> exit with 0 to indicate success */
+        close(fd);
+        return 0;
     }
     if(service_options.next) { /* there are service sections -> daemon mode */
 #if !defined(__vms) && !defined(USE_OS2)
@@ -105,6 +112,7 @@ NOEXPORT int main_unix(int argc, char* argv[]) {
 #endif
         daemon_loop();
     } else { /* inetd mode */
+        CLI *c;
 #if !defined(__vms) && !defined(USE_OS2)
         close(fd);
 #endif /* standard Unix */
@@ -114,7 +122,9 @@ NOEXPORT int main_unix(int argc, char* argv[]) {
 #endif
         set_nonblock(0, 1); /* stdin */
         set_nonblock(1, 1); /* stdout */
-        client_main(alloc_client_session(&service_options, 0, 1));
+        c=alloc_client_session(&service_options, 0, 1);
+        tls_alloc(c, ui_tls, NULL);
+        client_main(c);
     }
     return 0;
 }
@@ -219,12 +229,12 @@ void ui_config_reloaded(void) {
 #ifdef ICON_IMAGE
 
 ICON_IMAGE load_icon_default(ICON_TYPE icon) {
-    (void)icon; /* skip warning about unused parameter */
+    (void)icon; /* squash the unused parameter warning */
     return (ICON_IMAGE)0;
 }
 
 ICON_IMAGE load_icon_file(const char *file) {
-    (void)file; /* skip warning about unused parameter */
+    (void)file; /* squash the unused parameter warning */
     return (ICON_IMAGE)0;
 }
 
@@ -233,11 +243,11 @@ ICON_IMAGE load_icon_file(const char *file) {
 /**************************************** client callbacks */
 
 void ui_new_chain(const unsigned section_number) {
-    (void)section_number; /* skip warning about unused parameter */
+    (void)section_number; /* squash the unused parameter warning */
 }
 
 void ui_clients(const long num) {
-    (void)num; /* skip warning about unused parameter */
+    (void)num; /* squash the unused parameter warning */
 }
 
 /**************************************** s_log callbacks */
@@ -249,18 +259,13 @@ void ui_new_log(const char *line) {
 /**************************************** ctx callbacks */
 
 int passwd_cb(char *buf, int size, int rwflag, void *userdata) {
-    (void)buf; /* skip warning about unused parameter */
-    (void)size; /* skip warning about unused parameter */
-    (void)rwflag; /* skip warning about unused parameter */
-    (void)userdata; /* skip warning about unused parameter */
-    return 0; /* not implemented */
+    (void)userdata; /* squash the unused parameter warning */
+    return PEM_def_callback(buf, size, rwflag, NULL);
 }
 
 #ifndef OPENSSL_NO_ENGINE
-int pin_cb(UI *ui, UI_STRING *uis) {
-    (void)ui; /* skip warning about unused parameter */
-    (void)uis; /* skip warning about unused parameter */
-    return 0; /* not implemented */
+UI_METHOD *UI_stunnel() {
+    return UI_OpenSSL();
 }
 #endif
 

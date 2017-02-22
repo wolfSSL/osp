@@ -1,6 +1,6 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
@@ -55,7 +55,7 @@
 #define STUNNEL_PLATFORM "Win32"
 #endif
 #define SERVICE_NAME TEXT("stunnel")
-#define SERVICE_DISPLAY_NAME TEXT("Stunnel SSL wrapper")
+#define SERVICE_DISPLAY_NAME TEXT("Stunnel TLS wrapper")
 #endif
 
 /* mingw-Patches-1825044 is missing in Debian Squeeze */
@@ -71,6 +71,7 @@ NOEXPORT void CALLBACK timer_proc(HWND, UINT, UINT_PTR, DWORD);
 NOEXPORT LRESULT CALLBACK window_proc(HWND, UINT, WPARAM, LPARAM);
 NOEXPORT LRESULT CALLBACK about_proc(HWND, UINT, WPARAM, LPARAM);
 NOEXPORT LRESULT CALLBACK pass_proc(HWND, UINT, WPARAM, LPARAM);
+NOEXPORT int pin_cb(UI *, UI_STRING *);
 
 NOEXPORT void save_log(void);
 NOEXPORT void win_log(LPCTSTR);
@@ -83,10 +84,10 @@ NOEXPORT void daemon_thread(void *);
 NOEXPORT void valid_config(void);
 NOEXPORT void invalid_config(void);
 NOEXPORT void update_peer_menu(void);
-NOEXPORT void update_tray(const int);
+NOEXPORT void tray_update(const int);
+NOEXPORT void tray_delete(void);
 NOEXPORT void error_box(LPCTSTR);
 NOEXPORT void edit_config(HWND);
-NOEXPORT BOOL is_admin(void);
 
 /* NT Service related function */
 #ifndef _WIN32_WCE
@@ -109,8 +110,6 @@ static struct LIST {
   size_t len;
   TCHAR txt[1]; /* single character for trailing '\0' */
 } *head=NULL, *tail=NULL;
-
-static unsigned number_of_sections=0;
 
 static HINSTANCE ghInst;
 static HWND edit_handle=NULL;
@@ -161,9 +160,9 @@ int WINAPI WinMain(HINSTANCE this_instance, HINSTANCE prev_instance,
     LPTSTR errmsg;
 #endif
 
-    (void)prev_instance; /* skip warning about unused parameter */
-    (void)lpCmdLine; /* skip warning about unused parameter */
-    (void)nCmdShow; /* skip warning about unused parameter */
+    (void)prev_instance; /* squash the unused parameter warning */
+    (void)lpCmdLine; /* squash the unused parameter warning */
+    (void)nCmdShow; /* squash the unused parameter warning */
 
     tls_init(); /* initialize thread-local storage */
     ghInst=this_instance;
@@ -177,14 +176,18 @@ int WINAPI WinMain(HINSTANCE this_instance, HINSTANCE prev_instance,
             !cmdline.start && !cmdline.stop) {
         EnumWindows(enum_windows, (LPARAM)stunnel_exe_path);
         if(cmdline.exit)
-            return 0; /* in case EnumWindows didn't find a previous instance */
+            return 1; /* in case EnumWindows didn't find a previous instance */
     }
 #endif
 
     /* set current working directory and engine path */
     c=_tcsrchr(stunnel_exe_path, TEXT('\\')); /* last backslash */
-    if(c) /* found */
-        c[1]=TEXT('\0'); /* truncate program name */
+    if(c) { /* found */
+        *c=TEXT('\0'); /* truncate the program name */
+        c=_tcsrchr(stunnel_exe_path, TEXT('\\')); /* previous backslash */
+        if(c && !_tcscmp(c+1, TEXT("bin")))
+            *c=TEXT('\0'); /* truncate "bin" */
+    }
 #ifndef _WIN32_WCE
     if(!SetCurrentDirectory(stunnel_exe_path)) {
         errmsg=str_tprintf(TEXT("Cannot set directory to %s"),
@@ -193,8 +196,11 @@ int WINAPI WinMain(HINSTANCE this_instance, HINSTANCE prev_instance,
         str_free(errmsg);
         return 1;
     }
+    /* try to enter the "config" subdirectory, ignore the result */
+    SetCurrentDirectory(TEXT("config"));
 #endif
-    _tputenv(str_tprintf(TEXT("OPENSSL_ENGINES=%s"), stunnel_exe_path));
+    _tputenv(str_tprintf(TEXT("OPENSSL_ENGINES=%s\\engines"),
+        stunnel_exe_path));
 
     if(initialize_winsock())
         return 1;
@@ -222,14 +228,14 @@ int WINAPI WinMain(HINSTANCE this_instance, HINSTANCE prev_instance,
 
 NOEXPORT BOOL CALLBACK enum_windows(HWND other_window_handle, LPARAM lParam) {
     DWORD pid;
-    HINSTANCE hInstance;
+    HMODULE module;
     HANDLE process_handle;
     TCHAR window_exe_path[MAX_PATH];
     LPTSTR stunnel_exe_path=(LPTSTR)lParam;
 
     if(!other_window_handle)
         return TRUE;
-    hInstance=(HINSTANCE)GetWindowLong(other_window_handle, GWL_HINSTANCE);
+    module=(HMODULE)GetWindowLongPtr(other_window_handle, GWLP_HINSTANCE);
     GetWindowThreadProcessId(other_window_handle, &pid);
     process_handle=OpenProcess(SYNCHRONIZE|         /* WaitForSingleObject() */
         PROCESS_TERMINATE|                          /* TerminateProcess()    */
@@ -238,7 +244,7 @@ NOEXPORT BOOL CALLBACK enum_windows(HWND other_window_handle, LPARAM lParam) {
     if(!process_handle)
         return TRUE;
     if(!GetModuleFileNameEx(process_handle,
-            hInstance, window_exe_path, MAX_PATH)) {
+            module, window_exe_path, MAX_PATH)) {
         CloseHandle(process_handle);
         return TRUE;
     }
@@ -399,18 +405,17 @@ NOEXPORT int gui_loop() {
 }
 
 NOEXPORT void CALLBACK timer_proc(HWND hwnd, UINT msg, UINT_PTR id, DWORD t) {
-    (void)hwnd; /* skip warning about unused parameter */
-    (void)msg; /* skip warning about unused parameter */
-    (void)id; /* skip warning about unused parameter */
-    (void)t; /* skip warning about unused parameter */
+    (void)hwnd; /* squash the unused parameter warning */
+    (void)msg; /* squash the unused parameter warning */
+    (void)id; /* squash the unused parameter warning */
+    (void)t; /* squash the unused parameter warning */
     if(visible)
         update_logs();
-    update_tray(num_clients); /* needed when explorer.exe (re)starts */
+    tray_update(num_clients); /* needed when explorer.exe (re)starts */
 }
 
 NOEXPORT LRESULT CALLBACK window_proc(HWND main_window_handle,
         UINT message, WPARAM wParam, LPARAM lParam) {
-    NOTIFYICONDATA nid;
     POINT pt;
     RECT rect;
     PAINTSTRUCT ps;
@@ -506,20 +511,12 @@ NOEXPORT LRESULT CALLBACK window_proc(HWND main_window_handle,
         CommandBar_Destroy(command_bar_handle);
 #else
         if(main_menu_handle) {
-            DestroyMenu(main_menu_handle);
+            if(!DestroyMenu(main_menu_handle))
+                ioerror("DestroyMenu");
             main_menu_handle=NULL;
         }
 #endif
-        if(tray_menu_handle) {
-            DestroyMenu(tray_menu_handle);
-            tray_menu_handle=NULL;
-        }
-        ZeroMemory(&nid, sizeof nid);
-        nid.cbSize=sizeof nid;
-        nid.hWnd=main_window_handle;
-        nid.uID=1;
-        nid.uFlags=NIF_TIP; /* not really sure what to put here, but it works */
-        Shell_NotifyIcon(NIM_DELETE, &nid); /* this removes the icon */
+        tray_delete(); /* remove the taskbark icon if exists */
         PostQuitMessage(0);
         return 0;
 
@@ -535,10 +532,10 @@ NOEXPORT LRESULT CALLBACK window_proc(HWND main_window_handle,
                 return 0;
 #ifndef _WIN32_WCE
             if(main_menu_handle)
-                CheckMenuItem(main_menu_handle, wParam, MF_CHECKED);
+                CheckMenuItem(main_menu_handle, (UINT)wParam, MF_CHECKED);
 #endif
             if(tray_menu_handle)
-                CheckMenuItem(tray_menu_handle, wParam, MF_CHECKED);
+                CheckMenuItem(tray_menu_handle, (UINT)wParam, MF_CHECKED);
             message_box(section->help, MB_ICONINFORMATION);
             return 0;
         }
@@ -586,7 +583,7 @@ NOEXPORT LRESULT CALLBACK window_proc(HWND main_window_handle,
 #ifndef _WIN32_WCE
             if(!cmdline.service) /* security */
                 ShellExecute(main_window_handle, TEXT("open"),
-                    TEXT("stunnel.html"), NULL, NULL, SW_SHOWNORMAL);
+                    TEXT("..\\doc\\stunnel.html"), NULL, NULL, SW_SHOWNORMAL);
 #endif
             break;
         case IDM_HOMEPAGE:
@@ -646,14 +643,16 @@ NOEXPORT LRESULT CALLBACK window_proc(HWND main_window_handle,
     case WM_NEW_CHAIN:
 #ifndef _WIN32_WCE
         if(main_menu_handle)
-            EnableMenuItem(main_menu_handle, IDM_PEER_MENU+wParam, MF_ENABLED);
+            EnableMenuItem(main_menu_handle,
+                (UINT)(IDM_PEER_MENU+wParam), MF_ENABLED);
 #endif
         if(tray_menu_handle)
-            EnableMenuItem(tray_menu_handle, IDM_PEER_MENU+wParam, MF_ENABLED);
+            EnableMenuItem(tray_menu_handle,
+                (UINT)(IDM_PEER_MENU+wParam), MF_ENABLED);
         return 0;
 
     case WM_CLIENTS:
-        update_tray((int)wParam);
+        tray_update((int)wParam);
         return 0;
     }
 
@@ -662,7 +661,7 @@ NOEXPORT LRESULT CALLBACK window_proc(HWND main_window_handle,
 
 NOEXPORT LRESULT CALLBACK about_proc(HWND dialog_handle, UINT message,
         WPARAM wParam, LPARAM lParam) {
-    (void)lParam; /* skip warning about unused parameter */
+    (void)lParam; /* squash the unused parameter warning */
 
     switch(message) {
         case WM_INITDIALOG:
@@ -723,7 +722,7 @@ NOEXPORT LRESULT CALLBACK pass_proc(HWND dialog_handle, UINT message,
                 (WPARAM)0 /* line 0 */, (LPARAM)pass_dialog.txt);
             pass_dialog.txt[pass_len]='\0'; /* null-terminate the string */
 
-            /* convert input password to UTF-8 string (as ui_data->pass) */
+            /* convert input passphrase to UTF-8 string (as ui_data->pass) */
             pass_txt=tstr2str(pass_dialog.txt);
             strcpy(ui_data->pass, pass_txt);
             str_free(pass_txt);
@@ -743,7 +742,7 @@ NOEXPORT LRESULT CALLBACK pass_proc(HWND dialog_handle, UINT message,
 }
 
 int passwd_cb(char *buf, int size, int rwflag, void *userdata) {
-    (void)rwflag; /* skip warning about unused parameter */
+    (void)rwflag; /* squash the unused parameter warning */
 
     ui_data=userdata;
     if(size<0) /* just in case */
@@ -756,7 +755,21 @@ int passwd_cb(char *buf, int size, int rwflag, void *userdata) {
 }
 
 #ifndef OPENSSL_NO_ENGINE
-int pin_cb(UI *ui, UI_STRING *uis) {
+UI_METHOD *UI_stunnel() {
+    static UI_METHOD *ui_method=NULL;
+
+    if(ui_method) /* already initialized */
+        return ui_method;
+    ui_method=UI_create_method("stunnel WIN32 UI");
+    if(!ui_method) {
+        sslerror("UI_create_method");
+        return NULL;
+    }
+    UI_method_set_reader(ui_method, pin_cb);
+    return ui_method;
+}
+
+NOEXPORT int pin_cb(UI *ui, UI_STRING *uis) {
     ui_data=UI_get0_user_data(ui); /* was: ui_data=UI_get_app_data(ui); */
     if(!ui_data) {
         s_log(LOG_ERR, "INTERNAL ERROR: user data data pointer");
@@ -811,7 +824,7 @@ NOEXPORT int save_text_file(LPTSTR file_name, char *str) {
         error_box(TEXT("CreateFile"));
         return 1;
     }
-    if(!WriteFile(file_handle, str, strlen(str), &ignore, NULL)) {
+    if(!WriteFile(file_handle, str, (DWORD)strlen(str), &ignore, NULL)) {
         CloseHandle(file_handle);
         error_box(TEXT("WriteFile"));
         return 1;
@@ -858,7 +871,7 @@ NOEXPORT void update_logs(void) {
 
 NOEXPORT LPTSTR log_txt(void) {
     LPTSTR buff;
-    unsigned ptr=0, len=0;
+    size_t ptr=0, len=0;
     struct LIST *curr;
 
     for(curr=head; curr; curr=curr->next)
@@ -879,14 +892,15 @@ NOEXPORT LPTSTR log_txt(void) {
 /**************************************** worker thread */
 
 NOEXPORT void daemon_thread(void *arg) {
-    (void)arg; /* skip warning about unused parameter */
+    (void)arg; /* squash the unused parameter warning */
 
     tls_alloc(NULL, NULL, "main"); /* new thread-local storage */
     main_init();
     SetEvent(main_initialized); /* unlock the GUI thread */
     /* get a valid configuration */
     while(main_configure(cmdline.config_file, NULL)) {
-        cmdline.config_file=NULL; /* don't retry commandline switches */
+        if(cmdline.config_file && *cmdline.config_file=='-')
+            cmdline.config_file=NULL; /* don't retry commandline switches */
         unbind_ports(); /* in case initialization failed after bind_ports() */
         log_flush(LOG_MODE_ERROR); /* otherwise logs are buffered */
         PostMessage(hwnd, WM_INVALID_CONFIG, 0, 0); /* display error */
@@ -913,7 +927,7 @@ NOEXPORT void invalid_config() {
     ShowWindow(hwnd, SW_SHOWNORMAL); /* show window */
     SetForegroundWindow(hwnd); /* bring on top */
 
-    update_tray(-1); /* error icon */
+    tray_update(-1); /* error icon */
     update_peer_menu(); /* purge the list of sections */
 
     win_log(TEXT(""));
@@ -930,7 +944,7 @@ NOEXPORT void valid_config() {
         TEXT(STUNNEL_PLATFORM);
     SetWindowText(hwnd, win32_name);
 
-    update_tray(num_clients); /* idle or busy icon (on reload) */
+    tray_update(num_clients); /* idle or busy icon (on reload) */
     update_peer_menu(); /* one menu item per section */
 
     /* enable IDM_REOPEN_LOG menu if a log file is used, disable otherwise */
@@ -967,10 +981,6 @@ NOEXPORT void update_peer_menu(void) {
             DeleteMenu(tray_peer_list, 0, MF_BYPOSITION);
 
     /* initialize data structures */
-    number_of_sections=0;
-    for(section=service_options.next; section; section=section->next)
-        section->section_number=number_of_sections++;
-
     section_number=0;
     for(section=service_options.next; section; section=section->next) {
         servname=str2tstr(section->servname);
@@ -1053,28 +1063,28 @@ ICON_IMAGE load_icon_file(const char *name) {
     return icon;
 }
 
-NOEXPORT void update_tray(const int num) {
+NOEXPORT void tray_update(const int num) {
     NOTIFYICONDATA nid;
     static ICON_TYPE previous_icon=ICON_NONE;
     ICON_TYPE current_icon;
     LPTSTR tip;
 
-    if(!global_options.option.taskbar) {
-        /* release previously allocated menu resources */
-        if(tray_menu_handle) { /* disabled in the new configuration */
-            DestroyMenu(tray_menu_handle);
-            tray_menu_handle=NULL;
-        }
+    if(!global_options.option.taskbar) { /* currently disabled */
+        tray_delete(); /* remove the taskbark icon if exists */
         return;
     }
     if(!tray_menu_handle) /* initialize taskbar */
         tray_menu_handle=LoadMenu(ghInst, MAKEINTRESOURCE(IDM_TRAYMENU));
-    if(tray_menu_handle && cmdline.service)
+    if(!tray_menu_handle) {
+        ioerror("LoadMenu");
+        return;
+    }
+    if(cmdline.service)
         EnableMenuItem(tray_menu_handle, IDM_EDIT_CONFIG, MF_GRAYED);
 
     ZeroMemory(&nid, sizeof nid);
     nid.cbSize=sizeof nid;
-    nid.uID=1; /* application-defined ID for the icon */
+    nid.uID=1; /* application-defined icon ID */
     nid.uFlags=NIF_MESSAGE|NIF_TIP;
     nid.uCallbackMessage=WM_SYSTRAY; /* notification message */
     nid.hWnd=hwnd; /* window to receive notifications */
@@ -1101,6 +1111,22 @@ NOEXPORT void update_tray(const int num) {
     /* tooltip update failed - try to create the icon */
     nid.uFlags|=NIF_ICON;
     Shell_NotifyIcon(NIM_ADD, &nid);
+}
+
+NOEXPORT void tray_delete(void) {
+    NOTIFYICONDATA nid;
+
+    if(tray_menu_handle) {
+        ZeroMemory(&nid, sizeof nid);
+        nid.cbSize=sizeof nid;
+        nid.uID=1; /* application-defined icon ID */
+        nid.hWnd=hwnd; /* window to receive notifications */
+        nid.uFlags=NIF_TIP; /* not really sure what to put here, but it works */
+        Shell_NotifyIcon(NIM_DELETE, &nid); /* this removes the icon */
+        if(!DestroyMenu(tray_menu_handle)) /* release menu resources */
+            ioerror("DestroyMenu");
+        tray_menu_handle=NULL;
+    }
 }
 
 NOEXPORT void error_box(LPCTSTR text) {
@@ -1146,6 +1172,7 @@ void ui_clients(const long num) {
 NOEXPORT void edit_config(HWND main_window_handle) {
     TCHAR cwd[MAX_PATH];
     LPTSTR conf_file, conf_path;
+    DISK_FILE *df;
 
     conf_file=str2tstr(configuration_file);
     if(*conf_file==TEXT('\"')) {
@@ -1159,7 +1186,9 @@ NOEXPORT void edit_config(HWND main_window_handle) {
         str_free(conf_file);
     }
 
-    if(is_admin()) {
+    df=file_open(configuration_file, FILE_MODE_APPEND);
+    if(df) { /* the configuration file is writable */
+        file_close(df);
         ShellExecute(main_window_handle, TEXT("open"),
             TEXT("notepad.exe"), conf_path,
             NULL, SW_SHOWNORMAL);
@@ -1169,26 +1198,6 @@ NOEXPORT void edit_config(HWND main_window_handle) {
             NULL, SW_SHOWNORMAL);
     }
     str_free(conf_path);
-}
-
-NOEXPORT BOOL is_admin(void) {
-#ifndef _WIN32_WCE
-    SID_IDENTIFIER_AUTHORITY NtAuthority={SECURITY_NT_AUTHORITY};
-    PSID admin_group;
-    BOOL retval;
-
-    retval=AllocateAndInitializeSid(&NtAuthority, 2,
-        SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS,
-        0, 0, 0, 0, 0, 0, &admin_group);
-    if(retval) {
-        if(!CheckTokenMembership(NULL, admin_group, &retval))
-            retval=FALSE;
-        FreeSid(admin_group);
-    }
-    return retval;
-#else
-    return TRUE; /* always an admin on WCE */
-#endif
 }
 
 /**************************************** windows service */
@@ -1430,8 +1439,8 @@ NOEXPORT int service_user(DWORD sig) {
 }
 
 NOEXPORT void WINAPI service_main(DWORD argc, LPTSTR* argv) {
-    (void)argc; /* skip warning about unused parameter */
-    (void)argv; /* skip warning about unused parameter */
+    (void)argc; /* squash the unused parameter warning */
+    (void)argv; /* squash the unused parameter warning */
 
     tls_alloc(NULL, NULL, "service"); /* new thread-local storage */
 

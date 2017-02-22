@@ -1,24 +1,24 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
  *   Free Software Foundation; either version 2 of the License, or (at your
  *   option) any later version.
- * 
+ *
  *   This program is distributed in the hope that it will be useful,
  *   but WITHOUT ANY WARRANTY; without even the implied warranty of
  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *   See the GNU General Public License for more details.
- * 
+ *
  *   You should have received a copy of the GNU General Public License along
  *   with this program; if not, see <http://www.gnu.org/licenses>.
- * 
+ *
  *   Linking stunnel statically or dynamically with other modules is making
  *   a combined work based on stunnel. Thus, the terms and conditions of
  *   the GNU General Public License cover the whole combination.
- * 
+ *
  *   In addition, as a special exception, the copyright holder of stunnel
  *   gives you permission to combine stunnel with free software programs or
  *   libraries that are released under the GNU LGPL and with code included
@@ -26,7 +26,7 @@
  *   modified versions of such code, with unchanged license). You may copy
  *   and distribute such a system following the terms of the GNU GPL for
  *   stunnel and the licenses of the other code concerned.
- * 
+ *
  *   Note that people who make modified versions of stunnel are not obligated
  *   to grant this special exception for their modified versions; it is their
  *   choice whether to do so. The GNU General Public License gives permission
@@ -46,13 +46,16 @@
 
 /* CPU stack size */
 #ifdef WITH_WOLFSSL
+	/* Default option for wolfssl is Tom's fastmath with timing resistance
+     * which providers far greater security. This can be reduced to
+     * 65536 if not using TFM timing resistance. */
     #define DEFAULT_STACK_SIZE 131072
 #else
     #define DEFAULT_STACK_SIZE 65536
 #endif
 /* #define DEBUG_STACK_SIZE */
 
-/* I/O buffer size: 18432 (0x4800) is the maximum size of SSL record payload */
+/* I/O buffer size: 18432 (0x4800) is the maximum size of TLS record payload */
 #define BUFFSIZE 18432
 
 /* how many bytes of random input to read from files for PRNG */
@@ -94,16 +97,15 @@ typedef unsigned long long  uint64_t;
 #ifndef __MINGW32__
 #ifdef  _WIN64
 typedef __int64             ssize_t;
-#else
+#else /* _WIN64 */
 typedef int                 ssize_t;
-#endif
-#endif
+#endif /* _WIN64 */
+#endif /* !__MINGW32__ */
+#define PATH_MAX MAX_PATH
 #define USE_IPv6
 #define _CRT_SECURE_NO_DEPRECATE
 #define _CRT_NONSTDC_NO_DEPRECATE
 #define _CRT_NON_CONFORMING_SWPRINTFS
-#define HAVE_OSSL_ENGINE_H
-#define HAVE_OSSL_OCSP_H
 /* prevent including wincrypt.h, as it defines its own OCSP_RESPONSE */
 #define __WINCRYPT_H__
 #define S_EADDRINUSE  WSAEADDRINUSE
@@ -295,6 +297,9 @@ typedef int SOCKET;
     /* Unix-specific headers */
 #include <signal.h>         /* signal */
 #include <sys/wait.h>       /* wait */
+#ifdef HAVE_LIMITS_H
+#include <limits.h>         /* INT_MAX */
+#endif
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>   /* getrlimit */
 #endif
@@ -310,6 +315,7 @@ typedef int SOCKET;
 #ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>     /* for aix */
 #endif
+#include <dirent.h>
 
 #if defined(HAVE_POLL) && !defined(BROKEN_POLL)
 #ifdef HAVE_POLL_H
@@ -338,6 +344,7 @@ typedef int SOCKET;
 #include <sys/uio.h>    /* struct iovec */
 #endif /* HAVE_SYS_UIO_H */
 
+/* BSD sockets */
 #include <netinet/in.h>  /* struct sockaddr_in */
 #include <sys/socket.h>  /* getpeername */
 #include <arpa/inet.h>   /* inet_ntoa */
@@ -398,20 +405,28 @@ extern char *sys_errlist[];
 #ifdef HAVE_SYS_SYSCALL_H
 #include <sys/syscall.h> /* SYS_gettid */
 #endif
+#ifdef HAVE_LINUX_SCHED_H
+#include <linux/sched.h> /* SCHED_BATCH */
+#endif
 
 #endif /* USE_WIN32 */
+
+#ifndef S_ISREG
+#define S_ISREG(m) (((m)&S_IFMT)==S_IFREG)
+#endif
 
 /**************************************** wolfSSL headers */
 #ifdef WITH_WOLFSSL
 #include <wolfssl/options.h>
+#include <wolfssl/wolfcrypt/wc_port.h>
 #include <wolfssl/wolfcrypt/coding.h>
 #ifdef WOLFSSL_DEBUG_ON
 #include <wolfssl/wolfcrypt/logging.h>
 #endif /* WOLFSSL_DEBUG_ON */
 #include <wolfssl/wolfcrypt/dh.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
+#include <wolfssl/openssl/ec.h>
 #endif /* defined(WITH_WOLFSSL) */
-
 
 /**************************************** OpenSSL headers */
 
@@ -434,41 +449,56 @@ extern char *sys_errlist[];
 #endif /* OpenSSL older than 0.9.8 */
 
 /* non-blocking OCSP API is not available before OpenSSL 0.9.8h */
-#if OPENSSL_VERSION_NUMBER<0x00908080L && !defined(WITH_WOLFSSL)
+#if OPENSSL_VERSION_NUMBER<0x00908080L
 #ifndef OPENSSL_NO_OCSP
 #define OPENSSL_NO_OCSP
 #endif /* !defined(OPENSSL_NO_OCSP) */
 #endif /* OpenSSL older than 0.9.8h */
 
-#if OPENSSL_VERSION_NUMBER<0x10000000L && !defined(WITH_WOLFSSL)
+#if OPENSSL_VERSION_NUMBER<0x00908060L
 #define OPENSSL_NO_TLSEXT
+#endif /* OpenSSL older than 0.9.8f */
+
+#if OPENSSL_VERSION_NUMBER<0x10000000L
 #define OPENSSL_NO_PSK
 #endif /* OpenSSL older than 1.0.0 */
 
-#if (OPENSSL_VERSION_NUMBER<0x10001000L || defined(OPENSSL_NO_TLS1)) && !defined(WITH_WOLFSSL)
+#if OPENSSL_VERSION_NUMBER<0x10001000L || defined(OPENSSL_NO_TLS1)
 #define OPENSSL_NO_TLS1_1
 #define OPENSSL_NO_TLS1_2
-#endif /* (OpenSSL older than 1.0.1 || defined(OPENSSL_NO_TLS1)) && !defined(WITH_WOLFSSL) */
+#endif /* OpenSSL older than 1.0.1 || defined(OPENSSL_NO_TLS1) */
 
-#if OPENSSL_VERSION_NUMBER>=0x10100000L || defined(WITH_WOLFSSL)
+#if OPENSSL_VERSION_NUMBER>=0x10100000L
 #ifndef OPENSSL_NO_SSL2
 #define OPENSSL_NO_SSL2
 #endif /* !defined(OPENSSL_NO_SSL2) */
+#else /* OpenSSL older than 1.1.0 */
+#define X509_STORE_CTX_get0_chain(x) X509_STORE_CTX_get_chain(x)
 #endif /* OpenSSL 1.1.0 or newer */
 
-#if defined(WITH_WOLFSSL) && !defined(ENABLE_SSL3)
+
+/* WOLFSSL_SPECIFIC ifdefs */
+#ifdef WITH_WOLFSSL
+
+#ifndef WOLFSSL_ALLOW_SSLV3
 #ifndef OPENSSL_NO_SSL3
 #define OPENSSL_NO_SSL3
 #endif /* !defined(OPENSSL_NO_SSL3) */
-#endif /* def WITH_WOLFSSL*/
+#endif /*WOLFSSL_ALLOW_SSLv3 */
 
-#if !defined(HAVE_OSSL_ENGINE_H) && !defined(OPENSSL_NO_ENGINE)
+#ifndef OPENSSL_NO_ENGINE
 #define OPENSSL_NO_ENGINE
-#endif /* !defined(HAVE_OSSL_ENGINE_H) && !defined(OPENSSL_NO_ENGINE) */
+#endif /* OPENSSL_NO_ENGINE */
 
-#if !defined(HAVE_OSSL_OCSP_H) && !defined(OPENSSL_NO_OCSP)
-#define OPENSSL_NO_OCSP
-#endif /* !defined(HAVE_OSSL_OCSP_H) && !defined(OPENSSL_NO_OCSP) */
+#ifndef OPENSSL_NO_COMP
+#define OPENSSL_NO_COMP
+#endif /* OPENSSL_NO_COMP */
+
+#ifndef OPENSSL_NO_SSL2
+#define OPENSSL_NO_SSL2
+#endif /* !defined(OPENSSL_NO_SSL2) */
+
+#endif /* defined (WITH_WOLFSSL) */
 
 #if defined(USE_WIN32) && defined(OPENSSL_FIPS)
 #define USE_FIPS
@@ -476,17 +506,22 @@ extern char *sys_errlist[];
 
 #include <openssl/lhash.h>
 #include <openssl/ssl.h>
+#include <openssl/ssl23.h>
 #include <openssl/ui.h>
 #include <openssl/err.h>
 #include <openssl/crypto.h> /* for CRYPTO_* and SSLeay_version */
 #include <openssl/rand.h>
 #include <openssl/bn.h>
+#include <openssl/pkcs12.h>
 #ifndef OPENSSL_NO_MD4
 #include <openssl/md4.h>
 #endif /* !defined(OPENSSL_NO_MD4) */
 #include <openssl/des.h>
 #ifndef OPENSSL_NO_DH
 #include <openssl/dh.h>
+#if OPENSSL_VERSION_NUMBER<0x10100000L
+int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g);
+#endif /* OpenSSL older than 1.1.0 */
 #endif /* !defined(OPENSSL_NO_DH) */
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
@@ -498,6 +533,12 @@ extern char *sys_errlist[];
 /* not defined in public headers before OpenSSL 0.9.8 */
 STACK_OF(SSL_COMP) *SSL_COMP_get_compression_methods(void);
 #endif /* !defined(OPENSSL_NO_COMP) */
+
+#ifndef OPENSSL_VERSION
+#define OPENSSL_VERSION SSLEAY_VERSION
+#define OpenSSL_version_num() SSLeay()
+#define OpenSSL_version(x) SSLeay_version(x)
+#endif
 
 /**************************************** other defines */
 

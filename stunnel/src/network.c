@@ -1,6 +1,6 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
@@ -46,7 +46,6 @@
 /* #define DEBUG_UCONTEXT */
 
 NOEXPORT void s_poll_realloc(s_poll_set *);
-NOEXPORT int get_socket_error(const SOCKET);
 
 /**************************************** s_poll functions */
 
@@ -66,7 +65,7 @@ void s_poll_free(s_poll_set *fds) {
 
 void s_poll_init(s_poll_set *fds) {
     fds->nfds=0;
-    fds->allocated=4; /* prealloc 4 file desciptors */
+    fds->allocated=4; /* prealloc 4 file descriptors */
     s_poll_realloc(fds);
 }
 
@@ -75,7 +74,7 @@ void s_poll_add(s_poll_set *fds, SOCKET fd, int rd, int wr) {
 
     for(i=0; i<fds->nfds && fds->ufds[i].fd!=fd; i++)
         ;
-    if(i==fds->nfds) {
+    if(i==fds->nfds) { /* not found */
         if(i==fds->allocated) {
             fds->allocated=i+1;
             s_poll_realloc(fds);
@@ -94,12 +93,24 @@ void s_poll_add(s_poll_set *fds, SOCKET fd, int rd, int wr) {
         fds->ufds[i].events|=POLLOUT;
 }
 
+void s_poll_remove(s_poll_set *fds, SOCKET fd) {
+    unsigned i;
+
+    for(i=0; i<fds->nfds && fds->ufds[i].fd!=fd; i++)
+        ;
+    if(i<fds->nfds) { /* found */
+        memmove(fds->ufds+i, fds->ufds+i+1,
+            (fds->nfds-i-1)*sizeof(struct pollfd));
+        fds->nfds--;
+    }
+}
+
 int s_poll_canread(s_poll_set *fds, SOCKET fd) {
     unsigned i;
 
     for(i=0; i<fds->nfds; i++)
         if(fds->ufds[i].fd==fd)
-            return fds->ufds[i].revents&POLLIN;
+            return fds->ufds[i].revents&(POLLIN|POLLERR);
     return 0; /* not listed in fds */
 }
 
@@ -108,7 +119,7 @@ int s_poll_canwrite(s_poll_set *fds, SOCKET fd) {
 
     for(i=0; i<fds->nfds; i++)
         if(fds->ufds[i].fd==fd)
-            return fds->ufds[i].revents&POLLOUT;
+            return fds->ufds[i].revents&(POLLOUT|POLLERR);
     return 0; /* not listed in fds */
 }
 
@@ -136,8 +147,25 @@ int s_poll_rdhup(s_poll_set *fds, SOCKET fd) {
     return 0; /* not listed in fds */
 }
 
+int s_poll_err(s_poll_set *fds, SOCKET fd) {
+    unsigned i;
+
+    for(i=0; i<fds->nfds; i++)
+        if(fds->ufds[i].fd==fd)
+            return fds->ufds[i].revents&POLLERR;
+    return 0; /* not listed in fds */
+}
+
 NOEXPORT void s_poll_realloc(s_poll_set *fds) {
     fds->ufds=str_realloc(fds->ufds, fds->allocated*sizeof(struct pollfd));
+}
+
+void s_poll_dump(s_poll_set *fds, int level) {
+    unsigned i;
+
+    for(i=0; i<fds->nfds; i++)
+        s_log(level, "FD=%ld events=0x%X revents=0x%X",
+            (long)fds->ufds[i].fd, fds->ufds[i].events, fds->ufds[i].revents);
 }
 
 #ifdef USE_UCONTEXT
@@ -154,13 +182,14 @@ NOEXPORT void scan_waiting_queue(void) {
 
     time(&now);
     /* count file descriptors */
-    min_timeout=-1;
+    min_timeout=-1; /* infinity */
     nfds=0;
     for(context=waiting_head; context; context=context->next) {
         nfds+=context->fds->nfds;
         if(context->finish>=0) /* finite time */
             if(min_timeout<0 || min_timeout>context->finish-now)
-                min_timeout=context->finish-now<0 ? 0 : context->finish-now;
+                min_timeout=
+                    (int)(context->finish-now<0 ? 0 : context->finish-now);
     }
     /* setup ufds structure */
     if(nfds>max_nfds) { /* need to allocate more memory */
@@ -195,13 +224,13 @@ NOEXPORT void scan_waiting_queue(void) {
 #ifdef DEBUG_UCONTEXT
             s_log(LOG_DEBUG, "CONTEXT %ld, FD=%d,%s%s ->%s%s%s%s%s",
                 context->id, ufds[nfds].fd,
-                ufds[nfds].events & POLLIN ? " IN" : "",
-                ufds[nfds].events & POLLOUT ? " OUT" : "",
-                ufds[nfds].revents & POLLIN ? " IN" : "",
-                ufds[nfds].revents & POLLOUT ? " OUT" : "",
-                ufds[nfds].revents & POLLERR ? " ERR" : "",
-                ufds[nfds].revents & POLLHUP ? " HUP" : "",
-                ufds[nfds].revents & POLLNVAL ? " NVAL" : "");
+                (ufds[nfds].events & POLLIN) ? " IN" : "",
+                (ufds[nfds].events & POLLOUT) ? " OUT" : "",
+                (ufds[nfds].revents & POLLIN) ? " IN" : "",
+                (ufds[nfds].revents & POLLOUT) ? " OUT" : "",
+                (ufds[nfds].revents & POLLERR) ? " ERR" : "",
+                (ufds[nfds].revents & POLLHUP) ? " HUP" : "",
+                (ufds[nfds].revents & POLLNVAL) ? " NVAL" : "");
 #endif
             if(ufds[nfds].revents)
                 context->ready++;
@@ -235,7 +264,7 @@ int s_poll_wait(s_poll_set *fds, int sec, int msec) {
     static CONTEXT *to_free=NULL; /* delayed memory deallocation */
 
     /* FIXME: msec parameter is currently ignored with UCONTEXT threads */
-    (void)msec; /* skip warning about unused parameter */
+    (void)msec; /* squash the unused parameter warning */
 
     /* remove the current context from ready queue */
     context=ready_head;
@@ -331,7 +360,7 @@ void s_poll_free(s_poll_set *fds) {
 
 void s_poll_init(s_poll_set *fds) {
 #ifdef USE_WIN32
-    fds->allocated=4; /* prealloc 4 file desciptors */
+    fds->allocated=4; /* prealloc 4 file descriptors */
 #endif
     s_poll_realloc(fds);
     FD_ZERO(fds->irfds);
@@ -349,37 +378,51 @@ void s_poll_add(s_poll_set *fds, SOCKET fd, int rd, int wr) {
     }
 #endif
     if(rd)
-        FD_SET((unsigned)fd, fds->irfds);
+        FD_SET(fd, fds->irfds);
     if(wr)
-        FD_SET((unsigned)fd, fds->iwfds);
+        FD_SET(fd, fds->iwfds);
     /* always expect errors (and the Spanish Inquisition) */
-    FD_SET((unsigned)fd, fds->ixfds);
+    FD_SET(fd, fds->ixfds);
     if(fd>fds->max)
         fds->max=fd;
 }
 
+void s_poll_remove(s_poll_set *fds, SOCKET fd) {
+    FD_CLR(fd, fds->irfds);
+    FD_CLR(fd, fds->iwfds);
+    FD_CLR(fd, fds->ixfds);
+}
+
 int s_poll_canread(s_poll_set *fds, SOCKET fd) {
-    return FD_ISSET(fd, fds->orfds);
+    /* ignore exception if there is no error (WinCE 6.0 anomaly) */
+    return FD_ISSET(fd, fds->orfds) ||
+        (FD_ISSET(fd, fds->oxfds) && get_socket_error(fd));
 }
 
 int s_poll_canwrite(s_poll_set *fds, SOCKET fd) {
-    return FD_ISSET(fd, fds->owfds);
+    /* ignore exception if there is no error (WinCE 6.0 anomaly) */
+    return FD_ISSET(fd, fds->owfds) ||
+        (FD_ISSET(fd, fds->oxfds) && get_socket_error(fd));
 }
 
 int s_poll_hup(s_poll_set *fds, SOCKET fd) {
-    (void)fds; /* skip warning about unused parameter */
-    (void)fd; /* skip warning about unused parameter */
-    return 0; /* FIXME: how to detect HUP condition with select()? */
+    (void)fds; /* squash the unused parameter warning */
+    (void)fd; /* squash the unused parameter warning */
+    return 0; /* FIXME: how to detect the HUP condition with select()? */
 }
 
 int s_poll_rdhup(s_poll_set *fds, SOCKET fd) {
-    (void)fds; /* skip warning about unused parameter */
-    (void)fd; /* skip warning about unused parameter */
-    return 0; /* FIXME: how to detect RDHUP condition with select()? */
+    (void)fds; /* squash the unused parameter warning */
+    (void)fd; /* squash the unused parameter warning */
+    return 0; /* FIXME: how to detect the RDHUP condition with select()? */
+}
+
+int s_poll_err(s_poll_set *fds, SOCKET fd) {
+    return FD_ISSET(fd, fds->oxfds);
 }
 
 #ifdef USE_WIN32
-#define FD_SIZE(fds) (sizeof(u_int)+(fds)->allocated*sizeof(SOCKET))
+#define FD_SIZE(fds) (8+(fds)->allocated*sizeof(SOCKET))
 #else
 #define FD_SIZE(fds) (sizeof(fd_set))
 #endif
@@ -391,7 +434,11 @@ int s_poll_wait(s_poll_set *fds, int sec, int msec) {
     do { /* skip "Interrupted system call" errors */
         memcpy(fds->orfds, fds->irfds, FD_SIZE(fds));
         memcpy(fds->owfds, fds->iwfds, FD_SIZE(fds));
+#ifndef _WIN32_WCE
         memcpy(fds->oxfds, fds->ixfds, FD_SIZE(fds));
+#else /* WinCE reports unexpected permanent exceptions */
+        FD_ZERO(fds->oxfds);
+#endif
         if(sec<0) { /* infinite timeout */
             tv_ptr=NULL;
         } else {
@@ -414,13 +461,31 @@ NOEXPORT void s_poll_realloc(s_poll_set *fds) {
     fds->oxfds=str_realloc(fds->oxfds, FD_SIZE(fds));
 }
 
+void s_poll_dump(s_poll_set *fds, int level) {
+    SOCKET fd;
+    int ir, iw, ix, or, ow, ox;
+
+    for(fd=0; fd<fds->max; fd++) {
+        ir=FD_ISSET(fd, fds->irfds);
+        iw=FD_ISSET(fd, fds->iwfds);
+        ix=FD_ISSET(fd, fds->ixfds);
+        or=FD_ISSET(fd, fds->orfds);
+        ow=FD_ISSET(fd, fds->owfds);
+        ox=FD_ISSET(fd, fds->oxfds);
+        if(ir || iw || ix || or || ow || ox)
+            s_log(level, "FD=%ld ifds=%c%c%c ofds=%c%c%c", (long)fd,
+                ir?'r':'-', iw?'w':'-', ix?'x':'-',
+                or?'r':'-', ow?'w':'-', ox?'x':'-');
+    }
+}
+
 #endif /* USE_POLL */
 
 /**************************************** fd management */
 
 int set_socket_options(SOCKET s, int type) {
     SOCK_OPT *ptr;
-    extern SOCK_OPT sock_opts[];
+    extern SOCK_OPT *sock_opts;
     static char *type_str[3]={"accept", "local", "remote"};
     socklen_t opt_size;
     int retval=0; /* no error found */
@@ -453,17 +518,15 @@ int set_socket_options(SOCKET s, int type) {
                 retval=-1; /* failed to set this option */
             }
         }
-#ifdef DEBUG_FD_ALLOC
         else {
             s_log(LOG_DEBUG, "Option %s set on %s socket",
                 ptr->opt_str, type_str[type]);
         }
-#endif /* DEBUG_FD_ALLOC */
     }
     return retval; /* returns 0 when all options succeeded */
 }
 
-NOEXPORT int get_socket_error(const SOCKET fd) {
+int get_socket_error(const SOCKET fd) {
     int err;
     socklen_t optlen=sizeof err;
 
@@ -482,7 +545,7 @@ int s_connect(CLI *c, SOCKADDR_UNION *addr, socklen_t addrlen) {
     s_log(LOG_INFO, "s_connect: connecting %s", dst);
 
     if(!connect(c->fd, &addr->sa, addrlen)) {
-        s_log(LOG_NOTICE, "s_connect: connected %s", dst);
+        s_log(LOG_INFO, "s_connect: connected %s", dst);
         str_free(dst);
         return 0; /* no error -> success (on some OSes over the loopback) */
     }
@@ -606,9 +669,8 @@ void fd_putline(CLI *c, SOCKET fd, const char *line) {
     tmpline=str_printf("%s%s", line, crlf);
     len=strlen(tmpline);
     s_write(c, fd, tmpline, len);
-    tmpline[len-2]='\0'; /* remove CRLF */
-    s_log(LOG_DEBUG, " -> %s", tmpline);
     str_free(tmpline);
+    s_log(LOG_DEBUG, " -> %s", line);
 }
 
 char *fd_getline(CLI *c, SOCKET fd) {
@@ -731,7 +793,7 @@ char *ssl_getstring(CLI *c) { /* get null-terminated string */
     line=str_alloc(allocated);
     for(;;) {
         if(ptr>65536) { /* >64KB --> DoS protection */
-            s_log(LOG_ERR, "fd_getline: Line too long");
+            s_log(LOG_ERR, "ssl_getstring: Line too long");
             str_free(line);
             longjmp(c->err, 1);
         }
@@ -746,6 +808,54 @@ char *ssl_getstring(CLI *c) { /* get null-terminated string */
     }
     return line;
 }
+
+char *ssl_getline(CLI *c) { /* get newline-terminated string */
+    char *line;
+    size_t ptr=0, allocated=32;
+
+    line=str_alloc(allocated);
+    for(;;) {
+        if(ptr>65536) { /* >64KB --> DoS protection */
+            s_log(LOG_ERR, "ssl_getline: Line too long");
+            str_free(line);
+            longjmp(c->err, 1);
+        }
+        if(allocated<ptr+1) {
+            allocated*=2;
+            line=str_realloc(line, allocated);
+        }
+        s_ssl_read(c, line+ptr, 1);
+        if(line[ptr]=='\r')
+            continue;
+        if(line[ptr]=='\n')
+            break;
+        if(line[ptr]=='\0')
+            break;
+        ++ptr;
+    }
+    line[ptr]='\0';
+    s_log(LOG_DEBUG, " <- %s", line);
+    return line;
+}
+
+void ssl_putline(CLI *c, const char *line) { /* put newline-terminated string */
+    char *tmpline;
+    const char crlf[]="\r\n";
+    size_t len;
+
+    tmpline=str_printf("%s%s", line, crlf);
+    len=strlen(tmpline);
+    if(len>INT_MAX) { /* paranoia */
+        s_log(LOG_ERR, "ssl_putline: Line too long");
+        str_free(tmpline);
+        longjmp(c->err, 1);
+    }
+    s_ssl_write(c, tmpline, (int)len);
+    str_free(tmpline);
+    s_log(LOG_DEBUG, " -> %s", line);
+}
+
+/**************************************** network helpers */
 
 #define INET_SOCKET_PAIR
 
@@ -808,6 +918,28 @@ int make_sockets(SOCKET fd[2]) { /* make a pair of connected ipv4 sockets */
         return 1;
 #endif
     return 0;
+}
+
+/* returns 0 on success, and -1 on error */
+int original_dst(const SOCKET fd, SOCKADDR_UNION *addr) {
+    socklen_t addrlen;
+
+    memset(addr, 0, sizeof(SOCKADDR_UNION));
+    addrlen=sizeof(SOCKADDR_UNION);
+#ifdef SO_ORIGINAL_DST
+#ifdef USE_IPv6
+    if(!getsockopt(fd, SOL_IPV6, SO_ORIGINAL_DST, &addr->sa, &addrlen))
+        return 0; /* succeeded */
+#endif /* USE_IPv6 */
+    if(!getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &addr->sa, &addrlen))
+        return 0; /* succeeded */
+    sockerror("getsockopt SO_ORIGINAL_DST");
+#else /* SO_ORIGINAL_DST */
+    if(!getsockname(fd, &addr->sa, &addrlen))
+        return 0; /* succeeded */
+    sockerror("getsockname");
+#endif /* SO_ORIGINAL_DST */
+    return -1; /* failed */
 }
 
 /* end of network.c */

@@ -1,11 +1,11 @@
 prefix=.
 DEFS = -DPACKAGE_NAME=\"stunnel\" \
 	-DPACKAGE_TARNAME=\"stunnel\" \
-	-DPACKAGE_VERSION=\"5.17\" \
-	-DPACKAGE_STRING=\"stunnel\ 5.17\" \
+	-DPACKAGE_VERSION=\"5.40\" \
+	-DPACKAGE_STRING=\"stunnel\ 5.40\" \
 	-DPACKAGE_BUGREPORT=\"\" \
 	-DPACKAGE=\"stunnel\" \
-	-DVERSION=\"5.17\" \
+	-DVERSION=\"5.40\" \
 	-DSTDC_HEADERS=1 \
 	-DHAVE_SYS_TYPES_H=1 \
 	-DHAVE_SYS_STAT_H=1 \
@@ -14,7 +14,6 @@ DEFS = -DPACKAGE_NAME=\"stunnel\" \
 	-DHAVE_MEMORY_H=1 \
 	-DHAVE_STRINGS_H=1 \
 	-DHAVE_UNISTD_H=1 \
-	-DHAVE_OSSL_ENGINE_H=1 \
 	-DSSLDIR=\"/usr\" \
 	-DHOST=\"i386-pc-os2-emx\" \
 	-DHAVE_LIBSOCKET=1 \
@@ -42,7 +41,7 @@ OPENSSLDIR = u:/extras
 #SYSLOGDIR = /unixos2/workdir/syslog
 INCLUDES = -I$(OPENSSLDIR)/outinc
 LIBS = -lsocket -L$(OPENSSLDIR)/out -lssl -lcrypto -lz -lsyslog
-OBJS = file.o client.o log.o options.o protocol.o network.o ssl.o ctx.o verify.o sthreads.o stunnel.o pty.o resolver.o str.o tls.o fd.o
+OBJS = file.o client.o log.o options.o protocol.o network.o ssl.o ctx.o verify.o sthreads.o stunnel.o pty.o resolver.o str.o tls.o fd.o dhparam.o cron.o
 LIBDIR = .
 CFLAGS = -O2 -Wall -Wshadow -Wcast-align -Wpointer-arith
 
@@ -71,6 +70,8 @@ resolver.o: resolver.c common.h prototypes.h
 str.o: str.c common.h prototypes.h
 tls.o: tls.c common.h prototypes.h
 fd.o: fd.c common.h prototypes.h
+dhparam.o: dhparam.c common.h prototypes.h
+cron.o: cron.c common.h prototypes.h
 
 clean:
 	rm -f *.o *.exe

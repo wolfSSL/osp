@@ -1,6 +1,6 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
@@ -38,7 +38,7 @@
 #include "common.h"
 #include "prototypes.h"
 
-    /* global OpenSSL initalization: compression, engine, entropy */
+    /* global OpenSSL initialization: compression, engine, entropy */
 NOEXPORT void cb_free(void *parent, void *ptr, CRYPTO_EX_DATA *ad,
     int idx, long argl, void *argp);
 #ifndef OPENSSL_NO_COMP
@@ -49,9 +49,14 @@ NOEXPORT int add_rand_file(GLOBAL_OPTIONS *, const char *);
 
 int index_cli, index_opt, index_redirect, index_addr;
 
-int ssl_init(void) { /* init SSL before parsing configuration file */
+int ssl_init(void) { /* init TLS before parsing configuration file */
+#if OPENSSL_VERSION_NUMBER>=0x10100000L
+    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS |
+        OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+#else
     SSL_load_error_strings();
     SSL_library_init();
+#endif
     index_cli=SSL_get_ex_new_index(0, "cli index",
         NULL, NULL, NULL);
     index_opt=SSL_CTX_get_ex_new_index(0, "opt index",
@@ -67,26 +72,57 @@ int ssl_init(void) { /* init SSL before parsing configuration file */
 #ifndef OPENSSL_NO_ENGINE
     ENGINE_load_builtin_engines();
 #endif
+#ifndef OPENSSL_NO_DH
+    dh_params=get_dh2048();
+    if(!dh_params) {
+        s_log(LOG_ERR, "Failed to get default DH parameters");
+        return 1;
+    }
+#endif /* OPENSSL_NO_DH */
     return 0;
 }
 
+#ifndef OPENSSL_NO_DH
+#if OPENSSL_VERSION_NUMBER<0x10100000L
+/* this is needed for dhparam.c generated with OpenSSL >= 1.1.0
+ * to be linked against the older versions */
+int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g) {
+    if(!p || !g) /* q is optional */
+        return 0;
+    BN_free(dh->p);
+    BN_free(dh->q);
+    BN_free(dh->g);
+    dh->p = p;
+    dh->q = q;
+    dh->g = g;
+    if(q)
+        dh->length = BN_num_bits(q);
+    return 1;
+}
+#endif
+#endif
+
 NOEXPORT void cb_free(void *parent, void *ptr, CRYPTO_EX_DATA *ad,
         int idx, long argl, void *argp) {
-    (void)parent; /* skip warning about unused parameter */
-    (void)ad; /* skip warning about unused parameter */
-    (void)idx; /* skip warning about unused parameter */
-    (void)argl; /* skip warning about unused parameter */
+    (void)parent; /* squash the unused parameter warning */
+    (void)ad; /* squash the unused parameter warning */
+    (void)idx; /* squash the unused parameter warning */
+    (void)argl; /* squash the unused parameter warning */
     s_log(LOG_DEBUG, "Deallocating application specific data for %s",
         (char *)argp);
     str_free(ptr);
 }
 
-int ssl_configure(GLOBAL_OPTIONS *global) { /* configure global SSL settings */
+int ssl_configure(GLOBAL_OPTIONS *global) { /* configure global TLS settings */
 #ifdef USE_FIPS
     if(FIPS_mode()!=global->option.fips) {
         RAND_set_rand_method(NULL); /* reset RAND methods */
         if(!FIPS_mode_set(global->option.fips)) {
+#if OPENSSL_VERSION_NUMBER>=0x10100000L
+            OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+#else
             ERR_load_crypto_strings();
+#endif
             sslerror("FIPS_mode_set");
             return 1;
         }
@@ -120,7 +156,7 @@ NOEXPORT int compression_init(GLOBAL_OPTIONS *global) {
     }
 
     if(global->compression==COMP_NONE ||
-            SSLeay()<0x00908051L /* 0.9.8e-beta1 */) {
+            OpenSSL_version_num()<0x00908051L /* 0.9.8e-beta1 */) {
         /* delete OpenSSL defaults (empty the SSL_COMP stack) */
         /* cannot use sk_SSL_COMP_pop_free,
          * as it also destroys the stack itself */
@@ -137,13 +173,19 @@ NOEXPORT int compression_init(GLOBAL_OPTIONS *global) {
         return 0; /* success */
     }
 
-    /* also insert one of obsolete (ZLIB/RLE) algorithms */
+    /* also insert the obsolete ZLIB algorithm */
     if(global->compression==COMP_ZLIB) {
         /* 224 - within the private range (193 to 255) */
-        SSL_COMP_add_compression_method(0xe0, COMP_zlib());
-    } else if(global->compression==COMP_RLE) {
-        /* 225 - within the private range (193 to 255) */
-        SSL_COMP_add_compression_method(0xe1, COMP_rle());
+        COMP_METHOD *meth=COMP_zlib();
+#if OPENSSL_VERSION_NUMBER>=0x10100000L
+        if(!meth || COMP_get_type(meth)==NID_undef) {
+#else
+        if(!meth || meth->type==NID_undef) {
+#endif
+            s_log(LOG_ERR, "ZLIB compression is not supported");
+            return 1;
+        }
+        SSL_COMP_add_compression_method(0xe0, meth);
     }
     s_log(LOG_INFO, "Compression enabled: %d method(s)",
         sk_SSL_COMP_num(methods));
@@ -154,9 +196,6 @@ NOEXPORT int compression_init(GLOBAL_OPTIONS *global) {
 NOEXPORT int prng_init(GLOBAL_OPTIONS *global) {
     int totbytes=0;
     char filename[256];
-#ifndef USE_WIN32
-    int bytes;
-#endif
 
     filename[0]='\0';
 
@@ -190,8 +229,10 @@ NOEXPORT int prng_init(GLOBAL_OPTIONS *global) {
     }
     s_log(LOG_DEBUG, "RAND_screen failed to sufficiently seed PRNG");
 #else
+#ifndef OPENSSL_NO_EGD
     if(global->egd_sock) {
-        if((bytes=RAND_egd(global->egd_sock))==-1) {
+        int bytes=RAND_egd(global->egd_sock);
+        if(bytes==-1) {
             s_log(LOG_WARNING, "EGD Socket %s failed", global->egd_sock);
             bytes=0;
         } else {
@@ -202,6 +243,7 @@ NOEXPORT int prng_init(GLOBAL_OPTIONS *global) {
                          so no need to check if seeded sufficiently */
         }
     }
+#endif
     /* try the good-old default /dev/urandom, if available  */
     totbytes+=add_rand_file(global, "/dev/urandom");
     if(RAND_status())
@@ -228,7 +270,7 @@ NOEXPORT int add_rand_file(GLOBAL_OPTIONS *global, const char *filename) {
         s_log(LOG_INFO, "Cannot retrieve any random data from %s",
             filename);
     /* write new random data for future seeding if it's a regular file */
-    if(global->option.rand_write && (sb.st_mode & S_IFREG)) {
+    if(global->option.rand_write && S_ISREG(sb.st_mode)) {
         writebytes=RAND_write_file(filename);
         if(writebytes==-1)
             s_log(LOG_WARNING, "Failed to write strong random data to %s - "

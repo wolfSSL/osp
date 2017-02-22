@@ -1,6 +1,6 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
@@ -96,7 +96,7 @@ int libwrap_init() {
             drop_privileges(0); /* libwrap processes are not chrooted */
             close(0); /* stdin */
             close(1); /* stdout */
-            if(!global_options.option.foreground) /* for logging in read_fd */
+            if(!global_options.option.log_stderr) /* for logging in read_fd */
                 close(2); /* stderr */
             for(j=0; j<=i; ++j) /* close parent-side sockets created so far */
                 close(ipc_socket[2*j]);
@@ -200,9 +200,9 @@ void libwrap_auth(CLI *c, char *accepted_address) {
     } else
 #endif /* USE_LIBWRAP_POOL */
     { /* use original, synchronous libwrap calls */
-        enter_critical_section(CRIT_LIBWRAP);
+        CRYPTO_THREAD_write_lock(stunnel_locks[LOCK_LIBWRAP]);
         result=check(c->opt->servname, c->local_rfd.fd);
-        leave_critical_section(CRIT_LIBWRAP);
+        CRYPTO_THREAD_write_unlock(stunnel_locks[LOCK_LIBWRAP]);
     }
     if(!result) {
         s_log(LOG_WARNING, "Service [%s] REFUSED by libwrap from %s",

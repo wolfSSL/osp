@@ -1,6 +1,6 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
@@ -43,18 +43,18 @@
 #include "common.h"
 #include "prototypes.h"
 
+#ifndef USE_FORK
+STUNNEL_RWLOCK stunnel_locks[STUNNEL_LOCKS];
+#endif
+
+#if WITH_WOLFSSL
+#define CRYPTO_THREAD_lock_new wc_InitAndAllocMutex
+#elif OPENSSL_VERSION_NUMBER<0x10100004L
+#define CRYPTO_THREAD_lock_new() CRYPTO_get_new_dynlockid()
+#endif
+
 #if defined(USE_UCONTEXT) || defined(USE_FORK)
 /* no need for critical sections */
-
-void enter_critical_section(SECTION_CODE i) {
-    (void)i; /* skip warning about unused parameter */
-    /* empty */
-}
-
-void leave_critical_section(SECTION_CODE i) {
-    (void)i; /* skip warning about unused parameter */
-    /* empty */
-}
 
 #endif /* USE_UCONTEXT || USE_FORK */
 
@@ -88,7 +88,7 @@ unsigned long stunnel_thread_id(void) {
 }
 
 NOEXPORT CONTEXT *new_context(void) {
-    static int next_id=1;
+    static unsigned long next_id=1;
     CONTEXT *context;
 
     /* allocate and fill the CONTEXT structure */
@@ -114,6 +114,8 @@ int sthreads_init(void) {
         s_log(LOG_ERR, "Cannot create the listening context");
         return 1;
     }
+    /* update tls for newly allocated ready_head */
+    ui_tls=tls_alloc(NULL, ui_tls, "ui");
     /* no need to initialize ucontext_t structure here
        it will be initialied with swapcontext() call */
     return 0;
@@ -176,7 +178,7 @@ unsigned long stunnel_thread_id(void) {
 }
 
 NOEXPORT void null_handler(int sig) {
-    (void)sig; /* skip warning about unused parameter */
+    (void)sig; /* squash the unused parameter warning */
     signal(SIGCHLD, null_handler);
 }
 
@@ -205,58 +207,53 @@ int create_client(SOCKET ls, SOCKET s, CLI *arg, void *(*cli)(void *)) {
 
 #ifdef USE_PTHREAD
 
-static pthread_mutex_t stunnel_cs[CRIT_SECTIONS];
-static pthread_mutex_t *lock_cs;
-
-void enter_critical_section(SECTION_CODE i) {
-    pthread_mutex_lock(stunnel_cs+i);
-}
-
-void leave_critical_section(SECTION_CODE i) {
-    pthread_mutex_unlock(stunnel_cs+i);
-}
-
-NOEXPORT void locking_callback(int mode, int type, const char *file, int line) {
-    (void)file; /* skip warning about unused parameter */
-    (void)line; /* skip warning about unused parameter */
-    if(mode&CRYPTO_LOCK)
-        pthread_mutex_lock(lock_cs+type);
-    else
-        pthread_mutex_unlock(lock_cs+type);
-}
+#if OPENSSL_VERSION_NUMBER<0x10100004L
 
 struct CRYPTO_dynlock_value {
-    pthread_mutex_t mutex;
+    pthread_rwlock_t rwlock;
 };
+static struct CRYPTO_dynlock_value *lock_cs;
 
 NOEXPORT struct CRYPTO_dynlock_value *dyn_create_function(const char *file,
         int line) {
     struct CRYPTO_dynlock_value *value;
 
-    (void)file; /* skip warning about unused parameter */
-    (void)line; /* skip warning about unused parameter */
+    (void)file; /* squash the unused parameter warning */
+    (void)line; /* squash the unused parameter warning */
     value=str_alloc_detached(sizeof(struct CRYPTO_dynlock_value));
-    pthread_mutex_init(&value->mutex, NULL);
+    pthread_rwlock_init(&value->rwlock, NULL);
     return value;
 }
 
 NOEXPORT void dyn_lock_function(int mode, struct CRYPTO_dynlock_value *value,
         const char *file, int line) {
-    (void)file; /* skip warning about unused parameter */
-    (void)line; /* skip warning about unused parameter */
-    if(mode&CRYPTO_LOCK)
-        pthread_mutex_lock(&value->mutex);
-    else
-        pthread_mutex_unlock(&value->mutex);
+    (void)file; /* squash the unused parameter warning */
+    (void)line; /* squash the unused parameter warning */
+    if(mode&CRYPTO_LOCK) {
+        /* either CRYPTO_READ or CRYPTO_WRITE (but not both) are needed */
+        if(!(mode&CRYPTO_READ)==!(mode&CRYPTO_WRITE))
+            fatal("Invalid locking mode");
+        if(mode&CRYPTO_WRITE)
+            pthread_rwlock_wrlock(&value->rwlock);
+        else
+            pthread_rwlock_rdlock(&value->rwlock);
+    } else
+        pthread_rwlock_unlock(&value->rwlock);
 }
 
 NOEXPORT void dyn_destroy_function(struct CRYPTO_dynlock_value *value,
         const char *file, int line) {
-    (void)file; /* skip warning about unused parameter */
-    (void)line; /* skip warning about unused parameter */
-    pthread_mutex_destroy(&value->mutex);
+    (void)file; /* squash the unused parameter warning */
+    (void)line; /* squash the unused parameter warning */
+    pthread_rwlock_destroy(&value->rwlock);
     str_free(value);
 }
+
+NOEXPORT void locking_callback(int mode, int type, const char *file, int line) {
+    dyn_lock_function(mode, lock_cs+type, file, line);
+}
+
+#endif
 
 unsigned long stunnel_process_id(void) {
     return (unsigned long)getpid();
@@ -270,7 +267,7 @@ unsigned long stunnel_thread_id(void) {
 #endif
 }
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000L
+#if OPENSSL_VERSION_NUMBER>=0x10000000L && OPENSSL_VERSION_NUMBER<0x10100004L
 NOEXPORT void threadid_func(CRYPTO_THREADID *tid) {
     CRYPTO_THREADID_set_numeric(tid, stunnel_thread_id());
 }
@@ -279,26 +276,28 @@ NOEXPORT void threadid_func(CRYPTO_THREADID *tid) {
 int sthreads_init(void) {
     int i;
 
-    /* initialize stunnel critical sections */
-    for(i=0; i<CRIT_SECTIONS; i++)
-        pthread_mutex_init(stunnel_cs+i, NULL);
+#if OPENSSL_VERSION_NUMBER<0x10100004L
+    /* initialize the OpenSSL dynamic locking */
+    CRYPTO_set_dynlock_create_callback(dyn_create_function);
+    CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
+    CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
 
-    /* initialize OpenSSL locking callback */
+    /* initialize the OpenSSL static locking */
     lock_cs=str_alloc_detached(
-        (size_t)CRYPTO_num_locks()*sizeof(pthread_mutex_t));
+        (size_t)CRYPTO_num_locks()*sizeof(struct CRYPTO_dynlock_value));
     for(i=0; i<CRYPTO_num_locks(); i++)
-        pthread_mutex_init(lock_cs+i, NULL);
+        pthread_rwlock_init(&lock_cs[i].rwlock, NULL);
 #if OPENSSL_VERSION_NUMBER>=0x10000000L
     CRYPTO_THREADID_set_callback(threadid_func);
 #else
     CRYPTO_set_id_callback(stunnel_thread_id);
 #endif
     CRYPTO_set_locking_callback(locking_callback);
+#endif
 
-    /* initialize OpenSSL dynamic locks callbacks */
-    CRYPTO_set_dynlock_create_callback(dyn_create_function);
-    CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
-    CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
+    /* initialize stunnel critical sections */
+    for(i=0; i<STUNNEL_LOCKS; i++)
+        stunnel_locks[i]=CRYPTO_THREAD_lock_new();
 
     return 0;
 }
@@ -346,36 +345,23 @@ int create_client(SOCKET ls, SOCKET s, CLI *arg, void *(*cli)(void *)) {
 
 #ifdef USE_WIN32
 
-static CRITICAL_SECTION stunnel_cs[CRIT_SECTIONS];
-static CRITICAL_SECTION *lock_cs;
+/* Slim Reader/Writer (SRW) Lock would be better than CRITICAL_SECTION,
+ * but it is unsupported on Windows XP (and earlier versions of Windows):
+ * https://msdn.microsoft.com/en-us/library/windows/desktop/aa904937%28v=vs.85%29.aspx */
 
-void enter_critical_section(SECTION_CODE i) {
-    EnterCriticalSection(stunnel_cs+i);
-}
-
-void leave_critical_section(SECTION_CODE i) {
-    LeaveCriticalSection(stunnel_cs+i);
-}
-
-NOEXPORT void locking_callback(int mode, int type, const char *file, int line) {
-    (void)file; /* skip warning about unused parameter */
-    (void)line; /* skip warning about unused parameter */
-    if(mode&CRYPTO_LOCK)
-        EnterCriticalSection(lock_cs+type);
-    else
-        LeaveCriticalSection(lock_cs+type);
-}
+#if OPENSSL_VERSION_NUMBER<0x10100004L
 
 struct CRYPTO_dynlock_value {
     CRITICAL_SECTION mutex;
 };
+static struct CRYPTO_dynlock_value *lock_cs;
 
 NOEXPORT struct CRYPTO_dynlock_value *dyn_create_function(const char *file,
         int line) {
     struct CRYPTO_dynlock_value *value;
 
-    (void)file; /* skip warning about unused parameter */
-    (void)line; /* skip warning about unused parameter */
+    (void)file; /* squash the unused parameter warning */
+    (void)line; /* squash the unused parameter warning */
     value=str_alloc_detached(sizeof(struct CRYPTO_dynlock_value));
     InitializeCriticalSection(&value->mutex);
     return value;
@@ -383,8 +369,8 @@ NOEXPORT struct CRYPTO_dynlock_value *dyn_create_function(const char *file,
 
 NOEXPORT void dyn_lock_function(int mode, struct CRYPTO_dynlock_value *value,
         const char *file, int line) {
-    (void)file; /* skip warning about unused parameter */
-    (void)line; /* skip warning about unused parameter */
+    (void)file; /* squash the unused parameter warning */
+    (void)line; /* squash the unused parameter warning */
     if(mode&CRYPTO_LOCK)
         EnterCriticalSection(&value->mutex);
     else
@@ -393,11 +379,17 @@ NOEXPORT void dyn_lock_function(int mode, struct CRYPTO_dynlock_value *value,
 
 NOEXPORT void dyn_destroy_function(struct CRYPTO_dynlock_value *value,
         const char *file, int line) {
-    (void)file; /* skip warning about unused parameter */
-    (void)line; /* skip warning about unused parameter */
+    (void)file; /* squash the unused parameter warning */
+    (void)line; /* squash the unused parameter warning */
     DeleteCriticalSection(&value->mutex);
     str_free(value);
 }
+
+NOEXPORT void locking_callback(int mode, int type, const char *file, int line) {
+    dyn_lock_function(mode, lock_cs+type, file, line);
+}
+
+#endif
 
 unsigned long stunnel_process_id(void) {
     return GetCurrentProcessId() & 0x00ffffff;
@@ -408,23 +400,27 @@ unsigned long stunnel_thread_id(void) {
 }
 
 int sthreads_init(void) {
+#ifndef USE_FORK
     int i;
 
-    /* initialize stunnel critical sections */
-    for(i=0; i<CRIT_SECTIONS; i++)
-        InitializeCriticalSection(stunnel_cs+i);
-
-    /* initialize OpenSSL locking callback */
-    lock_cs=str_alloc_detached(
-        (size_t)CRYPTO_num_locks()*sizeof(CRITICAL_SECTION));
-    for(i=0; i<CRYPTO_num_locks(); i++)
-        InitializeCriticalSection(lock_cs+i);
-    CRYPTO_set_locking_callback(locking_callback);
-
-    /* initialize OpenSSL dynamic locks callbacks */
+#if OPENSSL_VERSION_NUMBER<0x10100004L
+    /* initialize the OpenSSL dynamic locking */
     CRYPTO_set_dynlock_create_callback(dyn_create_function);
     CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
     CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
+
+    /* initialize the OpenSSL static locking */
+    lock_cs=str_alloc_detached(
+        (size_t)CRYPTO_num_locks()*sizeof(struct CRYPTO_dynlock_value));
+    for(i=0; i<CRYPTO_num_locks(); i++)
+        InitializeCriticalSection(&lock_cs[i].mutex);
+    CRYPTO_set_locking_callback(locking_callback);
+#endif
+
+    /* initialize stunnel critical sections */
+    for(i=0; i<STUNNEL_LOCKS; i++)
+        stunnel_locks[i]=CRYPTO_THREAD_lock_new();
+#endif /* USE_FORK */
 
     return 0;
 }
@@ -432,7 +428,8 @@ int sthreads_init(void) {
 int create_client(SOCKET ls, SOCKET s, CLI *arg, void *(*cli)(void *)) {
     (void)ls; /* this parameter is only used with USE_FORK */
     s_log(LOG_DEBUG, "Creating a new thread");
-    if((long)_beginthread((void(*)(void *))cli, arg->opt->stack_size, arg)==-1) {
+    if((long)_beginthread((void(*)(void *))cli,
+            (unsigned)arg->opt->stack_size, arg)==-1) {
         ioerror("_beginthread");
         str_free(arg);
         if(s!=INVALID_SOCKET)
@@ -446,14 +443,6 @@ int create_client(SOCKET ls, SOCKET s, CLI *arg, void *(*cli)(void *)) {
 #endif /* USE_WIN32 */
 
 #ifdef USE_OS2
-
-void enter_critical_section(SECTION_CODE i) {
-    DosEnterCritSec();
-}
-
-void leave_critical_section(SECTION_CODE i) {
-    DosExitCritSec();
-}
 
 int sthreads_init(void) {
     return 0;
@@ -525,12 +514,12 @@ void stack_info(int init) { /* 1-initialize, 0-display */
         for(i=0; i<VERIFY_AREA; i++)
             table[i]=TEST_VALUE;
     } else {
-        /* the stack is growing down */
+        /* the stack grows down */
         for(i=0; i<VERIFY_AREA; i++)
             if(table[i]!=TEST_VALUE)
                 break;
         num=i;
-        /* the stack is growing up */
+        /* the stack grows up */
         for(i=0; i<VERIFY_AREA; i++)
             if(table[VERIFY_AREA-i-1]!=TEST_VALUE)
                 break;
