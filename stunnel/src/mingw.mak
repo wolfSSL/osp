@@ -1,4 +1,4 @@
-# Simple Makefile.w32 for stunnel.exe by Michal Trojnara 1998-2007
+# Simple Makefile.w32 for stunnel.exe by Michal Trojnara 1998-2017
 #
 # Modified by Brian Hatch  (bri@stunnel.org)
 # 20101030 pdelaage:
@@ -22,8 +22,21 @@
  
 # Modify this to point to your actual openssl compile directory
 # (You did already compile openssl, didn't you???)
-SSLDIR=../openssl-1.0.0f
-#SSLDIR=C:/Users/standard/Documents/Dvts/Contrib/openssl/v1.0.0c/patched3
+#SSLDIR=../../openssl-0.9.8zh
+#SSLDIR=../../openssl-1.0.0t
+SSLDIR=../../openssl-1.0.1q
+
+# For 0.9.8 mingw compiled openssl
+#SSLINC=$(SSLDIR)/outinc
+#SSLLIBS=-L$(SSLDIR)/out -leay32 -lssl32
+
+# for 1.0.0/1.0.1 mingw (msys2) compiled
+SSLINC=$(SSLDIR)/include
+SSLLIBS=-L$(SSLDIR) -lcrypto.dll -lssl.dll
+
+# For MSVC compiled openssl
+#SSLINC=$(SSLDIR)/inc32
+#SSLLIBS=-L$(SSLDIR)/out32dll -lssleay32 -llibeay32
 
 # c:\, backslash is not correctly recognized by mingw32-make, produces some
 # "missing separator" issue.
@@ -34,17 +47,19 @@ SSLDIR=../openssl-1.0.0f
 #       $(info is !MESSAGE in MS nmake or Borland make.
 
 ifdef windir
-$(info  host machine is a Windows machine )
+$(info host machine is a Windows machine )
 NULLDEV=NUL
 MKDIR="C:\Program Files\GnuWin32\bin\mkdir.exe"
 DELFILES="C:\Program Files\GnuWin32\bin\rm.exe" -f
 DELDIR="C:\Program Files\GnuWin32\bin\rm.exe" -rf
+COPYFILES="C:\Program Files\GnuWin32\bin\cp.exe" -f
 else
-$(info  host machine is a linux machine )
+$(info host machine is a linux machine )
 NULLDEV=/dev/null
 MKDIR=mkdir
 DELFILES=rm -f
 DELDIR=rm -rf
+COPYFILES=cp -f
 endif
 
 TARGETCPU=MGW32
@@ -57,8 +72,14 @@ BIN=$(BINROOT)/$(TARGETCPU)
 OBJS=$(OBJ)/stunnel.o $(OBJ)/ssl.o $(OBJ)/ctx.o $(OBJ)/verify.o \
 	$(OBJ)/file.o $(OBJ)/client.o $(OBJ)/protocol.o $(OBJ)/sthreads.o \
 	$(OBJ)/log.o $(OBJ)/options.o $(OBJ)/network.o $(OBJ)/resolver.o \
-	$(OBJ)/ui_win_gui.o $(OBJ)/resources.o $(OBJ)/str.o $(OBJ)\tls.obj \
-	$(OBJ)/fd.o
+	$(OBJ)/ui_win_gui.o $(OBJ)/resources.o $(OBJ)/str.o $(OBJ)/tls.o \
+	$(OBJ)/fd.o $(OBJ)/dhparam.o $(OBJ)/cron.o
+
+TOBJS=$(OBJ)/stunnel.o $(OBJ)/ssl.o $(OBJ)/ctx.o $(OBJ)/verify.o \
+	$(OBJ)/file.o $(OBJ)/client.o $(OBJ)/protocol.o $(OBJ)/sthreads.o \
+	$(OBJ)/log.o $(OBJ)/options.o $(OBJ)/network.o $(OBJ)/resolver.o \
+	$(OBJ)/ui_win_cli.o $(OBJ)/str.o $(OBJ)/tls.o \
+	$(OBJ)/fd.o $(OBJ)/dhparam.o $(OBJ)/cron.o
 
 CC=gcc
 RC=windres
@@ -71,9 +92,7 @@ DEFINES=-D_WIN32_WINNT=0x0501
 
 # some preprocessing debug : $(info  DEFINES is $(DEFINES) )
 
-#CFLAGS=-g -O2 -Wall $(DEFINES) -I$(SSLDIR)/outinc
-#pdelaage : outinc not correct, it is inc32!
-CFLAGS=-g -O2 -Wall $(DEFINES) -I$(SSLDIR)/inc32
+CFLAGS=-g -O2 -Wall $(DEFINES) -I$(SSLINC)
 
 # RFLAGS, note of pdelaage: windres accepts -fo for compatibility with ms tools
 # default options : -J rc -O coff, input rc file, output coff file.
@@ -83,10 +102,8 @@ RFLAGS=-v --use-temp-file $(DEFINES)
 RFLAGS2=-v $(DEFINES)
 LDFLAGS=-s
 
-# LIBS=-L$(SSLDIR)/out -lssl -lcrypto -lwsock32 -lgdi32 -lcrypt32
-#20101030 pdelaage fix winsock2 and BAD sslpath  ! LIBS=-L$(SSLDIR)/out -lzdll -leay32 -lssl32 -lwsock32 -lgdi32 -lcrypt32
-# added libeay instead of eay, ssleay instead of ssl32, suppressed zdll useless.
-LIBS=-L$(SSLDIR)/out32dll -lssleay32 -llibeay32 -lws2_32 -lpsapi -lgdi32 -lcrypt32
+LIBS=$(SSLLIBS) -lws2_32 -lpsapi -lgdi32 -lcrypt32 -lkernel32
+TLIBS=$(SSLLIBS) -lws2_32 -lpsapi -lcrypt32 -lkernel32
 # IMPORTANT pdelaage : restore this if you need (but I do not see why) -lzdll
 
 $(OBJ)/%.o: $(SRC)/%.c
@@ -114,12 +131,16 @@ $(OBJ)/%.o: $(OBJ)/%.rcp
 # in the system...
 # for debug of the preprocessed rcp file, because it is automatically deleted by gnu-make:	cp $< $<.2
 
-all: testenv makedirs $(BIN)/stunnel.exe
+all: testenv makedirs $(BIN)/stunnel.exe $(BIN)/tstunnel.exe
+
+testopenssl:
+	@if not exist $(SSLDIR) echo You mush have a compiled OpenSSL tree
+	@if not exist $(SSLINC)/openssl/applink.c $(COPYFILES) $(SSLDIR)/ms/applink.c $(SSLINC)/openssl
 
 #pdelaage : testenv purpose is to detect, on windows, whether Gnu-win32 has been properly installed...
 # a first call to "true" is made to detect availability, a second is made to stop the make process.
 ifdef windir
-testenv:
+testenv: testopenssl
 	-@ echo OFF
 	-@ true >$(NULLDEV) 2>&1 || echo You MUST install Gnu-Win32 coreutils \
 	from http://gnuwin32.sourceforge.net/downlinks/coreutils.php \
@@ -134,8 +155,8 @@ endif
 clean: 
 	-@ $(DELFILES) $(OBJ)/*.o
 	-@ $(DELFILES) $(BIN)/stunnel.exe >$(NULLDEV) 2>&1
-	-@ $(DELDIR) $(OBJ)   >$(NULLDEV) 2>&1
-	-@ $(DELDIR) $(BIN)   >$(NULLDEV) 2>&1
+	-@ $(DELDIR) $(OBJ) >$(NULLDEV) 2>&1
+	-@ $(DELDIR) $(BIN) >$(NULLDEV) 2>&1
 
 makedirs:
 	-@ $(MKDIR) $(OBJROOT) >$(NULLDEV) 2>&1
@@ -152,6 +173,9 @@ $(OBJS): *.h mingw.mak
 
 $(BIN)/stunnel.exe: $(OBJS)
 	$(CC) $(LDFLAGS) -o $(BIN)/stunnel.exe $(OBJS) $(LIBS) -mwindows
+
+$(BIN)/tstunnel.exe: $(TOBJS)
+	$(CC) $(LDFLAGS) -o $(BIN)/tstunnel.exe $(TOBJS) $(TLIBS)
 
 # "missing separator" issue with mingw32-make: tabs MUST BE TABS in your text
 # editor, and not set of spaces even if your development host is windows.

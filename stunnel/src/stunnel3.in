@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # stunnel3      Perl wrapper to use stunnel 3.x syntax in stunnel >=4.05
-# Copyright (C) 2004-2012 Michal Trojnara <Michal.Trojnara@mirt.net>
+# Copyright (C) 2004-2012 Michal Trojnara <Michal.Trojnara@stunnel.org>
 # Version:      2.03
 # Date:         2011.10.22
 #
@@ -22,7 +22,7 @@ use POSIX;
 use Getopt::Std;
 
 # Configuration - path to stunnel (version >=4.05)
-$stunnel_bin='@prefix@/bin/stunnel';
+$stunnel_bin='@bindir@/stunnel';
 
 # stunnel3 script body begins here
 ($read_fd, $write_fd)=POSIX::pipe();

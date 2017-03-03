@@ -1,14 +1,14 @@
 # Process this file with autoconf to produce a configure script.
 
-AC_INIT([stunnel],[5.17])
+AC_INIT([stunnel],[5.40])
 AC_MSG_NOTICE([**************************************** initialization])
 AC_CONFIG_AUX_DIR(auto)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_SRCDIR([src/stunnel.c])
 AM_INIT_AUTOMAKE
-AC_DEFINE([_GNU_SOURCE], [1], [Use GNU source])
 
+AM_CONDITIONAL([AUTHOR_TESTS], [test -d ".git"])
 AC_CANONICAL_HOST
 AC_SUBST([host])
 AC_DEFINE_UNQUOTED([HOST], ["$host"], [Host description])
@@ -17,10 +17,24 @@ AC_DEFINE_UNQUOTED(esc(CPU_$host_cpu))
 AC_DEFINE_UNQUOTED(esc(VENDOR_$host_vendor))
 AC_DEFINE_UNQUOTED(esc(OS_$host_os))
 
+case "$host_os" in
+*darwin*)
+    # OSX does not declare ucontext without _XOPEN_SOURCE
+    AC_DEFINE([_XOPEN_SOURCE], [500], [Use X/Open 5 with POSIX 1995])
+    # OSX does not declare chroot() without _DARWIN_C_SOURCE
+    AC_DEFINE([_DARWIN_C_SOURCE], [1], [Use Darwin source])
+    ;;
+*)
+    AC_DEFINE([_GNU_SOURCE], [1], [Use GNU source])
+    ;;
+esac
+
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
+# silent build by default
+ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_MSG_NOTICE([**************************************** thread model])
 # thread detection should be done first, as it may change the CC variable
@@ -64,20 +78,28 @@ AC_ARG_WITH(threads,
 ])
 
 AC_MSG_NOTICE([**************************************** compiler/linker flags])
-AX_APPEND_COMPILE_FLAGS([-Wall])
-AX_APPEND_COMPILE_FLAGS([-Wextra])
-AX_APPEND_COMPILE_FLAGS([-Wpedantic])
-AX_APPEND_COMPILE_FLAGS([-Wformat=2])
-AX_APPEND_COMPILE_FLAGS([-Wconversion])
-AX_APPEND_COMPILE_FLAGS([-Wno-long-long])
-AX_APPEND_COMPILE_FLAGS([-Wno-deprecated-declarations])
-AX_APPEND_COMPILE_FLAGS([-fstack-protector])
-AX_APPEND_COMPILE_FLAGS([-fPIE])
+if test "$GCC" = yes; then
+    AX_APPEND_COMPILE_FLAGS([-Wall])
+    AX_APPEND_COMPILE_FLAGS([-Wextra])
+    AX_APPEND_COMPILE_FLAGS([-Wpedantic])
+    AX_APPEND_COMPILE_FLAGS([-Wformat=2])
+    AX_APPEND_COMPILE_FLAGS([-Wconversion])
+    AX_APPEND_COMPILE_FLAGS([-Wno-long-long])
+    AX_APPEND_COMPILE_FLAGS([-Wno-deprecated-declarations])
+    AX_APPEND_COMPILE_FLAGS([-fPIE])
+    case "${host}" in
+        avr-*.* | powerpc-*-aix* | rl78-*.* | visium-*.*)
+            ;;
+        *)
+            AX_APPEND_COMPILE_FLAGS([-fstack-protector])
+            ;;
+    esac
+    AX_APPEND_LINK_FLAGS([-fPIE -pie])
+    AX_APPEND_LINK_FLAGS([-Wl,-z,relro])
+    AX_APPEND_LINK_FLAGS([-Wl,-z,now])
+    AX_APPEND_LINK_FLAGS([-Wl,-z,noexecstack])
+fi
 AX_APPEND_COMPILE_FLAGS([-D_FORTIFY_SOURCE=2])
-AX_APPEND_LINK_FLAGS([-fPIE -pie])
-AX_APPEND_LINK_FLAGS([-Wl,-z,relro])
-AX_APPEND_LINK_FLAGS([-Wl,-z,now])
-AX_APPEND_LINK_FLAGS([-Wl,-z,noexecstack])
 
 AC_MSG_NOTICE([**************************************** libtool])
 LT_INIT([disable-static])
@@ -104,7 +126,7 @@ AC_CHECK_TYPES([struct sockaddr_un], [], [], [#include <sys/un.h>])
 AC_CHECK_TYPES([struct addrinfo], [], [], [#include <netdb.h>])
 
 AC_MSG_NOTICE([**************************************** PTY device files])
-if test "$cross_compiling" = "no"; then
+if test "x$cross_compiling" = "xno"; then
     AC_CHECK_FILE("/dev/ptmx", AC_DEFINE([HAVE_DEV_PTMX], [1],
         [Define to 1 if you have '/dev/ptmx' device.]))
     AC_CHECK_FILE("/dev/ptc", AC_DEFINE([HAVE_DEV_PTS_AND_PTC], [1],
@@ -115,7 +137,7 @@ fi
 
 AC_MSG_NOTICE([**************************************** entropy sources])
 
-if test "$cross_compiling" = "no"; then
+if test "x$cross_compiling" = "xno"; then
     AC_ARG_WITH(egd-socket,
         [  --with-egd-socket=FILE  Entropy Gathering Daemon socket path],
         [EGD_SOCKET="$withval"]
@@ -144,7 +166,7 @@ fi
 
 AC_MSG_NOTICE([**************************************** default group])
 DEFAULT_GROUP=nobody
-if test "$cross_compiling" = "no"; then
+if test "x$cross_compiling" = "xno"; then
     grep '^nogroup:' /etc/group >/dev/null && DEFAULT_GROUP=nogroup
 else
     AC_MSG_WARN([cross-compilation: assuming nogroup is not available])
@@ -153,12 +175,17 @@ AC_MSG_CHECKING([for default group])
 AC_MSG_RESULT([$DEFAULT_GROUP])
 AC_SUBST([DEFAULT_GROUP])
 
+AC_SYS_LARGEFILE
+
 AC_MSG_NOTICE([**************************************** header files])
 # AC_HEADER_DIRENT
 # AC_HEADER_STDC
 # AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([stdint.h inttypes.h malloc.h ucontext.h pthread.h poll.h tcpd.h stropts.h grp.h unistd.h util.h libutil.h pty.h])
-AC_CHECK_HEADERS([sys/types.h sys/select.h sys/poll.h sys/socket.h sys/un.h sys/ioctl.h sys/filio.h sys/resource.h sys/uio.h sys/syscall.h])
+AC_CHECK_HEADERS([stdint.h inttypes.h malloc.h ucontext.h pthread.h poll.h \
+    tcpd.h stropts.h grp.h unistd.h util.h libutil.h pty.h limits.h])
+AC_CHECK_HEADERS([sys/types.h sys/select.h sys/poll.h sys/socket.h sys/un.h \
+    sys/ioctl.h sys/filio.h sys/resource.h sys/uio.h sys/syscall.h])
+AC_CHECK_HEADERS([linux/sched.h])
 AC_CHECK_MEMBERS([struct msghdr.msg_control],
     [AC_DEFINE([HAVE_MSGHDR_MSG_CONTROL], [1],
     [Define to 1 if you have 'msghdr.msg_control' structure.])], [], [
@@ -179,13 +206,12 @@ AC_SEARCH_LIBS([gethostbyname], [nsl])
 AC_SEARCH_LIBS([yp_get_default_domain], [nsl])
 AC_SEARCH_LIBS([socket], [socket])
 AC_SEARCH_LIBS([openpty], [util])
-# Checks for dynamic loader and zlib needed by OpenSSL
+# Checks for dynamic loader needed by OpenSSL
 AC_SEARCH_LIBS([dlopen], [dl])
 AC_SEARCH_LIBS([shl_load], [dld])
-AC_SEARCH_LIBS([inflateEnd], [z])
 
 # Add BeOS libraries
-if test "$host_os" = "beos"; then
+if test "x$host_os" = "xbeos"; then
     LIBS="$LIBS -lbe -lroot -lbind"
 fi
 
@@ -195,7 +221,7 @@ AC_CHECK_FUNCS(snprintf vsnprintf)
 # pseudoterminal
 AC_CHECK_FUNCS(openpty _getpty)
 # Unix
-AC_CHECK_FUNCS(daemon waitpid wait4 setsid setgroups chroot)
+AC_CHECK_FUNCS(daemon waitpid wait4 setsid setgroups chroot realpath)
 # limits
 AC_CHECK_FUNCS(sysconf getrlimit)
 # threads/reentrant functions
@@ -228,10 +254,10 @@ getaddrinfo(NULL, NULL, NULL, NULL);
         [AC_MSG_RESULT([no])])
     ;;
 esac
-# poll() is not recommended on Mac OS X <=10.3 and broken on Mac OS X >=10.4
+# poll() is not recommended on Mac OS X <= 10.3 and broken on Mac OS X 10.4
 AC_MSG_CHECKING([for broken poll() implementation])
 case "$host_os" in
-darwin*)
+darwin[0-8].*)
     AC_MSG_RESULT([yes (poll() disabled)])
     AC_DEFINE([BROKEN_POLL], [1], [Define to 1 if you have a broken 'poll' implementation.])
     ;;
@@ -369,38 +395,36 @@ AC_ARG_ENABLE(libwrap,
     ]
 )
 
-AC_MSG_NOTICE([**************************************** SSL])
-
-AC_ARG_ENABLE([sslv3],
-    [  --enable-sslv3 Enable sslv3. This is turned off by default when using wolfSSL],
-    [ ENABLED_SSL3=$enableval ],
-    [ ENABLED_SSL3=$no ])
-
-if test "x$ENABLED_SSL3" = "xyes"
-then
-    AM_CFLAGS="$AM_CFLAGS -DENABLE_SSL3"
-    AC_DEFINE([ENABLE_SSL3], [1],
-    [Define to 1 to enable SSL3 (Disabled by default with wolfSSL).])
-fi
-
-AM_CONDITIONAL([SSL3], test "x$ENABLED_SSL3" = "xyes")
+AC_MSG_NOTICE([**************************************** TLS])
 
 AC_MSG_CHECKING([for compiler sysroot])
-if test "$GCC" = yes; then
-    SYSROOT=`$CC --print-sysroot 2>/dev/null`
+if test "x$GCC" = "xyes"; then
+    sysroot=`$CC --print-sysroot 2>/dev/null`
 fi
-if test -z "$SYSROOT"; then
-    SYSROOT="/"
+if test -z "$sysroot" -o "x$sysroot" = "x/"; then
+    sysroot=""
+    AC_MSG_RESULT([/])
+else
+    AC_MSG_RESULT([$sysroot])
 fi
-AC_MSG_RESULT([$SYSROOT])
 
-# Check for SSL directory
 check_ssl_dir() { :
-    SSLDIR="$1"
-    if test -f "$1/include/openssl/ssl.h"; then
-        return 0
+    test -n "$1" -a -f "$1/include/openssl/ssl.h" && SSLDIR="$1"
+}
+
+find_ssl_dir() { :
+    stunnel_prefix="$prefix"
+    test "x$stunnel_prefix" = "xNONE" && stunnel_prefix=$ac_default_prefix
+    for main_dir in "$stunnel_prefix" "/usr/local" "/usr/lib" "/usr/pkg" "/opt/local" "/opt" "/opt/csw" "/usr" ""; do
+        for sub_dir in "/ssl" "/openssl" "/ossl" ""; do
+            check_ssl_dir "$sysroot$main_dir$sub_dir" && return
+        done
+    done
+    if test -x "/usr/bin/xcrun"; then
+        sdk_path=`/usr/bin/xcrun --sdk macosx --show-sdk-path`
+        check_ssl_dir "$sdk_path/usr" && return
     fi
-    return 1
+    check_ssl_dir "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk/usr"
 }
 
 AC_ARG_ENABLE([wolfssl],
@@ -414,35 +438,6 @@ then
     SSLDIR="/usr/local"
     AC_DEFINE([WITH_WOLFSSL], [1],
     [Define to 1 if you using WOLFSSL header file.])
-
-    AC_MSG_CHECKING([is wolfssl configured with aesni])
-    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
-    #include <wolfssl/options.h>
-    #ifndef WOLFSSL_AESNI
-    # error macro not defined
-    #endif
-    ]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
-
-    if test "x$wolf_has_aesni" == "xyes" ; then
-        AC_MSG_RESULT([yes])
-        AC_MSG_CHECKING([is gcc compiler detected])
-        if test "$GCC" = "yes"
-        then
-            AC_MSG_RESULT([yes])
-            AC_MSG_CHECKING([is compiler set to icc])
-            if test "$CC" != "icc"
-            then
-                AC_MSG_RESULT([not icc, add flags -maes and -msse4])
-                CFLAGS="$CFLAGS -maes -msse4"
-            else
-                AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
-            fi
-        else
-            AC_MSG_RESULT([no gcc])
-        fi
-    else
-        AC_MSG_RESULT([no])
-    fi
 fi
 
 AM_CONDITIONAL([WOLFSSL], test "x$ENABLED_WOLFSSL" = "xyes")
@@ -462,33 +457,24 @@ AM_CONDITIONAL([WOLFSSL_DEBUG_ON], test "x$ENABLED_WOLFSSLDEBUG" = "xyes")
 
 if test "x$ENABLED_WOLFSSL" = "xno"
 then
-    AC_MSG_CHECKING([for SSL directory])
+    SSLDIR=""
+    AC_MSG_CHECKING([for TLS directory])
     AC_ARG_WITH(ssl,
     [  --with-ssl=DIR          location of installed SSL libraries/include files],
-        [
-            check_ssl_dir "$withval"
-        ],
-        [
-            for main_dir in usr/local usr/lib usr/pkg opt/local opt usr ""; do
-                for sub_dir in /ssl /openssl ""; do
-                    check_ssl_dir "$SYSROOT$main_dir$sub_dir" && break 2
-                done
-            done
-        ]
+        [check_ssl_dir "$withval"],
+        [find_ssl_dir]
     )
-
-
-    if test ! -f "$SSLDIR/include/openssl/ssl.h"; then
+    if test -z "$SSLDIR"; then
     AC_MSG_RESULT([not found])
     AC_MSG_ERROR([
-    Could not find your SSL library installation dir
+    Could not find your TLS library installation dir
     Use --with-ssl option to fix this problem
-    ])
+    ]) 
     fi
 fi
 AC_MSG_RESULT([$SSLDIR])
 AC_SUBST([SSLDIR])
-AC_DEFINE_UNQUOTED([SSLDIR], ["$SSLDIR"], [SSL directory])
+AC_DEFINE_UNQUOTED([SSLDIR], ["$SSLDIR"], [TLS directory])
 
 
 if test "x$ENABLED_WOLFSSL" = "xyes"
@@ -500,25 +486,7 @@ valid_CPPFLAGS="$CPPFLAGS"; CPPFLAGS="$CPPFLAGS -I$SSLDIR/include"
 valid_LIBS="$LIBS"; LIBS="$LIBS -L$SSLDIR/lib64 -L$SSLDIR/lib -lssl -lcrypto"
 fi
 
-if test "x$ENABLED_WOLFSSL" = "xno"
-then
-AC_CHECK_HEADER([$SSLDIR/include/openssl/engine.h],
-    [AC_DEFINE([HAVE_OSSL_ENGINE_H], [1],
-    [Define to 1 if you have <engine.h> header file.])],
-    [AC_MSG_WARN([OpenSSL engine header not found])])
-
-AC_CHECK_HEADER([$SSLDIR/include/openssl/ocsp.h],
-    [AC_DEFINE([HAVE_OSSL_OCSP_H], [1],
-    [Define to 1 if you have <ocsp.h> header file.])],
-    [AC_MSG_WARN([OpenSSL ocsp header not found])])
-else
-    AC_DEFINE([HAVE_OSSL_OCSP_H], [1],
-    [Define to 1 if you have <ocsp.h> header file.])
-    AC_DEFINE([OPENSSL_NO_ENGINE], [1],
-    [Wolfssl does not currently support ENGINE with Stunnel])
-fi
-
-if test "$use_fips" = "auto"; then
+if test "x$use_fips" = "xauto"; then
     AC_CHECK_FUNCS(FIPS_mode_set, [
         AC_DEFINE([USE_FIPS], [1], [Define to 1 to enable OpenSSL FIPS support])
         AC_MSG_NOTICE([FIPS support enabled])
@@ -531,9 +499,9 @@ CPPFLAGS="$valid_CPPFLAGS"
 LIBS="$valid_LIBS"
 
 AC_MSG_NOTICE([**************************************** write the results])
-AC_CONFIG_FILES([Makefile src/Makefile src/stunnel3 doc/Makefile tools/Makefile tools/stunnel.conf-sample tools/stunnel.init tools/stunnel.service])
+AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile tools/Makefile])
 AC_OUTPUT
 
 AC_MSG_NOTICE([**************************************** success])
-# End of configure.ac
 # vim:ft=automake
+# End of configure.ac

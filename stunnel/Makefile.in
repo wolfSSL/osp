@@ -14,6 +14,8 @@
 
 @SET_MAKE@
 
+# by Michal Trojnara 2015-2017
+
 VPATH = @srcdir@
 am__is_gnu_make = test -n '$(MAKEFILE_LIST)' && test -n '$(MAKELEVEL)'
 am__make_running_with_option = \
@@ -357,10 +359,14 @@ top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = src doc tools
 EXTRA_DIST = PORTS BUGS COPYRIGHT.GPL CREDITS INSTALL.W32 INSTALL.WCE \
-	INSTALL.FIPS build-android.sh
+	INSTALL.FIPS build-android.sh .travis.yml
 doc_DATA = INSTALL README TODO COPYING AUTHORS ChangeLog PORTS BUGS \
 	COPYRIGHT.GPL CREDITS INSTALL.W32 INSTALL.WCE INSTALL.FIPS
 distcleancheck_listfiles = find -type f -exec sh -c 'test -f $(srcdir)/{} || echo {}' ';'
+edit = sed \
+	-e 's|@bindir[@]|$(bindir)|g' \
+	-e 's|@sysconfdir[@]|$(sysconfdir)|g'
+
 all: all-recursive
 
 .SUFFIXES:
@@ -857,29 +863,38 @@ libtool: $(LIBTOOL_DEPS)
 
 distclean-local:
 	rm -rf autom4te.cache
-#	rm -f $(distdir)-installer.exe
+#	rm -f $(distdir)-win32-installer.exe
 
 #dist-hook:
-#	makensis -NOCD -DVERSION=${VERSION} -DSRCDIR=$(srcdir) \
-#		-DOPENSSL=/usr/src/openssl-0.9.8u-fips/out32dll \
-#		-DZLIB=/usr/src/zlib-1.2.8-i586 \
+#	makensis -NOCD -DVERSION=${VERSION} \
+#		-DSTUNNEL_DIR=$(srcdir) \
+#		-DROOT_DIR=/usr/src \
 #		$(srcdir)/tools/stunnel.nsi
 
 sign: dist
-	cp -f $(distdir).tar.gz $(distdir)-installer.exe $(distdir)-android.zip ../dist
-	gpg-agent --daemon /bin/sh -c "cd ../dist; gpg --yes --armor --detach-sign --force-v3-sigs $(distdir).tar.gz; gpg --yes --armor --detach-sign --force-v3-sigs $(distdir)-installer.exe; gpg --yes --armor --detach-sign --force-v3-sigs $(distdir)-android.zip"
+	cp -f $(distdir).tar.gz $(distdir)-win32-installer.exe $(distdir)-android.zip ../dist
+	gpg-agent --daemon /bin/sh -c "cd ../dist; gpg --yes --armor --detach-sign --force-v3-sigs $(distdir).tar.gz; gpg --yes --armor --detach-sign --force-v3-sigs $(distdir)-win32-installer.exe; gpg --yes --armor --detach-sign --force-v3-sigs $(distdir)-android.zip"
 	sha256sum $(distdir).tar.gz >../dist/$(distdir).tar.gz.sha256
-	sha256sum $(distdir)-installer.exe >../dist/$(distdir)-installer.exe.sha256
+	sha256sum $(distdir)-win32-installer.exe >../dist/$(distdir)-win32-installer.exe.sha256
 	sha256sum $(distdir)-android.zip >../dist/$(distdir)-android.zip.sha256
-	cat ../dist/$(distdir)*.sha256
+	cat ../dist/$(distdir)*.sha256 | tac
 
 cert:
 	$(MAKE) -C tools cert
+
+test:
+	$(abs_builddir)/src/stunnel -version
+	@echo "No tests are currently implemented"
 
 install-data-hook:
 	@echo "*********************************************************"
 	@echo "* Type 'make cert' to also install a sample certificate *"
 	@echo "*********************************************************"
+
+stunnel.pod: Makefile
+	$(edit) '$(srcdir)/$@.in' >$@
+
+stunnel.pod: $(srcdir)/stunnel.pod
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

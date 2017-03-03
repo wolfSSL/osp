@@ -1,5 +1,328 @@
 stunnel change log
 
+Version 5.40, 2017.01.28, urgency: HIGH
+* Security bugfixes
+  - OpenSSL DLLs updated to version 1.0.2k.
+    https://www.openssl.org/news/secadv/20170126.txt
+* New features
+  - DH ciphersuites are now disabled by default.
+  - The daily server DH parameter regeneration is only performed if
+    DH ciphersuites are enabled in the configuration file.
+  - "checkHost" and "checkEmail" were modified to require either
+    "verifyChain" or "verifyPeer" (thx to Małorzata Olszówka).
+* Bugfixes
+  - Fixed setting default ciphers.
+
+Version 5.39, 2017.01.01, urgency: LOW
+* New features
+  - PKCS#11 engine (pkcs11.dll) added to the Win32 build.
+  - Per-destination TLS session cache added for the client mode.
+  - The new "logId" parameter "process" added to log PID values.
+  - Added support for the new SSL_set_options() values.
+  - Updated the manual page.
+  - Obsolete references to "SSL" replaced with "TLS".
+* Bugfixes
+  - Fixed "logId" parameter to also work in inetd mode.
+  - "delay = yes" properly enforces "failover = prio".
+  - Fixed fd_set allocation size on Win64.
+  - Fixed reloading invalid configuration file on Win32.
+  - Fixed resolving addresses with unconfigured network interfaces.
+
+Version 5.38, 2016.11.26, urgency: MEDIUM
+* New features
+  - "sni=" can be used to prevent sending the SNI extension.
+  - The AI_ADDRCONFIG resolver flag is used when available.
+  - Merged Debian 06-lfs.patch (thx to Peter Pentchev).
+* Bugfixes
+  - Fixed a memory allocation bug causing crashes with OpenSSL 1.1.0.
+  - Fixed error handling for mixed IPv4/IPv6 destinations.
+  - Merged Debian 08-typos.patch (thx to Peter Pentchev).
+
+Version 5.37, 2016.11.06, urgency: MEDIUM
+* Bugfixes
+  - OpenSSL DLLs updated to version 1.0.2j (stops crashes).
+  - The default SNI target (not handled by any slave service)
+    is handled by the master service rather than rejected.
+  - Removed thread synchronization in the FORK threading model.
+
+Version 5.36, 2016.09.22, urgency: HIGH
+* Security bugfixes
+  - OpenSSL DLLs updated to version 1.0.2i.
+    https://www.openssl.org/news/secadv_20160922.txt
+* New features
+  - Added support for OpenSSL 1.1.0 built with "no-deprecated".
+  - Removed direct zlib dependency.
+
+Version 5.35, 2016.07.18, urgency: HIGH
+* Bugfixes
+  - Fixed incorrectly enforced client certificate requests.
+  - Only default to SO_EXCLUSIVEADDRUSE on Vista and later.
+  - Fixed thread safety of the configuration file reopening.
+
+Version 5.34, 2016.07.05, urgency: HIGH
+* Security bugfixes
+  - Fixed malfunctioning "verify = 4".
+* New features
+  - Bind sockets with SO_EXCLUSIVEADDRUSE on WIN32.
+  - Added three new service-level options: requireCert, verifyChain,
+    and verifyPeer for fine-grained certificate verification control.
+  - Improved compatibility with the current OpenSSL 1.1.0-dev tree.
+
+Version 5.33, 2016.06.23, urgency: HIGH
+* New features
+  - Improved memory leak detection performance and accuracy.
+  - Improved compatibility with the current OpenSSL 1.1.0-dev tree.
+  - SNI support also enabled on OpenSSL 0.9.8f and later (thx to
+    Guillermo Rodriguez Garcia).
+  - Added support for PKCS #12 (.p12/.pfx) certificates (thx to
+    Dmitry Bakshaev).
+* Bugfixes
+  - Fixed a TLS session caching memory leak (thx to Richard Kraemer).
+    Before stunnel 5.27 this leak only emerged with sessiond enabled.
+  - Yet another WinCE socket fix (thx to Richard Kraemer).
+  - Fixed passphrase/pin dialogs in tstunnel.exe.
+  - Fixed a FORK threading build regression bug.
+  - OPENSSL_NO_DH compilation fix (thx to Brian Lin).
+
+Version 5.32, 2016.05.03, urgency: HIGH
+* Security bugfixes
+  - OpenSSL DLLs updated to version 1.0.2h.
+    https://www.openssl.org/news/secadv_20160503.txt
+* New features
+  - New "socket = a:IPV6_V6ONLY=yes" option to only bind IPv6.
+  - Memory leak detection.
+  - Improved compatibility with the current OpenSSL 1.1.0-dev tree.
+  - Added/fixed Red Hat scripts (thx to Andrew Colin Kissa).
+* Bugfixes
+  - Workaround for a WinCE sockets quirk (thx to Richard Kraemer).
+  - Fixed data alignment on 64-bit MSVC (thx to Yuris W. Auzins).
+
+Version 5.31, 2016.03.01, urgency: HIGH
+* Security bugfixes
+  - OpenSSL DLLs updated to version 1.0.2g.
+    https://www.openssl.org/news/secadv_20160301.txt
+* New features
+  - Added logging the list of client CAs requested by the server.
+  - Improved compatibility with the current OpenSSL 1.1.0-dev tree.
+* Bugfixes
+  - Only reset the watchdog if some data was actually transferred.
+  - A workaround implemented for the unexpected exceptfds set by
+    select() on WinCE 6.0 (thx to Richard Kraemer).
+  - Fixed logging an incorrect value of the round-robin starting
+    point (thx to Jose Alf.).
+
+Version 5.30, 2016.01.28, urgency: HIGH
+* Security bugfixes
+  - OpenSSL DLLs updated to version 1.0.2f.
+    https://www.openssl.org/news/secadv_20160128.txt
+* New features
+  - Improved compatibility with the current OpenSSL 1.1.0-dev tree.
+  - Added OpenSSL autodetection for the recent versions of Xcode.
+* Bugfixes
+  - Fixed references to /etc removed from stunnel.init.in.
+  - Stopped even trying -fstack-protector on unsupported platforms
+    (thx to Rob Lockhart).
+
+Version 5.29, 2016.01.08, urgency: LOW
+* New features
+  - New WIN32 icons.
+  - Performance improvement: rwlocks used for locking with pthreads.
+* Bugfixes
+  - Compilation fix for *BSD.
+  - Fixed configuration file reload for relative stunnel.conf path
+    on Unix.
+  - Fixed ignoring CRLfile unless CAfile was also specified (thx
+    to Strukov Petr).
+
+Version 5.28, 2015.12.11, urgency: HIGH
+* New features
+  - Build matrix (.travis.yml) extended with ./configure options.
+  - mingw.mak updated to build tstunnel.exe (thx to Jose Alf.).
+* Bugfixes
+  - Fixed incomplete initialization.
+  - Fixed UCONTEXT threading on OSX.
+  - Fixed exit codes for information requests (as
+    in "stunnel -version" or "stunnel -help").
+
+Version 5.27, 2015.12.03, urgency: MEDIUM
+* Security bugfixes
+  - OpenSSL DLLs updated to version 1.0.2e.
+    https://www.openssl.org/news/secadv_20151203.txt
+* New features
+  - Automated build testing configured with .travis.yml.
+  - Added reading server certificates from hardware engines.
+    For example: cert = id_45
+  - Only attempt to use potentially harmful compiler or linker
+    options if gcc was detected.
+  - /opt/csw added to the OpenSSL directory lookup list.
+  - mingw.mak updates (thx to Jose Alf.).
+  - TODO list updated.
+
+Version 5.26, 2015.11.06, urgency: MEDIUM
+* Bugfixes
+  - Compilation fixes for OSX, *BSD and Solaris.
+
+Version 5.25, 2015.11.02, urgency: MEDIUM
+* New features
+  - SMTP client protocol negotiation support for
+    "protocolUsername", "protocolPassword", and
+    "protocolAuthentication" (thx to Douglas Harris).
+  - New service-level option "config" to specify configuration
+    commands introduced in OpenSSL 1.0.2 (thx to Stephen Wall).
+  - The global option "foreground" now also accepts "quiet"
+    parameter, which does not enable logging to stderr.
+  - Manual page updated.
+  - Obsolete OpenSSL engines removed from the Windows build:
+    4758cca, aep, atalla, cswift, nuron, sureware.
+  - Improved compatibility with the current OpenSSL 1.1.0-dev tree:
+    gracefully handle symbols renamed from SSLeay* to OpenSSL*.
+* Bugfixes
+  - Fixed the "s_poll_wait returned 1, but no descriptor
+    is ready" internal error.
+  - Fixed "exec" hangs due to incorrect thread-local
+    storage handling (thx to Philip Craig).
+  - Fixed PRNG initialization (thx to Philip Craig).
+  - Setting socket options no longer performed on PTYs.
+  - Fixed 64-bit Windows build.
+
+Version 5.24, 2015.10.08, urgency: MEDIUM
+* New features
+  - Custom CRL verification was replaced with the internal
+    OpenSSL functionality.
+  - *BSD support for "transparent = destination" and
+    client-side "protocol = socks". This feature should
+    work at least on FreeBSD, OpenBSD and OS X.
+  - Added a new "protocolDomain" option for the NTLM
+    authentication (thx to Andreas Botsikas).
+  - Improved compatibility of the NTLM phase 1 message (thx
+    to Andreas Botsikas).
+  - "setuid" and "setgid" options are now also available
+    in service sections.  They can be used to set owner
+    and group of the Unix socket specified with "accept".
+  - Added support for the new OpenSSL 1.0.2 SSL options.
+  - Added OPENSSL_NO_EGD support (thx to Bernard Spil).
+  - VC autodetection added to makew32.bat (thx to Andreas
+    Botsikas).
+* Bugfixes
+  - Fixed the RESOLVE [F0] TOR extension support in SOCKS5.
+  - Fixed the error code reported on the failed bind()
+    requests.
+  - Fixed the sequential log id with the FORK threading.
+  - Restored the missing Microsoft.VC90.CRT.manifest file.
+
+Version 5.23, 2015.09.02, urgency: LOW
+* New features
+  - Client-side support for the SOCKS protocol.
+    See https://www.stunnel.org/socksvpn.html for details.
+  - Reject SOCKS requests to connect loopback addresses.
+  - New service-level option "OCSPnonce".
+    The default value is "OCSPnonce = no".
+  - Win32 directory structure rearranged.  The installer
+    script provides automatic migration for common setups.
+  - Added Win32 installer option to install stunnel for the
+    current user only.  This feature does not deploy the NT
+    service, but it also does not require aministrative
+    privileges to install and configure stunnel.
+  - stunnel.cnf was renamed to openssl.cnf in order to
+    to prevent users from mixing it up with stunnel.conf.
+  - Win32 desktop is automatically refreshed when the icon
+    is created or removed.
+  - The ca-certs.pem file is now updated on stunnel upgrade.
+  - Inactive ports were removed from the PORTS file.
+  - Added IPv6 support to the transparent proxy code.
+* Bugfixes
+  - Compilation fix for OpenSSL version older than 1.0.0.
+  - Compilation fix for mingw.
+
+Version 5.22, 2015.07.30, urgency: HIGH
+* New features
+  - "OCSPaia = yes" added to the configuration file templates.
+  - Improved double free detection.
+* Bugfixes
+  - Fixed a number of OCSP bugs.  The most severe of those
+    bugs caused stunnel to treat OCSP responses that failed
+    OCSP_basic_verify() checks as if they were successful.
+  - Fixed the passive IPv6 resolver (broken in stunnel 5.21).
+
+Version 5.21, 2015.07.27, urgency: MEDIUM
+* New features
+  - Signal names are displayed instead of numbers.
+  - First resolve IPv4 addresses on passive resolver requests.
+    This speeds up stunnel startup on Win32 with a slow/defunct
+    DNS service.
+  - The "make check" target was modified to only build Win32
+    executables when stunnel is built from a git repository (thx
+    to Peter Pentchev).
+  - More elaborate descriptions were added to the warning about
+    using "verify = 2" without "checkHost" or "checkIP".
+  - Performance optimization was performed on the debug code.
+* Bugfixes
+  - Fixed the FORK and UCONTEXT threading support.
+  - Fixed "failover=prio" (broken since stunnel 5.15).
+  - Added a retry when sleep(3) was interrupted by a signal
+    in the cron thread scheduler.
+
+Version 5.20, 2015.07.09, urgency: HIGH 
+* Security bugfixes
+  - OpenSSL DLLs updated to version 1.0.2d.
+    https://www.openssl.org/news/secadv_20150709.txt
+* New features
+  - poll(2) re-enabled on MacOS X 10.5 and later.
+  - Xcode SDK is automatically used on MacOS X if no other
+    locally installed OpenSSL directory is found.
+  - The SSL library detection algorithm was made a bit smarter.
+  - Warnings about insecure authentication were modified to
+    include the name of the affected service section.
+  - A warning was added to stunnel.init if no pid file was
+    specified in the configuration file (thx to Peter Pentchev).
+  - Optional debugging symbols are included in the Win32 installer.
+  - Documentation updates (closes Debian bug #781669).
+* Bugfixes
+  - Signal pipe reinitialization added to prevent turning the
+    main accepting thread into a busy wait loop when an external
+    condition breaks the signal pipe.  This bug was found to
+    surface on Win32, but other platforms may also be affected.
+  - Fixed removing the disabled taskbar icon.
+  - Generated temporary DH parameters are used for configuration
+    reload instead of the static defaults.
+  - LSB compatibility fixes added to the stunnel.init script (thx
+    to Peter Pentchev).
+  - Fixed the manual page headers (thx to Gleydson Soares).
+
+Version 5.19, 2015.06.16, urgency: MEDIUM:
+* New features
+  - OpenSSL DLLs updated to version 1.0.2c.
+  - Added a runtime check whether COMP_zlib() method is implemented
+    in order to improve compatibility with the Debian OpenSSL build.
+* Bugfixes
+  - Improved socket error handling.
+  - Cron thread priority on Win32 platform changed to
+    THREAD_PRIORITY_LOWEST to improve portability.
+  - Makefile bugfixes for stunnel 5.18 regressions.
+  - Fixed some typos in docs and scripts (thx to Peter Pentchev).
+  - Fixed a log level check condition (thx to Peter Pentchev).
+
+Version 5.18, 2015.06.12, urgency: MEDIUM:
+* New features
+  - OpenSSL DLLs updated to version 1.0.2b.
+    https://www.openssl.org/news/secadv_20150611.txt
+  - Added "include" configuration file option to include all
+    configuration file parts located in a specified directory.
+  - Log file is reopened every 24 hours.  With "log = overwrite"
+    this feature can be used to prevent filling up disk space.
+  - Temporary DH parameters are refreshed every 24 hours, unless
+    static DH parameters were provided in the certificate file.
+  - Unique initial DH parameters are distributed with each release.
+  - Warnings are logged on potentially insecure authentication.
+  - Improved compatibility with the current OpenSSL 1.1.0-dev tree:
+    removed RLE compression support, etc.
+  - Updated stunnel.spec (thx to Bill Quayle).
+* Bugfixes
+  - Fixed handling of dynamic connect targets.
+  - Fixed handling of trailing whitespaces in the Content-Length
+    header of the NTLM authentication.
+  - Fixed --sysconfdir and --localstatedir handling (thx to
+    Dagobert Michelsen).
 
 Version 5.17, 2015.04.29, urgency: HIGH:
 * Bugfixes
@@ -45,7 +368,7 @@ Version 5.15, 2015.04.16, urgency: LOW:
 Version 5.14, 2015.03.25, urgency: HIGH:
 * Security bugfixes
   - The "redirect" option now also redirects clients on SSL session
-    reuse.  In stunnel versions 5.00 to 5.12 reused sessions were
+    reuse.  In stunnel versions 5.00 to 5.13 reused sessions were
     instead always connected hosts specified with the "connect"
     option regardless of their certificate verification result.
     This vulnerability was reported by Johan Olofsson.
@@ -840,7 +1163,7 @@ Version 4.19, 2006.11.11, urgency: LOW/EXPERIMENTAL:
   - There are a lot of new features in this version.  I recommend
     to test it well before upgrading your mission-critical systems.
 * New features
-  - New service-level option to specify OCSP server flag:
+  - New service-level option to specify an OCSP responder flag:
     OCSPflag = <flag>
   - "protocolCredentials" option changed to "protocolUsername"
     and "protocolPassword"

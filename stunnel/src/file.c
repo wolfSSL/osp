@@ -1,6 +1,6 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
@@ -175,10 +175,10 @@ ssize_t file_getline(DISK_FILE *df, char *line, int len) {
 
 ssize_t file_putline(DISK_FILE *df, char *line) {
     char *buff;
-#ifdef USE_WIN32
-    DWORD len, num;
-#else /* USE_WIN32 */
     size_t len;
+#ifdef USE_WIN32
+    DWORD num;
+#else /* USE_WIN32 */
     ssize_t num;
 #endif /* USE_WIN32 */
 
@@ -190,7 +190,7 @@ ssize_t file_putline(DISK_FILE *df, char *line) {
 #endif /* USE_WIN32 */
     buff[len++]='\n'; /* LF */
 #ifdef USE_WIN32
-    WriteFile(df->fh, buff, len, &num, NULL);
+    WriteFile(df->fh, buff, (DWORD)len, &num, NULL);
 #else /* USE_WIN32 */
     /* no file -> write to stderr */
     num=write(df ? df->fd : 2, buff, len);
@@ -201,18 +201,18 @@ ssize_t file_putline(DISK_FILE *df, char *line) {
 
 int file_permissions(const char *file_name) {
 #if !defined(USE_WIN32) && !defined(USE_OS2)
-    struct stat st; /* buffer for stat */
+    struct stat sb; /* buffer for stat */
 
     /* check permissions of the private key file */
-    if(stat(file_name, &st)) {
+    if(stat(file_name, &sb)) {
         ioerror(file_name);
         return 1; /* FAILED */
     }
-    if(st.st_mode & 7)
+    if(sb.st_mode & 7)
         s_log(LOG_WARNING,
             "Insecure file permissions on %s", file_name);
 #else
-    (void)file_name; /* skip warning about unused parameter */
+    (void)file_name; /* squash the unused parameter warning */
 #endif
     return 0;
 }

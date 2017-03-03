@@ -14,6 +14,8 @@
 
 @SET_MAKE@
 
+# by Michal Trojnara 2015-2017
+
 VPATH = @srcdir@
 am__is_gnu_make = test -n '$(MAKEFILE_LIST)' && test -n '$(MAKELEVEL)'
 am__make_running_with_option = \
@@ -79,9 +81,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 subdir = tools
-DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
-	$(srcdir)/stunnel.conf-sample.in $(srcdir)/stunnel.init.in \
-	$(srcdir)/stunnel.service.in
+DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_append_compile_flags.m4 \
 	$(top_srcdir)/m4/ax_append_flag.m4 \
@@ -97,7 +97,7 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/src/config.h
-CONFIG_CLEAN_FILES = stunnel.conf-sample stunnel.init stunnel.service
+CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -272,15 +272,24 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 EXTRA_DIST = ca.html ca.pl importCA.html importCA.sh script.sh \
-	stunnel.spec stunnel.cnf stunnel.nsi stunnel.license stunnel.conf
-
+	makecert.sh openssl.cnf stunnel.nsi stunnel.license \
+	stunnel.conf stunnel.conf-sample.in stunnel.init.in \
+	stunnel.service.in stunnel.logrotate stunnel.rh.init \
+	stunnel.spec
 confdir = $(sysconfdir)/stunnel
 conf_DATA = stunnel.conf-sample
 examplesdir = $(docdir)/examples
-examples_DATA = ca.html ca.pl importCA.html importCA.sh script.sh \
-	stunnel.spec stunnel.init stunnel.service
+examples_DATA = stunnel.init stunnel.service stunnel.logrotate \
+	stunnel.rh.init stunnel.spec ca.html ca.pl importCA.html \
+	importCA.sh script.sh
+CLEANFILES = stunnel.conf-sample stunnel.init stunnel.service
+edit = sed \
+	-e 's|@prefix[@]|$(prefix)|g' \
+	-e 's|@bindir[@]|$(bindir)|g' \
+	-e 's|@localstatedir[@]|$(localstatedir)|g' \
+	-e 's|@sysconfdir[@]|$(sysconfdir)|g' \
+	-e 's|@DEFAULT_GROUP[@]|$(DEFAULT_GROUP)|g'
 
-OPENSSL = $(SSLDIR)/bin/openssl
 all: all-am
 
 .SUFFIXES:
@@ -314,12 +323,6 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-stunnel.conf-sample: $(top_builddir)/config.status $(srcdir)/stunnel.conf-sample.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-stunnel.init: $(top_builddir)/config.status $(srcdir)/stunnel.init.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-stunnel.service: $(top_builddir)/config.status $(srcdir)/stunnel.service.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -434,6 +437,7 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -531,24 +535,16 @@ install-data-local:
 	-chgrp $(DEFAULT_GROUP) $(DESTDIR)$(localstatedir)/lib/stunnel
 
 cert:
-	@if test -r $(DESTDIR)$(confdir)/stunnel.pem; \
-	then \
-		echo "$(DESTDIR)$(confdir)/stunnel.pem already exists"; \
-	else \
-		if test -r "$(RANDOM_FILE)"; then \
-			dd if="$(RANDOM_FILE)" of=stunnel.rnd bs=256 count=1; \
-			RND="-rand stunnel.rnd"; \
-		else \
-			RND=""; \
-		fi; \
-		$(OPENSSL) req -new -x509 -days 365 $$RND \
-			-config $(srcdir)/stunnel.cnf \
-			-out stunnel.pem -keyout stunnel.pem; \
-		$(OPENSSL) x509 -subject -dates -fingerprint -noout -in stunnel.pem; \
-		${INSTALL} -m 600 stunnel.pem $(DESTDIR)$(confdir)/stunnel.pem; \
-		rm stunnel.pem; \
-		rm -f stunnel.rnd; \
-	fi
+	$(srcdir)/makecert.sh $(srcdir) $(SSLDIR) $(RANDOM_FILE)
+	${INSTALL} -b -m 600 stunnel.pem $(DESTDIR)$(confdir)/stunnel.pem
+	rm -f stunnel.pem
+
+stunnel.conf-sample stunnel.init stunnel.service: Makefile
+	$(edit) '$(srcdir)/$@.in' >$@
+
+stunnel.conf-sample: $(srcdir)/stunnel.conf-sample.in
+stunnel.init: $(srcdir)/stunnel.init.in
+stunnel.service: $(srcdir)/stunnel.service.in
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

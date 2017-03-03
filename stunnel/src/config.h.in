@@ -6,9 +6,6 @@
 /* Entropy Gathering Daemon socket path */
 #undef EGD_SOCKET
 
-/* Define to 1 to enable SSL3 (Disabled by default with wolfSSL). */
-#undef ENABLE_SSL3
-
 /* Define to 1 if you have the `accept4' function. */
 #undef HAVE_ACCEPT4
 
@@ -57,8 +54,14 @@
 /* Define to 1 if you have the <libutil.h> header file. */
 #undef HAVE_LIBUTIL_H
 
+/* Define to 1 if you have the <limits.h> header file. */
+#undef HAVE_LIMITS_H
+
 /* Define to 1 if you have the <linux/netfilter_ipv4.h> header file. */
 #undef HAVE_LINUX_NETFILTER_IPV4_H
+
+/* Define to 1 if you have the <linux/sched.h> header file. */
+#undef HAVE_LINUX_SCHED_H
 
 /* Define to 1 if you have the `localtime_r' function. */
 #undef HAVE_LOCALTIME_R
@@ -74,12 +77,6 @@
 
 /* Define to 1 if you have the `openpty' function. */
 #undef HAVE_OPENPTY
-
-/* Define to 1 if you have <engine.h> header file. */
-#undef HAVE_OSSL_ENGINE_H
-
-/* Define to 1 if you have <ocsp.h> header file. */
-#undef HAVE_OSSL_OCSP_H
 
 /* Define to 1 if you have the `pipe2' function. */
 #undef HAVE_PIPE2
@@ -104,6 +101,9 @@
 
 /* Define to 1 if you have the <pty.h> header file. */
 #undef HAVE_PTY_H
+
+/* Define to 1 if you have the `realpath' function. */
+#undef HAVE_REALPATH
 
 /* Define to 1 if you have the `setgroups' function. */
 #undef HAVE_SETGROUPS
@@ -211,9 +211,6 @@
    */
 #undef LT_OBJDIR
 
-/* Wolfssl does not currently support ENGINE with Stunnel */
-#undef OPENSSL_NO_ENGINE
-
 /* Name of package */
 #undef PACKAGE
 
@@ -242,7 +239,7 @@
 /* Random file path */
 #undef RANDOM_FILE
 
-/* SSL directory */
+/* TLS directory */
 #undef SSLDIR
 
 /* Define to 1 if you have the ANSI C header files. */
@@ -278,8 +275,22 @@
 /* Define to 1 to enable WOLFSSL debug messages. */
 #undef WOLFSSL_DEBUG_ON
 
+/* Use Darwin source */
+#undef _DARWIN_C_SOURCE
+
+/* Enable large inode numbers on Mac OS X 10.5.  */
+#ifndef _DARWIN_USE_64_BIT_INODE
+# define _DARWIN_USE_64_BIT_INODE 1
+#endif
+
+/* Number of bits in a file offset, on hosts where this is settable. */
+#undef _FILE_OFFSET_BITS
+
 /* Use GNU source */
 #undef _GNU_SOURCE
+
+/* Define for large files, on AIX-style hosts. */
+#undef _LARGE_FILES
 
 /* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
@@ -295,6 +306,9 @@
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
    #define below would cause a syntax error. */
 #undef _UINT8_T
+
+/* Use X/Open 5 with POSIX 1995 */
+#undef _XOPEN_SOURCE
 
 /* Define to `int' if <sys/types.h> doesn't define. */
 #undef gid_t

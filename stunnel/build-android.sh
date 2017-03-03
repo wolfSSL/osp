@@ -1,18 +1,10 @@
 #!/bin/sh
 set -ev
-VERSION=5.17
+VERSION=5.40
 DST=stunnel-$VERSION-android
 
-# to build Zlib:
-# export CHOST=arm-linux-androideabi
-# ./configure --static --prefix=/opt/androideabi/sysroot
-# make
-# make install
-
 # to build OpenSSL:
-# export CC=arm-linux-androideabi-gcc
-# ./Configure linux-armv4 threads no-shared zlib no-dso --openssldir=/opt/androideabi/sysroot
-# make
+# ./Configure threads no-shared no-dso --cross-compile-prefix=arm-linux-androideabi- --openssldir=/opt/androideabi/sysroot linux-armv4
 # make install
 
 test -f Makefile && make distclean

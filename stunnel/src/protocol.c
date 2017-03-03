@@ -1,6 +1,6 @@
 /*
  *   stunnel       TLS offloading and load-balancing proxy
- *   Copyright (C) 1998-2015 Michal Trojnara <Michal.Trojnara@mirt.net>
+ *   Copyright (C) 1998-2017 Michal Trojnara <Michal.Trojnara@stunnel.org>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the
@@ -41,16 +41,23 @@
 #define is_prefix(a, b) (strncasecmp((a), (b), strlen(b))==0)
 
 /* protocol-specific function prototypes */
+NOEXPORT char *socks_client(CLI *, SERVICE_OPTIONS *, const PHASE);
+NOEXPORT void socks5_client_method(CLI *);
+NOEXPORT void socks5_client_address(CLI *);
 NOEXPORT char *socks_server(CLI *, SERVICE_OPTIONS *, const PHASE);
 NOEXPORT void socks4_server(CLI *);
 NOEXPORT void socks5_server_method(CLI *);
 NOEXPORT void socks5_server(CLI *);
+NOEXPORT int validate(CLI *);
 NOEXPORT char *proxy_server(CLI *, SERVICE_OPTIONS *, const PHASE);
 NOEXPORT char *cifs_client(CLI *, SERVICE_OPTIONS *, const PHASE);
 NOEXPORT char *cifs_server(CLI *, SERVICE_OPTIONS *, const PHASE);
 NOEXPORT char *pgsql_client(CLI *, SERVICE_OPTIONS *, const PHASE);
 NOEXPORT char *pgsql_server(CLI *, SERVICE_OPTIONS *, const PHASE);
 NOEXPORT char *smtp_client(CLI *, SERVICE_OPTIONS *, const PHASE);
+NOEXPORT void smtp_client_negotiate(CLI *);
+NOEXPORT void smtp_client_plain(CLI *, const char *, const char *);
+NOEXPORT void smtp_client_login(CLI *, const char *, const char *);
 NOEXPORT char *smtp_server(CLI *, SERVICE_OPTIONS *, const PHASE);
 NOEXPORT char *pop3_client(CLI *, SERVICE_OPTIONS *, const PHASE);
 NOEXPORT char *pop3_server(CLI *, SERVICE_OPTIONS *, const PHASE);
@@ -62,10 +69,10 @@ NOEXPORT char *connect_client(CLI *, SERVICE_OPTIONS *, const PHASE);
 #ifndef OPENSSL_NO_MD4
 NOEXPORT void ntlm(CLI *, SERVICE_OPTIONS *);
 NOEXPORT char *ntlm1();
-NOEXPORT char *ntlm3(char *, char *, char *);
+NOEXPORT char *ntlm3(char *, char *, char *, char *);
 NOEXPORT void crypt_DES(DES_cblock, DES_cblock, DES_cblock);
 #endif
-NOEXPORT char *base64(int, char *, int);
+NOEXPORT char *base64(int, const char *, int);
 
 /**************************************** framework */
 
@@ -76,11 +83,11 @@ char *protocol(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
         return NULL; /* skip further actions */
     if(!strcasecmp(opt->protocol, "socks"))
         return opt->option.client ?
-            "The 'socks' protocol is not supported in client mode" :
+            socks_client(c, opt, phase) :
             socks_server(c, opt, phase);
     if(!strcasecmp(opt->protocol, "proxy"))
         return opt->option.client ?
-            "The 'proxy' protocol is not supported in client mode" :
+            "The 'proxy' protocol is not supported in the client mode" :
             proxy_server(c, opt, phase);
     if(!strcasecmp(opt->protocol, "cifs"))
         return opt->option.client ?
@@ -105,7 +112,7 @@ char *protocol(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     if(!strcasecmp(opt->protocol, "nntp"))
         return opt->option.client ?
             nntp_client(c, opt, phase) :
-            "The 'nntp' protocol is not supported in server mode";
+            "The 'nntp' protocol is not supported in the server mode";
     if(!strcasecmp(opt->protocol, "connect"))
         return opt->option.client ?
             connect_client(c, opt, phase) :
@@ -115,29 +122,168 @@ char *protocol(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 
 /**************************************** socks */
 
-/* SOCKS over SSL (SOCKS protocol itself is also encrypted) */
-/* FIXME: connect() failures are not currently reported with SOCKS protocol */
+/* SOCKS over TLS (SOCKS protocol itself is also encrypted) */
+
+typedef union {
+    struct {
+        uint8_t ver, cmd, rsv, atyp;
+    } req;
+    struct {
+        uint8_t ver, rep, rsv, atyp;
+    } resp;
+    struct {
+        uint8_t ver, code, rsv, atyp, addr[4], port[2];
+    } v4;
+    struct {
+        uint8_t ver, code, rsv, atyp, addr[16], port[2];
+    } v6;
+} SOCKS5_UNION;
+
+NOEXPORT char *socks_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
+    (void)opt; /* squash the unused parameter warning */
+    if(phase!=PROTOCOL_LATE)
+        return NULL;
+    socks5_client_method(c);
+    socks5_client_address(c);
+    return NULL;
+}
+
+NOEXPORT void socks5_client_method(CLI *c) {
+    const struct {
+        uint8_t ver, nmethods, method;
+    } req={5, 1, 0x00}; /* NO AUTHENTICATION REQUIRED */
+    struct {
+        uint8_t ver, method;
+    } resp;
+
+    s_ssl_write(c, &req, sizeof req);
+
+    s_ssl_read(c, &resp, sizeof resp);
+    if(resp.ver!=5) {
+        s_log(LOG_ERR, "Invalid SOCKS5 message version 0x%02x", resp.ver);
+        longjmp(c->err, 2); /* don't reset */
+    }
+    /* TODO: add USERNAME/PASSWORD authentication */
+    if(resp.method!=0x00) {
+        s_log(LOG_ERR, "No supported SOCKS5 authentication method received");
+        longjmp(c->err, 2); /* don't reset */
+    }
+}
+
+NOEXPORT void socks5_client_address(CLI *c) {
+    SOCKADDR_UNION addr;
+    SOCKS5_UNION socks;
+
+    if(original_dst(c->local_rfd.fd, &addr))
+        longjmp(c->err, 2); /* don't reset */
+    memset(&socks, 0, sizeof socks);
+    socks.req.ver=5; /* SOCKS5 */
+    socks.req.cmd=0x01; /* CONNECT */
+    switch(addr.sa.sa_family) {
+    case AF_INET:
+        socks.req.atyp=0x01; /* IP v4 address */
+        memcpy(&socks.v4.addr, &addr.in.sin_addr, 4);
+        memcpy(&socks.v4.port, &addr.in.sin_port, 2);
+        s_log(LOG_INFO, "Sending SOCKS5 IPv4 address");
+        s_ssl_write(c, &socks, sizeof socks.v4);
+        break;
+#ifdef USE_IPv6
+    case AF_INET6:
+        socks.req.atyp=0x04; /* IP v6 address */
+        memcpy(&socks.v6.addr, &addr.in6.sin6_addr, 16);
+        memcpy(&socks.v6.port, &addr.in6.sin6_port, 2);
+        s_log(LOG_INFO, "Sending SOCKS5 IPv6 address");
+        s_ssl_write(c, &socks, sizeof socks.v6);
+        break;
+#endif
+    default:
+        s_log(LOG_ERR, "Unsupported address type 0x%02x", addr.sa.sa_family);
+        longjmp(c->err, 2); /* don't reset */
+    }
+
+    s_ssl_read(c, &socks, sizeof socks.resp);
+    if(socks.resp.atyp==0x04) /* IP V6 address */
+        s_ssl_read(c, &socks.v6.addr, 16+2);
+    else
+        s_ssl_read(c, &socks.v4.addr, 4+2);
+    if(socks.resp.ver!=5) {
+        s_log(LOG_ERR, "Invalid SOCKS5 message version 0x%02x", socks.req.ver);
+        longjmp(c->err, 2); /* don't reset */
+    }
+    switch(socks.resp.rep) {
+        case 0x00:
+            s_log(LOG_INFO,
+                "SOCKS5 request succeeded");
+            return; /* SUCCESS */
+        case 0x01:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: General SOCKS server failure");
+            break;
+        case 0x02:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: Connection not allowed by ruleset");
+            break;
+        case 0x03:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: Network unreachable");
+            break;
+        case 0x04:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: Host unreachable");
+            break;
+        case 0x05:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: Connection refused");
+            break;
+        case 0x06:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: TTL expired");
+            break;
+        case 0x07:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: Command not supported");
+            break;
+        case 0x08:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: Address type not supported");
+            break;
+        default:
+            s_log(LOG_ERR,
+                "SOCKS5 request failed: Unknown error 0x%02x", socks.resp.rep);
+    }
+    longjmp(c->err, 2); /* don't reset */
+}
 
 NOEXPORT char *socks_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     uint8_t version;
 
-    (void)opt; /* skip warning about unused parameter */
-    if(phase!=PROTOCOL_MIDDLE)
-        return NULL;
-
-    s_log(LOG_DEBUG, "Waiting for the SOCKS request");
-    s_ssl_read(c, &version, sizeof version);
-    switch(version) {
-    case 4:
-        socks4_server(c);
+    switch(phase) {
+    case PROTOCOL_CHECK:
+        opt->option.protocol_endpoint=1;
         break;
-    case 5:
-        socks5_server_method(c);
-        socks5_server(c);
+    case PROTOCOL_MIDDLE:
+        s_log(LOG_DEBUG, "Waiting for the SOCKS request");
+        s_ssl_read(c, &version, sizeof version);
+        switch(version) {
+        case 4:
+            socks4_server(c);
+            break;
+        case 5:
+            socks5_server_method(c);
+            socks5_server(c);
+            break;
+        default:
+            s_log(LOG_ERR, "Unsupported SOCKS version 0x%02x", version);
+            longjmp(c->err, 1);
+        }
+        break;
+    case PROTOCOL_LATE:
+        /* TODO: send the SOCKS reply *after* the target is connected */
+        /* FIXME: the SOCKS replies do not report CONNECT failures */
+        /* FIXME: the SOCKS replies do not contain the bound IP address */
         break;
     default:
-        s_log(LOG_ERR, "Unsupported SOCKS version %u", version);
-        longjmp(c->err, 1);
+        break;
     }
     return NULL;
 }
@@ -171,11 +317,15 @@ NOEXPORT void socks4_server(CLI *c) {
             if(c->connect_addr.num) {
                 s_log(LOG_INFO, "SOCKS4a resolved \"%s\" to %u host(s)",
                     host_name, c->connect_addr.num);
-                socks.cd=90;
-                close_connection=0;
+                if(validate(c)) {
+                    socks.cd=90; /* access granted */
+                    close_connection=0;
+                } else {
+                    socks.cd=91; /* rejected */
+                }
             } else {
                 s_log(LOG_ERR, "SOCKS4a failed to resolve \"%s\"", host_name);
-                socks.cd=91;
+                socks.cd=91; /* failed */
             }
             str_free(host_name);
         } else {
@@ -185,23 +335,27 @@ NOEXPORT void socks4_server(CLI *c) {
             c->connect_addr.addr[0].in.sin_port=socks.sin_port;
             c->connect_addr.addr[0].in.sin_addr.s_addr=socks.sin_addr.s_addr;
             s_log(LOG_INFO, "SOCKS4 address received");
-            socks.cd=90;
-            close_connection=0;
+            if(validate(c)) {
+                socks.cd=90; /* access granted */
+                close_connection=0;
+            } else {
+                socks.cd=91; /* rejected */
+            }
         }
     } else if(socks.cd==0xf0) { /* RESOLVE (a TOR extension) */
         host_name=ssl_getstring(c);
-        if(hostport2addr(&addr, host_name, "0") && addr.sa.sa_family==AF_INET) {
+        if(hostport2addr(&addr, host_name, "0", 0) && addr.sa.sa_family==AF_INET) {
             memcpy(&socks.sin_addr, &addr.in.sin_addr, 4);
             s_log(LOG_INFO, "SOCKS4a/TOR resolved \"%s\"", host_name);
-            socks.cd=90;
+            socks.cd=90; /* access granted */
         } else {
             s_log(LOG_ERR, "SOCKS4a/TOR failed to resolve \"%s\"", host_name);
-            socks.cd=91;
+            socks.cd=91; /* failed */
         }
         str_free(host_name);
     } else {
-        s_log(LOG_ERR, "Unsupported SOCKS4/SOCKS4a command %u", socks.cd);
-        socks.cd=91;
+        s_log(LOG_ERR, "Unsupported SOCKS4/SOCKS4a command 0x%02x", socks.cd);
+        socks.cd=91; /* failed */
     }
     s_ssl_write(c, &socks, sizeof socks);
     if(close_connection)
@@ -236,20 +390,7 @@ NOEXPORT void socks5_server_method(CLI *c) {
 /* CONNECT does not return valid BND.ADDR and BND.PORT values */
 
 NOEXPORT void socks5_server(CLI *c) {
-    union {
-        struct {
-            uint8_t ver, cmd, rsv, atyp;
-        } req;
-        struct {
-            uint8_t ver, cmd, rsv, atyp, addr[4], port[2];
-        } v4;
-        struct {
-            uint8_t ver, cmd, rsv, atyp, addr[16], port[2];
-        } v6;
-        struct {
-            uint8_t ver, rep, rsv, atyp;
-        } resp;
-    } socks;
+    SOCKS5_UNION socks;
     uint8_t host_len;
     char *host_name, *port_name;
     u_short port_number;
@@ -260,7 +401,7 @@ NOEXPORT void socks5_server(CLI *c) {
     memset(&socks, 0, sizeof socks);
     s_ssl_read(c, &socks, sizeof socks.req);
     if(socks.req.ver!=0x05) {
-        s_log(LOG_ERR, "Invalid SOCKS5 message version %u", socks.req.ver);
+        s_log(LOG_ERR, "Invalid SOCKS5 message version 0x%02x", socks.req.ver);
         socks.resp.ver=0x05; /* response version 5 */
         socks.resp.rep=0x01; /* general SOCKS server failure */
     } else if(socks.req.cmd==0x01) { /* CONNECT */
@@ -272,8 +413,12 @@ NOEXPORT void socks5_server(CLI *c) {
             memcpy(&c->connect_addr.addr[0].in.sin_addr, &socks.v4.addr, 4);
             memcpy(&c->connect_addr.addr[0].in.sin_port, &socks.v4.port, 2);
             s_log(LOG_INFO, "SOCKS5 IPv4 address received");
-            socks.resp.rep=0x00; /* succeeded */
-            close_connection=0;
+            if(validate(c)) {
+                socks.resp.rep=0x00; /* succeeded */
+                close_connection=0;
+            } else {
+                socks.resp.rep=0x02; /* connection not allowed by ruleset */
+            }
         } else if(socks.req.atyp==0x03) { /* DOMAINNAME */
             s_ssl_read(c, &host_len, sizeof host_len);
             host_name=str_alloc((size_t)host_len+1);
@@ -286,8 +431,12 @@ NOEXPORT void socks5_server(CLI *c) {
             if(c->connect_addr.num) {
                 s_log(LOG_INFO, "SOCKS5 resolved \"%s\" to %u host(s)",
                     host_name, c->connect_addr.num);
-                socks.resp.rep=0x00; /* succeeded */
-                close_connection=0;
+                if(validate(c)) {
+                    socks.resp.rep=0x00; /* succeeded */
+                    close_connection=0;
+                } else {
+                    socks.resp.rep=0x02; /* connection not allowed by ruleset */
+                }
             } else {
                 s_log(LOG_ERR, "SOCKS5 failed to resolve \"%s\"", host_name);
                 socks.resp.rep=0x04; /* Host unreachable */
@@ -302,16 +451,26 @@ NOEXPORT void socks5_server(CLI *c) {
             memcpy(&c->connect_addr.addr[0].in6.sin6_addr, &socks.v6.addr, 16);
             memcpy(&c->connect_addr.addr[0].in6.sin6_port, &socks.v6.port, 2);
             s_log(LOG_INFO, "SOCKS5 IPv6 address received");
-            socks.resp.rep=0x00; /* succeeded */
-            close_connection=0;
+            if(validate(c)) {
+                socks.resp.rep=0x00; /* succeeded */
+                close_connection=0;
+            } else {
+                socks.resp.rep=0x02; /* connection not allowed by ruleset */
+            }
 #endif
         } else {
-            s_log(LOG_ERR, "Unsupported SOCKS5 address type %u", socks.req.atyp);
+            s_log(LOG_ERR,
+                "Unsupported SOCKS5 address type 0x%02x", socks.req.atyp);
             socks.resp.rep=0x07; /* Address type not supported */
         }
     } else if(socks.req.cmd==0xf0) { /* RESOLVE (a TOR extension) */
-        host_name=ssl_getstring(c);
-        if(hostport2addr(&addr, host_name, "0")) {
+        s_ssl_read(c, &host_len, sizeof host_len);
+        host_name=str_alloc((size_t)host_len+1);
+        s_ssl_read(c, host_name, host_len);
+        host_name[host_len]='\0';
+        s_ssl_read(c, &port_number, 2);
+        port_name=str_printf("%u", ntohs(port_number));
+        if(hostport2addr(&addr, host_name, port_name, 0)) {
             if(addr.sa.sa_family==AF_INET) {
                 s_log(LOG_INFO, "SOCKS5/TOR resolved \"%s\" to IPv4", host_name);
                 memcpy(&socks.v4.addr, &addr.in.sin_addr, 4);
@@ -325,7 +484,7 @@ NOEXPORT void socks5_server(CLI *c) {
                 socks.resp.rep=0x00; /* succeeded */
 #endif
             } else {
-                s_log(LOG_ERR, "SOCKS5/TOR unsupported address family for \"%s\"",
+                s_log(LOG_ERR, "SOCKS5/TOR unsupported address type for \"%s\"",
                     host_name);
                 socks.resp.rep=0x04; /* Host unreachable */
             }
@@ -334,8 +493,9 @@ NOEXPORT void socks5_server(CLI *c) {
             socks.resp.rep=0x04; /* Host unreachable */
         }
         str_free(host_name);
+        str_free(port_name);
     } else {
-        s_log(LOG_ERR, "Unsupported SOCKS5 command %u", socks.req.cmd);
+        s_log(LOG_ERR, "Unsupported SOCKS5 command 0x%02x", socks.req.cmd);
         socks.resp.rep=0x07; /* Command not supported */
     }
 
@@ -352,11 +512,46 @@ NOEXPORT void socks5_server(CLI *c) {
         longjmp(c->err, 2); /* don't reset */
 }
 
+/* validate the allocated address */
+NOEXPORT int validate(CLI *c) {
+#ifdef USE_IPv6
+    const unsigned char ipv6_loopback[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+#endif
+    unsigned i;
+
+    for(i=0; i<c->connect_addr.num; ++i) {
+        SOCKADDR_UNION *addr=&c->connect_addr.addr[i];
+#ifdef USE_IPv6
+        if(addr->sa.sa_family==AF_INET6) {
+            if(!memcmp(&addr->in6.sin6_addr, ipv6_loopback, 16)) {
+                s_log(LOG_ERR,
+                    "SOCKS connection to the IPv6 loopback rejected");
+                return 0;
+            }
+            /* TODO: implement more checks */
+        } else
+#endif
+        if(addr->sa.sa_family==AF_INET) {
+            if((ntohl(addr->in.sin_addr.s_addr)&0xff000000)==0x7f000000) {
+                s_log(LOG_ERR,
+                    "SOCKS connection to the IPv4 loopback rejected");
+                return 0;
+            }
+            /* TODO: implement more checks */
+        } else {
+            s_log(LOG_ERR, "Unsupported address type 0x%02x",
+                addr->sa.sa_family);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 /**************************************** proxy */
 
 /*
  * PROXY protocol: http://haproxy.1wt.eu/download/1.5/doc/proxy-protocol.txt
- * this is a protocol client support for stunnel acting as an SSL server
+ * this is a protocol client support for stunnel acting as an TLS server
  * I don't think anything else is useful, but feel free to discuss on the
  * stunnel-users mailing list if you disagree
  */
@@ -373,7 +568,7 @@ NOEXPORT char *proxy_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     char src_port[PORT_LEN], dst_port[PORT_LEN], *proto;
     int err;
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_LATE)
         return NULL;
     addrlen=sizeof addr;
@@ -423,7 +618,7 @@ NOEXPORT char *cifs_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     uint8_t buffer[5];
     uint8_t request_dummy[4] = {0x81, 0, 0, 0}; /* a zero-length request */
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_MIDDLE)
         return NULL;
     s_write(c, c->remote_fd.fd, request_dummy, 4);
@@ -436,8 +631,8 @@ NOEXPORT char *cifs_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
         s_log(LOG_ERR, "Unexpected NetBIOS response size");
         longjmp(c->err, 1);
     }
-    if(buffer[4]!=0x8e) { /* use SSL */
-        s_log(LOG_ERR, "Remote server does not require SSL");
+    if(buffer[4]!=0x8e) { /* use TLS */
+        s_log(LOG_ERR, "Remote server does not require TLS");
         longjmp(c->err, 1);
     }
     return NULL;
@@ -449,7 +644,7 @@ NOEXPORT char *cifs_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     uint8_t response_use_ssl[5] = {0x83, 0, 0, 1, 0x8e};
     uint16_t len;
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_EARLY)
         return NULL;
     s_read(c, c->local_rfd.fd, buffer, 4) ;/* NetBIOS header */
@@ -476,14 +671,14 @@ static const uint8_t ssl_request[8]={0, 0, 0, 8, 0x04, 0xd2, 0x16, 0x2f};
 NOEXPORT char *pgsql_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     uint8_t buffer[1];
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_MIDDLE)
         return NULL;
     s_write(c, c->remote_fd.fd, ssl_request, sizeof ssl_request);
     s_read(c, c->remote_fd.fd, buffer, 1);
-    /* S - accepted, N - rejected, non-SSL preferred */
+    /* S - accepted, N - rejected, non-TLS preferred */
     if(buffer[0]!='S') {
-        s_log(LOG_ERR, "PostgreSQL server rejected SSL");
+        s_log(LOG_ERR, "PostgreSQL server rejected TLS");
         longjmp(c->err, 1);
     }
     return NULL;
@@ -492,13 +687,13 @@ NOEXPORT char *pgsql_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 NOEXPORT char *pgsql_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     uint8_t buffer[8], ssl_ok[1]={'S'};
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_EARLY)
         return NULL;
     memset(buffer, 0, sizeof buffer);
     s_read(c, c->local_rfd.fd, buffer, sizeof buffer);
     if(safe_memcmp(buffer, ssl_request, sizeof ssl_request)) {
-        s_log(LOG_ERR, "PostgreSQL client did not request SSL, rejecting");
+        s_log(LOG_ERR, "PostgreSQL client did not request TLS, rejecting");
         /* no way to send error on startup, so just drop the client */
         longjmp(c->err, 1);
     }
@@ -509,11 +704,30 @@ NOEXPORT char *pgsql_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 /**************************************** smtp */
 
 NOEXPORT char *smtp_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
+    (void)opt; /* squash the unused parameter warning */
+    switch(phase) {
+    case PROTOCOL_MIDDLE:
+        smtp_client_negotiate(c);
+        break;
+    case PROTOCOL_LATE:
+        if(opt->protocol_username && opt->protocol_password) {
+            if(!strcasecmp(c->opt->protocol_authentication, "LOGIN"))
+                smtp_client_login(c,
+                    opt->protocol_username, opt->protocol_password);
+            else /* use PLAIN by default */
+                smtp_client_plain(c,
+                    opt->protocol_username, opt->protocol_password);
+        }
+        break;
+    default:
+        break;
+    }
+    return NULL;
+}
+
+NOEXPORT void smtp_client_negotiate(CLI *c) {
     char *line;
 
-    (void)opt; /* skip warning about unused parameter */
-    if(phase!=PROTOCOL_MIDDLE)
-        return NULL;
     line=str_dup("");
     do { /* copy multiline greeting */
         str_free(line);
@@ -543,13 +757,81 @@ NOEXPORT char *smtp_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
         longjmp(c->err, 1);
     }
     str_free(line);
-    return NULL;
+}
+
+/* http://www.samlogic.net/articles/smtp-commands-reference-auth.htm */
+
+NOEXPORT void smtp_client_plain(CLI *c, const char *user, const char *pass) {
+    char *line, *encoded;
+
+    line=str_printf("%c%s%c%s", '\0', user, '\0', pass);
+    encoded=base64(1, line, (int)strlen(user) + (int)strlen(pass) + 2);
+    if(!encoded) {
+        s_log(LOG_ERR, "Base64 encoder failed");
+        str_free(line);
+        longjmp(c->err, 1);
+    }
+    str_free(line);
+    line=str_printf("AUTH PLAIN %s", encoded);
+    str_free(encoded);
+    ssl_putline(c, line);
+    str_free(line);
+
+    line=ssl_getline(c);
+    if(!is_prefix(line, "235 ")) { /* not 'Authentication successful' */
+        s_log(LOG_ERR, "PLAIN Authentication Failed");
+        str_free(line);
+        longjmp(c->err, 1);
+    }
+    str_free(line);
+}
+
+NOEXPORT void smtp_client_login(CLI *c, const char *user, const char *pass) {
+    char *line, *encoded;
+
+    ssl_putline(c, "AUTH LOGIN");
+    line=ssl_getline(c);
+    if(!is_prefix(line, "334 ")) { /* not the username challenge */
+        s_log(LOG_ERR, "Remote server does not support LOGIN authentication");
+        str_free(line);
+        longjmp(c->err, 1);
+    }
+    str_free(line);
+
+    encoded=base64(1, user, (int)strlen(user));
+    if(!encoded) {
+        s_log(LOG_ERR, "Base64 encoder failed");
+        longjmp(c->err, 1);
+    }
+    ssl_putline(c, encoded);
+    str_free(encoded);
+    line=ssl_getline(c);
+    if(!is_prefix(line, "334 ")) { /* not the password challenge */
+        s_log(LOG_ERR, "LOGIN authentication failed");
+        str_free(line);
+        longjmp(c->err, 1);
+    }
+    str_free(line);
+
+    encoded=base64(1, pass, (int)strlen(pass));
+    if(!encoded) {
+        s_log(LOG_ERR, "Base64 encoder failed");
+        longjmp(c->err, 1);
+    }
+    ssl_putline(c, encoded);
+    str_free(encoded);
+    line=ssl_getline(c);
+    if(!is_prefix(line, "235 ")) { /* not 'Authentication successful' */
+        s_log(LOG_ERR, "LOGIN authentication failed");
+        str_free(line);
+        longjmp(c->err, 1);
+    }
+    str_free(line);
 }
 
 NOEXPORT char *smtp_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     char *line, *domain, *greeting;
 
-    (void)opt; /* skip warning about unused parameter */
     if(phase==PROTOCOL_CHECK)
         opt->option.connect_before_ssl=1; /* c->remote_fd needed */
     if(phase!=PROTOCOL_MIDDLE)
@@ -625,7 +907,7 @@ NOEXPORT char *smtp_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 NOEXPORT char *pop3_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     char *line;
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_MIDDLE)
         return NULL;
     line=fd_getline(c, c->remote_fd.fd);
@@ -650,7 +932,6 @@ NOEXPORT char *pop3_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 NOEXPORT char *pop3_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     char *line;
 
-    (void)opt; /* skip warning about unused parameter */
     if(phase==PROTOCOL_CHECK)
         opt->option.connect_before_ssl=1; /* c->remote_fd needed */
     if(phase!=PROTOCOL_MIDDLE)
@@ -681,7 +962,7 @@ NOEXPORT char *pop3_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 NOEXPORT char *imap_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     char *line;
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_MIDDLE)
         return NULL;
     line=fd_getline(c, c->remote_fd.fd);
@@ -708,7 +989,6 @@ NOEXPORT char *imap_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 NOEXPORT char *imap_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     char *line, *id, *tail, *capa;
 
-    (void)opt; /* skip warning about unused parameter */
     if(phase==PROTOCOL_CHECK)
         opt->option.connect_before_ssl=1; /* c->remote_fd needed */
     if(phase!=PROTOCOL_MIDDLE)
@@ -762,7 +1042,7 @@ NOEXPORT char *imap_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
         } else if(is_prefix(tail, "CAPABILITY")) {
             fd_putline(c, c->remote_fd.fd, line); /* send it to server */
             str_free(line);
-            line=fd_getline(c, c->remote_fd.fd); /* get the capabilites */
+            line=fd_getline(c, c->remote_fd.fd); /* get the capabilities */
             if(*line=='*') {
                 /*
                  * append STARTTLS
@@ -812,7 +1092,7 @@ NOEXPORT char *imap_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 NOEXPORT char *nntp_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     char *line;
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_MIDDLE)
         return NULL;
     line=fd_getline(c, c->remote_fd.fd);
@@ -839,7 +1119,7 @@ NOEXPORT char *nntp_client(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
 NOEXPORT char *connect_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     char *request, *proto, *header;
 
-    (void)opt; /* skip warning about unused parameter */
+    (void)opt; /* squash the unused parameter warning */
     if(phase!=PROTOCOL_EARLY)
         return NULL;
     request=fd_getline(c, c->local_rfd.fd);
@@ -867,7 +1147,7 @@ NOEXPORT char *connect_server(CLI *c, SERVICE_OPTIONS *opt, const PHASE phase) {
     } while(*header); /* not empty */
     str_free(header);
 
-    if(!name2addrlist(&c->connect_addr, request+8, DEFAULT_LOOPBACK)) {
+    if(!name2addrlist(&c->connect_addr, request+8)) {
         fd_putline(c, c->local_wfd.fd, "HTTP/1.0 404 Not Found");
         fd_putline(c, c->local_wfd.fd, "Server: stunnel/" STUNNEL_VERSION);
         fd_putline(c, c->local_wfd.fd, "");
@@ -980,6 +1260,9 @@ NOEXPORT void ntlm(CLI *c, SERVICE_OPTIONS *opt) {
             ntlm2_txt=str_dup(line+25);
         else if(is_prefix(line, "Content-Length: ")) {
             content_length=strtol(line+16, &tmpstr, 10);
+            if(tmpstr>line+16) /* found some digits */
+                while(*tmpstr && isspace((int)*tmpstr))
+                    ++tmpstr;
             if(tmpstr==line+16 || *tmpstr || content_length<0) {
                 s_log(LOG_ERR, "Proxy-Authenticate: Invalid Content-Length");
                 str_free(line);
@@ -1003,7 +1286,8 @@ NOEXPORT void ntlm(CLI *c, SERVICE_OPTIONS *opt) {
     /* send Proxy-Authorization (phase 3) */
     fd_printf(c, c->remote_fd.fd, "CONNECT %s HTTP/1.1", opt->protocol_host);
     fd_printf(c, c->remote_fd.fd, "Host: %s", opt->protocol_host);
-    ntlm3_txt=ntlm3(opt->protocol_username, opt->protocol_password, ntlm2_txt);
+    ntlm3_txt=ntlm3(opt->protocol_domain,
+        opt->protocol_username, opt->protocol_password, ntlm2_txt);
     str_free(ntlm2_txt);
     if(!ntlm3_txt) {
         s_log(LOG_ERR, "Proxy-Authenticate: Failed to build NTLM response");
@@ -1014,42 +1298,63 @@ NOEXPORT void ntlm(CLI *c, SERVICE_OPTIONS *opt) {
 }
 
 NOEXPORT char *ntlm1() {
-    char phase1[16];
+    char phase1[32];
 
     memset(phase1, 0, sizeof phase1);
     strcpy(phase1, "NTLMSSP");
     phase1[8]=1; /* type: 1 */
     phase1[12]=2; /* flag: negotiate OEM */
     phase1[13]=2; /* flag: negotiate NTLM */
+    /* bytes 16-23: supplied domain security buffer */
+    /* bytes 24-31: supplied workstation security buffer */
     return base64(1, phase1, sizeof phase1); /* encode */
 }
 
-NOEXPORT char *ntlm3(char *username, char *password, char *phase2) {
+NOEXPORT char *ntlm3(char *domain,
+        char *user, char *password, char *phase2) {
     MD4_CTX md4;
     uint8_t *decoded; /* decoded reply from proxy */
     uint8_t phase3[146];
     uint8_t md4_hash[21];
-    size_t userlen=strlen(username);
-    size_t phase3len=s_min(88+userlen, sizeof phase3);
+    const size_t ntlm_len=24; /* length of the NTLM hash response */
+    const size_t domain_len=strlen(domain);
+    const size_t user_len=strlen(user);
+    const size_t ntlm_off=64; /* start of the data block in version 2 */
+    const size_t domain_off=ntlm_off+ntlm_len;
+    const size_t user_off=domain_off+domain_len;
+    const size_t end_off=user_off+user_len;
 
-    /* setup phase3 structure */
+    /* setup the phase3 structure */
+    if(end_off>sizeof phase3)
+        return NULL;
     memset(phase3, 0, sizeof phase3);
+    /* bytes 0-7: null-terminated NTLMSSP signature */
     strcpy((char *)phase3, "NTLMSSP");
+    /* bytes 8-11: NTLM message type */
     phase3[8]=3;                    /* type: 3 */
-    phase3[16]=(uint8_t)phase3len;  /* LM-resp off */
-    phase3[20]=24;                  /* NT-resp len */
-    phase3[22]=24;                  /* NT-Resp len */
-    phase3[24]=64;                  /* NT-resp off */
-    phase3[32]=(uint8_t)phase3len;  /* domain offset */
-    phase3[36]=(uint8_t)userlen;    /* user length */
-    phase3[38]=(uint8_t)userlen;    /* user length */
-    phase3[40]=88;                  /* user offset */
-    phase3[48]=(uint8_t)phase3len;  /* host offset */
-    phase3[56]=(uint8_t)phase3len;  /* message len */
+    /* bytes 12-19: LM/LMv2 response */
+    phase3[16]=(uint8_t)end_off;    /* LM response offset */
+    /* bytes 20-27: NTLM/NTLMv2 response */
+    phase3[20]=(uint8_t)ntlm_len;   /* NTLM response length */
+    phase3[22]=(uint8_t)ntlm_len;   /* NTLM response length */
+    phase3[24]=(uint8_t)ntlm_off;   /* NTLM response offset */
+    /* bytes 28-35: target (domain/server) name */
+    phase3[28]=(uint8_t)domain_len; /* domain length */
+    phase3[30]=(uint8_t)domain_len; /* domain length */
+    phase3[32]=(uint8_t)domain_off; /* domain offset */
+    /* bytes 36-43: user name */
+    phase3[36]=(uint8_t)user_len;   /* user length */
+    phase3[38]=(uint8_t)user_len;   /* user length */
+    phase3[40]=(uint8_t)user_off;   /* user offset */
+    /* bytes 44-51: workstation name */
+    phase3[48]=(uint8_t)end_off;    /* host offset */
+    /* bytes 52-59: session key */
+    phase3[56]=(uint8_t)end_off;    /* session key offset */
+    /* bytes 60-63: flags */
     phase3[60]=2;                   /* flag: negotiate OEM */
     phase3[61]=2;                   /* flag: negotiate NTLM */
 
-    /* calculate MD4 of UTF-16 encoded password */
+    /* calculate MD4 of the UTF-16 encoded password */
     MD4_Init(&md4);
     while(*password) {
         MD4_Update(&md4, password++, 1);
@@ -1058,25 +1363,27 @@ NOEXPORT char *ntlm3(char *username, char *password, char *phase2) {
     MD4_Final(md4_hash, &md4);
     memset(md4_hash+16, 0, 5); /* pad to 21 bytes */
 
-    /* decode challenge and calculate response */
+    /* decode the challenge and calculate the response */
     decoded=(uint8_t *)base64(0, phase2, (int)strlen(phase2)); /* decode */
     if(!decoded)
         return NULL;
-    crypt_DES(phase3+64, decoded+24, md4_hash);
-    crypt_DES(phase3+72, decoded+24, md4_hash+7);
-    crypt_DES(phase3+80, decoded+24, md4_hash+14);
+    crypt_DES(phase3+ntlm_off,    decoded+24, md4_hash);
+    crypt_DES(phase3+ntlm_off+8,  decoded+24, md4_hash+7);
+    crypt_DES(phase3+ntlm_off+16, decoded+24, md4_hash+14);
     str_free(decoded);
 
-    strncpy((char *)phase3+88, username, sizeof phase3-88);
+    strncpy((char *)phase3+domain_off, domain, domain_len);
+    strncpy((char *)phase3+user_off, user, user_len);
 
-    return base64(1, (char *)phase3, (int)phase3len); /* encode */
+    return base64(1, (char *)phase3, (int)end_off); /* encode */
 }
 
-NOEXPORT void crypt_DES(DES_cblock dst, const_DES_cblock src, DES_cblock hash) {
+NOEXPORT void crypt_DES(DES_cblock dst, const_DES_cblock src,
+        unsigned char hash[7]) {
     DES_cblock key;
     DES_key_schedule sched;
 
-    /* convert key from 56 to 64 bits */
+    /* convert 56-bit hash to 64-bit DES key */
     key[0]=hash[0];
     key[1]=(unsigned char)(((hash[0]&1)<<7)|(hash[1]>>1));
     key[2]=(unsigned char)(((hash[1]&3)<<6)|(hash[2]>>2));
@@ -1095,33 +1402,9 @@ NOEXPORT void crypt_DES(DES_cblock dst, const_DES_cblock src, DES_cblock hash) {
 
 #endif
 
-NOEXPORT char *base64(int encode, char *in, int len) {
-    char *out;
-#ifdef WITH_WOLFSSL
-    word32 outLen;
-    if(encode) {
-        outLen = (word32) (len + 2) / 3 * 4;
-        if(outLen < 32)
-            outLen = 32;
-        out=str_alloc(outLen);
-
-        if( Base64_Encode_NoNl((byte*)in, (word32)len,
-                    (byte*)out, &outLen) != 0 ) {
-            return NULL; /* encoding failed */
-        }
-    } else { /* decode */
-        outLen = (word32) (len * 3 + 3) / 4;
-        if(outLen < 32)
-            outLen = 32;
-        out=str_alloc((size_t)outLen);
-
-        if( Base64_Decode((byte*)in, (word32)len,
-                    (byte*)out, &outLen) != 0 ) {
-            return NULL; /* decoding failed */
-        }
-    }
-#else
+NOEXPORT char *base64(int encode, const char *in, int len) {
     BIO *bio, *b64;
+    char *out;
     int n;
 
     b64=BIO_new(BIO_f_base64());
@@ -1154,7 +1437,6 @@ NOEXPORT char *base64(int encode, char *in, int len) {
         return NULL;
     }
     BIO_free_all(bio);
-#endif
     return out;
 }
 
