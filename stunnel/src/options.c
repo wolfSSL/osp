@@ -2312,7 +2312,7 @@ NOEXPORT char *parse_service_option(CMD cmd, SERVICE_OPTIONS *section,
                 section->option.delayed_lookup=1;
             }
             if(!section->option.verify_chain && !section->option.verify_peer)
-                return "\"verify\" needs to be 1 or higher for \"redirect\" to work";
+                return "Either \"verifyChain\" or \"verifyPeer\" has to be enabled for \"redirect\" to work";
         }
         break;
     case CMD_FREE:
@@ -3602,6 +3602,15 @@ NOEXPORT char *engine_open(const char *name) {
         return "Failed to open the engine";
     }
     engine_initialized=0;
+    if(ENGINE_ctrl(engines[current_engine], ENGINE_CTRL_SET_USER_INTERFACE,
+            0, UI_stunnel(), NULL)) {
+        s_log(LOG_NOTICE, "UI set for engine #%d (%s)",
+            current_engine+1, ENGINE_get_id(engines[current_engine]));
+    } else {
+        ERR_clear_error();
+        s_log(LOG_INFO, "UI not supported by engine #%d (%s)",
+            current_engine+1, ENGINE_get_id(engines[current_engine]));
+    }
     return NULL; /* OK */
 }
 

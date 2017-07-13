@@ -46,10 +46,6 @@ typedef struct tls_data_struct TLS_DATA;
 
 /**************************************** data structures */
 
-/* non-zero constants for the "redirect" option */
-#define REDIRECT_ON         1
-#define REDIRECT_OFF        2
-
 #if defined (USE_WIN32)
 #define ICON_IMAGE HICON
 #elif defined(__APPLE__)
@@ -410,7 +406,6 @@ typedef struct {
     FD *ssl_rfd, *ssl_wfd; /* read and write TLS descriptors */
     uint64_t sock_bytes, ssl_bytes; /* bytes written to socket and TLS */
     s_poll_set *fds; /* file descriptors */
-    uintptr_t redirect; /* redirect to another destination after failed auth */
 } CLI;
 
 /**************************************** prototypes for stunnel.c */
@@ -496,17 +491,15 @@ int cron_init(void);
 
 /**************************************** prototypes for ssl.c */
 
-extern int index_cli, index_opt, index_redirect, index_addr;
+extern int index_ssl_cli, index_ssl_ctx_opt;
+extern int index_session_authenticated, index_session_connect_address;
 
 int ssl_init(void);
 int ssl_configure(GLOBAL_OPTIONS *);
 
 /**************************************** prototypes for ctx.c */
 
-typedef struct {
-    SERVICE_OPTIONS *section;
-    char pass[PEM_BUFSIZE];
-} UI_DATA;
+extern SERVICE_OPTIONS *current_section;
 
 #ifndef OPENSSL_NO_DH
 extern DH *dh_params;
@@ -686,11 +679,11 @@ extern STUNNEL_RWLOCK stunnel_locks[STUNNEL_LOCKS];
 #define CRYPTO_THREAD_read_lock(type) \
     if(type) CRYPTO_lock(type)
 #define CRYPTO_THREAD_read_unlock(type) \
-    if(type) CRYPTO_lock(type)
+    if(type) CRYPTO_unlock(type)
 #define CRYPTO_THREAD_write_lock(type) \
     if(type) CRYPTO_lock(type)
 #define CRYPTO_THREAD_write_unlock(type) \
-    if(type) CRYPTO_lock(type)
+    if(type) CRYPTO_unlock(type)
 #define CRYPTO_atomic_add(addr,amount,result,type) \
     *result = type ? CRYPTO_add(addr,amount,type) : (*addr+=amount)
 #else
@@ -822,7 +815,7 @@ void ui_new_log(const char *);
 void message_box(LPCTSTR, const UINT);
 #endif /* USE_WIN32 */
 
-int passwd_cb(char *, int, int, void *);
+int ui_passwd_cb(char *, int, int, void *);
 #ifndef OPENSSL_NO_ENGINE
 UI_METHOD *UI_stunnel(void);
 #endif /* !defined(OPENSSL_NO_ENGINE) */

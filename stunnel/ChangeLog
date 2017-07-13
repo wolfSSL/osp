@@ -1,5 +1,17 @@
 stunnel change log
 
+Version 5.41, 2017.04.01, urgency: MEDIUM
+* New features
+  - PKCS#11 engine DLL updated to version 0.4.5.
+  - Default engine UI set with ENGINE_CTRL_SET_USER_INTERFACE.
+  - Key file name added into the passphrase console prompt.
+  - Performance optimization in memory leak detection.
+* Bugfixes
+  - Fixed crashes with the OpenSSL 1.1.0 branch.
+  - Fixed certificate verification with "verifyPeer = yes"
+    and "verifyChain = no" (the default), while the peer
+    only returns a single certificate.
+
 Version 5.40, 2017.01.28, urgency: HIGH
 * Security bugfixes
   - OpenSSL DLLs updated to version 1.0.2k.
