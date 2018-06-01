@@ -1,3 +1,6 @@
+#include "first.h"
+
+#include "fdevent_impl.h"
 #include "fdevent.h"
 #include "buffer.h"
 #include "log.h"
@@ -6,14 +9,13 @@
 
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <signal.h>
 #include <fcntl.h>
 
-#ifdef USE_SOLARIS_PORT
+#ifdef FDEVENT_USE_SOLARIS_PORT
 
+#include <sys/poll.h>
 static const int SOLARIS_PORT_POLL_READ       = POLLIN;
 static const int SOLARIS_PORT_POLL_WRITE      = POLLOUT;
 static const int SOLARIS_PORT_POLL_READ_WRITE = POLLIN & POLLOUT;
@@ -156,6 +158,7 @@ int fdevent_solaris_port_init(fdevents *ev) {
 	}
 
 	ev->port_events = malloc(ev->maxfds * sizeof(*ev->port_events));
+	force_assert(NULL != ev->port_events);
 
 	return 0;
 }

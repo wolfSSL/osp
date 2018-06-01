@@ -1,10 +1,12 @@
+#include "first.h"
+
 #include "base.h"
 #include "log.h"
 #include "buffer.h"
+#include "rand.h"
 
 #include "plugin.h"
 
-#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -14,6 +16,7 @@
 
 typedef struct {
 	buffer *cookie_name;
+	buffer *cookie_attrs;
 	buffer *cookie_domain;
 	unsigned int cookie_max_age;
 } plugin_config;
@@ -48,7 +51,10 @@ FREE_FUNC(mod_usertrack_free) {
 		for (i = 0; i < srv->config_context->used; i++) {
 			plugin_config *s = p->config_storage[i];
 
+			if (NULL == s) continue;
+
 			buffer_free(s->cookie_name);
+			buffer_free(s->cookie_attrs);
 			buffer_free(s->cookie_domain);
 
 			free(s);
@@ -71,8 +77,8 @@ SETDEFAULTS_FUNC(mod_usertrack_set_defaults) {
 		{ "usertrack.cookie-name",       NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },       /* 0 */
 		{ "usertrack.cookie-max-age",    NULL, T_CONFIG_INT, T_CONFIG_SCOPE_CONNECTION },          /* 1 */
 		{ "usertrack.cookie-domain",     NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },       /* 2 */
+		{ "usertrack.cookie-attrs",      NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },       /* 3 */
 
-		{ "usertrack.cookiename",        NULL, T_CONFIG_DEPRECATED, T_CONFIG_SCOPE_CONNECTION },
 		{ NULL,                          NULL, T_CONFIG_UNSET, T_CONFIG_SCOPE_UNSET }
 	};
 
@@ -81,28 +87,31 @@ SETDEFAULTS_FUNC(mod_usertrack_set_defaults) {
 	p->config_storage = calloc(1, srv->config_context->used * sizeof(plugin_config *));
 
 	for (i = 0; i < srv->config_context->used; i++) {
+		data_config const* config = (data_config const*)srv->config_context->data[i];
 		plugin_config *s;
 
 		s = calloc(1, sizeof(plugin_config));
 		s->cookie_name    = buffer_init();
+		s->cookie_attrs   = buffer_init();
 		s->cookie_domain  = buffer_init();
 		s->cookie_max_age = 0;
 
 		cv[0].destination = s->cookie_name;
 		cv[1].destination = &(s->cookie_max_age);
 		cv[2].destination = s->cookie_domain;
+		cv[3].destination = s->cookie_attrs;
 
 		p->config_storage[i] = s;
 
-		if (0 != config_insert_values_global(srv, ((data_config *)srv->config_context->data[i])->value, cv)) {
+		if (0 != config_insert_values_global(srv, config->value, cv, i == 0 ? T_CONFIG_SCOPE_SERVER : T_CONFIG_SCOPE_CONNECTION)) {
 			return HANDLER_ERROR;
 		}
 
-		if (buffer_is_empty(s->cookie_name)) {
+		if (buffer_string_is_empty(s->cookie_name)) {
 			buffer_copy_string_len(s->cookie_name, CONST_STR_LEN("TRACKID"));
 		} else {
-			size_t j;
-			for (j = 0; j < s->cookie_name->used - 1; j++) {
+			size_t j, len = buffer_string_length(s->cookie_name);
+			for (j = 0; j < len; j++) {
 				char c = s->cookie_name->ptr[j] | 32;
 				if (c < 'a' || c > 'z') {
 					log_error_write(srv, __FILE__, __LINE__, "sb",
@@ -114,9 +123,9 @@ SETDEFAULTS_FUNC(mod_usertrack_set_defaults) {
 			}
 		}
 
-		if (!buffer_is_empty(s->cookie_domain)) {
-			size_t j;
-			for (j = 0; j < s->cookie_domain->used - 1; j++) {
+		if (!buffer_string_is_empty(s->cookie_domain)) {
+			size_t j, len = buffer_string_length(s->cookie_domain);
+			for (j = 0; j < len; j++) {
 				char c = s->cookie_domain->ptr[j];
 				if (c <= 32 || c >= 127 || c == '"' || c == '\\') {
 					log_error_write(srv, __FILE__, __LINE__, "sb",
@@ -139,6 +148,7 @@ static int mod_usertrack_patch_connection(server *srv, connection *con, plugin_d
 	plugin_config *s = p->config_storage[0];
 
 	PATCH(cookie_name);
+	PATCH(cookie_attrs);
 	PATCH(cookie_domain);
 	PATCH(cookie_max_age);
 
@@ -156,6 +166,8 @@ static int mod_usertrack_patch_connection(server *srv, connection *con, plugin_d
 
 			if (buffer_is_equal_string(du->key, CONST_STR_LEN("usertrack.cookie-name"))) {
 				PATCH(cookie_name);
+			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN("usertrack.cookie-attrs"))) {
+				PATCH(cookie_attrs);
 			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN("usertrack.cookie-max-age"))) {
 				PATCH(cookie_max_age);
 			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN("usertrack.cookie-domain"))) {
@@ -173,9 +185,9 @@ URIHANDLER_FUNC(mod_usertrack_uri_handler) {
 	data_string *ds;
 	unsigned char h[16];
 	li_MD5_CTX Md5Ctx;
-	char hh[32];
+	char hh[LI_ITOSTRING_LENGTH];
 
-	if (con->uri.path->used == 0) return HANDLER_GO_ON;
+	if (buffer_is_empty(con->uri.path)) return HANDLER_GO_ON;
 
 	mod_usertrack_patch_connection(srv, con, p);
 
@@ -193,7 +205,7 @@ URIHANDLER_FUNC(mod_usertrack_uri_handler) {
 			char *nc;
 
 			/* skip WS */
-			for (nc = g + p->conf.cookie_name->used-1; *nc == ' ' || *nc == '\t'; nc++);
+			for (nc = g + buffer_string_length(p->conf.cookie_name); *nc == ' ' || *nc == '\t'; nc++);
 
 			if (*nc == '=') {
 				/* ok, found the key of our own cookie */
@@ -211,7 +223,7 @@ URIHANDLER_FUNC(mod_usertrack_uri_handler) {
 		ds = data_response_init();
 	}
 	buffer_copy_string_len(ds->key, CONST_STR_LEN("Set-Cookie"));
-	buffer_copy_string_buffer(ds->value, p->conf.cookie_name);
+	buffer_copy_buffer(ds->value, p->conf.cookie_name);
 	buffer_append_string_len(ds->value, CONST_STR_LEN("="));
 
 
@@ -219,30 +231,36 @@ URIHANDLER_FUNC(mod_usertrack_uri_handler) {
 
 	/* generate shared-secret */
 	li_MD5_Init(&Md5Ctx);
-	li_MD5_Update(&Md5Ctx, (unsigned char *)con->uri.path->ptr, con->uri.path->used - 1);
-	li_MD5_Update(&Md5Ctx, (unsigned char *)"+", 1);
+	li_MD5_Update(&Md5Ctx, CONST_BUF_LEN(con->uri.path));
+	li_MD5_Update(&Md5Ctx, CONST_STR_LEN("+"));
 
-	/* we assume sizeof(time_t) == 4 here, but if not it ain't a problem at all */
-	LI_ltostr(hh, srv->cur_ts);
+	li_itostrn(hh, sizeof(hh), srv->cur_ts);
 	li_MD5_Update(&Md5Ctx, (unsigned char *)hh, strlen(hh));
-	li_MD5_Update(&Md5Ctx, (unsigned char *)srv->entropy, sizeof(srv->entropy));
-	LI_ltostr(hh, rand());
+	li_itostrn(hh, sizeof(hh), li_rand_pseudo());
 	li_MD5_Update(&Md5Ctx, (unsigned char *)hh, strlen(hh));
 
 	li_MD5_Final(h, &Md5Ctx);
 
 	buffer_append_string_encoded(ds->value, (char *)h, 16, ENCODING_HEX);
+
+	/* usertrack.cookie-attrs, if set, replaces all other attrs */
+	if (!buffer_string_is_empty(p->conf.cookie_attrs)) {
+		buffer_append_string_buffer(ds->value, p->conf.cookie_attrs);
+		array_insert_unique(con->response.headers, (data_unset *)ds);
+		return HANDLER_GO_ON;
+	}
+
 	buffer_append_string_len(ds->value, CONST_STR_LEN("; Path=/"));
 	buffer_append_string_len(ds->value, CONST_STR_LEN("; Version=1"));
 
-	if (!buffer_is_empty(p->conf.cookie_domain)) {
+	if (!buffer_string_is_empty(p->conf.cookie_domain)) {
 		buffer_append_string_len(ds->value, CONST_STR_LEN("; Domain="));
 		buffer_append_string_encoded(ds->value, CONST_BUF_LEN(p->conf.cookie_domain), ENCODING_REL_URI);
 	}
 
 	if (p->conf.cookie_max_age) {
 		buffer_append_string_len(ds->value, CONST_STR_LEN("; max-age="));
-		buffer_append_long(ds->value, p->conf.cookie_max_age);
+		buffer_append_int(ds->value, p->conf.cookie_max_age);
 	}
 
 	array_insert_unique(con->response.headers, (data_unset *)ds);

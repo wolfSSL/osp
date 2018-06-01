@@ -1,3 +1,5 @@
+#include "first.h"
+
 #include "plugin.h"
 #include "log.h"
 #include "response.h"
@@ -5,7 +7,6 @@
 
 #include <string.h>
 #include <errno.h>
-#include <ctype.h>
 
 typedef struct {
 	/* unparsed pieces */
@@ -46,7 +47,7 @@ FREE_FUNC(mod_evhost_free) {
 		for (i = 0; i < srv->config_context->used; i++) {
 			plugin_config *s = p->config_storage[i];
 
-			if (!s) continue;
+			if (NULL == s) continue;
 
 			if(s->path_pieces) {
 				size_t j;
@@ -71,21 +72,41 @@ FREE_FUNC(mod_evhost_free) {
 	return HANDLER_GO_ON;
 }
 
-static void mod_evhost_parse_pattern(plugin_config *s) {
+static int mod_evhost_parse_pattern(plugin_config *s) {
 	char *ptr = s->path_pieces_raw->ptr,*pos;
 
 	s->path_pieces = NULL;
 
 	for(pos=ptr;*ptr;ptr++) {
 		if(*ptr == '%') {
+			size_t len;
 			s->path_pieces = realloc(s->path_pieces,(s->len+2) * sizeof(*s->path_pieces));
 			s->path_pieces[s->len] = buffer_init();
 			s->path_pieces[s->len+1] = buffer_init();
 
-			buffer_copy_string_len(s->path_pieces[s->len],pos,ptr-pos);
-			pos = ptr + 2;
+			/* "%%" "%_" "%x" "%{x.y}" where x and y are *single digit* 0 - 9 */
+			if (ptr[1] == '%' || ptr[1] == '_' || light_isdigit(ptr[1])) {
+				len = 2;
+			} else if (ptr[1] == '{') {
+				if (!light_isdigit(ptr[2])) return -1;
+				if (ptr[3] == '.') {
+					if (!light_isdigit(ptr[4])) return -1;
+					if (ptr[5] != '}') return -1;
+					len = 6;
+				} else if (ptr[3] == '}') {
+					len = 4;
+				} else {
+					return -1;
+				}
+			} else {
+				return -1;
+			}
 
-			buffer_copy_string_len(s->path_pieces[s->len+1],ptr++,2);
+			buffer_copy_string_len(s->path_pieces[s->len],pos,ptr-pos);
+			pos = ptr + len;
+
+			buffer_copy_string_len(s->path_pieces[s->len+1],ptr,len);
+			ptr += len - 1; /*(ptr++ in for() loop)*/
 
 			s->len += 2;
 		}
@@ -99,6 +120,8 @@ static void mod_evhost_parse_pattern(plugin_config *s) {
 
 		s->len += 1;
 	}
+
+	return 0;
 }
 
 SETDEFAULTS_FUNC(mod_evhost_set_defaults) {
@@ -131,6 +154,7 @@ SETDEFAULTS_FUNC(mod_evhost_set_defaults) {
 	p->config_storage = calloc(1, srv->config_context->used * sizeof(plugin_config *));
 
 	for (i = 0; i < srv->config_context->used; i++) {
+		data_config const* config = (data_config const*)srv->config_context->data[i];
 		plugin_config *s;
 
 		s = calloc(1, sizeof(plugin_config));
@@ -142,12 +166,15 @@ SETDEFAULTS_FUNC(mod_evhost_set_defaults) {
 
 		p->config_storage[i] = s;
 
-		if (0 != config_insert_values_global(srv, ((data_config *)srv->config_context->data[i])->value,  cv)) {
+		if (0 != config_insert_values_global(srv, config->value, cv, i == 0 ? T_CONFIG_SCOPE_SERVER : T_CONFIG_SCOPE_CONNECTION)) {
 			return HANDLER_ERROR;
 		}
 
-		if (s->path_pieces_raw->used != 0) {
-			mod_evhost_parse_pattern(s);
+		if (!buffer_string_is_empty(s->path_pieces_raw)) {
+			if (0 != mod_evhost_parse_pattern(s)) {
+				log_error_write(srv, __FILE__, __LINE__, "sb", "invalid evhost.path-pattern:", s->path_pieces_raw);
+				return HANDLER_ERROR;
+			}
 		}
 	}
 
@@ -164,8 +191,7 @@ SETDEFAULTS_FUNC(mod_evhost_set_defaults) {
  */
 
 static int mod_evhost_parse_host(connection *con,array *host) {
-	/* con->uri.authority->used is always > 0 if we come here */
-	register char *ptr = con->uri.authority->ptr + con->uri.authority->used - 1;
+	register char *ptr = con->uri.authority->ptr + buffer_string_length(con->uri.authority);
 	char *colon = ptr; /* needed to filter out the colon (if exists) */
 	int first = 1;
 	data_string *ds;
@@ -200,7 +226,7 @@ static int mod_evhost_parse_host(connection *con,array *host) {
 					/* is something between the dots */
 					ds = data_string_init();
 					buffer_copy_string_len(ds->key,CONST_STR_LEN("%"));
-					buffer_append_long(ds->key, i++);
+					buffer_append_int(ds->key, i++);
 					buffer_copy_string_len(ds->value,ptr+1,colon-ptr-1);
 
 					array_insert_unique(host,(data_unset *)ds);
@@ -213,7 +239,7 @@ static int mod_evhost_parse_host(connection *con,array *host) {
 		if (colon != ptr) {
 			ds = data_string_init();
 			buffer_copy_string_len(ds->key,CONST_STR_LEN("%"));
-			buffer_append_long(ds->key, i /* ++ */);
+			buffer_append_int(ds->key, i /* ++ */);
 			buffer_copy_string_len(ds->value,ptr,colon-ptr);
 
 			array_insert_unique(host,(data_unset *)ds);
@@ -265,7 +291,7 @@ static handler_t mod_evhost_uri_handler(server *srv, connection *con, void *p_d)
 	stat_cache_entry *sce = NULL;
 
 	/* not authority set */
-	if (con->uri.authority->used == 0) return HANDLER_GO_ON;
+	if (buffer_string_is_empty(con->uri.authority)) return HANDLER_GO_ON;
 
 	mod_evhost_patch_connection(srv, con, p);
 
@@ -299,10 +325,22 @@ static handler_t mod_evhost_uri_handler(server *srv, connection *con, void *p_d)
 					/* strip the port out of the authority-part of the URI scheme */
 					buffer_append_string_len(p->tmp_buf, con->uri.authority->ptr, colon - con->uri.authority->ptr); /* adds fqdn */
 				}
-			} else if (NULL != (ds = (data_string *)array_get_element(parsed_host,p->conf.path_pieces[i]->ptr))) {
-				if (ds->value->used) {
-					buffer_append_string_buffer(p->tmp_buf,ds->value);
+			} else if (ptr[1] == '{' ) {
+				char s[3] = "% ";
+				s[1] = ptr[2]; /*(assumes single digit before '.', and, optionally, '.' and single digit after '.')*/
+				if (NULL != (ds = (data_string *)array_get_element_klen(parsed_host, s, 2))) {
+					if (ptr[3] != '.' || ptr[4] == '0') {
+						buffer_append_string_buffer(p->tmp_buf, ds->value);
+					} else {
+						if ((size_t)(ptr[4]-'0') <= buffer_string_length(ds->value)) {
+							buffer_append_string_len(p->tmp_buf, ds->value->ptr+(ptr[4]-'0')-1, 1);
+						}
+					}
+				} else {
+					/* unhandled %-sequence */
 				}
+			} else if (NULL != (ds = (data_string *)array_get_element_klen(parsed_host, CONST_BUF_LEN(p->conf.path_pieces[i])))) {
+				buffer_append_string_buffer(p->tmp_buf,ds->value);
 			} else {
 				/* unhandled %-sequence */
 			}
@@ -311,7 +349,7 @@ static handler_t mod_evhost_uri_handler(server *srv, connection *con, void *p_d)
 		}
 	}
 
-	BUFFER_APPEND_SLASH(p->tmp_buf);
+	buffer_append_slash(p->tmp_buf);
 
 	array_free(parsed_host);
 
@@ -324,7 +362,7 @@ static handler_t mod_evhost_uri_handler(server *srv, connection *con, void *p_d)
 	}
 
 	if (!not_good) {
-		buffer_copy_string_buffer(con->physical.doc_root, p->tmp_buf);
+		buffer_copy_buffer(con->physical.doc_root, p->tmp_buf);
 	}
 
 	return HANDLER_GO_ON;

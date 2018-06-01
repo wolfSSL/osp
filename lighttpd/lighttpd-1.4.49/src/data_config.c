@@ -1,3 +1,5 @@
+#include "first.h"
+
 #include "array.h"
 
 #include <string.h>
@@ -8,8 +10,10 @@ static data_unset *data_config_copy(const data_unset *s) {
 	data_config *src = (data_config *)s;
 	data_config *ds = data_config_init();
 
-	buffer_copy_string_buffer(ds->key, src->key);
-	buffer_copy_string_buffer(ds->comp_key, src->comp_key);
+	ds->comp = src->comp;
+	buffer_copy_buffer(ds->key, src->key);
+	buffer_copy_buffer(ds->comp_tag, src->comp_tag);
+	buffer_copy_buffer(ds->comp_key, src->comp_key);
 	array_free(ds->value);
 	ds->value = array_init_array(src->value);
 	return (data_unset *)ds;
@@ -20,10 +24,11 @@ static void data_config_free(data_unset *d) {
 
 	buffer_free(ds->key);
 	buffer_free(ds->op);
+	buffer_free(ds->comp_tag);
 	buffer_free(ds->comp_key);
 
 	array_free(ds->value);
-	array_free(ds->childs);
+	vector_config_weak_clear(&ds->children);
 
 	if (ds->string) buffer_free(ds->string);
 #ifdef HAVE_PCRE_H
@@ -39,6 +44,7 @@ static void data_config_reset(data_unset *d) {
 
 	/* reused array elements */
 	buffer_reset(ds->key);
+	buffer_reset(ds->comp_tag);
 	buffer_reset(ds->comp_key);
 	array_reset(ds->value);
 }
@@ -61,8 +67,12 @@ static void data_config_print(const data_unset *d, int depth) {
 		fprintf(stdout, "config {\n");
 	}
 	else {
-		fprintf(stdout, "$%s %s \"%s\" {\n",
-				ds->comp_key->ptr, ds->op->ptr, ds->string->ptr);
+		if (ds->cond != CONFIG_COND_ELSE) {
+			fprintf(stdout, "$%s %s \"%s\" {\n",
+					ds->comp_key->ptr, ds->op->ptr, ds->string->ptr);
+		} else {
+			fprintf(stdout, "{\n");
+		}
 		array_print_indent(depth + 1);
 		fprintf(stdout, "# block %d\n", ds->context_ndx);
 	}
@@ -71,7 +81,7 @@ static void data_config_print(const data_unset *d, int depth) {
 	maxlen = array_get_max_key_length(a);
 	for (i = 0; i < a->used; i ++) {
 		data_unset *du = a->data[i];
-		size_t len = strlen(du->key->ptr);
+		size_t len = buffer_string_length(du->key);
 		size_t j;
 
 		array_print_indent(depth);
@@ -84,18 +94,16 @@ static void data_config_print(const data_unset *d, int depth) {
 		fprintf(stdout, "\n");
 	}
 
-	if (ds->childs) {
-		fprintf(stdout, "\n");
-		for (i = 0; i < ds->childs->used; i ++) {
-			data_unset *du = ds->childs->data[i];
+	fprintf(stdout, "\n");
+	for (i = 0; i < ds->children.used; i ++) {
+		data_config *dc = ds->children.data[i];
 
-			/* only the 1st block of chaining */
-			if (NULL == ((data_config *)du)->prev) {
-				fprintf(stdout, "\n");
-				array_print_indent(depth);
-				du->print(du, depth);
-				fprintf(stdout, "\n");
-			}
+		/* only the 1st block of chaining */
+		if (NULL == dc->prev) {
+			fprintf(stdout, "\n");
+			array_print_indent(depth);
+			dc->print((data_unset *) dc, depth);
+			fprintf(stdout, "\n");
 		}
 	}
 
@@ -103,8 +111,12 @@ static void data_config_print(const data_unset *d, int depth) {
 	array_print_indent(depth);
 	fprintf(stdout, "}");
 	if (0 != ds->context_ndx) {
-		fprintf(stdout, " # end of $%s %s \"%s\"",
-				ds->comp_key->ptr, ds->op->ptr, ds->string->ptr);
+		if (ds->cond != CONFIG_COND_ELSE) {
+			fprintf(stdout, " # end of $%s %s \"%s\"",
+					ds->comp_key->ptr, ds->op->ptr, ds->string->ptr);
+		} else {
+			fprintf(stdout, " # end of else");
+		}
 	}
 
 	if (ds->next) {
@@ -122,10 +134,10 @@ data_config *data_config_init(void) {
 
 	ds->key = buffer_init();
 	ds->op = buffer_init();
+	ds->comp_tag = buffer_init();
 	ds->comp_key = buffer_init();
 	ds->value = array_init();
-	ds->childs = array_init();
-	ds->childs->is_weakref = 1;
+	vector_config_weak_init(&ds->children);
 
 	ds->copy = data_config_copy;
 	ds->free = data_config_free;

@@ -1,3 +1,5 @@
+#include "first.h"
+
 #include "base.h"
 #include "log.h"
 #include "buffer.h"
@@ -5,9 +7,7 @@
 #include "plugin.h"
 
 #include "response.h"
-#include "stat_cache.h"
 
-#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -75,7 +75,7 @@ static void connection_map_free(connection_map *cm) {
 	free(cm);
 }
 
-static int connection_map_insert(connection_map *cm, connection *con, buffer *con_id) {
+static int connection_map_insert(connection_map *cm, connection *con, const char *con_id, size_t idlen) {
 	connection_map_entry *cme;
 	size_t i;
 
@@ -98,9 +98,9 @@ static int connection_map_insert(connection_map *cm, connection *con, buffer *co
 		cme = cm->ptr[cm->used];
 	} else {
 		cme = malloc(sizeof(*cme));
+		cme->con_id = buffer_init();
 	}
-	cme->con_id = buffer_init();
-	buffer_copy_string_buffer(cme->con_id, con_id);
+	buffer_copy_string_len(cme->con_id, con_id, idlen);
 	cme->con = con;
 
 	cm->ptr[cm->used++] = cme;
@@ -108,13 +108,13 @@ static int connection_map_insert(connection_map *cm, connection *con, buffer *co
 	return 0;
 }
 
-static connection *connection_map_get_connection(connection_map *cm, buffer *con_id) {
+static connection *connection_map_get_connection(connection_map *cm, const char *con_id, size_t idlen) {
 	size_t i;
 
 	for (i = 0; i < cm->used; i++) {
 		connection_map_entry *cme = cm->ptr[i];
 
-		if (buffer_is_equal(cme->con_id, con_id)) {
+		if (buffer_is_equal_string(cme->con_id, con_id, idlen)) {
 			/* found connection */
 
 			return cme->con;
@@ -174,6 +174,8 @@ FREE_FUNC(mod_uploadprogress_free) {
 		for (i = 0; i < srv->config_context->used; i++) {
 			plugin_config *s = p->config_storage[i];
 
+			if (NULL == s) continue;
+
 			buffer_free(s->progress_url);
 
 			free(s);
@@ -204,6 +206,7 @@ SETDEFAULTS_FUNC(mod_uploadprogress_set_defaults) {
 	p->config_storage = calloc(1, srv->config_context->used * sizeof(plugin_config *));
 
 	for (i = 0; i < srv->config_context->used; i++) {
+		data_config const* config = (data_config const*)srv->config_context->data[i];
 		plugin_config *s;
 
 		s = calloc(1, sizeof(plugin_config));
@@ -213,7 +216,7 @@ SETDEFAULTS_FUNC(mod_uploadprogress_set_defaults) {
 
 		p->config_storage[i] = s;
 
-		if (0 != config_insert_values_global(srv, ((data_config *)srv->config_context->data[i])->value, cv)) {
+		if (0 != config_insert_values_global(srv, config->value, cv, i == 0 ? T_CONFIG_SCOPE_SERVER : T_CONFIG_SCOPE_CONNECTION)) {
 			return HANDLER_ERROR;
 		}
 	}
@@ -271,84 +274,65 @@ static int mod_uploadprogress_patch_connection(server *srv, connection *con, plu
 
 URIHANDLER_FUNC(mod_uploadprogress_uri_handler) {
 	plugin_data *p = p_d;
-	size_t i;
+	size_t len;
+	char *id;
 	data_string *ds;
 	buffer *b;
 	connection *post_con = NULL;
+	int pathinfo = 0;
 
-	UNUSED(srv);
-
-	if (con->uri.path->used == 0) return HANDLER_GO_ON;
+	if (buffer_string_is_empty(con->uri.path)) return HANDLER_GO_ON;
+	switch(con->request.http_method) {
+	case HTTP_METHOD_GET:
+	case HTTP_METHOD_POST: break;
+	default:               return HANDLER_GO_ON;
+	}
 
 	mod_uploadprogress_patch_connection(srv, con, p);
+	if (buffer_string_is_empty(p->conf.progress_url)) return HANDLER_GO_ON;
+
+	if (con->request.http_method == HTTP_METHOD_GET) {
+		if (!buffer_is_equal(con->uri.path, p->conf.progress_url)) {
+			return HANDLER_GO_ON;
+		}
+	}
+
+	if (NULL != (ds = (data_string *)array_get_element(con->request.headers, "X-Progress-ID"))) {
+		id = ds->value->ptr;
+	} else if (!buffer_string_is_empty(con->uri.query)
+		   && (id = strstr(con->uri.query->ptr, "X-Progress-ID="))) {
+		/* perhaps the POST request is using the query-string to pass the X-Progress-ID */
+		id += sizeof("X-Progress-ID=")-1;
+	} else {
+		/*(path-info is not known at this point in request)*/
+		id = con->uri.path->ptr;
+		len = buffer_string_length(con->uri.path);
+		if (len >= 33 && id[len-33] == '/') {
+			id += len - 32;
+			pathinfo = 1;
+		} else {
+			return HANDLER_GO_ON;
+		}
+	}
+
+	/* the request has to contain a 32byte ID */
+	for (len = 0; light_isxdigit(id[len]); ++len) ;
+	if (len != 32) {
+		if (!pathinfo) { /*(reduce false positive noise in error log)*/
+			log_error_write(srv, __FILE__, __LINE__, "ss",
+					"invalid progress-id; non-xdigit or len != 32:", id);
+		}
+		return HANDLER_GO_ON;
+	}
 
 	/* check if this is a POST request */
 	switch(con->request.http_method) {
 	case HTTP_METHOD_POST:
-		/* the request has to contain a 32byte ID */
 
-		if (NULL == (ds = (data_string *)array_get_element(con->request.headers, "X-Progress-ID"))) {
-			if (!buffer_is_empty(con->uri.query)) {
-				/* perhaps the POST request is using the querystring to pass the X-Progress-ID */
-				b = con->uri.query;
-			} else {
-				return HANDLER_GO_ON;
-			}
-		} else {
-			b = ds->value;
-		}
-
-		if (b->used != 32 + 1) {
-			log_error_write(srv, __FILE__, __LINE__, "sd",
-					"len of progress-id != 32:", b->used - 1);
-			return HANDLER_GO_ON;
-		}
-
-		for (i = 0; i < b->used - 1; i++) {
-			char c = b->ptr[i];
-
-			if (!light_isxdigit(c)) {
-				log_error_write(srv, __FILE__, __LINE__, "sb",
-						"non-xdigit in progress-id:", b);
-				return HANDLER_GO_ON;
-			}
-		}
-
-		connection_map_insert(p->con_map, con, b);
+		connection_map_insert(p->con_map, con, id, len);
 
 		return HANDLER_GO_ON;
 	case HTTP_METHOD_GET:
-		if (!buffer_is_equal(con->uri.path, p->conf.progress_url)) {
-			return HANDLER_GO_ON;
-		}
-
-		if (NULL == (ds = (data_string *)array_get_element(con->request.headers, "X-Progress-ID"))) {
-			if (!buffer_is_empty(con->uri.query)) {
-				/* perhaps the GET request is using the querystring to pass the X-Progress-ID */
-				b = con->uri.query;
-			} else {
-				return HANDLER_GO_ON;
-			}
-		} else {
-			b = ds->value;
-		}
-
-		if (b->used != 32 + 1) {
-			log_error_write(srv, __FILE__, __LINE__, "sd",
-					"len of progress-id != 32:", b->used - 1);
-			return HANDLER_GO_ON;
-		}
-
-		for (i = 0; i < b->used - 1; i++) {
-			char c = b->ptr[i];
-
-			if (!light_isxdigit(c)) {
-				log_error_write(srv, __FILE__, __LINE__, "sb",
-						"non-xdigit in progress-id:", b);
-				return HANDLER_GO_ON;
-			}
-		}
-
 		buffer_reset(con->physical.path);
 
 		con->file_started = 1;
@@ -358,13 +342,11 @@ URIHANDLER_FUNC(mod_uploadprogress_uri_handler) {
 		con->mode = DIRECT;
 
 		/* get the connection */
-		if (NULL == (post_con = connection_map_get_connection(p->con_map, b))) {
-			log_error_write(srv, __FILE__, __LINE__, "sb",
-					"ID no known:", b);
+		if (NULL == (post_con = connection_map_get_connection(p->con_map, id, len))) {
+			log_error_write(srv, __FILE__, __LINE__, "ss",
+					"ID not known:", id);
 
-			b = chunkqueue_get_append_buffer(con->write_queue);
-
-			buffer_append_string_len(b, CONST_STR_LEN("starting"));
+			chunkqueue_append_mem(con->write_queue, CONST_STR_LEN("not in progress"));
 
 			return HANDLER_FINISHED;
 		}
@@ -376,23 +358,28 @@ URIHANDLER_FUNC(mod_uploadprogress_uri_handler) {
 		response_header_overwrite(srv, con, CONST_STR_LEN("Expires"), CONST_STR_LEN("Thu, 19 Nov 1981 08:52:00 GMT"));
 		response_header_overwrite(srv, con, CONST_STR_LEN("Cache-Control"), CONST_STR_LEN("no-store, no-cache, must-revalidate, post-check=0, pre-check=0"));
 
-		b = chunkqueue_get_append_buffer(con->write_queue);
+		b = buffer_init();
 
 		/* prepare XML */
 		buffer_copy_string_len(b, CONST_STR_LEN(
 			"<?xml version=\"1.0\" encoding=\"iso-8859-1\"?>"
 			"<upload>"
 			"<size>"));
-		buffer_append_off_t(b, post_con->request.content_length);
+		buffer_append_int(b, post_con->request.content_length);
 		buffer_append_string_len(b, CONST_STR_LEN(
 			"</size>"
 			"<received>"));
-		buffer_append_off_t(b, post_con->request_content_queue->bytes_in);
+		buffer_append_int(b, post_con->request_content_queue->bytes_in);
 		buffer_append_string_len(b, CONST_STR_LEN(
 			"</received>"
 			"</upload>"));
 
+#if 0
 		log_error_write(srv, __FILE__, __LINE__, "sb", "...", b);
+#endif
+
+		chunkqueue_append_buffer(con->write_queue, b);
+		buffer_free(b);
 
 		return HANDLER_FINISHED;
 	default:
@@ -407,7 +394,8 @@ REQUESTDONE_FUNC(mod_uploadprogress_request_done) {
 
 	UNUSED(srv);
 
-	if (con->uri.path->used == 0) return HANDLER_GO_ON;
+	if (con->request.http_method != HTTP_METHOD_POST) return HANDLER_GO_ON;
+	if (buffer_string_is_empty(con->uri.path)) return HANDLER_GO_ON;
 
 	if (connection_map_remove_connection(p->con_map, con)) {
 		/* removed */
@@ -425,7 +413,7 @@ int mod_uploadprogress_plugin_init(plugin *p) {
 
 	p->init        = mod_uploadprogress_init;
 	p->handle_uri_clean  = mod_uploadprogress_uri_handler;
-	p->handle_request_done  = mod_uploadprogress_request_done;
+	p->connection_reset  = mod_uploadprogress_request_done;
 	p->set_defaults  = mod_uploadprogress_set_defaults;
 	p->cleanup     = mod_uploadprogress_free;
 

@@ -6,8 +6,11 @@
 #define LIGHTTPD_VERSION_ID ${LIGHTTPD_VERSION_ID}
 #define PACKAGE_NAME "${PACKAGE_NAME}"
 #define PACKAGE_VERSION "${PACKAGE_VERSION}"
-#define PACKAGE_BUILD_DATE "${PACKAGE_BUILD_DATE}"
 #define LIBRARY_DIR "${LIGHTTPD_LIBRARY_DIR}"
+
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
 
 /* System */
 #cmakedefine  HAVE_SYS_DEVPOLL_H
@@ -20,7 +23,6 @@
 #cmakedefine  HAVE_SYS_RESOURCE_H
 #cmakedefine  HAVE_SYS_SENDFILE_H
 #cmakedefine  HAVE_SYS_SELECT_H
-#cmakedefine  HAVE_SYS_SYSLIMITS_H
 #cmakedefine  HAVE_SYS_TYPES_H
 #cmakedefine  HAVE_SYS_UIO_H
 #cmakedefine  HAVE_SYS_UN_H
@@ -28,9 +30,8 @@
 #cmakedefine HAVE_SYS_TIME_H
 #cmakedefine HAVE_UNISTD_H
 #cmakedefine HAVE_PTHREAD_H
-#cmakedefine HAVE_INET_ATON
 #cmakedefine HAVE_IPV6
-#cmakedefine HAVE_ISSETUGID
+#cmakedefine HAVE_WEAK_SYMBOLS
 
 /* XATTR */
 #cmakedefine HAVE_ATTR_ATTRIBUTES_H
@@ -43,7 +44,6 @@
 /* OpenSSL */
 #cmakedefine  HAVE_OPENSSL_SSL_H
 #cmakedefine  HAVE_LIBCRYPTO
-#cmakedefine  OPENSSL_NO_KRB5
 #cmakedefine  HAVE_LIBSSL
 
 /* BZip */
@@ -64,7 +64,6 @@
 #cmakedefine  HAVE_LIBLDAP
 #cmakedefine  HAVE_LBER_H
 #cmakedefine  HAVE_LIBLBER
-#cmakedefine  LDAP_DEPRECATED 1
 
 /* XML */
 #cmakedefine  HAVE_LIBXML_H
@@ -102,7 +101,7 @@
 #cmakedefine  HAVE_GDBM
 
 /* memcache */
-#cmakedefine  HAVE_MEMCACHE_H
+#cmakedefine  USE_MEMCACHED
 
 /* inotify */
 #cmakedefine  HAVE_INOTIFY_INIT
@@ -115,7 +114,6 @@
 
 /* Functions */
 #cmakedefine  HAVE_CHROOT
-#cmakedefine  HAVE_CRYPT
 #cmakedefine  HAVE_EPOLL_CTL
 #cmakedefine  HAVE_FORK
 #cmakedefine  HAVE_GETRLIMIT
@@ -146,10 +144,17 @@
 #cmakedefine  HAVE_STRPTIME
 #cmakedefine  HAVE_SYSLOG
 #cmakedefine  HAVE_WRITEV
+#cmakedefine  HAVE_INET_ATON
+#cmakedefine  HAVE_ISSETUGID
+#cmakedefine  HAVE_INET_PTON
+#cmakedefine  HAVE_MEMSET_S
+#cmakedefine  HAVE_EXPLICIT_BZERO
 
 /* libcrypt */
 #cmakedefine  HAVE_CRYPT_H
 #cmakedefine  HAVE_LIBCRYPT
+#cmakedefine  HAVE_CRYPT
+#cmakedefine  HAVE_CRYPT_R
 
 /* fastcgi */
 #cmakedefine HAVE_FASTCGI_H
@@ -157,5 +162,8 @@
 
 /* libev */
 #cmakedefine HAVE_LIBEV
+
+/* libunwind */
+#cmakedefine HAVE_LIBUNWIND
 
 #cmakedefine LIGHTTPD_STATIC

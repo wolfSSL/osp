@@ -1,5 +1,6 @@
 #ifndef _MOD_SSI_H_
 #define _MOD_SSI_H_
+#include "first.h"
 
 #include "base.h"
 #include "buffer.h"
@@ -7,23 +8,32 @@
 
 #include "plugin.h"
 
-#ifdef HAVE_PCRE_H
-#include <pcre.h>
-#endif
-
 /* plugin config for all request/connections */
 
 typedef struct {
 	array *ssi_extension;
 	buffer *content_type;
+	unsigned short conditional_requests;
+	unsigned short ssi_exec;
+	unsigned short ssi_recursion_max;
 } plugin_config;
 
 typedef struct {
 	PLUGIN_DATA;
 
-#ifdef HAVE_PCRE_H
-	pcre *ssi_regex;
-#endif
+	buffer *timefmt;
+
+	buffer *stat_fn;
+
+	array *ssi_vars;
+	array *ssi_cgi_env;
+
+	plugin_config **config_storage;
+
+	plugin_config conf;
+} plugin_data;
+
+typedef struct {
 	buffer *timefmt;
 	int sizefmt;
 
@@ -33,12 +43,11 @@ typedef struct {
 	array *ssi_cgi_env;
 
 	int if_level, if_is_false_level, if_is_false, if_is_false_endif;
-
-	plugin_config **config_storage;
+	unsigned short ssi_recursion_depth;
 
 	plugin_config conf;
-} plugin_data;
+} handler_ctx;
 
-int ssi_eval_expr(server *srv, connection *con, plugin_data *p, const char *expr);
+int ssi_eval_expr(server *srv, connection *con, handler_ctx *p, const char *expr);
 
 #endif

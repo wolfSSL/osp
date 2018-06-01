@@ -1,3 +1,6 @@
+#include "first.h"
+
+#include "fdevent_impl.h"
 #include "fdevent.h"
 #include "buffer.h"
 #include "log.h"
@@ -6,15 +9,16 @@
 
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <signal.h>
-#include <fcntl.h>
 
-#ifdef USE_LINUX_EPOLL
+#ifdef FDEVENT_USE_LINUX_EPOLL
 
 # include <sys/epoll.h>
+
+#ifndef EPOLLRDHUP
+#define EPOLLRDHUP 0
+#endif
 
 static void fdevent_linux_sysepoll_free(fdevents *ev) {
 	close(ev->epoll_fd);
@@ -56,6 +60,7 @@ static int fdevent_linux_sysepoll_event_set(fdevents *ev, int fde_ndx, int fd, i
 
 	if (events & FDEVENT_IN)  ep.events |= EPOLLIN;
 	if (events & FDEVENT_OUT) ep.events |= EPOLLOUT;
+	if (events & FDEVENT_RDHUP) ep.events |= EPOLLRDHUP;
 
 	/**
 	 *
@@ -95,6 +100,7 @@ static int fdevent_linux_sysepoll_event_get_revent(fdevents *ev, size_t ndx) {
 	if (e & EPOLLERR) events |= FDEVENT_ERR;
 	if (e & EPOLLHUP) events |= FDEVENT_HUP;
 	if (e & EPOLLPRI) events |= FDEVENT_PRI;
+	if (e & EPOLLRDHUP) events |= FDEVENT_RDHUP;
 
 	return events;
 }
@@ -140,9 +146,10 @@ int fdevent_linux_sysepoll_init(fdevents *ev) {
 		return -1;
 	}
 
-	fd_close_on_exec(ev->epoll_fd);
+	fdevent_setfd_cloexec(ev->epoll_fd);
 
 	ev->epoll_events = malloc(ev->maxfds * sizeof(*ev->epoll_events));
+	force_assert(NULL != ev->epoll_events);
 
 	return 0;
 }

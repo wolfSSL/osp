@@ -1,15 +1,13 @@
 #ifndef _KEY_VALUE_H_
 #define _KEY_VALUE_H_
-
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
+#include "first.h"
 
 #ifdef HAVE_PCRE_H
 # include <pcre.h>
 #endif
 
 struct server;
+struct cond_cache_t;
 
 /* sources:
  * - [RFC2616], Section 9
@@ -68,14 +66,8 @@ typedef enum { HTTP_VERSION_UNSET = -1, HTTP_VERSION_1_0, HTTP_VERSION_1_1 } htt
 typedef struct {
 	int key;
 
-	char *value;
+	const char *value;
 } keyvalue;
-
-typedef struct {
-	char *key;
-
-	char *value;
-} s_keyvalue;
 
 typedef struct {
 #ifdef HAVE_PCRE_H
@@ -86,26 +78,11 @@ typedef struct {
 	buffer *value;
 } pcre_keyvalue;
 
-typedef enum { HTTP_AUTH_BASIC, HTTP_AUTH_DIGEST } httpauth_type;
-
 typedef struct {
-	char *key;
-
-	char *realm;
-	httpauth_type type;
-} httpauth_keyvalue;
-
-#define KVB(x) \
-typedef struct {\
-	x **kv; \
-	size_t used;\
-	size_t size;\
-} x ## _buffer
-
-KVB(keyvalue);
-KVB(s_keyvalue);
-KVB(httpauth_keyvalue);
-KVB(pcre_keyvalue);
+	pcre_keyvalue **kv;
+	size_t used;
+	size_t size;
+} pcre_keyvalue_buffer;
 
 const char *get_http_status_name(int i);
 const char *get_http_version_name(int i);
@@ -114,23 +91,9 @@ const char *get_http_status_body_name(int i);
 int get_http_version_key(const char *s);
 http_method_t get_http_method_key(const char *s);
 
-const char *keyvalue_get_value(keyvalue *kv, int k);
-int keyvalue_get_key(keyvalue *kv, const char *s);
-
-keyvalue_buffer *keyvalue_buffer_init(void);
-int keyvalue_buffer_append(keyvalue_buffer *kvb, int k, const char *value);
-void keyvalue_buffer_free(keyvalue_buffer *kvb);
-
-s_keyvalue_buffer *s_keyvalue_buffer_init(void);
-int s_keyvalue_buffer_append(s_keyvalue_buffer *kvb, const char *key, const char *value);
-void s_keyvalue_buffer_free(s_keyvalue_buffer *kvb);
-
-httpauth_keyvalue_buffer *httpauth_keyvalue_buffer_init(void);
-int httpauth_keyvalue_buffer_append(httpauth_keyvalue_buffer *kvb, const char *key, const char *realm, httpauth_type type);
-void httpauth_keyvalue_buffer_free(httpauth_keyvalue_buffer *kvb);
-
 pcre_keyvalue_buffer *pcre_keyvalue_buffer_init(void);
 int pcre_keyvalue_buffer_append(struct server *srv, pcre_keyvalue_buffer *kvb, const char *key, const char *value);
 void pcre_keyvalue_buffer_free(pcre_keyvalue_buffer *kvb);
+void pcre_keyvalue_buffer_subst(buffer *b, const buffer *patternb, const char **list, int n, struct cond_cache_t *cache);
 
 #endif

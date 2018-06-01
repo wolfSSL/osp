@@ -1,8 +1,8 @@
 SUBDIRS=src doc tests
 
-EXTRA_DIST=autogen.sh SConstruct wolfStartUp
+EXTRA_DIST=autogen.sh SConstruct CMakeLists.txt meson.build meson_options.txt README.FreeBSD scripts wolfStartUp
 
-ACLOCAL_AMFLAGS = -I m4
+ACLOCAL_AMFLAGS = -I m4 -I scripts/m4
 
 distcleancheck_listfiles = find -type f -exec sh -c 'test -f $(srcdir)/{} || echo {}' ';'
 

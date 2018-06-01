@@ -1,3 +1,5 @@
+#include "first.h"
+
 #include "base.h"
 #include "log.h"
 #include "buffer.h"
@@ -6,15 +8,12 @@
 
 #include "response.h"
 #include "stat_cache.h"
-#include "stream.h"
 
-#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
-#include <assert.h>
 #include <errno.h>
-#include <stdio.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
 
@@ -22,16 +21,13 @@
  * this is a dirlisting for a lighttpd plugin
  */
 
-
-#ifdef HAVE_SYS_SYSLIMITS_H
-#include <sys/syslimits.h>
-#endif
-
 #ifdef HAVE_ATTR_ATTRIBUTES_H
 #include <attr/attributes.h>
 #endif
 
-#include "version.h"
+#ifdef HAVE_SYS_EXTATTR_H
+#include <sys/extattr.h>
+#endif
 
 /* plugin config for all request/connections */
 
@@ -52,17 +48,18 @@ typedef struct {
 typedef struct {
 	unsigned short dir_listing;
 	unsigned short hide_dot_files;
-	unsigned short show_readme;
 	unsigned short hide_readme_file;
 	unsigned short encode_readme;
-	unsigned short show_header;
 	unsigned short hide_header_file;
 	unsigned short encode_header;
 	unsigned short auto_layout;
 
 	excludes_buffer *excludes;
 
+	buffer *show_readme;
+	buffer *show_header;
 	buffer *external_css;
+	buffer *external_js;
 	buffer *encoding;
 	buffer *set_footer;
 } plugin_config;
@@ -120,7 +117,7 @@ static int excludes_buffer_append(excludes_buffer *exb, buffer *string) {
 	}
 
 	exb->ptr[exb->used]->string = buffer_init();
-	buffer_copy_string_buffer(exb->ptr[exb->used]->string, string);
+	buffer_copy_buffer(exb->ptr[exb->used]->string, string);
 
 	exb->used++;
 
@@ -177,7 +174,10 @@ FREE_FUNC(mod_dirlisting_free) {
 			if (!s) continue;
 
 			excludes_buffer_free(s->excludes);
+			buffer_free(s->show_readme);
+			buffer_free(s->show_header);
 			buffer_free(s->external_css);
+			buffer_free(s->external_js);
 			buffer_free(s->encoding);
 			buffer_free(s->set_footer);
 
@@ -194,53 +194,13 @@ FREE_FUNC(mod_dirlisting_free) {
 	return HANDLER_GO_ON;
 }
 
-static int parse_config_entry(server *srv, plugin_config *s, array *ca, const char *option) {
-	data_unset *du;
-
-	if (NULL != (du = array_get_element(ca, option))) {
-		data_array *da;
-		size_t j;
-
-		if (du->type != TYPE_ARRAY) {
-			log_error_write(srv, __FILE__, __LINE__, "sss",
-				"unexpected type for key: ", option, "array of strings");
-
-			return HANDLER_ERROR;
-		}
-
-		da = (data_array *)du;
-
-		for (j = 0; j < da->value->used; j++) {
-			if (da->value->data[j]->type != TYPE_STRING) {
-				log_error_write(srv, __FILE__, __LINE__, "sssbs",
-					"unexpected type for key: ", option, "[",
-					da->value->data[j]->key, "](string)");
-
-				return HANDLER_ERROR;
-			}
-
-			if (0 != excludes_buffer_append(s->excludes,
-				    ((data_string *)(da->value->data[j]))->value)) {
-#ifdef HAVE_PCRE_H
-				log_error_write(srv, __FILE__, __LINE__, "sb",
-						"pcre-compile failed for", ((data_string *)(da->value->data[j]))->value);
-#else
-				log_error_write(srv, __FILE__, __LINE__, "s",
-						"pcre support is missing, please install libpcre and the headers");
-#endif
-			}
-		}
-	}
-
-	return 0;
-}
-
 /* handle plugin config and check values */
 
 #define CONFIG_EXCLUDE          "dir-listing.exclude"
 #define CONFIG_ACTIVATE         "dir-listing.activate"
 #define CONFIG_HIDE_DOTFILES    "dir-listing.hide-dotfiles"
 #define CONFIG_EXTERNAL_CSS     "dir-listing.external-css"
+#define CONFIG_EXTERNAL_JS      "dir-listing.external-js"
 #define CONFIG_ENCODING         "dir-listing.encoding"
 #define CONFIG_SHOW_README      "dir-listing.show-readme"
 #define CONFIG_HIDE_README_FILE "dir-listing.hide-readme-file"
@@ -263,15 +223,16 @@ SETDEFAULTS_FUNC(mod_dirlisting_set_defaults) {
 		{ CONFIG_HIDE_DOTFILES,    NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 2 */
 		{ CONFIG_EXTERNAL_CSS,     NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },  /* 3 */
 		{ CONFIG_ENCODING,         NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },  /* 4 */
-		{ CONFIG_SHOW_README,      NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 5 */
+		{ CONFIG_SHOW_README,      NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },  /* 5 */
 		{ CONFIG_HIDE_README_FILE, NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 6 */
-		{ CONFIG_SHOW_HEADER,      NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 7 */
+		{ CONFIG_SHOW_HEADER,      NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },  /* 7 */
 		{ CONFIG_HIDE_HEADER_FILE, NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 8 */
 		{ CONFIG_DIR_LISTING,      NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 9 */
 		{ CONFIG_SET_FOOTER,       NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },  /* 10 */
 		{ CONFIG_ENCODE_README,    NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 11 */
 		{ CONFIG_ENCODE_HEADER,    NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 12 */
 		{ CONFIG_AUTO_LAYOUT,      NULL, T_CONFIG_BOOLEAN, T_CONFIG_SCOPE_CONNECTION }, /* 13 */
+		{ CONFIG_EXTERNAL_JS,      NULL, T_CONFIG_STRING, T_CONFIG_SCOPE_CONNECTION },  /* 14 */
 
 		{ NULL,                          NULL, T_CONFIG_UNSET, T_CONFIG_SCOPE_UNSET }
 	};
@@ -281,17 +242,19 @@ SETDEFAULTS_FUNC(mod_dirlisting_set_defaults) {
 	p->config_storage = calloc(1, srv->config_context->used * sizeof(plugin_config *));
 
 	for (i = 0; i < srv->config_context->used; i++) {
+		data_config const* config = (data_config const*)srv->config_context->data[i];
 		plugin_config *s;
-		array *ca;
+		data_unset *du_excludes;
 
 		s = calloc(1, sizeof(plugin_config));
 		s->excludes = excludes_buffer_init();
 		s->dir_listing = 0;
+		s->show_readme = buffer_init();
+		s->show_header = buffer_init();
 		s->external_css = buffer_init();
-		s->hide_dot_files = 0;
-		s->show_readme = 0;
+		s->external_js = buffer_init();
+		s->hide_dot_files = 1;
 		s->hide_readme_file = 0;
-		s->show_header = 0;
 		s->hide_header_file = 0;
 		s->encode_readme = 1;
 		s->encode_header = 1;
@@ -305,24 +268,78 @@ SETDEFAULTS_FUNC(mod_dirlisting_set_defaults) {
 		cv[2].destination = &(s->hide_dot_files);
 		cv[3].destination = s->external_css;
 		cv[4].destination = s->encoding;
-		cv[5].destination = &(s->show_readme);
+		cv[5].destination = s->show_readme;
 		cv[6].destination = &(s->hide_readme_file);
-		cv[7].destination = &(s->show_header);
+		cv[7].destination = s->show_header;
 		cv[8].destination = &(s->hide_header_file);
 		cv[9].destination = &(s->dir_listing); /* old name */
 		cv[10].destination = s->set_footer;
 		cv[11].destination = &(s->encode_readme);
 		cv[12].destination = &(s->encode_header);
 		cv[13].destination = &(s->auto_layout);
+		cv[14].destination = s->external_js;
 
 		p->config_storage[i] = s;
-		ca = ((data_config *)srv->config_context->data[i])->value;
 
-		if (0 != config_insert_values_global(srv, ca, cv)) {
+		if (0 != config_insert_values_global(srv, config->value, cv, i == 0 ? T_CONFIG_SCOPE_SERVER : T_CONFIG_SCOPE_CONNECTION)) {
 			return HANDLER_ERROR;
 		}
 
-		parse_config_entry(srv, s, ca, CONFIG_EXCLUDE);
+		if (NULL != (du_excludes = array_get_element(config->value, CONFIG_EXCLUDE))) {
+			array *excludes_list;
+			size_t j;
+
+			excludes_list = ((data_array*)du_excludes)->value;
+
+			if (du_excludes->type != TYPE_ARRAY || !array_is_vlist(excludes_list)) {
+				log_error_write(srv, __FILE__, __LINE__, "s",
+					"unexpected type for " CONFIG_EXCLUDE "; expected list of \"regex\"");
+				return HANDLER_ERROR;
+			}
+
+#ifndef HAVE_PCRE_H
+			if (excludes_list->used > 0) {
+				log_error_write(srv, __FILE__, __LINE__, "sss",
+					"pcre support is missing for: ", CONFIG_EXCLUDE, ", please install libpcre and the headers");
+				return HANDLER_ERROR;
+			}
+#else
+			for (j = 0; j < excludes_list->used; j++) {
+				data_unset *du_exclude = excludes_list->data[j];
+
+				if (du_exclude->type != TYPE_STRING) {
+					log_error_write(srv, __FILE__, __LINE__, "sssbs",
+						"unexpected type for key: ", CONFIG_EXCLUDE, "[",
+						du_exclude->key, "](string)");
+					return HANDLER_ERROR;
+				}
+
+				if (0 != excludes_buffer_append(s->excludes, ((data_string*)(du_exclude))->value)) {
+					log_error_write(srv, __FILE__, __LINE__, "sb",
+						"pcre-compile failed for", ((data_string*)(du_exclude))->value);
+					return HANDLER_ERROR;
+				}
+			}
+#endif
+		}
+
+		if (!buffer_string_is_empty(s->show_readme)) {
+			if (buffer_is_equal_string(s->show_readme, CONST_STR_LEN("enable"))) {
+				buffer_copy_string_len(s->show_readme, CONST_STR_LEN("README.txt"));
+			}
+			else if (buffer_is_equal_string(s->show_readme, CONST_STR_LEN("disable"))) {
+				buffer_string_set_length(s->show_readme, 0);
+			}
+		}
+
+		if (!buffer_string_is_empty(s->show_header)) {
+			if (buffer_is_equal_string(s->show_header, CONST_STR_LEN("enable"))) {
+				buffer_copy_string_len(s->show_header, CONST_STR_LEN("HEADER.txt"));
+			}
+			else if (buffer_is_equal_string(s->show_header, CONST_STR_LEN("disable"))) {
+				buffer_string_set_length(s->show_header, 0);
+			}
+		}
 	}
 
 	return HANDLER_GO_ON;
@@ -336,6 +353,7 @@ static int mod_dirlisting_patch_connection(server *srv, connection *con, plugin_
 
 	PATCH(dir_listing);
 	PATCH(external_css);
+	PATCH(external_js);
 	PATCH(hide_dot_files);
 	PATCH(encoding);
 	PATCH(show_readme);
@@ -367,6 +385,8 @@ static int mod_dirlisting_patch_connection(server *srv, connection *con, plugin_
 				PATCH(hide_dot_files);
 			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN(CONFIG_EXTERNAL_CSS))) {
 				PATCH(external_css);
+			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN(CONFIG_EXTERNAL_JS))) {
+				PATCH(external_js);
 			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN(CONFIG_ENCODING))) {
 				PATCH(encoding);
 			} else if (buffer_is_equal_string(du->key, CONST_STR_LEN(CONFIG_SHOW_README))) {
@@ -441,11 +461,11 @@ static void http_dirls_sort(dirls_entry_t **ent, int num) {
 /* buffer must be able to hold "999.9K"
  * conversion is simple but not perfect
  */
-static int http_list_directory_sizefmt(char *buf, off_t size) {
-	const char unit[] = "KMGTPE";	/* Kilo, Mega, Tera, Peta, Exa */
-	const char *u = unit - 1;		/* u will always increment at least once */
+static int http_list_directory_sizefmt(char *buf, size_t bufsz, off_t size) {
+	const char unit[] = " KMGTPE";	/* Kilo, Mega, Giga, Tera, Peta, Exa */
+	const char *u = unit;		/* u will always increment at least once */
 	int remain;
-	char *out = buf;
+	size_t buflen;
 
 	if (size < 100)
 		size += 99;
@@ -469,13 +489,256 @@ static int http_list_directory_sizefmt(char *buf, off_t size) {
 		u++;
 	}
 
-	out   += LI_ltostr(out, size);
-	out[0] = '.';
-	out[1] = remain + '0';
-	out[2] = *u;
-	out[3] = '\0';
+	li_itostrn(buf, bufsz, size);
+	buflen = strlen(buf);
+	if (buflen + 3 >= bufsz) return buflen;
+	buf[buflen+0] = '.';
+	buf[buflen+1] = remain + '0';
+	buf[buflen+2] = *u;
+	buf[buflen+3] = '\0';
 
-	return (out + 3 - buf);
+	return buflen + 3;
+}
+
+/* don't want to block when open()ing a fifo */
+#if defined(O_NONBLOCK)
+# define FIFO_NONBLOCK O_NONBLOCK
+#else
+# define FIFO_NONBLOCK 0
+#endif
+
+static void http_list_directory_include_file(buffer *out, buffer *path, const char *classname, int encode) {
+	int fd = open(path->ptr, O_RDONLY | FIFO_NONBLOCK);
+	ssize_t rd;
+	char buf[8192];
+
+	if (-1 == fd) return;
+
+	if (encode) {
+		buffer_append_string_len(out, CONST_STR_LEN("<pre class=\""));
+		buffer_append_string(out, classname);
+		buffer_append_string_len(out, CONST_STR_LEN("\">"));
+	}
+
+	while ((rd = read(fd, buf, sizeof(buf))) > 0) {
+		if (encode) {
+			buffer_append_string_encoded(out, buf, (size_t)rd, ENCODING_MINIMAL_XML);
+		} else {
+			buffer_append_string_len(out, buf, (size_t)rd);
+		}
+	}
+	close(fd);
+
+	if (encode) {
+		buffer_append_string_len(out, CONST_STR_LEN("</pre>"));
+	}
+}
+
+/* portions copied from mod_status
+ * modified and specialized for stable dirlist sorting by name */
+static const char js_simple_table_resort[] = \
+"var click_column;\n" \
+"var name_column = 0;\n" \
+"var date_column = 1;\n" \
+"var size_column = 2;\n" \
+"var type_column = 3;\n" \
+"var prev_span = null;\n" \
+"\n" \
+"if (typeof(String.prototype.localeCompare) === 'undefined') {\n" \
+" String.prototype.localeCompare = function(str, locale, options) {\n" \
+"   return ((this == str) ? 0 : ((this > str) ? 1 : -1));\n" \
+" };\n" \
+"}\n" \
+"\n" \
+"if (typeof(String.prototype.toLocaleUpperCase) === 'undefined') {\n" \
+" String.prototype.toLocaleUpperCase = function() {\n" \
+"  return this.toUpperCase();\n" \
+" };\n" \
+"}\n" \
+"\n" \
+"function get_inner_text(el) {\n" \
+" if((typeof el == 'string')||(typeof el == 'undefined'))\n" \
+"  return el;\n" \
+" if(el.innerText)\n" \
+"  return el.innerText;\n" \
+" else {\n" \
+"  var str = \"\";\n" \
+"  var cs = el.childNodes;\n" \
+"  var l = cs.length;\n" \
+"  for (i=0;i<l;i++) {\n" \
+"   if (cs[i].nodeType==1) str += get_inner_text(cs[i]);\n" \
+"   else if (cs[i].nodeType==3) str += cs[i].nodeValue;\n" \
+"  }\n" \
+" }\n" \
+" return str;\n" \
+"}\n" \
+"\n" \
+"function isdigit(c) {\n" \
+" return (c >= '0' && c <= '9');\n" \
+"}\n" \
+"\n" \
+"function unit_multiplier(unit) {\n" \
+" return (unit=='K') ? 1000\n" \
+"      : (unit=='M') ? 1000000\n" \
+"      : (unit=='G') ? 1000000000\n" \
+"      : (unit=='T') ? 1000000000000\n" \
+"      : (unit=='P') ? 1000000000000000\n" \
+"      : (unit=='E') ? 1000000000000000000 : 1;\n" \
+"}\n" \
+"\n" \
+"var li_date_regex=/(\\d{4})-(\\w{3})-(\\d{2}) (\\d{2}):(\\d{2}):(\\d{2})/;\n" \
+"\n" \
+"var li_mon = ['Jan','Feb','Mar','Apr','May','Jun',\n" \
+"              'Jul','Aug','Sep','Oct','Nov','Dec'];\n" \
+"\n" \
+"function li_mon_num(mon) {\n" \
+" var i; for (i = 0; i < 12 && mon != li_mon[i]; ++i); return i;\n" \
+"}\n" \
+"\n" \
+"function li_date_cmp(s1, s2) {\n" \
+" var dp1 = li_date_regex.exec(s1)\n" \
+" var dp2 = li_date_regex.exec(s2)\n" \
+" for (var i = 1; i < 7; ++i) {\n" \
+"  var cmp = (2 != i)\n" \
+"   ? parseInt(dp1[i]) - parseInt(dp2[i])\n" \
+"   : li_mon_num(dp1[2]) - li_mon_num(dp2[2]);\n" \
+"  if (0 != cmp) return cmp;\n" \
+" }\n" \
+" return 0;\n" \
+"}\n" \
+"\n" \
+"function sortfn_then_by_name(a,b,sort_column) {\n" \
+" if (sort_column == name_column || sort_column == type_column) {\n" \
+"  var ad = (a.cells[type_column].innerHTML === 'Directory');\n" \
+"  var bd = (b.cells[type_column].innerHTML === 'Directory');\n" \
+"  if (ad != bd) return (ad ? -1 : 1);\n" \
+" }\n" \
+" var at = get_inner_text(a.cells[sort_column]);\n" \
+" var bt = get_inner_text(b.cells[sort_column]);\n" \
+" var cmp;\n" \
+" if (sort_column == name_column) {\n" \
+"  if (at == '..') return -1;\n" \
+"  if (bt == '..') return  1;\n" \
+" }\n" \
+" if (a.cells[sort_column].className == 'int') {\n" \
+"  cmp = parseInt(at)-parseInt(bt);\n" \
+" } else if (sort_column == date_column) {\n" \
+"  var ad = isdigit(at.substr(0,1));\n" \
+"  var bd = isdigit(bt.substr(0,1));\n" \
+"  if (ad != bd) return (!ad ? -1 : 1);\n" \
+"  cmp = li_date_cmp(at,bt);\n" \
+" } else if (sort_column == size_column) {\n" \
+"  var ai = parseInt(at, 10) * unit_multiplier(at.substr(-1,1));\n" \
+"  var bi = parseInt(bt, 10) * unit_multiplier(bt.substr(-1,1));\n" \
+"  if (at.substr(0,1) == '-') ai = -1;\n" \
+"  if (bt.substr(0,1) == '-') bi = -1;\n" \
+"  cmp = ai - bi;\n" \
+" } else {\n" \
+"  cmp = at.toLocaleUpperCase().localeCompare(bt.toLocaleUpperCase());\n" \
+"  if (0 != cmp) return cmp;\n" \
+"  cmp = at.localeCompare(bt);\n" \
+" }\n" \
+" if (0 != cmp || sort_column == name_column) return cmp;\n" \
+" return sortfn_then_by_name(a,b,name_column);\n" \
+"}\n" \
+"\n" \
+"function sortfn(a,b) {\n" \
+" return sortfn_then_by_name(a,b,click_column);\n" \
+"}\n" \
+"\n" \
+"function resort(lnk) {\n" \
+" var span = lnk.childNodes[1];\n" \
+" var table = lnk.parentNode.parentNode.parentNode.parentNode;\n" \
+" var rows = new Array();\n" \
+" for (j=1;j<table.rows.length;j++)\n" \
+"  rows[j-1] = table.rows[j];\n" \
+" click_column = lnk.parentNode.cellIndex;\n" \
+" rows.sort(sortfn);\n" \
+"\n" \
+" if (prev_span != null) prev_span.innerHTML = '';\n" \
+" if (span.getAttribute('sortdir')=='down') {\n" \
+"  span.innerHTML = '&uarr;';\n" \
+"  span.setAttribute('sortdir','up');\n" \
+"  rows.reverse();\n" \
+" } else {\n" \
+"  span.innerHTML = '&darr;';\n" \
+"  span.setAttribute('sortdir','down');\n" \
+" }\n" \
+" for (i=0;i<rows.length;i++)\n" \
+"  table.tBodies[0].appendChild(rows[i]);\n" \
+" prev_span = span;\n" \
+"}\n";
+
+/* portions copied from mod_dirlist (lighttpd2) */
+static const char js_simple_table_init_sort[] = \
+"\n" \
+"function init_sort(init_sort_column, ascending) {\n" \
+" var tables = document.getElementsByTagName(\"table\");\n" \
+" for (var i = 0; i < tables.length; i++) {\n" \
+"  var table = tables[i];\n" \
+"  //var c = table.getAttribute(\"class\")\n" \
+"  //if (-1 != c.split(\" \").indexOf(\"sort\")) {\n" \
+"   var row = table.rows[0].cells;\n" \
+"   for (var j = 0; j < row.length; j++) {\n" \
+"    var n = row[j];\n" \
+"    if (n.childNodes.length == 1 && n.childNodes[0].nodeType == 3) {\n" \
+"     var link = document.createElement(\"a\");\n" \
+"     var title = n.childNodes[0].nodeValue.replace(/:$/, \"\");\n" \
+"     link.appendChild(document.createTextNode(title));\n" \
+"     link.setAttribute(\"href\", \"#\");\n" \
+"     link.setAttribute(\"class\", \"sortheader\");\n" \
+"     link.setAttribute(\"onclick\", \"resort(this);return false;\");\n" \
+"     var arrow = document.createElement(\"span\");\n" \
+"     arrow.setAttribute(\"class\", \"sortarrow\");\n" \
+"     arrow.appendChild(document.createTextNode(\":\"));\n" \
+"     link.appendChild(arrow)\n" \
+"     n.replaceChild(link, n.firstChild);\n" \
+"    }\n" \
+"   }\n" \
+"   var lnk = row[init_sort_column].firstChild;\n" \
+"   if (ascending) {\n" \
+"    var span = lnk.childNodes[1];\n" \
+"    span.setAttribute('sortdir','down');\n" \
+"   }\n" \
+"   resort(lnk);\n" \
+"  //}\n" \
+" }\n" \
+"}\n";
+
+static void http_dirlist_append_js_table_resort (buffer *b, connection *con) {
+	char col = '0';
+	char ascending = '0';
+	if (!buffer_string_is_empty(con->uri.query)) {
+		const char *qs = con->uri.query->ptr;
+		do {
+			if (qs[0] == 'C' && qs[1] == '=') {
+				switch (qs[2]) {
+				case 'N': col = '0'; break;
+				case 'M': col = '1'; break;
+				case 'S': col = '2'; break;
+				case 'T':
+				case 'D': col = '3'; break;
+				default:  break;
+				}
+			}
+			else if (qs[0] == 'O' && qs[1] == '=') {
+				switch (qs[2]) {
+				case 'A': ascending = '1'; break;
+				case 'D': ascending = '0'; break;
+				default:  break;
+				}
+			}
+		} while ((qs = strchr(qs, '&')) && *++qs);
+	}
+
+	buffer_append_string_len(b, CONST_STR_LEN("\n<script type=\"text/javascript\">\n// <!--\n\n"));
+	buffer_append_string_len(b, js_simple_table_resort, sizeof(js_simple_table_resort)-1);
+	buffer_append_string_len(b, js_simple_table_init_sort, sizeof(js_simple_table_init_sort)-1);
+	buffer_append_string_len(b, CONST_STR_LEN("\ninit_sort("));
+	buffer_append_string_len(b, &col, 1);
+	buffer_append_string_len(b, CONST_STR_LEN(", "));
+	buffer_append_string_len(b, &ascending, 1);
+	buffer_append_string_len(b, CONST_STR_LEN(");\n\n// -->\n</script>\n\n"));
 }
 
 static void http_list_directory_header(server *srv, connection *con, plugin_data *p, buffer *out) {
@@ -483,18 +746,24 @@ static void http_list_directory_header(server *srv, connection *con, plugin_data
 
 	if (p->conf.auto_layout) {
 		buffer_append_string_len(out, CONST_STR_LEN(
-			"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">\n"
-			"<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\">\n"
+			"<!DOCTYPE html>\n"
+			"<html>\n"
 			"<head>\n"
-			"<title>Index of "
 		));
+		if (!buffer_string_is_empty(p->conf.encoding)) {
+			buffer_append_string_len(out, CONST_STR_LEN("<meta charset=\""));
+			buffer_append_string_buffer(out, p->conf.encoding);
+			buffer_append_string_len(out, CONST_STR_LEN("\">\n"));
+		}
+		buffer_append_string_len(out, CONST_STR_LEN("<title>Index of "));
 		buffer_append_string_encoded(out, CONST_BUF_LEN(con->uri.path), ENCODING_MINIMAL_XML);
 		buffer_append_string_len(out, CONST_STR_LEN("</title>\n"));
 
-		if (p->conf.external_css->used > 1) {
+		if (!buffer_string_is_empty(p->conf.external_css)) {
+			buffer_append_string_len(out, CONST_STR_LEN("<meta name=\"viewport\" content=\"initial-scale=1\">"));
 			buffer_append_string_len(out, CONST_STR_LEN("<link rel=\"stylesheet\" type=\"text/css\" href=\""));
 			buffer_append_string_buffer(out, p->conf.external_css);
-			buffer_append_string_len(out, CONST_STR_LEN("\" />\n"));
+			buffer_append_string_len(out, CONST_STR_LEN("\">\n"));
 		} else {
 			buffer_append_string_len(out, CONST_STR_LEN(
 				"<style type=\"text/css\">\n"
@@ -534,25 +803,18 @@ static void http_list_directory_header(server *srv, connection *con, plugin_data
 		buffer_append_string_len(out, CONST_STR_LEN("</head>\n<body>\n"));
 	}
 
-	/* HEADER.txt */
-	if (p->conf.show_header) {
-		stream s;
+	if (!buffer_string_is_empty(p->conf.show_header)) {
 		/* if we have a HEADER file, display it in <pre class="header"></pre> */
 
-		buffer_copy_string_buffer(p->tmp_buf, con->physical.path);
-		BUFFER_APPEND_SLASH(p->tmp_buf);
-		buffer_append_string_len(p->tmp_buf, CONST_STR_LEN("HEADER.txt"));
-
-		if (-1 != stream_open(&s, p->tmp_buf)) {
-			if (p->conf.encode_header) {
-				buffer_append_string_len(out, CONST_STR_LEN("<pre class=\"header\">"));
-				buffer_append_string_encoded(out, s.start, s.size, ENCODING_MINIMAL_XML);
-				buffer_append_string_len(out, CONST_STR_LEN("</pre>"));
-			} else {
-				buffer_append_string_len(out, s.start, s.size);
-			}
+		buffer *hb = p->conf.show_header;
+		if (hb->ptr[0] != '/') {
+			buffer_copy_buffer(p->tmp_buf, con->physical.path);
+			buffer_append_slash(p->tmp_buf);
+			buffer_append_string_buffer(p->tmp_buf, p->conf.show_header);
+			hb = p->tmp_buf;
 		}
-		stream_close(&s);
+
+		http_list_directory_include_file(out, hb, "header", p->conf.encode_header);
 	}
 
 	buffer_append_string_len(out, CONST_STR_LEN("<h2>Index of "));
@@ -570,13 +832,17 @@ static void http_list_directory_header(server *srv, connection *con, plugin_data
 		"</tr>"
 		"</thead>\n"
 		"<tbody>\n"
-		"<tr>"
-			"<td class=\"n\"><a href=\"../\">Parent Directory</a>/</td>"
+	));
+	if (!buffer_is_equal_string(con->uri.path, CONST_STR_LEN("/"))) {
+		buffer_append_string_len(out, CONST_STR_LEN(
+		"<tr class=\"d\">"
+			"<td class=\"n\"><a href=\"../\">..</a>/</td>"
 			"<td class=\"m\">&nbsp;</td>"
 			"<td class=\"s\">- &nbsp;</td>"
 			"<td class=\"t\">Directory</td>"
 		"</tr>\n"
-	));
+		));
+	}
 }
 
 static void http_list_directory_footer(server *srv, connection *con, plugin_data *p, buffer *out) {
@@ -588,41 +854,45 @@ static void http_list_directory_footer(server *srv, connection *con, plugin_data
 		"</div>\n"
 	));
 
-	if (p->conf.show_readme) {
-		stream s;
+	if (!buffer_string_is_empty(p->conf.show_readme)) {
 		/* if we have a README file, display it in <pre class="readme"></pre> */
 
-		buffer_copy_string_buffer(p->tmp_buf,  con->physical.path);
-		BUFFER_APPEND_SLASH(p->tmp_buf);
-		buffer_append_string_len(p->tmp_buf, CONST_STR_LEN("README.txt"));
-
-		if (-1 != stream_open(&s, p->tmp_buf)) {
-			if (p->conf.encode_readme) {
-				buffer_append_string_len(out, CONST_STR_LEN("<pre class=\"readme\">"));
-				buffer_append_string_encoded(out, s.start, s.size, ENCODING_MINIMAL_XML);
-				buffer_append_string_len(out, CONST_STR_LEN("</pre>"));
-			} else {
-				buffer_append_string_len(out, s.start, s.size);
-			}
+		buffer *rb = p->conf.show_readme;
+		if (rb->ptr[0] != '/') {
+			buffer_copy_buffer(p->tmp_buf,  con->physical.path);
+			buffer_append_slash(p->tmp_buf);
+			buffer_append_string_buffer(p->tmp_buf, p->conf.show_readme);
+			rb = p->tmp_buf;
 		}
-		stream_close(&s);
+
+		http_list_directory_include_file(out, rb, "readme", p->conf.encode_readme);
 	}
 
 	if(p->conf.auto_layout) {
+
 		buffer_append_string_len(out, CONST_STR_LEN(
 			"<div class=\"foot\">"
 		));
 
-		if (p->conf.set_footer->used > 1) {
+		if (!buffer_string_is_empty(p->conf.set_footer)) {
 			buffer_append_string_buffer(out, p->conf.set_footer);
-		} else if (buffer_is_empty(con->conf.server_tag)) {
-			buffer_append_string_len(out, CONST_STR_LEN(PACKAGE_DESC));
 		} else {
 			buffer_append_string_buffer(out, con->conf.server_tag);
 		}
 
 		buffer_append_string_len(out, CONST_STR_LEN(
 			"</div>\n"
+		));
+
+		if (!buffer_string_is_empty(p->conf.external_js)) {
+			buffer_append_string_len(out, CONST_STR_LEN("<script type=\"text/javascript\" src=\""));
+			buffer_append_string_buffer(out, p->conf.external_js);
+			buffer_append_string_len(out, CONST_STR_LEN("\"></script>\n"));
+		} else if (buffer_is_empty(p->conf.external_js)) {
+			http_dirlist_append_js_table_resort(out, con);
+		}
+
+		buffer_append_string_len(out, CONST_STR_LEN(
 			"</body>\n"
 			"</html>\n"
 		));
@@ -641,10 +911,9 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 	dirls_entry_t *tmp;
 	char sizebuf[sizeof("999.9K")];
 	char datebuf[sizeof("2005-Jan-01 22:23:24")];
-	size_t k;
 	const char *content_type;
 	long name_max;
-#ifdef HAVE_XATTR
+#if defined(HAVE_XATTR) || defined(HAVE_EXTATTR)
 	char attrval[128];
 	int attrlen;
 #endif
@@ -652,9 +921,9 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 	struct tm tm;
 #endif
 
-	if (dir->used == 0) return -1;
+	if (buffer_string_is_empty(dir)) return -1;
 
-	i = dir->used - 1;
+	i = buffer_string_length(dir);
 
 #ifdef HAVE_PATHCONF
 	if (0 >= (name_max = pathconf(dir->ptr, _PC_NAME_MAX))) {
@@ -671,9 +940,9 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 	name_max = NAME_MAX;
 #endif
 
-	path = malloc(dir->used + name_max);
-	force_assert(path);
-	strcpy(path, dir->ptr);
+	path = malloc(i + name_max + 1);
+	force_assert(NULL != path);
+	memcpy(path, dir->ptr, i+1);
 	path_file = path + i;
 
 	if (NULL == (dp = opendir(path))) {
@@ -705,12 +974,12 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 				continue;
 		}
 
-		if (p->conf.hide_readme_file) {
-			if (strcmp(dent->d_name, "README.txt") == 0)
+		if (p->conf.hide_readme_file && !buffer_string_is_empty(p->conf.show_readme)) {
+			if (strcmp(dent->d_name, p->conf.show_readme->ptr) == 0)
 				continue;
 		}
-		if (p->conf.hide_header_file) {
-			if (strcmp(dent->d_name, "HEADER.txt") == 0)
+		if (p->conf.hide_header_file && !buffer_string_is_empty(p->conf.show_header)) {
+			if (strcmp(dent->d_name, p->conf.show_header->ptr) == 0)
 				continue;
 		}
 
@@ -783,14 +1052,7 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 
 	if (files.used) http_dirls_sort(files.ent, files.used);
 
-	out = chunkqueue_get_append_buffer(con->write_queue);
-	buffer_copy_string_len(out, CONST_STR_LEN("<?xml version=\"1.0\" encoding=\""));
-	if (buffer_is_empty(p->conf.encoding)) {
-		buffer_append_string_len(out, CONST_STR_LEN("iso-8859-1"));
-	} else {
-		buffer_append_string_buffer(out, p->conf.encoding);
-	}
-	buffer_append_string_len(out, CONST_STR_LEN("\"?>\n"));
+	out = buffer_init();
 	http_list_directory_header(srv, con, p, out);
 
 	/* directories */
@@ -804,7 +1066,7 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 		strftime(datebuf, sizeof(datebuf), "%Y-%b-%d %H:%M:%S", localtime(&(tmp->mtime)));
 #endif
 
-		buffer_append_string_len(out, CONST_STR_LEN("<tr><td class=\"n\"><a href=\""));
+		buffer_append_string_len(out, CONST_STR_LEN("<tr class=\"d\"><td class=\"n\"><a href=\""));
 		buffer_append_string_encoded(out, DIRLIST_ENT_NAME(tmp), tmp->namelen, ENCODING_REL_URI_PART);
 		buffer_append_string_len(out, CONST_STR_LEN("/\">"));
 		buffer_append_string_encoded(out, DIRLIST_ENT_NAME(tmp), tmp->namelen, ENCODING_MINIMAL_XML);
@@ -820,12 +1082,19 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 		tmp = files.ent[i];
 
 		content_type = NULL;
-#ifdef HAVE_XATTR
-
+#if defined(HAVE_XATTR)
 		if (con->conf.use_xattr) {
 			memcpy(path_file, DIRLIST_ENT_NAME(tmp), tmp->namelen + 1);
 			attrlen = sizeof(attrval) - 1;
-			if (attr_get(path, "Content-Type", attrval, &attrlen, 0) == 0) {
+			if (attr_get(path, srv->srvconf.xattr_name->ptr, attrval, &attrlen, 0) == 0) {
+				attrval[attrlen] = '\0';
+				content_type = attrval;
+			}
+		}
+#elif defined(HAVE_EXTATTR)
+		if (con->conf.use_xattr) {
+			memcpy(path_file, DIRLIST_ENT_NAME(tmp), tmp->namelen + 1);
+			if(-1 != (attrlen = extattr_get_file(path, EXTATTR_NAMESPACE_USER, srv->srvconf.xattr_name->ptr, attrval, sizeof(attrval)-1))) {
 				attrval[attrlen] = '\0';
 				content_type = attrval;
 			}
@@ -833,23 +1102,8 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 #endif
 
 		if (content_type == NULL) {
-			content_type = "application/octet-stream";
-			for (k = 0; k < con->conf.mimetypes->used; k++) {
-				data_string *ds = (data_string *)con->conf.mimetypes->data[k];
-				size_t ct_len;
-
-				if (ds->key->used == 0)
-					continue;
-
-				ct_len = ds->key->used - 1;
-				if (tmp->namelen < ct_len)
-					continue;
-
-				if (0 == strncasecmp(DIRLIST_ENT_NAME(tmp) + tmp->namelen - ct_len, ds->key->ptr, ct_len)) {
-					content_type = ds->value->ptr;
-					break;
-				}
-			}
+			const buffer *type = stat_cache_mimetype_by_ext(con, DIRLIST_ENT_NAME(tmp), tmp->namelen);
+			content_type = NULL != type ? type->ptr : "application/octet-stream";
 		}
 
 #ifdef HAVE_LOCALTIME_R
@@ -858,7 +1112,7 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 #else
 		strftime(datebuf, sizeof(datebuf), "%Y-%b-%d %H:%M:%S", localtime(&(tmp->mtime)));
 #endif
-		http_list_directory_sizefmt(sizebuf, tmp->size);
+		http_list_directory_sizefmt(sizebuf, sizeof(sizebuf), tmp->size);
 
 		buffer_append_string_len(out, CONST_STR_LEN("<tr><td class=\"n\"><a href=\""));
 		buffer_append_string_encoded(out, DIRLIST_ENT_NAME(tmp), tmp->namelen, ENCODING_REL_URI_PART);
@@ -882,7 +1136,7 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 	http_list_directory_footer(srv, con, p, out);
 
 	/* Insert possible charset to Content-Type */
-	if (buffer_is_empty(p->conf.encoding)) {
+	if (buffer_string_is_empty(p->conf.encoding)) {
 		response_header_overwrite(srv, con, CONST_STR_LEN("Content-Type"), CONST_STR_LEN("text/html"));
 	} else {
 		buffer_copy_string_len(p->content_charset, CONST_STR_LEN("text/html; charset="));
@@ -891,6 +1145,8 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 	}
 
 	con->file_finished = 1;
+	chunkqueue_append_buffer(con->write_queue, out);
+	buffer_free(out);
 
 	return 0;
 }
@@ -903,10 +1159,9 @@ URIHANDLER_FUNC(mod_dirlisting_subrequest) {
 
 	UNUSED(srv);
 
-	/* we only handle GET, POST and HEAD */
+	/* we only handle GET and HEAD */
 	switch(con->request.http_method) {
 	case HTTP_METHOD_GET:
-	case HTTP_METHOD_POST:
 	case HTTP_METHOD_HEAD:
 		break;
 	default:
@@ -915,9 +1170,9 @@ URIHANDLER_FUNC(mod_dirlisting_subrequest) {
 
 	if (con->mode != DIRECT) return HANDLER_GO_ON;
 
-	if (con->physical.path->used == 0) return HANDLER_GO_ON;
-	if (con->uri.path->used == 0) return HANDLER_GO_ON;
-	if (con->uri.path->ptr[con->uri.path->used - 2] != '/') return HANDLER_GO_ON;
+	if (buffer_is_empty(con->physical.path)) return HANDLER_GO_ON;
+	if (buffer_is_empty(con->uri.path)) return HANDLER_GO_ON;
+	if (con->uri.path->ptr[buffer_string_length(con->uri.path) - 1] != '/') return HANDLER_GO_ON;
 
 	mod_dirlisting_patch_connection(srv, con, p);
 

@@ -1,3 +1,5 @@
+#include "first.h"
+
 #include "buffer.h"
 #include "log.h"
 #include "mod_ssi.h"
@@ -35,13 +37,13 @@ void ssi_val_free(ssi_val_t *s) {
 
 int ssi_val_tobool(ssi_val_t *B) {
 	if (B->type == SSI_TYPE_STRING) {
-		return B->str->used > 1 ? 1 : 0;
+		return !buffer_string_is_empty(B->str);
 	} else {
 		return B->bo;
 	}
 }
 
-static int ssi_expr_tokenizer(server *srv, connection *con, plugin_data *p,
+static int ssi_expr_tokenizer(server *srv, connection *con, handler_ctx *p,
 			      ssi_tokenizer_t *t, int *token_id, buffer *token) {
 	int tid = 0;
 	size_t i;
@@ -207,17 +209,19 @@ static int ssi_expr_tokenizer(server *srv, connection *con, plugin_data *p,
 
 				buffer_copy_string_len(token, t->input + t->offset + 2, i-3);
 			} else {
-				for (i = 1; isalpha(t->input[t->offset + i]) || t->input[t->offset + i] == '_';  i++);
+				for (i = 1; isalpha(t->input[t->offset + i]) ||
+					    t->input[t->offset + i] == '_' ||
+					    ((i > 1) && isdigit(t->input[t->offset + i]));  i++);
 
 				buffer_copy_string_len(token, t->input + t->offset + 1, i-1);
 			}
 
 			tid = TK_VALUE;
 
-			if (NULL != (ds = (data_string *)array_get_element(p->ssi_cgi_env, token->ptr))) {
-				buffer_copy_string_buffer(token, ds->value);
-			} else if (NULL != (ds = (data_string *)array_get_element(p->ssi_vars, token->ptr))) {
-				buffer_copy_string_buffer(token, ds->value);
+			if (NULL != (ds = (data_string *)array_get_element_klen(p->ssi_cgi_env, CONST_BUF_LEN(token)))) {
+				buffer_copy_buffer(token, ds->value);
+			} else if (NULL != (ds = (data_string *)array_get_element_klen(p->ssi_vars, CONST_BUF_LEN(token)))) {
+				buffer_copy_buffer(token, ds->value);
 			} else {
 				buffer_copy_string_len(token, CONST_STR_LEN(""));
 			}
@@ -268,7 +272,7 @@ static int ssi_expr_tokenizer(server *srv, connection *con, plugin_data *p,
 	return 0;
 }
 
-int ssi_eval_expr(server *srv, connection *con, plugin_data *p, const char *expr) {
+int ssi_eval_expr(server *srv, connection *con, handler_ctx *p, const char *expr) {
 	ssi_tokenizer_t t;
 	void *pParser;
 	int token_id;
@@ -291,6 +295,7 @@ int ssi_eval_expr(server *srv, connection *con, plugin_data *p, const char *expr
 	/* default context */
 
 	pParser = ssiexprparserAlloc( malloc );
+	force_assert(pParser);
 	token = buffer_init();
 	while((1 == (ret = ssi_expr_tokenizer(srv, con, p, &t, &token_id, token))) && context.ok) {
 		ssiexprparser(pParser, token_id, token, &context);

@@ -1,17 +1,18 @@
+#include "first.h"
+
 #include "base.h"
 #include "log.h"
 #include "buffer.h"
 
 #include "plugin.h"
 
-#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
 /**
  * this is a skeleton for a lighttpd plugin
  *
- * just replaces every occurance of 'skeleton' by your plugin name
+ * just replaces every occurrence of 'skeleton' by your plugin name
  *
  * e.g. in vim:
  *
@@ -45,6 +46,7 @@ static handler_ctx * handler_ctx_init() {
 	handler_ctx * hctx;
 
 	hctx = calloc(1, sizeof(*hctx));
+	force_assert(hctx);
 
 	return hctx;
 }
@@ -59,13 +61,14 @@ INIT_FUNC(mod_skeleton_init) {
 	plugin_data *p;
 
 	p = calloc(1, sizeof(*p));
+	force_assert(p);
 
 	p->match_buf = buffer_init();
 
 	return p;
 }
 
-/* detroy the plugin data */
+/* destroy the plugin data */
 FREE_FUNC(mod_skeleton_free) {
 	plugin_data *p = p_d;
 
@@ -79,7 +82,7 @@ FREE_FUNC(mod_skeleton_free) {
 		for (i = 0; i < srv->config_context->used; i++) {
 			plugin_config *s = p->config_storage[i];
 
-			if (!s) continue;
+			if (NULL == s) continue;
 
 			array_free(s->match);
 
@@ -109,18 +112,25 @@ SETDEFAULTS_FUNC(mod_skeleton_set_defaults) {
 	if (!p) return HANDLER_ERROR;
 
 	p->config_storage = calloc(1, srv->config_context->used * sizeof(plugin_config *));
+	force_assert(p->config_storage);
 
 	for (i = 0; i < srv->config_context->used; i++) {
-		plugin_config *s;
-
-		s = calloc(1, sizeof(plugin_config));
+		data_config const* config = (data_config const*)srv->config_context->data[i];
+		plugin_config *s = calloc(1, sizeof(plugin_config));
+		force_assert(s);
 		s->match    = array_init();
 
 		cv[0].destination = s->match;
 
 		p->config_storage[i] = s;
 
-		if (0 != config_insert_values_global(srv, ((data_config *)srv->config_context->data[i])->value, cv)) {
+		if (0 != config_insert_values_global(srv, config->value, cv, i == 0 ? T_CONFIG_SCOPE_SERVER : T_CONFIG_SCOPE_CONNECTION)) {
+			return HANDLER_ERROR;
+		}
+
+		if (!array_is_vlist(s->match)) {
+			log_error_write(srv, __FILE__, __LINE__, "s",
+					"unexpected value for skeleton.array; expected list of \"urlpath\"");
 			return HANDLER_ERROR;
 		}
 	}
@@ -160,25 +170,24 @@ static int mod_skeleton_patch_connection(server *srv, connection *con, plugin_da
 
 URIHANDLER_FUNC(mod_skeleton_uri_handler) {
 	plugin_data *p = p_d;
-	int s_len;
-	size_t k, i;
+	size_t s_len;
+	size_t k;
 
 	UNUSED(srv);
 
 	if (con->mode != DIRECT) return HANDLER_GO_ON;
 
-	if (con->uri.path->used == 0) return HANDLER_GO_ON;
+	s_len = buffer_string_length(con->uri.path);
+	if (0 == s_len) return HANDLER_GO_ON;
 
 	mod_skeleton_patch_connection(srv, con, p);
 
-	s_len = con->uri.path->used - 1;
-
 	for (k = 0; k < p->conf.match->used; k++) {
 		data_string *ds = (data_string *)p->conf.match->data[k];
-		int ct_len = ds->value->used - 1;
+		size_t ct_len = buffer_string_length(ds->value);
 
 		if (ct_len > s_len) continue;
-		if (ds->value->used == 0) continue;
+		if (ct_len == 0) continue;
 
 		if (0 == strncmp(con->uri.path->ptr + s_len - ct_len, ds->value->ptr, ct_len)) {
 			con->http_status = 403;

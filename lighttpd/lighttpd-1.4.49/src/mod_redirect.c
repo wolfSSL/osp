@@ -1,3 +1,5 @@
+#include "first.h"
+
 #include "base.h"
 #include "log.h"
 #include "buffer.h"
@@ -18,7 +20,6 @@ typedef struct {
 
 typedef struct {
 	PLUGIN_DATA;
-	buffer *match_buf;
 	buffer *location;
 
 	plugin_config **config_storage;
@@ -31,7 +32,6 @@ INIT_FUNC(mod_redirect_init) {
 
 	p = calloc(1, sizeof(*p));
 
-	p->match_buf = buffer_init();
 	p->location = buffer_init();
 
 	return p;
@@ -47,6 +47,8 @@ FREE_FUNC(mod_redirect_free) {
 		for (i = 0; i < srv->config_context->used; i++) {
 			plugin_config *s = p->config_storage[i];
 
+			if (NULL == s) continue;
+
 			pcre_keyvalue_buffer_free(s->redirect);
 
 			free(s);
@@ -55,7 +57,6 @@ FREE_FUNC(mod_redirect_free) {
 	}
 
 
-	buffer_free(p->match_buf);
 	buffer_free(p->location);
 
 	free(p);
@@ -79,9 +80,9 @@ SETDEFAULTS_FUNC(mod_redirect_set_defaults) {
 	p->config_storage = calloc(1, srv->config_context->used * sizeof(plugin_config *));
 
 	for (i = 0; i < srv->config_context->used; i++) {
+		data_config const* config = (data_config const*)srv->config_context->data[i];
 		plugin_config *s;
 		size_t j;
-		array *ca;
 		data_unset *du;
 		data_array *da;
 
@@ -93,42 +94,32 @@ SETDEFAULTS_FUNC(mod_redirect_set_defaults) {
 		cv[1].destination = &(s->redirect_code);
 
 		p->config_storage[i] = s;
-		ca = ((data_config *)srv->config_context->data[i])->value;
 
-		if (0 != config_insert_values_global(srv, ca, cv)) {
+		if (0 != config_insert_values_global(srv, config->value, cv, i == 0 ? T_CONFIG_SCOPE_SERVER : T_CONFIG_SCOPE_CONNECTION)) {
 			return HANDLER_ERROR;
 		}
 
-		if (NULL == (du = array_get_element(ca, "url.redirect"))) {
+		if (NULL == (du = array_get_element(config->value, "url.redirect"))) {
 			/* no url.redirect defined */
 			continue;
 		}
 
-		if (du->type != TYPE_ARRAY) {
-			log_error_write(srv, __FILE__, __LINE__, "sss",
-					"unexpected type for key: ", "url.redirect", "array of strings");
+		da = (data_array *)du;
 
+		if (du->type != TYPE_ARRAY || !array_is_kvstring(da->value)) {
+			log_error_write(srv, __FILE__, __LINE__, "s",
+					"unexpected value for url.redirect; expected list of \"regex\" => \"redirect\"");
 			return HANDLER_ERROR;
 		}
 
-		da = (data_array *)du;
-
 		for (j = 0; j < da->value->used; j++) {
-			if (da->value->data[j]->type != TYPE_STRING) {
-				log_error_write(srv, __FILE__, __LINE__, "sssbs",
-						"unexpected type for key: ",
-						"url.redirect",
-						"[", da->value->data[j]->key, "](string)");
-
-				return HANDLER_ERROR;
-			}
-
 			if (0 != pcre_keyvalue_buffer_append(srv, s->redirect,
 							     ((data_string *)(da->value->data[j]))->key->ptr,
 							     ((data_string *)(da->value->data[j]))->value->ptr)) {
 
 				log_error_write(srv, __FILE__, __LINE__, "sb",
 						"pcre-compile failed for", da->value->data[j]->key);
+				return HANDLER_ERROR;
 			}
 		}
 	}
@@ -171,6 +162,7 @@ static int mod_redirect_patch_connection(server *srv, connection *con, plugin_da
 static handler_t mod_redirect_uri_handler(server *srv, connection *con, void *p_data) {
 #ifdef HAVE_PCRE_H
 	plugin_data *p = p_data;
+	cond_cache_t *cache;
 	size_t i;
 
 	/*
@@ -181,74 +173,31 @@ static handler_t mod_redirect_uri_handler(server *srv, connection *con, void *p_
 	 */
 
 	mod_redirect_patch_connection(srv, con, p);
-
-	buffer_copy_string_buffer(p->match_buf, con->request.uri);
+	cache = p->conf.context ? &con->cond_cache[p->conf.context->context_ndx] : NULL;
 
 	for (i = 0; i < p->conf.redirect->used; i++) {
-		pcre *match;
-		pcre_extra *extra;
-		const char *pattern;
-		size_t pattern_len;
-		int n;
 		pcre_keyvalue *kv = p->conf.redirect->kv[i];
 # define N 10
 		int ovec[N * 3];
+		int n = pcre_exec(kv->key, kv->key_extra, CONST_BUF_LEN(con->request.uri), 0, 0, ovec, 3 * N);
 
-		match       = kv->key;
-		extra       = kv->key_extra;
-		pattern     = kv->value->ptr;
-		pattern_len = kv->value->used - 1;
-
-		if ((n = pcre_exec(match, extra, p->match_buf->ptr, p->match_buf->used - 1, 0, 0, ovec, 3 * N)) < 0) {
+		if (n < 0) {
 			if (n != PCRE_ERROR_NOMATCH) {
 				log_error_write(srv, __FILE__, __LINE__, "sd",
 						"execution error while matching: ", n);
 				return HANDLER_ERROR;
 			}
+		} else if (0 == buffer_string_length(kv->value)) {
+			/* short-circuit if blank replacement pattern
+			 * (do not attempt to match against remaining redirect rules) */
+			return HANDLER_GO_ON;
 		} else {
 			const char **list;
-			size_t start;
-			size_t k;
 
 			/* it matched */
-			pcre_get_substring_list(p->match_buf->ptr, ovec, n, &list);
+			pcre_get_substring_list(con->request.uri->ptr, ovec, n, &list);
 
-			/* search for $[0-9] */
-
-			buffer_reset(p->location);
-
-			start = 0;
-			for (k = 0; k + 1 < pattern_len; k++) {
-				if (pattern[k] == '$' || pattern[k] == '%') {
-					/* got one */
-
-					size_t num = pattern[k + 1] - '0';
-
-					buffer_append_string_len(p->location, pattern + start, k - start);
-
-					if (!isdigit((unsigned char)pattern[k + 1])) {
-						/* enable escape: "%%" => "%", "%a" => "%a", "$$" => "$" */
-						buffer_append_string_len(p->location, pattern+k, pattern[k] == pattern[k+1] ? 1 : 2);
-					} else if (pattern[k] == '$') {
-						/* n is always > 0 */
-						if (num < (size_t)n) {
-							buffer_append_string(p->location, list[num]);
-						}
-					} else if (p->conf.context == NULL) {
-						/* we have no context, we are global */
-						log_error_write(srv, __FILE__, __LINE__, "sb",
-								"used a rewrite containing a %[0-9]+ in the global scope, ignored:",
-								kv->value);
-					} else {
-						config_append_cond_match_buffer(con, p->conf.context, p->location, num);
-					}
-
-					k++;
-					start = k + 1;
-				}
-			}
-
-			buffer_append_string_len(p->location, pattern + start, pattern_len - start);
+			pcre_keyvalue_buffer_subst(p->location, kv->value, list, n, cache);
 
 			pcre_free(list);
 

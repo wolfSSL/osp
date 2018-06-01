@@ -1,3 +1,5 @@
+#include "first.h"
+
 #include "array.h"
 
 #include <string.h>
@@ -8,7 +10,7 @@ static data_unset *data_array_copy(const data_unset *s) {
 	data_array *src = (data_array *)s;
 	data_array *ds = data_array_init();
 
-	buffer_copy_string_buffer(ds->key, src->key);
+	buffer_copy_buffer(ds->key, src->key);
 	array_free(ds->value);
 	ds->value = array_init_array(src->value);
 	ds->is_index_key = src->is_index_key;
@@ -50,6 +52,7 @@ data_array *data_array_init(void) {
 	data_array *ds;
 
 	ds = calloc(1, sizeof(*ds));
+	force_assert(NULL != ds);
 
 	ds->key = buffer_init();
 	ds->value = array_init();

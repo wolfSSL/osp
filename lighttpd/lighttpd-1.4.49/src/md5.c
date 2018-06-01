@@ -1,3 +1,5 @@
+#include "first.h"
+
 /* MD5C.C - RSA Data Security, Inc., MD5 message-digest algorithm
  */
 
@@ -23,14 +25,17 @@ These notices must be retained in any copies of any part of this
 documentation and/or software.
  */
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
-
-#ifndef USE_OPENSSL
-#include <string.h>
 
 #include "md5.h"
+
+#if 0 /* Note: not defined here or in lighttpd local "md5.h" */
+#if defined HAVE_LIBSSL && defined HAVE_OPENSSL_SSL_H
+#define USE_OPENSSL_CRYPTO
+#endif
+#endif
+
+#ifndef USE_OPENSSL_CRYPTO
+#include <string.h>
 
 /* Constants for MD5Transform routine.
  */

@@ -7,7 +7,7 @@ BEGIN {
 }
 
 use strict;
-use Test::More tests => 58;
+use Test::More tests => 59;
 use LightyTest;
 
 my $tf = LightyTest->new();
@@ -15,13 +15,10 @@ my $tf = LightyTest->new();
 my $t;
 my $php_child = -1;
 
-my $phpbin = (defined $ENV{'PHP'} ? $ENV{'PHP'} : '/usr/bin/php-cgi');
-$ENV{'PHP'} = $phpbin;
-
 SKIP: {
 	skip "PHP already running on port 1026", 1 if $tf->listening_on(1026);
-	skip "no php binary found", 1 unless -x $phpbin;
-	ok(-1 != ($php_child = $tf->spawnfcgi($phpbin, 1026)), "Spawning php");
+	skip "no php binary found", 1 unless $LightyTest::HAVE_PHP;
+	ok(-1 != ($php_child = $tf->spawnfcgi($ENV{'PHP'}, 1026)), "Spawning php");
 }
 
 SKIP: {
@@ -132,12 +129,16 @@ EOF
 	$t->{RESPONSE} = [ { 'HTTP-Protocol' => 'HTTP/1.0', 'HTTP-Status' => 200 } ];
 	ok($tf->handle_http($t) == 0, 'PATHINFO');
 
+    if ($^O ne "cygwin") {
 	$t->{REQUEST}  = ( <<EOF
 GET /cgi.php%20%20%20 HTTP/1.0
 EOF
  );
 	$t->{RESPONSE} = [ { 'HTTP-Protocol' => 'HTTP/1.0', 'HTTP-Status' => 404 } ];
 	ok($tf->handle_http($t) == 0, 'No source retrieval');
+    } else {
+	ok(1, 'No source retrieval; skipped on cygwin; see response.c');
+    }
 
 	$t->{REQUEST}  = ( <<EOF
 GET /www/abc/def HTTP/1.0
@@ -263,7 +264,7 @@ SKIP: {
 }
 
 SKIP: {
-	skip "no fcgi-auth found", 5 unless -x $tf->{BASEDIR}."/tests/fcgi-auth" || -x $tf->{BASEDIR}."/tests/fcgi-auth.exe"; 
+	skip "no fcgi-auth found", 7 unless -x $tf->{BASEDIR}."/tests/fcgi-auth" || -x $tf->{BASEDIR}."/tests/fcgi-auth.exe";
 
 	$tf->{CONFIGFILE} = 'fastcgi-auth.conf';
 	ok($tf->start_proc == 0, "Starting lighttpd with $tf->{CONFIGFILE}") or die();
@@ -291,11 +292,28 @@ EOF
 	$t->{RESPONSE} = [ { 'HTTP-Protocol' => 'HTTP/1.0', 'HTTP-Status' => 200 } ];
 	ok($tf->handle_http($t) == 0, 'FastCGI - Auth in subdirectory');
 
+	$t->{REQUEST}  = ( <<EOF
+GET /index.fcgi?varfail HTTP/1.0
+Host: www.example.org
+EOF
+ );
+	$t->{RESPONSE} = [ { 'HTTP-Protocol' => 'HTTP/1.0', 'HTTP-Status' => 403 } ];
+	ok($tf->handle_http($t) == 0, 'FastCGI - Auth Fail with FastCGI responder afterwards');
+
+	$t->{REQUEST}  = ( <<EOF
+GET /index.fcgi?var HTTP/1.0
+Host: www.example.org
+EOF
+ );
+	$t->{RESPONSE} = [ { 'HTTP-Protocol' => 'HTTP/1.0', 'HTTP-Status' => 200, 'HTTP-Content' => 'LighttpdTestContent' } ];
+	ok($tf->handle_http($t) == 0, 'FastCGI - Auth Success with Variable- to Env expansion');
+
+
 	ok($tf->stop_proc == 0, "Stopping lighttpd");
 }
 
 SKIP: {
-	skip "no php found", 5 unless -x $phpbin;
+	skip "no php found", 5 unless $LightyTest::HAVE_PHP;
 	$tf->{CONFIGFILE} = 'fastcgi-13.conf';
 	ok($tf->start_proc == 0, "Starting lighttpd with $tf->{CONFIGFILE}") or die();
 	$t->{REQUEST}  = ( <<EOF
@@ -330,7 +348,7 @@ EOF
 
 
 SKIP: {
-	skip "no fcgi-responder found", 11 unless -x $tf->{BASEDIR}."/tests/fcgi-responder" || -x $tf->{BASEDIR}."/tests/fcgi-responder.exe";
+	skip "no fcgi-responder found", 10 unless -x $tf->{BASEDIR}."/tests/fcgi-responder" || -x $tf->{BASEDIR}."/tests/fcgi-responder.exe";
 	
 	$tf->{CONFIGFILE} = 'fastcgi-responder.conf';
 	ok($tf->start_proc == 0, "Starting lighttpd with $tf->{CONFIGFILE}") or die();
@@ -391,17 +409,11 @@ EOF
 	$t->{RESPONSE} = [ { 'HTTP-Protocol' => 'HTTP/1.0', 'HTTP-Status' => 200, 'HTTP-Content' => 'test123' } ];
 	ok($tf->handle_http($t) == 0, 'killing fastcgi and wait for restart');
 
-	select(undef, undef, undef, .2);
-	$t->{REQUEST}  = ( <<EOF
-GET /index.fcgi?die-at-end HTTP/1.0
-Host: www.example.org
-EOF
- );
-	$t->{RESPONSE} = [ { 'HTTP-Protocol' => 'HTTP/1.0', 'HTTP-Status' => 200, 'HTTP-Content' => 'test123' } ];
-	ok($tf->handle_http($t) == 0, 'killing fastcgi and wait for restart');
-
-
-	select(undef, undef, undef, .2);
+	# (might take lighttpd 1 sec to detect backend exit)
+	select(undef, undef, undef, .5);
+	for (my $c = 2*20; $c && 0 == $tf->listening_on(10000); --$c) {
+		select(undef, undef, undef, 0.05);
+	}
 	$t->{REQUEST}  = ( <<EOF
 GET /index.fcgi?crlf HTTP/1.0
 Host: www.example.org

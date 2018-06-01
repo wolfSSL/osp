@@ -2,16 +2,21 @@
 
 SRCTEST=src/server.c
 PACKAGE=lighttpd
-BASEDOWNLOADURL="http://download.lighttpd.net/lighttpd/releases-1.4.x"
-SNAPSHOTURL="http://download.lighttpd.net/lighttpd/snapshots-1.4.x"
+BASEDOWNLOADURL="https://download.lighttpd.net/lighttpd/releases-1.4.x"
+SNAPSHOTURL="https://download.lighttpd.net/lighttpd/snapshots-1.4.x"
 
-AUTHOR=stbuehler
+if [[ "`id -un`" != "stbuehler" ]] && [[ -z "$AUTHOR" ]]; then
+  export AUTHOR="gstrauss"
+  export KEYID="AF16D0F0"
+fi
+
+AUTHOR="${AUTHOR:-stbuehler}"
 
 # may take one argument for prereleases like
 # ./packdist.sh [--nopack] rc1-r10
 
 syntax() {
-	echo "./packdist.sh [--nopack] [--help] [rc1-r10]" >&2
+	echo "./packdist.sh [--nopack] [--help] [~rc1]" >&2
 	exit 2
 }
 
@@ -30,7 +35,7 @@ while [ $# -gt 0 ]; do
 	"--help")
 		syntax
 		;;
-	"rc"*)
+	"rc"*|"~rc"*)
 		if [ -n "$append" ]; then
 			echo "Only one append allowed" >&2
 			syntax
@@ -65,26 +70,26 @@ genchanges() {
 # genereate links in old textile format "text":url
 genlinks_changes() {
 	local repourl ticketurl inf out
-	repourl="http://redmine.lighttpd.net/projects/lighttpd/repository/revisions/"
-	ticketurl="http://redmine.lighttpd.net/issues/"
+	repourl="https://redmine.lighttpd.net/projects/lighttpd/repository/revisions/"
+	ticketurl="https://redmine.lighttpd.net/issues/"
 	inf="$1"
 	outf="$1".links
 	(
-		sed -e 's%\(http://[a-zA-Z0-9.:_/\-]\+\)%"\1":\1%g' |
+		sed -e 's%\(https://[a-zA-Z0-9.:_/\-]\+\)%"\1":\1%g' |
 		sed -e 's%#\([0-9]\+\)%"#\1":'"${ticketurl}"'\1%g' |
 		sed -e 's%r\([0-9]\+\)%"r\1":'"${repourl}"'\1%g' |
-		sed -e 's%\(CVE-[0-9\-]\+\)%"\1":http://cve.mitre.org/cgi-bin/cvename.cgi?name=\1%g' |
+		sed -e 's%\(CVE-[0-9\-]\+\)%"\1":https://cve.mitre.org/cgi-bin/cvename.cgi?name=\1%g' |
 		cat
 	) < "$inf" > "$outf"
 }
 genlinks_downloads() {
 	local repourl ticketurl inf out
-	repourl="http://redmine.lighttpd.net/projects/lighttpd/repository/revisions/"
-	ticketurl="http://redmine.lighttpd.net/issues/"
+	repourl="https://redmine.lighttpd.net/projects/lighttpd/repository/revisions/"
+	ticketurl="https://redmine.lighttpd.net/issues/"
 	inf="$1"
 	outf="$1".links
 	(
-		sed -e 's%\(http://[a-zA-Z0-9.:_/\-]\+\)%"\1":\1%g' |
+		sed -e 's%\(https://[a-zA-Z0-9.:_/\-]\+\)%"\1":\1%g' |
 		cat
 	) < "$inf" > "$outf"
 }
@@ -106,6 +111,9 @@ tags:
 - releases
 ---
 {% excerpt %}
+
+TODO
+
 h2. Important changes
 
 TODO
@@ -158,10 +166,10 @@ EOF
 		cat <<EOF
 
 If you want to get the latest source for any branch, you can get it from our svn repository.
-Documentation to do so can be obtained from this page: "DevelSubversion":http://redmine.lighttpd.net/projects/lighttpd/wiki/DevelSubversion
-Bug reports or feature requests can be filed in our ticket system: "New Issue":http://redmine.lighttpd.net/projects/lighttpd/issues/new
-Please make sure to check if there isn't a ticket already here: "Issues":http://redmine.lighttpd.net/projects/lighttpd/issues
-Perhaps you also want to have a look at our "download site":http://download.lighttpd.net/lighttpd/
+Documentation to do so can be obtained from this page: "DevelSubversion":https://redmine.lighttpd.net/projects/lighttpd/wiki/DevelSubversion
+Bug reports or feature requests can be filed in our ticket system: "New Issue":https://redmine.lighttpd.net/projects/lighttpd/issues/new
+Please make sure to check if there isn't a ticket already here: "Issues":https://redmine.lighttpd.net/projects/lighttpd/issues
+Perhaps you also want to have a look at our "download site":https://download.lighttpd.net/lighttpd/
 
 Thank you for flying light.
 EOF
@@ -185,10 +193,8 @@ if [ ${dopack} = "1" ]; then
 	# force make
 	# force make check
 
-	force make distcheck
-	force make dist-gzip
-	force make dist-bzip2
-	force make dist-xz
+	force make -j 4 distcheck
+	force fakeroot make dist
 else
 	force cd distbuild
 fi
@@ -197,26 +203,21 @@ version=`./config.status -V | head -n 1 | cut -d' ' -f3`
 name="${PACKAGE}-${version}"
 if [ -n "${append}" ]; then
 	cp "${name}.tar.gz" "${name}${append}.tar.gz"
-	cp "${name}.tar.bz2" "${name}${append}.tar.bz2"
 	cp "${name}.tar.xz" "${name}${append}.tar.xz"
 	name="${name}${append}"
 fi
 
-force sha256sum "${name}.tar."{gz,bz2,xz} > "${name}.sha256sum"
+force sha256sum "${name}.tar."{gz,xz} > "${name}.sha256sum"
 
 rm -f "${name}".tar.*.asc
 
-force gpg -a --output "${name}.tar.gz.asc" --detach-sig "${name}.tar.gz"
-force gpg -a --output "${name}.tar.bz2.asc" --detach-sig "${name}.tar.bz2"
-force gpg -a --output "${name}.tar.xz.asc" --detach-sig "${name}.tar.xz"
+force gpg ${KEYID:+-u "${KEYID}"} -a --output "${name}.tar.gz.asc" --detach-sig "${name}.tar.gz"
+force gpg ${KEYID:+-u "${KEYID}"} -a --output "${name}.tar.xz.asc" --detach-sig "${name}.tar.xz"
 
 (
 	echo "* ${BASEDOWNLOADURL}/${name}.tar.gz"
 	echo "** GPG signature: ${BASEDOWNLOADURL}/${name}.tar.gz.asc"
 	echo "** SHA256: @$(sha256sum ${name}.tar.gz | cut -d' ' -f1)@"
-	echo "* ${BASEDOWNLOADURL}/${name}.tar.bz2"
-	echo "** GPG signature: ${BASEDOWNLOADURL}/${name}.tar.bz2.asc"
-	echo "** SHA256: @$(sha256sum ${name}.tar.bz2 | cut -d' ' -f1)@"
 	echo "* ${BASEDOWNLOADURL}/${name}.tar.xz"
 	echo "** GPG signature: ${BASEDOWNLOADURL}/${name}.tar.xz.asc"
 	echo "** SHA256: @$(sha256sum ${name}.tar.xz | cut -d' ' -f1)@"
@@ -226,8 +227,6 @@ force gpg -a --output "${name}.tar.xz.asc" --detach-sig "${name}.tar.xz"
 (
 	echo "* \"${name}.tar.gz\":${BASEDOWNLOADURL}/${name}.tar.gz (\"GPG signature\":${BASEDOWNLOADURL}/${name}.tar.gz.asc)"
 	echo "** SHA256: @$(sha256sum ${name}.tar.gz | cut -d' ' -f1)@"
-	echo "* \"${name}.tar.bz2\":${BASEDOWNLOADURL}/${name}.tar.bz2 (\"GPG signature\":${BASEDOWNLOADURL}/${name}.tar.bz2.asc)"
-	echo "** SHA256: @$(sha256sum ${name}.tar.bz2 | cut -d' ' -f1)@"
 	echo "* \"${name}.tar.xz\":${BASEDOWNLOADURL}/${name}.tar.xz (\"GPG signature\":${BASEDOWNLOADURL}/${name}.tar.xz.asc)"
 	echo "** SHA256: @$(sha256sum ${name}.tar.xz | cut -d' ' -f1)@"
 	echo "* \"SHA256 checksums\":${BASEDOWNLOADURL}/${name}.sha256sum"
@@ -271,7 +270,7 @@ EOF
 
 h1. External references
 
-* http://www.lighttpd.net/$(date +"%Y/%m/%d")/${version//./-}
+* https://www.lighttpd.net/$(date +"%Y/%-m/%-d")/${version}
 
 EOF
 	) > "Release-${version//./_}.page"
@@ -285,11 +284,11 @@ echo
 
 
 
-blog_post > $(date +"%Y-%m-%d")-"${version//./-}.textile"
-cat $(date +"%Y-%m-%d")-"${version//./-}.textile"
+blog_post > $(date +"%Y-%m-%d")-"${version}.textile"
+cat $(date +"%Y-%m-%d")-"${version}.textile"
 
 echo
 echo -------
 echo
 
-echo wget "${BASEDOWNLOADURL}/${name}".'{tar.gz,tar.bz2,tar.xz,sha256sum}; sha256sum -c '${name}'.sha256sum'
+echo wget "${BASEDOWNLOADURL}/${name}".'{tar.gz,tar.xz,sha256sum}; sha256sum -c '${name}'.sha256sum'

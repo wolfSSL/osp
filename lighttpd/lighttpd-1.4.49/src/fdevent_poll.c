@@ -1,3 +1,6 @@
+#include "first.h"
+
+#include "fdevent_impl.h"
 #include "fdevent.h"
 #include "buffer.h"
 #include "log.h"
@@ -6,19 +9,20 @@
 
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <signal.h>
-#include <fcntl.h>
 
-#ifdef USE_POLL
+#ifdef FDEVENT_USE_POLL
 
 # ifdef HAVE_POLL_H
 #  include <poll.h>
 # else
 #  include <sys/poll.h>
 # endif
+
+#ifndef POLLRDHUP
+#define POLLRDHUP 0
+#endif
 
 static void fdevent_poll_free(fdevents *ev) {
 	free(ev->pollfds);
@@ -44,9 +48,11 @@ static int fdevent_poll_event_del(fdevents *ev, int fde_ndx, int fd) {
 		if (ev->unused.size == 0) {
 			ev->unused.size = 16;
 			ev->unused.ptr = malloc(sizeof(*(ev->unused.ptr)) * ev->unused.size);
+			force_assert(NULL != ev->unused.ptr);
 		} else if (ev->unused.size == ev->unused.used) {
 			ev->unused.size += 16;
 			ev->unused.ptr = realloc(ev->unused.ptr, sizeof(*(ev->unused.ptr)) * ev->unused.size);
+			force_assert(NULL != ev->unused.ptr);
 		}
 
 		ev->unused.ptr[ev->unused.used++] = k;
@@ -77,6 +83,7 @@ static int fdevent_poll_event_set(fdevents *ev, int fde_ndx, int fd, int events)
 	int pevents = 0;
 	if (events & FDEVENT_IN)  pevents |= POLLIN;
 	if (events & FDEVENT_OUT) pevents |= POLLOUT;
+	if (events & FDEVENT_RDHUP) pevents |= POLLRDHUP;
 
 	/* known index */
 
@@ -102,9 +109,11 @@ static int fdevent_poll_event_set(fdevents *ev, int fde_ndx, int fd, int events)
 		if (ev->size == 0) {
 			ev->size = 16;
 			ev->pollfds = malloc(sizeof(*ev->pollfds) * ev->size);
+			force_assert(NULL != ev->pollfds);
 		} else if (ev->size == ev->used) {
 			ev->size += 16;
 			ev->pollfds = realloc(ev->pollfds, sizeof(*ev->pollfds) * ev->size);
+			force_assert(NULL != ev->pollfds);
 		}
 
 		ev->pollfds[ev->used].fd = fd;
@@ -149,6 +158,7 @@ static int fdevent_poll_event_get_revent(fdevents *ev, size_t ndx) {
 	if (poll_r & POLLHUP) r |= FDEVENT_HUP;
 	if (poll_r & POLLNVAL) r |= FDEVENT_NVAL;
 	if (poll_r & POLLPRI) r |= FDEVENT_PRI;
+	if (poll_r & POLLRDHUP) r |= FDEVENT_RDHUP;
 
 	return r;
 }
@@ -193,7 +203,7 @@ int fdevent_poll_init(fdevents *ev) {
 int fdevent_poll_init(fdevents *ev) {
 	UNUSED(ev);
 
-	log_error_write(srv, __FILE__, __LINE__,
+	log_error_write(ev->srv, __FILE__, __LINE__,
 		"s", "poll is not supported, try to set server.event-handler = \"select\"");
 
 	return -1;

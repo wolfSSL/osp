@@ -1,17 +1,6 @@
 #ifndef _LIGHTTPD_SETTINGS_H_
 #define _LIGHTTPD_SETTINGS_H_
-
-#ifndef _GNU_SOURCE
-# define _GNU_SOURCE
-#endif
-
-#ifdef HAVE_WOLFSSL_SSL_H
-    #include <wolfssl/options.h>
-#endif
-
-#ifndef __USE_GNU
-# define __USE_GNU /* a hack in my eyes, <fcntl.h> F_SETSIG should work with _GNU_SOURCE */
-#endif
+#include "first.h"
 
 #ifdef __GNUC__
 # define LI_NORETURN __attribute__((noreturn))
@@ -19,9 +8,10 @@
 # define LI_NORETURN
 #endif
 
+#define UNUSED(x) ( (void)(x) )
+
 #define BV(x) (1 << x)
 
-#define INET_NTOP_CACHE_MAX 4
 #define FILE_CACHE_MAX      16
 
 /**
@@ -54,14 +44,5 @@ typedef enum { HANDLER_UNSET,
 } handler_t;
 
 #define HTTP_LINGER_TIMEOUT 5
-
-/* we use it in a enum */
-#ifdef TRUE
-#undef TRUE
-#endif
-
-#ifdef FALSE
-#undef FALSE
-#endif
 
 #endif

@@ -1,24 +1,29 @@
+#include "first.h"
+
+#include <stdlib.h>
+
+#include "fdevent_impl.h"
 #include "fdevent.h"
 #include "buffer.h"
 #include "log.h"
 
-#include <assert.h>
-
-#ifdef USE_LIBEV
+#ifdef FDEVENT_USE_LIBEV
 
 # include <ev.h>
 
 static void io_watcher_cb(struct ev_loop *loop, ev_io *w, int revents) {
 	fdevents *ev = w->data;
-	fdnode *fdn = ev->fdarray[w->fd];
+	fdevent_handler handler = fdevent_get_handler(ev, w->fd);
+	void *context = fdevent_get_context(ev, w->fd);
 	int r = 0;
 	UNUSED(loop);
+	if (NULL == handler) return;
 
 	if (revents & EV_READ) r |= FDEVENT_IN;
 	if (revents & EV_WRITE) r |= FDEVENT_OUT;
 	if (revents & EV_ERROR) r |= FDEVENT_ERR;
 
-	switch (r = (*fdn->handler)(ev->srv, fdn->ctx, r)) {
+	switch (r = (*handler)(ev->srv, context, r)) {
 	case HANDLER_FINISHED:
 	case HANDLER_GO_ON:
 	case HANDLER_WAIT_FOR_EVENT:
@@ -87,28 +92,15 @@ static void timeout_watcher_cb(struct ev_loop *loop, ev_timer *w, int revents) {
 	UNUSED(loop);
 	UNUSED(w);
 	UNUSED(revents);
-
-	ev_timer_stop(loop, w);
 }
 
+static ev_timer timeout_watcher;
 
 static int fdevent_libev_poll(fdevents *ev, int timeout_ms) {
-	union {
-		struct ev_watcher w;
-		struct ev_timer timer;
-	} timeout_watcher;
+	timeout_watcher.repeat = (timeout_ms > 0) ? timeout_ms/1000.0 : 0.001;
 
-	if (!timeout_ms) timeout_ms = 1;
-
-	ev_init(&timeout_watcher.w, NULL);
-	ev_set_cb(&timeout_watcher.timer, timeout_watcher_cb);
-	timeout_watcher.timer.repeat = ((ev_tstamp) timeout_ms)/1000.0;
-	force_assert(timeout_watcher.timer.repeat);
-	ev_timer_again(ev->libev_loop, &timeout_watcher.timer);
-
-	ev_loop(ev->libev_loop, EVLOOP_ONESHOT);
-
-	ev_timer_stop(ev->libev_loop, &timeout_watcher.timer);
+	ev_timer_again(ev->libev_loop, &timeout_watcher);
+	ev_run(ev->libev_loop, EVRUN_ONCE);
 
 	return 0;
 }
@@ -143,6 +135,9 @@ static int fdevent_libev_reset(fdevents *ev) {
 }
 
 int fdevent_libev_init(fdevents *ev) {
+	struct ev_timer * const timer = &timeout_watcher;
+	memset(timer, 0, sizeof(*timer));
+
 	ev->type = FDEVENT_HANDLER_LIBEV;
 #define SET(x) \
 	ev->x = fdevent_libev_##x;
@@ -164,6 +159,8 @@ int fdevent_libev_init(fdevents *ev) {
 
 		return -1;
 	}
+
+	ev_timer_init(timer, timeout_watcher_cb, 0.0, 1.0);
 
 	return 0;
 }

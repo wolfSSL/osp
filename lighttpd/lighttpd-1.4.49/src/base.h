@@ -1,9 +1,7 @@
 #ifndef _BASE_H_
 #define _BASE_H_
+#include "first.h"
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
 #include "settings.h"
 
 #include <sys/types.h>
@@ -20,37 +18,19 @@
 # include <inttypes.h>
 #endif
 
+#include "base_decls.h"
 #include "buffer.h"
 #include "array.h"
 #include "chunk.h"
 #include "keyvalue.h"
-#include "fdevent.h"
-#include "sys-socket.h"
-#include "splaytree.h"
+#include "sock_addr.h"
 #include "etag.h"
 
-
-#if defined HAVE_LIBSSL && defined HAVE_OPENSSL_SSL_H
-# define USE_OPENSSL
-# include <openssl/ssl.h>
-# ifdef HAVE_WOLFSSL_SSL_H
-#  include <openssl/objects.h>
-# endif
-# if ! defined OPENSSL_NO_TLSEXT && ! defined SSL_CTRL_SET_TLSEXT_HOSTNAME
-#  define OPENSSL_NO_TLSEXT
-# endif
-#endif
-
-#ifdef HAVE_FAM_H
-# include <fam.h>
-#endif
+struct fdevents;        /* declaration */
+struct stat_cache;      /* declaration */
 
 #ifndef O_BINARY
 # define O_BINARY 0
-#endif
-
-#ifndef O_LARGEFILE
-# define O_LARGEFILE 0
 #endif
 
 #ifndef SIZE_MAX
@@ -119,25 +99,6 @@ typedef struct {
 	char *value;
 } request_handler;
 
-typedef struct {
-	char *key;
-	char *host;
-	unsigned short port;
-	int used;
-	short factor;
-} fcgi_connections;
-
-
-typedef union {
-#ifdef HAVE_IPV6
-	struct sockaddr_in6 ipv6;
-#endif
-	struct sockaddr_in ipv4;
-#ifdef HAVE_SYS_UN_H
-	struct sockaddr_un un;
-#endif
-	struct sockaddr plain;
-} sock_addr;
 
 /* fcgi_response_header contains ... */
 #define HTTP_STATUS         BV(0)
@@ -145,6 +106,10 @@ typedef union {
 #define HTTP_CONTENT_LENGTH BV(2)
 #define HTTP_DATE           BV(3)
 #define HTTP_LOCATION       BV(4)
+#define HTTP_TRANSFER_ENCODING BV(5)
+#define HTTP_CONTENT_LOCATION  BV(6)
+#define HTTP_SET_COOKIE        BV(7)
+#define HTTP_UPGRADE           BV(8)
 
 typedef struct {
 	/** HEADER */
@@ -169,7 +134,8 @@ typedef struct {
 	array  *headers;
 
 	/* CONTENT */
-	size_t content_length; /* returned by strtoul() */
+	off_t content_length; /* returned by strtoll() */
+	off_t te_chunked;
 
 	/* internal representation */
 	int     accept_encoding;
@@ -231,29 +197,19 @@ typedef struct {
 } stat_cache_entry;
 
 typedef struct {
-	splay_tree *files; /* the nodes of the tree are stat_cache_entry's */
-
-	buffer *dir_name; /* for building the dirname from the filename */
-#ifdef HAVE_FAM_H
-	splay_tree *dirs; /* the nodes of the tree are fam_dir_entry */
-
-	FAMConnection fam;
-	int    fam_fcce_ndx;
-#endif
-	buffer *hash_key;  /* temp-store for the hash-key */
-} stat_cache;
-
-typedef struct {
 	array *mimetypes;
 
 	/* virtual-servers */
 	buffer *document_root;
 	buffer *server_name;
 	buffer *error_handler;
+	buffer *error_handler_404;
 	buffer *server_tag;
 	buffer *dirlist_encoding;
 	buffer *errorfile_prefix;
+	buffer *socket_perms;
 
+	unsigned short high_precision_timestamps;
 	unsigned short max_keep_alive_requests;
 	unsigned short max_keep_alive_idle;
 	unsigned short max_read_idle;
@@ -261,6 +217,9 @@ typedef struct {
 	unsigned short use_xattr;
 	unsigned short follow_symlink;
 	unsigned short range_requests;
+	unsigned short stream_request_body;
+	unsigned short stream_response_body;
+	unsigned short error_intercept;
 
 	/* debug */
 
@@ -269,27 +228,10 @@ typedef struct {
 	unsigned short log_request_handling;
 	unsigned short log_response_header;
 	unsigned short log_condition_handling;
-	unsigned short log_ssl_noise;
 	unsigned short log_timeouts;
 
 
 	/* server wide */
-	buffer *ssl_pemfile;
-	buffer *ssl_ca_file;
-	buffer *ssl_cipher_list;
-	buffer *ssl_dh_file;
-	buffer *ssl_ec_curve;
-	unsigned short ssl_honor_cipher_order; /* determine SSL cipher in server-preferred order, not client-order */
-	unsigned short ssl_empty_fragments; /* whether to not set SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS */
-	unsigned short ssl_use_sslv2;
-	unsigned short ssl_use_sslv3;
-	unsigned short ssl_verifyclient;
-	unsigned short ssl_verifyclient_enforce;
-	unsigned short ssl_verifyclient_depth;
-	buffer *ssl_verifyclient_username;
-	unsigned short ssl_verifyclient_export_cert;
-	unsigned short ssl_disable_client_renegotiation;
-
 	unsigned short use_ipv6, set_v6only; /* set_v6only is only a temporary option */
 	unsigned short defer_accept;
 	unsigned short ssl_enabled; /* only interesting for setting up listening sockets. don't use at runtime */
@@ -298,7 +240,9 @@ typedef struct {
 	unsigned short etag_use_mtime;
 	unsigned short etag_use_size;
 	unsigned short force_lowercase_filenames; /* if the FS is case-insensitive, force all files to lower-case */
+	unsigned int http_parseopts;
 	unsigned int max_request_size;
+	int listen_backlog;
 
 	unsigned short kbytes_per_second; /* connection kb/s limit */
 
@@ -321,20 +265,11 @@ typedef struct {
 	 */
 	off_t *global_bytes_per_second_cnt_ptr; /*  */
 
-#ifdef USE_OPENSSL
-	SSL_CTX *ssl_ctx; /* not patched */
-	/* SNI per host: with COMP_SERVER_SOCKET, COMP_HTTP_SCHEME, COMP_HTTP_HOST */
+#if defined(__FreeBSD__) || defined(__NetBSD__) \
+ || defined(__OpenBSD__) || defined(__DragonFly__)
+	buffer *bsd_accept_filter;
+#endif
 
-/* These fields are used to temporarily hold values read from a file.
- * WolfSSL does not require this intermediate step, and reads the contents
- * of the files to their final location right away.
- */
-#ifndef HAVE_WOLFSSL_SSL_H
-	EVP_PKEY *ssl_pemfile_pkey;
-	X509 *ssl_pemfile_x509;
-#endif
-	STACK_OF(X509_NAME) *ssl_ca_file_cert_names;
-#endif
 } specific_config;
 
 /* the order of the items should be the same as they are processed
@@ -353,17 +288,33 @@ typedef enum {
 	CON_STATE_CLOSE
 } connection_state_t;
 
-typedef enum { COND_RESULT_UNSET, COND_RESULT_FALSE, COND_RESULT_TRUE } cond_result_t;
-typedef struct {
+typedef enum {
+	/* condition not active at the moment because itself or some
+	 * pre-condition depends on data not available yet
+	 */
+	COND_RESULT_UNSET,
+
+	/* special "unset" for branches not selected due to pre-conditions
+	 * not met (but pre-conditions are not "unset" anymore)
+	 */
+	COND_RESULT_SKIP,
+
+	/* actually evaluated the condition itself */
+	COND_RESULT_FALSE, /* not active */
+	COND_RESULT_TRUE   /* active */
+} cond_result_t;
+
+typedef struct cond_cache_t {
+	/* current result (with preconditions) */
 	cond_result_t result;
+	/* result without preconditions (must never be "skip") */
+	cond_result_t local_result;
 	int patterncount;
 	int matches[3 * 10];
 	buffer *comp_value; /* just a pointer */
-	
-	comp_key_t comp_type;
 } cond_cache_t;
 
-typedef struct {
+struct connection {
 	connection_state_t state;
 
 	/* timestamps */
@@ -373,8 +324,7 @@ typedef struct {
 
 	time_t connection_start;
 	time_t request_start;
-
-	struct timeval start_tv;
+	struct timespec request_start_hp;
 
 	size_t request_count;        /* number of requests handled in this connection */
 	size_t loops_per_request;    /* to catch endless loops in a single request
@@ -426,12 +376,8 @@ typedef struct {
 
 	array  *environment; /* used to pass lighttpd internal stuff to the FastCGI/CGI apps, setenv does that */
 
-	/* response */
-	int    got_response;
-
-	int    in_joblist;
-
 	connection_type mode;
+	int async_callback;
 
 	void **plugin_ctx;           /* plugin connection specific config */
 
@@ -439,45 +385,27 @@ typedef struct {
 	cond_cache_t *cond_cache;
 
 	buffer *server_name;
+	buffer *proto;
 
 	/* error-handler */
-	buffer *error_handler;
 	int error_handler_saved_status;
-	int in_error_handler;
+	http_method_t error_handler_saved_method;
 
 	struct server_socket *srv_socket;   /* reference to the server-socket */
+	int (* network_write)(struct server *srv, struct connection *con, chunkqueue *cq, off_t max_bytes);
+	int (* network_read)(struct server *srv, struct connection *con, chunkqueue *cq, off_t max_bytes);
 
-#ifdef USE_OPENSSL
-	SSL *ssl;
-# ifndef OPENSSL_NO_TLSEXT
-	buffer *tlsext_server_name;
-# endif
-	unsigned int renegotiations; /* count of SSL_CB_HANDSHAKE_START */
-#endif
 	/* etag handling */
 	etag_flags_t etag_flags;
 
 	int conditional_is_valid[COMP_LAST_ELEMENT]; 
-} connection;
+};
 
 typedef struct {
 	connection **ptr;
 	size_t size;
 	size_t used;
 } connections;
-
-
-#ifdef HAVE_IPV6
-typedef struct {
-	int family;
-	union {
-		struct in6_addr ipv6;
-		struct in_addr  ipv4;
-	} addr;
-	char b2[INET6_ADDRSTRLEN + 1];
-	time_t ts;
-} inet_ntop_cache_type;
-#endif
 
 
 typedef struct {
@@ -506,6 +434,7 @@ typedef struct {
 	buffer *breakagelog_file;
 
 	unsigned short dont_daemonize;
+	unsigned short preflight_check;
 	buffer *changeroot;
 	buffer *username;
 	buffer *groupname;
@@ -518,24 +447,28 @@ typedef struct {
 	buffer *network_backend;
 	array *modules;
 	array *upload_tempdirs;
+	unsigned int upload_temp_file_size;
+	unsigned int max_request_field_size;
 
 	unsigned short max_worker;
 	unsigned short max_fds;
 	unsigned short max_conns;
-	unsigned int max_request_size;
 
 	unsigned short log_request_header_on_error;
 	unsigned short log_state_handling;
 
-	enum { STAT_CACHE_ENGINE_UNSET,
-			STAT_CACHE_ENGINE_NONE,
-			STAT_CACHE_ENGINE_SIMPLE
-#ifdef HAVE_FAM_H
-			, STAT_CACHE_ENGINE_FAM
-#endif
-	} stat_cache_engine;
+	int stat_cache_engine;
 	unsigned short enable_cores;
 	unsigned short reject_expect_100_with_417;
+	buffer *xattr_name;
+
+	unsigned short http_header_strict;
+	unsigned short http_host_strict;
+	unsigned short http_host_normalize;
+	unsigned short high_precision_timestamps;
+	time_t loadts;
+	double loadavg[3];
+	buffer *syslog_facility;
 } server_config;
 
 typedef struct server_socket {
@@ -544,12 +477,9 @@ typedef struct server_socket {
 	int       fde_ndx;
 
 	unsigned short is_ssl;
+	unsigned short sidx;
 
 	buffer *srv_token;
-
-#ifdef USE_OPENSSL
-	SSL_CTX *ssl_ctx;
-#endif
 } server_socket;
 
 typedef struct {
@@ -559,7 +489,7 @@ typedef struct {
 	size_t used;
 } server_socket_array;
 
-typedef struct server {
+struct server {
 	server_socket_array srv_sockets;
 
 	/* the errorlog */
@@ -567,7 +497,7 @@ typedef struct server {
 	enum { ERRORLOG_FILE, ERRORLOG_FD, ERRORLOG_SYSLOG, ERRORLOG_PIPE } errorlog_mode;
 	buffer *errorlog_buf;
 
-	fdevents *ev, *ev_ins;
+	struct fdevents *ev;
 
 	buffer_plugin plugins;
 	void *plugin_slots;
@@ -577,8 +507,6 @@ typedef struct server {
 	int con_read;
 	int con_written;
 	int con_closed;
-
-	int ssl_is_init;
 
 	int max_fds;    /* max possible fds */
 	int cur_fds;    /* currently used fds */
@@ -600,9 +528,6 @@ typedef struct server {
 	buffer *cond_check_buf;
 
 	/* caches */
-#ifdef HAVE_IPV6
-	inet_ntop_cache_type inet_ntop_cache[INET_NTOP_CACHE_MAX];
-#endif
 	mtime_cache_type mtime_cache[FILE_CACHE_MAX];
 
 	array *split_vals;
@@ -613,14 +538,10 @@ typedef struct server {
 	time_t last_generated_debug_ts;
 	time_t startup_ts;
 
-	char entropy[8]; /* from /dev/[u]random if possible, otherwise rand() */
-	char is_real_entropy; /* whether entropy is from /dev/[u]random */
-
 	buffer *ts_debug_str;
 	buffer *ts_date_str;
 
 	/* config-file */
-	array *config;
 	array *config_touched;
 
 	array *config_context;
@@ -635,7 +556,7 @@ typedef struct server {
 	connections *joblist;
 	connections *fdwaitqueue;
 
-	stat_cache  *stat_cache;
+	struct stat_cache *stat_cache;
 
 	/**
 	 * The status array can carry all the status information you want
@@ -652,16 +573,15 @@ typedef struct server {
 	 */
 	array *status;
 
-	fdevent_handler_t event_handler;
+	int event_handler;
 
-	int (* network_backend_write)(struct server *srv, connection *con, int fd, chunkqueue *cq, off_t max_bytes);
-#ifdef USE_OPENSSL
-	int (* network_ssl_backend_write)(struct server *srv, connection *con, SSL *ssl, chunkqueue *cq, off_t max_bytes);
-#endif
+	int (* network_backend_write)(struct server *srv, int fd, chunkqueue *cq, off_t max_bytes);
+	handler_t (* request_env)(struct server *srv, connection *con);
 
 	uid_t uid;
 	gid_t gid;
-} server;
+	pid_t pid;
+};
 
 
 #endif

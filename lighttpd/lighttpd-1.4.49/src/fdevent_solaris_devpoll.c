@@ -1,3 +1,6 @@
+#include "first.h"
+
+#include "fdevent_impl.h"
 #include "fdevent.h"
 #include "buffer.h"
 #include "log.h"
@@ -6,15 +9,14 @@
 
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <signal.h>
 #include <fcntl.h>
 
-#ifdef USE_SOLARIS_DEVPOLL
+#ifdef FDEVENT_USE_SOLARIS_DEVPOLL
 
 # include <sys/devpoll.h>
+# include <sys/ioctl.h>
 
 static void fdevent_solaris_devpoll_free(fdevents *ev) {
 	free(ev->devpollfds);
@@ -121,7 +123,7 @@ int fdevent_solaris_devpoll_reset(fdevents *ev) {
 		return -1;
 	}
 
-	fd_close_on_exec(ev->devpoll_fd);
+	fdevent_setfd_cloexec(ev->devpoll_fd);
 	return 0;
 }
 int fdevent_solaris_devpoll_init(fdevents *ev) {
@@ -141,6 +143,7 @@ int fdevent_solaris_devpoll_init(fdevents *ev) {
 	SET(event_get_revent);
 
 	ev->devpollfds = malloc(sizeof(*ev->devpollfds) * ev->maxfds);
+	force_assert(NULL != ev->devpollfds);
 
 	if ((ev->devpoll_fd = open("/dev/poll", O_RDWR)) < 0) {
 		log_error_write(ev->srv, __FILE__, __LINE__, "SSS",

@@ -1,3 +1,6 @@
+#include "first.h"
+
+#include "fdevent_impl.h"
 #include "fdevent.h"
 #include "buffer.h"
 #include "log.h"
@@ -6,13 +9,11 @@
 
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <signal.h>
 #include <fcntl.h>
 
-#ifdef USE_FREEBSD_KQUEUE
+#ifdef FDEVENT_USE_FREEBSD_KQUEUE
 # include <sys/event.h>
 # include <sys/time.h>
 
@@ -46,7 +47,7 @@ static int fdevent_freebsd_kqueue_event_del(fdevents *ev, int fde_ndx, int fd) {
 	ts.tv_nsec = 0;
 
 	ret = kevent(ev->kq_fd,
-		&kev, n,
+		kev, n,
 		NULL, 0,
 		&ts);
 
@@ -73,14 +74,14 @@ static int fdevent_freebsd_kqueue_event_set(fdevents *ev, int fde_ndx, int fd, i
 	if (events == oevents) return fd;
 
 	if (addevents & FDEVENT_IN)  {
-		EV_SET(&kev[n], fd, EVFILT_READ, EV_ADD|EV_CLEAR, 0, 0, NULL);
+		EV_SET(&kev[n], fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 		n++;
 	} else if (delevents & FDEVENT_IN) {
 		EV_SET(&kev[n], fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 		n++;
 	}
 	if (addevents & FDEVENT_OUT)  {
-		EV_SET(&kev[n], fd, EVFILT_WRITE, EV_ADD|EV_CLEAR, 0, 0, NULL);
+		EV_SET(&kev[n], fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
 		n++;
 	} else if (delevents & FDEVENT_OUT) {
 		EV_SET(&kev[n], fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
@@ -137,7 +138,7 @@ static int fdevent_freebsd_kqueue_poll(fdevents *ev, int timeout_ms) {
 static int fdevent_freebsd_kqueue_event_get_revent(fdevents *ev, size_t ndx) {
 	int events = 0, e;
 
-	e = ev->kq_results[ndx].filter;
+	int filt = e = ev->kq_results[ndx].filter;
 
 	if (e == EVFILT_READ) {
 		events |= FDEVENT_IN;
@@ -148,7 +149,11 @@ static int fdevent_freebsd_kqueue_event_get_revent(fdevents *ev, size_t ndx) {
 	e = ev->kq_results[ndx].flags;
 
 	if (e & EV_EOF) {
-		events |= FDEVENT_HUP;
+		if (filt == EVFILT_READ) {
+			events |= FDEVENT_RDHUP;
+		} else {
+			events |= FDEVENT_HUP;
+		}
 	}
 
 	if (e & EV_ERROR) {
@@ -199,6 +204,7 @@ int fdevent_freebsd_kqueue_init(fdevents *ev) {
 	ev->kq_fd = -1;
 
 	ev->kq_results = calloc(ev->maxfds, sizeof(*ev->kq_results));
+	force_assert(NULL != ev->kq_results);
 
 	/* check that kqueue works */
 

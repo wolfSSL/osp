@@ -1,5 +1,6 @@
 #ifndef WIN32_SOCKET_H
 #define WIN32_SOCKET_H
+#include "first.h"
 
 #ifdef __WIN32
 
@@ -9,17 +10,27 @@
 #define EINPROGRESS WSAEINPROGRESS
 #define EALREADY WSAEALREADY
 #define ECONNABORTED WSAECONNABORTED
-#define ioctl ioctlsocket
-#define hstrerror(x) ""
+
 #else
+
 #include <sys/socket.h>
-#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#ifdef HAVE_SYS_UN_H
 #include <sys/un.h>
-#include <arpa/inet.h>
+#endif
 
-#include <netdb.h>
+#endif
+
+
+#ifndef INET_ADDRSTRLEN
+#define INET_ADDRSTRLEN   16
+#endif
+#ifndef INET6_ADDRSTRLEN
+#define INET6_ADDRSTRLEN  46
+#endif
+#ifndef UNIX_PATH_MAX
+#define UNIX_PATH_MAX    108
 #endif
 
 #endif

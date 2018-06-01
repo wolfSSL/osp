@@ -1,4 +1,17 @@
-SET(T_FILES
+check_include_files(fastcgi.h HAVE_FASTCGI_H)
+check_include_files(fastcgi/fastcgi.h HAVE_FASTCGI_FASTCGI_H)
+if(HAVE_FASTCGI_H OR HAVE_FASTCGI_FASTCGI_H)
+	check_library_exists(fcgi FCGI_Accept "" HAVE_FASTCGI)
+	if(HAVE_FASTCGI)
+		add_executable(fcgi-auth fcgi-auth.c)
+		add_executable(fcgi-responder fcgi-responder.c)
+		target_link_libraries(fcgi-auth fcgi)
+		target_link_libraries(fcgi-responder fcgi)
+	endif()
+endif()
+add_executable(scgi-responder scgi-responder.c)
+
+set(T_FILES
 	prepare.sh
 	cachable.t
 	core-404-handler.t
@@ -28,9 +41,9 @@ SET(T_FILES
 	cleanup.sh
 )
 
-FOREACH(it ${T_FILES})
-  ADD_TEST(NAME ${it} COMMAND "${lighttpd_SOURCE_DIR}/tests/wrapper.sh"
+foreach(it ${T_FILES})
+	add_test(NAME ${it} COMMAND "${lighttpd_SOURCE_DIR}/tests/wrapper.sh"
 		"${lighttpd_SOURCE_DIR}/tests"
 		"${lighttpd_BINARY_DIR}"
 		"${lighttpd_SOURCE_DIR}/tests/${it}")
-ENDFOREACH(it)
+endforeach()
