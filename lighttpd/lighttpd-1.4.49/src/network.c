@@ -22,6 +22,11 @@
 #include <assert.h>
 
 #ifdef USE_OPENSSL
+
+#  ifdef HAVE_WOLFSSL_SSL_H
+#    include <openssl/pem.h>
+#  endif /*end HAVE_WOLFSSL_SSL_H*/
+
 # include <openssl/ssl.h>
 # include <openssl/err.h>
 # include <openssl/rand.h>
@@ -83,6 +88,7 @@ static handler_t network_server_handle_fdevent(server *srv, void *context, int r
 	return HANDLER_GO_ON;
 }
 
+
 #if defined USE_OPENSSL && ! defined OPENSSL_NO_TLSEXT
 static int network_ssl_servername_callback(SSL *ssl, int *al, server *srv) {
 	const char *servername;
@@ -112,6 +118,29 @@ static int network_ssl_servername_callback(SSL *ssl, int *al, server *srv) {
 	config_patch_connection(srv, con, COMP_HTTP_SCHEME);
 	config_patch_connection(srv, con, COMP_HTTP_HOST);
 
+/* Wolf does not use the ssl_pemfile_x509 and ssl_pemfile_pkey fields to hold
+ * the contents of ssl_pemfile->ptr, rather choosing to read the file directly
+ * to the final location.
+ */
+#ifdef HAVE_WOLFSSL_SSL_H
+
+	/* first set certificate! setting private key checks whether certificate matches it */
+	if (!SSL_use_certificate_file(ssl, con->conf.ssl_pemfile->ptr, SSL_FILETYPE_PEM)) {
+		log_error_write(srv, __FILE__, __LINE__, "ssb:s", "SSL:",
+			"failed to set certificate for TLS server name", con->tlsext_server_name,
+			ERR_error_string(ERR_get_error(), NULL));
+		return SSL_TLSEXT_ERR_ALERT_FATAL;
+	}
+
+	if (!SSL_use_PrivateKey_file(ssl, con->conf.ssl_pemfile->ptr, SSL_FILETYPE_PEM)) {
+		log_error_write(srv, __FILE__, __LINE__, "ssb:s", "SSL:",
+			"failed to set private key for TLS server name", con->tlsext_server_name,
+			ERR_error_string(ERR_get_error(), NULL));
+		return SSL_TLSEXT_ERR_ALERT_FATAL;
+	}
+
+#else
+
 	if (NULL == con->conf.ssl_pemfile_x509 || NULL == con->conf.ssl_pemfile_pkey) {
 		/* x509/pkey available <=> pemfile was set <=> pemfile got patched: so this should never happen, unless you nest $SERVER["socket"] */
 		log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
@@ -133,6 +162,9 @@ static int network_ssl_servername_callback(SSL *ssl, int *al, server *srv) {
 			ERR_error_string(ERR_get_error(), NULL));
 		return SSL_TLSEXT_ERR_ALERT_FATAL;
 	}
+
+#endif /*HAVE_WOLFSSL_SSL_H*/
+
 
 	if (con->conf.ssl_verifyclient) {
 		if (NULL == con->conf.ssl_ca_file_cert_names) {
@@ -523,6 +555,13 @@ typedef enum {
 } network_backend_t;
 
 #ifdef USE_OPENSSL
+
+/* The following functions are not needed with wolfSSL as we
+ * load the file into the SSL_CTX directly.  As a result the
+ * ssl_pemfile_x509 and ssl_pemfile_pkey fields of specific_config
+ * were not needed for the wolfSSL build.
+ */
+#ifndef HAVE_WOLFSSL_SSL_H
 static X509* x509_load_pem_file(server *srv, const char *file) {
 	BIO *in;
 	X509 *x = NULL;
@@ -537,6 +576,7 @@ static X509* x509_load_pem_file(server *srv, const char *file) {
 		log_error_write(srv, __FILE__, __LINE__, "SSS", "SSL: BIO_read_filename('", file,"') failed");
 		goto error;
 	}
+
 	x = PEM_read_bio_X509(in, NULL, NULL, NULL);
 
 	if (NULL == x) {
@@ -581,6 +621,8 @@ error:
 	return NULL;
 }
 
+#endif /*HAVE_WOLFSSL_SSL_H*/
+
 static int network_openssl_load_pemfile(server *srv, size_t ndx) {
 	specific_config *s = srv->config_storage[ndx];
 
@@ -596,6 +638,10 @@ static int network_openssl_load_pemfile(server *srv, size_t ndx) {
 	}
 #endif
 
+/* This is a temporary step in loading the file to ssl_ctx. If using wolf, we simply
+ * load the file to the final destination.
+ */
+#ifndef HAVE_WOLFSSL_SSL_H
 	if (NULL == (s->ssl_pemfile_x509 = x509_load_pem_file(srv, s->ssl_pemfile->ptr))) return -1;
 	if (NULL == (s->ssl_pemfile_pkey = evp_pkey_load_pem_file(srv, s->ssl_pemfile->ptr))) return -1;
 
@@ -606,6 +652,7 @@ static int network_openssl_load_pemfile(server *srv, size_t ndx) {
 				s->ssl_pemfile);
 		return -1;
 	}
+#endif /* HAVE_WOLFSSL_SSL_H */
 
 	return 0;
 }
@@ -728,6 +775,7 @@ int network_init(server *srv) {
 		}
 
 
+#ifndef HAVE_WOLFSSL_SSL_H
 		if (!buffer_is_empty(s->ssl_ca_file)) {
 			s->ssl_ca_file_cert_names = SSL_load_client_CA_file(s->ssl_ca_file->ptr);
 			if (NULL == s->ssl_ca_file_cert_names) {
@@ -735,6 +783,7 @@ int network_init(server *srv) {
 						ERR_error_string(ERR_get_error(), NULL), s->ssl_ca_file);
 			}
 		}
+#endif /*HAVE_WOLFSSL_SSL_H*/
 
 		if (buffer_is_empty(s->ssl_pemfile) || !s->ssl_enabled) continue;
 
@@ -765,6 +814,7 @@ int network_init(server *srv) {
 		SSL_CTX_set_options(s->ssl_ctx, ssloptions);
 		SSL_CTX_set_info_callback(s->ssl_ctx, ssl_info_callback);
 
+#ifndef HAVE_WOLFSSL_SSL_H /* wolfSSL doesn't support SSLV2 */
 		if (!s->ssl_use_sslv2) {
 			/* disable SSLv2 */
 			if (!(SSL_OP_NO_SSLv2 & SSL_CTX_set_options(s->ssl_ctx, SSL_OP_NO_SSLv2))) {
@@ -773,6 +823,7 @@ int network_init(server *srv) {
 				return -1;
 			}
 		}
+#endif
 
 		if (!s->ssl_use_sslv3) {
 			/* disable SSLv3 */
@@ -800,6 +851,16 @@ int network_init(server *srv) {
 		/* Support for Diffie-Hellman key exchange */
 		if (!buffer_is_empty(s->ssl_dh_file)) {
 			/* DH parameters from file */
+
+        #ifdef HAVE_WOLFSSL_SSL_H
+            /* wolfSSL API to read in DH file.
+               Using instead of BIO_new_file function, possibly will implement
+               compatibility for BIO_new_file and functions in future versions
+             */
+            wolfSSL_CTX_SetTmpDH_file(s->ssl_ctx, s->ssl_dh_file->ptr,
+                                      SSL_FILETYPE_PEM);
+            (void)bio; /* take care of warning when not using BIO pointer */
+        #else
 			bio = BIO_new_file((char *) s->ssl_dh_file->ptr, "r");
 			if (bio == NULL) {
 				log_error_write(srv, __FILE__, __LINE__, "ss", "SSL: Unable to open file", s->ssl_dh_file->ptr);
@@ -811,6 +872,7 @@ int network_init(server *srv) {
 				log_error_write(srv, __FILE__, __LINE__, "ss", "SSL: PEM_read_bio_DHparams failed", s->ssl_dh_file->ptr);
 				return -1;
 			}
+            #endif /* HAVE_WOLFSSL_SSL_H */
 		} else {
 			/* Default DH parameters from RFC5114 */
 			dh = DH_new();
@@ -874,9 +936,14 @@ int network_init(server *srv) {
 			}
 		}
 
-		if (s->ssl_verifyclient) {
+
+        if (s->ssl_verifyclient) {
+#ifdef HAVE_WOLFSSL_SSL_H
+            if (NULL == s->ssl_ca_file->ptr) {
+#else
 			if (NULL == s->ssl_ca_file_cert_names) {
-				log_error_write(srv, __FILE__, __LINE__, "s",
+#endif
+                log_error_write(srv, __FILE__, __LINE__, "s",
 					"SSL: You specified ssl.verifyclient.activate but no ca_file"
 				);
 				return -1;
@@ -890,17 +957,36 @@ int network_init(server *srv) {
 			SSL_CTX_set_verify_depth(s->ssl_ctx, s->ssl_verifyclient_depth);
 		}
 
-		if (SSL_CTX_use_certificate(s->ssl_ctx, s->ssl_pemfile_x509) < 0) {
+/* Here wolfSSL loads the cert and private key from the file directly to the ctx, eliminating the need
+ * for the temporary ssl_pemfile_pkey and ssl_pemfile_x509 fields.
+ */
+#ifdef HAVE_WOLFSSL_SSL_H
+
+        if (SSL_CTX_use_certificate_file(s->ssl_ctx, s->ssl_pemfile->ptr, SSL_FILETYPE_PEM) < 0) {
 			log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
 					ERR_error_string(ERR_get_error(), NULL), s->ssl_pemfile);
 			return -1;
 		}
 
-		if (SSL_CTX_use_PrivateKey(s->ssl_ctx, s->ssl_pemfile_pkey) < 0) {
+		if (SSL_CTX_use_PrivateKey_file(s->ssl_ctx, s->ssl_pemfile->ptr, SSL_FILETYPE_PEM) < 0) {
 			log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
 					ERR_error_string(ERR_get_error(), NULL), s->ssl_pemfile);
 			return -1;
 		}
+
+#else
+        if (SSL_CTX_use_certificate(s->ssl_ctx, s->ssl_pemfile_x509) < 0) {
+            log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
+                    ERR_error_string(ERR_get_error(), NULL), s->ssl_pemfile);
+            return -1;
+        }
+
+        if (SSL_CTX_use_PrivateKey(s->ssl_ctx, s->ssl_pemfile_pkey) < 0) {
+            log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
+                    ERR_error_string(ERR_get_error(), NULL), s->ssl_pemfile);
+            return -1;
+        }
+#endif
 
 		if (SSL_CTX_check_private_key(s->ssl_ctx) != 1) {
 			log_error_write(srv, __FILE__, __LINE__, "sssb", "SSL:",

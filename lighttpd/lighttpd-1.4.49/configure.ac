@@ -8,7 +8,6 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
 
-dnl HOW FUCKING BROKEN IS AUTOMAKE...
 dnl serial-tests is not recognized before 1.12, and required for serial tests with 1.13, sane version checks "impossible"
 dnl if you don't use the default (symlinked) automake on your box, set AUTOMAKE to the path you're using
 m4_define([serial_tests], [
@@ -535,7 +534,40 @@ AC_ARG_ENABLE(lfs,
 AC_MSG_RESULT($enableval)
 
 AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(off_t)
+
+TAO_REQUIRE_LIBWOLFSSL
+
+AC_MSG_CHECKING([is wolfssl configured with aesni])
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+#include <wolfssl/options.h>
+#ifndef WOLFSSL_AESNI
+# error macro not defined
+#endif
+]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+
+if test "x$wolf_has_aesni" == "xyes" ; then
+    AC_MSG_RESULT([yes])
+    AC_MSG_CHECKING([is gcc compiler detected])
+    if test "$GCC" = "yes"
+    then
+        AC_MSG_RESULT([yes])
+        AC_MSG_CHECKING([is compiler set to icc])
+        if test "$CC" != "icc"
+        then
+            AC_MSG_RESULT([not icc, add flags -maes and -msse4])
+            CFLAGS="$CFLAGS -maes -msse4"
+        else
+            AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
+        fi
+    else
+        AC_MSG_RESULT([no gcc])
+    fi
+else
+    AC_MSG_RESULT([no])
+fi
+
 
 if test "x$ac_cv_func_sendfile" = xyes; then
 	dnl check if sendfile works

@@ -314,8 +314,14 @@ static void server_free(server *srv) {
 			buffer_free(s->ssl_verifyclient_username);
 #ifdef USE_OPENSSL
 			SSL_CTX_free(s->ssl_ctx);
+
+/* ssl_pemfile_pkey and ssl_pemfile_x509 are not used with the
+ * wolfSSL build.
+ */
+#ifndef HAVE_WOLFSSL_SSL_H
 			EVP_PKEY_free(s->ssl_pemfile_pkey);
 			X509_free(s->ssl_pemfile_x509);
+#endif /*HAVE_WOLFSSL_SSL_H*/
 			if (NULL != s->ssl_ca_file_cert_names) sk_X509_NAME_pop_free(s->ssl_ca_file_cert_names, X509_NAME_free);
 #endif
 			free(s);
@@ -539,7 +545,7 @@ static void show_help (void) {
 }
 
 int main (int argc, char **argv) {
-	server *srv = NULL;
+    server *srv = NULL;
 	int print_config = 0;
 	int test_config = 0;
 	int i_am_root;

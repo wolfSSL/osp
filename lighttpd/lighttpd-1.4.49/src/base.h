@@ -33,6 +33,9 @@
 #if defined HAVE_LIBSSL && defined HAVE_OPENSSL_SSL_H
 # define USE_OPENSSL
 # include <openssl/ssl.h>
+# ifdef HAVE_WOLFSSL_SSL_H
+#  include <openssl/objects.h>
+# endif
 # if ! defined OPENSSL_NO_TLSEXT && ! defined SSL_CTRL_SET_TLSEXT_HOSTNAME
 #  define OPENSSL_NO_TLSEXT
 # endif
@@ -321,8 +324,15 @@ typedef struct {
 #ifdef USE_OPENSSL
 	SSL_CTX *ssl_ctx; /* not patched */
 	/* SNI per host: with COMP_SERVER_SOCKET, COMP_HTTP_SCHEME, COMP_HTTP_HOST */
+
+/* These fields are used to temporarily hold values read from a file.
+ * WolfSSL does not require this intermediate step, and reads the contents
+ * of the files to their final location right away.
+ */
+#ifndef HAVE_WOLFSSL_SSL_H
 	EVP_PKEY *ssl_pemfile_pkey;
 	X509 *ssl_pemfile_x509;
+#endif
 	STACK_OF(X509_NAME) *ssl_ca_file_cert_names;
 #endif
 } specific_config;

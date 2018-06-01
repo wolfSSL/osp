@@ -5,6 +5,10 @@
 # define _GNU_SOURCE
 #endif
 
+#ifdef HAVE_WOLFSSL_SSL_H
+    #include <wolfssl/options.h>
+#endif
+
 #ifndef __USE_GNU
 # define __USE_GNU /* a hack in my eyes, <fcntl.h> F_SETSIG should work with _GNU_SOURCE */
 #endif

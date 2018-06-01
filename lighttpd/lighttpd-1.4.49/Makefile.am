@@ -1,6 +1,6 @@
 SUBDIRS=src doc tests
 
-EXTRA_DIST=autogen.sh SConstruct
+EXTRA_DIST=autogen.sh SConstruct wolfStartUp
 
 ACLOCAL_AMFLAGS = -I m4
 
