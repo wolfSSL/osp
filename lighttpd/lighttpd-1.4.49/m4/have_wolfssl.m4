@@ -9,7 +9,7 @@ AC_DEFUN([_TAO_SEARCH_LIBWOLFSSL],[
 
   LDFLAGS="$LDFLAGS -L/usr/local/lib"
   CPPFLAGS="$CPPFLAGS -DHAVE_WOLFSSL_SSL_H -DUSE_WOLFSSL -DHAVE_LIBSSL -DHAVE_OPENSSL_SSL_H"
-  CFLAGS="$CFLAGS -I/usr/local/inlucde -I/usr/local/include/wolfssl"
+  CFLAGS="$CFLAGS -I/usr/local/include -I/usr/local/include/wolfssl"
   LIBS="$LIBS -lwolfssl"
   SSL_LIB="-lwolfssl"
 
