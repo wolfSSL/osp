@@ -35,8 +35,10 @@ available in both PDF and HTML formats from the wolfSSL Documentation page.
 When building Lighttpd on Linux, or OS X, use the autoconf system.  To build
 Lighttpd, run the following two commands from Lighttpd’s top level directory:
     ./autogen.sh
-    ./configure
+    ./configure --with-wolfssl
     make
+
+The `--with-wolfssl` option defaults to `/usr/local`.
 
 To install lighttpd, run the following command:
     sudo make install

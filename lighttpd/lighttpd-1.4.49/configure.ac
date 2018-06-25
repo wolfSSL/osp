@@ -575,36 +575,68 @@ AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(off_t)
 
 
-TAO_REQUIRE_LIBWOLFSSL
+# WOLFSSL Support
+AC_ARG_WITH([wolfssl],
+  [AC_HELP_STRING([--with-wolfssl@<:@=DIR@:>@],
+    [Include wolfSSL support (default no, yes=/usr/local)]
+  )],
+  [WITH_WOLFSSL=$withval],
+  [WITH_WOLFSSL=no]
 
-AC_MSG_CHECKING([is wolfssl configured with aesni])
-AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
-#include <wolfssl/options.h>
-#ifndef WOLFSSL_AESNI
-# error macro not defined
-#endif
-]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+[
+AC_MSG_RESULT([$WITH_WOLFSSL])
 
-if test "x$wolf_has_aesni" == "xyes" ; then
-    AC_MSG_RESULT([yes])
-    AC_MSG_CHECKING([is gcc compiler detected])
-    if test "$GCC" = "yes"
-    then
-        AC_MSG_RESULT([yes])
-        AC_MSG_CHECKING([is compiler set to icc])
-        if test "$CC" != "icc"
-        then
-            AC_MSG_RESULT([not icc, add flags -maes and -msse4])
-            CFLAGS="$CFLAGS -maes -msse4"
-        else
-            AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
-        fi
+if test "x$WITH_WOLFSSL" != "xno" ; then
+  if test "x$withval" == "xyes" ; then
+    LDFLAGS="-L/usr/local/lib $LDFLAGS"
+    CFLAGS="-I/usr/local/include $CFLAGS"
+  else
+    if test -d "$withval/lib"; then
+      LDFLAGS="$LDFLAGS -L${withval}/lib"
     else
-        AC_MSG_RESULT([no gcc])
+      LDFLAGS="$LDFLAGS -L${withval}"
     fi
-else
-    AC_MSG_RESULT([no])
+    if test -d "$withval/include"; then
+      CFLAGS="$CFLAGS -I${withval}/include -I${withval}/include/wolfssl"
+    else
+      CFLAGS="$CFLAGS -I${withval} -I${withval}/wolfssl"
+    fi
+  fi
+
+  TAO_REQUIRE_LIBWOLFSSL
+
+  AC_MSG_CHECKING([is wolfssl configured with aesni])
+  AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+    #include <wolfssl/options.h>
+    #ifndef WOLFSSL_AESNI
+    # error macro not defined
+    #endif
+  ]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
+
+  if test "x$wolf_has_aesni" == "xyes" ; then
+      AC_MSG_RESULT([yes])
+      AC_MSG_CHECKING([is gcc compiler detected])
+      if test "$GCC" = "yes"
+      then
+          AC_MSG_RESULT([yes])
+          AC_MSG_CHECKING([is compiler set to icc])
+          if test "$CC" != "icc"
+          then
+              AC_MSG_RESULT([not icc, add flags -maes and -msse4])
+              CFLAGS="$CFLAGS -maes -msse4"
+          else
+              AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
+          fi
+      else
+          AC_MSG_RESULT([no gcc])
+      fi
+  else
+      AC_MSG_RESULT([no])
+  fi
+
+  ])
 fi
+
 
 
 dnl Check for openssl
@@ -1393,6 +1425,9 @@ lighty_track_feature() {
     no_build="$no_build $2"
   fi
 }
+
+lighty_track_feature "wolfssl" "" \
+  'test "$WITH_WOLFSSL" != no'
 
 lighty_track_feature "regex-conditionals" "" \
   'test "$WITH_PCRE" != no'
