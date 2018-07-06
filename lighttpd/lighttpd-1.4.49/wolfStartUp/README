@@ -1,31 +1,33 @@
-1.0 INTRO
+1.0 Intro to lighttpd v.1.4.49 with wolfSSL
 
-Lighttpd is a lightweight web server we have ported wolfSSL to.  The goal of
+Lighttpd is a lightweight web server we have ported wolfSSL to. The goal of
 this manual is to help the user get started with Lighttpd using the wolfSSL
 library for SSL and TLS operations.
 
 1.1 Current Status Notes
 
-Currently only ECDHE and DHE are supported.  We will be adding support for ECDH
-in the next release.
-
-Client authentication is unsupported in this release.
-
+The wolfSSL SSL/TLS library now supports TLS 1.3 (Draft 28) on both the client
+and server side! wolfSSL offers support based in the United States as well as
+training! With our dual-licensing options, wolfSSL can provide you with the
+solution that you need for your commercial application or open source project.
 
 2.0 INSTALLATION
 
 2.1 Dependencies
 
-The lighttpd-1.4.35 with wolfSSL requires the wolfSSL library version 3.6.1 or
+The lighttpd-1.4.49 with wolfSSL requires the wolfSSL library version 3.15.3 or
 later.  Future releases of wolfSSL can be obtained from http://www.wolfssl.com.
+By default, lighttpd and wolfSSL install their libraries in different locations,
+making use of the `--prefix` option can help ensure your libarary files are in
+the expected locations.
 
 To build and install wolfSSL for use with Lighttpd run the following commands
 from the root wolfSSL directory:
-    ./autogen.sh
-    ./configure --enable-lighty
+    ./autogen.sh (if cloned from a git repository)
+    ./configure --enable-lighty --prefix=installLocation
     make
     sudo make install
-    sudo ldconfig (some Linux platforms require)
+    sudo ldconfig (may additionally be required on some unix systems)
 
 More details and information about wolfSSL can be found in the wolfSSL Manual,
 available in both PDF and HTML formats from the wolfSSL Documentation page.
@@ -35,16 +37,21 @@ available in both PDF and HTML formats from the wolfSSL Documentation page.
 When building Lighttpd on Linux, or OS X, use the autoconf system.  To build
 Lighttpd, run the following two commands from Lighttpd’s top level directory:
     ./autogen.sh
-    ./configure --with-wolfssl
+    ./configure --with-wolfssl=yes --prefix=installLocation/lib --without-bzip2
+        --without-zlib --without-pcre
     make
 
-The `--with-wolfssl` option defaults to `/usr/local`.
+The `--with-wolfssl` option defaults to installing the wolfSSL libraries in the
+`/usr/local` directory. If the `--prefix` option is used, the libary location
+will overwrite the default.
 
 To install lighttpd, run the following command:
     sudo make install
+    sudo ldconfig (may additionally be required on some unix systems)
 
 By default, the Lighttpd library is installed in the /usr/local/lib directory.
-
+If the `--prefix` option is used, the libary location will overwrite the
+default.
 
 3.0 EXAMPLE SERVER
 
@@ -53,7 +60,7 @@ provided a directory containing an example server setup: wolfStartUp in the
 lighttpd root directory.  The directory contains the following:
 
     lighttpd.conf: a simple conf file that lighttpd will run.  It uses
-    localhost, and the port 443.  It should only work with https.
+    localhost, and the port 443. It should only work with https.
 
     server.pem: the server’s certificate (the client will need to authenticate
     the server).
@@ -89,13 +96,13 @@ Browser: in the browser type:
 Accept the complaints about unrecognized certs to see the page without server.
 Page should show same congratulatory text as above.
 
-
 4.0 Debugging
 
-To get debug messages from wolfSSL code you must configure with the --enable-debug option:
+To get debug messages from wolfSSL code you must configure with the 
+`--enable-debug` option:
     ./configure  --enable-lighty  --enable-debug
 
-To turn on the wolfSSL debugging the following must be added to lighttpd: 
+To turn on the wolfSSL debugging the following must be added to lighttpd:
 ./src/server.c: main() before any wolfSSL functions are called:
     wolfSSL_Debugging_ON();
 
@@ -106,7 +113,7 @@ The following line in the lighttpd.conf will specify the lighttpd log file:
 
 Prior to the log being opened, log messages will be directed to stderr.
 
-To use lighttpd logging the following function is called with a lighttpd 
+To use lighttpd logging the following function is called with a lighttpd
 server *srv arguement:
     log_error_write(srv, __FILE__, __LINE__, "ss", "", "desired message");
 
