@@ -575,67 +575,49 @@ AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(off_t)
 
 
-# WOLFSSL Support
+dnl Check for wolfSSL
+ENABLED_WOLFSSL=no
 AC_ARG_WITH([wolfssl],
   [AC_HELP_STRING([--with-wolfssl@<:@=DIR@:>@],
     [Include wolfSSL support (default no, yes=/usr/local)]
   )],
-  [WITH_WOLFSSL=$withval],
-  [WITH_WOLFSSL=no]
+  [
+    AC_MSG_NOTICE([----------------------------------------])
+    AC_MSG_CHECKING([for wolfSSL])
+    CPPFLAGS="$CPPFLAGS -DHAVE_WOLFSSL_SSL_H -DUSE_WOLFSSL -DHAVE_LIBSSL -DHAVE_OPENSSL_SSL_H"
+    LIBS="$LIBS -lwolfssl"
+    SSL_LIB="-lwolfssl"
 
-[
-AC_MSG_RESULT([$WITH_WOLFSSL])
-
-if test "x$WITH_WOLFSSL" != "xno" ; then
-  if test "x$withval" == "xyes" ; then
-    LDFLAGS="-L/usr/local/lib $LDFLAGS"
-    CFLAGS="-I/usr/local/include $CFLAGS"
-  else
-    if test -d "$withval/lib"; then
-      LDFLAGS="$LDFLAGS -L${withval}/lib"
+    if test "x$withval" == "xyes" ; then
+        LDFLAGS="$LDFLAGS -L/usr/local/lib"
+        CFLAGS="$CFLAGS -I/usr/local/include -I/usr/local/include/wolfssl"
     else
-      LDFLAGS="$LDFLAGS -L${withval}"
-    fi
-    if test -d "$withval/include"; then
-      CFLAGS="$CFLAGS -I${withval}/include -I${withval}/include/wolfssl"
-    else
-      CFLAGS="$CFLAGS -I${withval} -I${withval}/wolfssl"
-    fi
-  fi
-
-  TAO_REQUIRE_LIBWOLFSSL
-
-  AC_MSG_CHECKING([is wolfssl configured with aesni])
-  AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
-    #include <wolfssl/options.h>
-    #ifndef WOLFSSL_AESNI
-    # error macro not defined
-    #endif
-  ]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
-
-  if test "x$wolf_has_aesni" == "xyes" ; then
-      AC_MSG_RESULT([yes])
-      AC_MSG_CHECKING([is gcc compiler detected])
-      if test "$GCC" = "yes"
-      then
-          AC_MSG_RESULT([yes])
-          AC_MSG_CHECKING([is compiler set to icc])
-          if test "$CC" != "icc"
-          then
-              AC_MSG_RESULT([not icc, add flags -maes and -msse4])
-              CFLAGS="$CFLAGS -maes -msse4"
-          else
-              AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
-          fi
+      if test -d "$withval/lib" ; then
+          LDFLAGS="$LDFLAGS -L$withval/lib"
       else
-          AC_MSG_RESULT([no gcc])
+          LDFLAGS="$LDFLAGS -L$withval"
       fi
-  else
-      AC_MSG_RESULT([no])
-  fi
+      if test -d "$withval/include"; then
+          CFLAGS="$CFLAGS -I$withval/include -I$withval/include/wolfssl"
+      else
+          CFLAGS="$CFLAGS -I$withval -I$withval/wolfssl"
+      fi
+    fi
 
-  ])
-fi
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <wolfssl/ssl.h>]], [[ wolfSSL_Init(); ]])], [ wolfssl_linked=yes ],[ wolfssl_linked=no ])
+    AM_CONDITIONAL(HAVE_LIBWOLFSSL, [test "x$wolfssl_linked" = "xyes"])
+
+    if test "x$wolfssl_linked" == "xno" ; then
+      AC_MSG_ERROR([wolfSSL Library not found.
+          If it's already installed, specify its path using --with-wolfssl=/dir/])
+
+    else
+      ENABLED_WOLFSSL=yes
+    fi
+  ]
+)
+
+AC_MSG_RESULT([$ENABLED_WOLFSSL])
 
 
 
@@ -684,7 +666,7 @@ AC_ARG_WITH([openssl-libs],
   [AC_MSG_RESULT([no])]
 )
 
-AM_CONDITIONAL([BUILD_WITH_OPENSSL], [test "$WITH_OPENSSL" != no || test "$ac_enable_libwolfssl" == yes])
+AM_CONDITIONAL([BUILD_WITH_OPENSSL], [test "$WITH_OPENSSL" != no || test "$ENABLED_WOLFSSL" == yes])
 
 if test "$WITH_OPENSSL" != no; then
   if test "$WITH_KRB5" != no; then
@@ -1427,7 +1409,7 @@ lighty_track_feature() {
 }
 
 lighty_track_feature "wolfssl" "" \
-  'test "$WITH_WOLFSSL" != no'
+  'test "$ENABLED_WOLFSSL" != no'
 
 lighty_track_feature "regex-conditionals" "" \
   'test "$WITH_PCRE" != no'
