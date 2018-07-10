@@ -1,0 +1,20 @@
+PPP v2.4.5 EAP-TLS with CyaSSL v2.0.8
+-------------------------------------
+
+This project started with ppp-2.4.5 as the base. It does not have EAP-TLS
+support. That is supplied by a set of patches on top of the sources. CyaSSL
+is applied as a patch on top of the patches.
+
+The repository has two commits. First is the original ppp sources with the
+EAP-TLS v0.992 patch applied. (commit 5e13f6b) Next commit has the
+modifiction where OpenSSL is ripped out and replaced with CyaSSL.
+(commit f5d2954)
+
+The original ppp-2.4.5 can be found at the Samba website. The EAP-TLS
+patches can be found at Jan Just Keijser's website.
+
+Links:
+
+1. https://ppp.samba.org
+2. http://www.nikhef.nl/~janjust/ppp
+3. http://www.nikhef.nl/~janjust/ppp/ppp-2.4.5-eaptls-mppe-0.992.patch
