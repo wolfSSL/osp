@@ -7,7 +7,7 @@
 * text=auto
 
 # types requiring CRLF
-[attr]visualstudio text eol=crlf
+[attr] visualstudio text eol=crlf
 *.csproj  visualstudio
 *.def     visualstudio
 *.dsp     visualstudio
