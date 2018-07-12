@@ -605,7 +605,6 @@ AC_ARG_WITH([wolfssl],
     fi
 
     AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <wolfssl/ssl.h>]], [[ wolfSSL_Init(); ]])], [ wolfssl_linked=yes ],[ wolfssl_linked=no ])
-    AM_CONDITIONAL(HAVE_LIBWOLFSSL, [test "x$wolfssl_linked" = "xyes"])
 
     if test "x$wolfssl_linked" == "xno" ; then
       AC_MSG_ERROR([wolfSSL Library not found.
@@ -617,6 +616,7 @@ AC_ARG_WITH([wolfssl],
   ]
 )
 
+AM_CONDITIONAL(HAVE_LIBWOLFSSL, [test "x$ENABLED_WOLFSSL" = "xyes"])
 AC_MSG_RESULT([$ENABLED_WOLFSSL])
 
 
