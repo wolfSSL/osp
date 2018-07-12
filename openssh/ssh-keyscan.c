@@ -627,6 +627,7 @@ main(int argc, char **argv)
 	extern int optind;
 	extern char *optarg;
 
+	OpenSSL_add_all_algorithms();
 	__progname = ssh_get_progname(argv[0]);
 	seed_rng();
 	TAILQ_INIT(&tq);
