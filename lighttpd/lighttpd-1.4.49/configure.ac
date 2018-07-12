@@ -577,48 +577,48 @@ AC_CHECK_SIZEOF(off_t)
 
 dnl Check for wolfSSL
 ENABLED_WOLFSSL=no
+AC_MSG_NOTICE([----------------------------------------])
+AC_MSG_CHECKING([for wolfSSL])
 AC_ARG_WITH([wolfssl],
   [AC_HELP_STRING([--with-wolfssl@<:@=DIR@:>@],
     [Include wolfSSL support (default no, yes=/usr/local)]
   )],
   [
-    AC_MSG_NOTICE([----------------------------------------])
-    AC_MSG_CHECKING([for wolfSSL])
     CPPFLAGS="$CPPFLAGS -DHAVE_WOLFSSL_SSL_H -DUSE_WOLFSSL -DHAVE_LIBSSL -DHAVE_OPENSSL_SSL_H"
     LIBS="$LIBS -lwolfssl"
     SSL_LIB="-lwolfssl"
 
-    if test "x$withval" == "xyes" ; then
-        LDFLAGS="$LDFLAGS -L/usr/local/lib"
-        CFLAGS="$CFLAGS -I/usr/local/include -I/usr/local/include/wolfssl"
-    else
-      if test -d "$withval/lib" ; then
-          LDFLAGS="$LDFLAGS -L$withval/lib"
+    if test "x$withval" != "xno" ; then
+      if test "x$withval" == "xyes" || test "x$withval" == "x" ; then
+          LDFLAGS="$LDFLAGS -L/usr/local/lib"
+          CFLAGS="$CFLAGS -I/usr/local/include -I/usr/local/include/wolfssl"
       else
-          LDFLAGS="$LDFLAGS -L$withval"
+        if test -d "$withval/lib" ; then
+            LDFLAGS="$LDFLAGS -L$withval/lib"
+        else
+            LDFLAGS="$LDFLAGS -L$withval"
+        fi
+        if test -d "$withval/include"; then
+            CFLAGS="$CFLAGS -I$withval/include -I$withval/include/wolfssl"
+        else
+            CFLAGS="$CFLAGS -I$withval -I$withval/wolfssl"
+        fi
       fi
-      if test -d "$withval/include"; then
-          CFLAGS="$CFLAGS -I$withval/include -I$withval/include/wolfssl"
+
+      AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <wolfssl/ssl.h>]], [[ wolfSSL_Init(); ]])], [ wolfssl_linked=yes ],[ wolfssl_linked=no ])
+
+      if test "x$wolfssl_linked" == "xno" ; then
+        AC_MSG_ERROR([wolfSSL Library not found.
+            If it's already installed, specify its path using --with-wolfssl=/dir/])
+
       else
-          CFLAGS="$CFLAGS -I$withval -I$withval/wolfssl"
+        ENABLED_WOLFSSL=yes
       fi
-    fi
-
-    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <wolfssl/ssl.h>]], [[ wolfSSL_Init(); ]])], [ wolfssl_linked=yes ],[ wolfssl_linked=no ])
-
-    if test "x$wolfssl_linked" == "xno" ; then
-      AC_MSG_ERROR([wolfSSL Library not found.
-          If it's already installed, specify its path using --with-wolfssl=/dir/])
-
-    else
-      ENABLED_WOLFSSL=yes
     fi
   ]
 )
-
-AM_CONDITIONAL(HAVE_LIBWOLFSSL, [test "x$ENABLED_WOLFSSL" = "xyes"])
 AC_MSG_RESULT([$ENABLED_WOLFSSL])
-
+AM_CONDITIONAL(HAVE_LIBWOLFSSL, [test "x$ENABLED_WOLFSSL" = "xyes"])
 
 
 dnl Check for openssl
