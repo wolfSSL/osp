@@ -72,6 +72,7 @@ ELSE()
 		test_common_openssl.c
 	)
   IF(WOLFSSL)
+    include_directories(${WOLFSSL}/include)
     include_directories(${WOLFSSL}/include/wolfssl)
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-sign-conversion -include ${WOLFSSL}/include/wolfssl/options.h")
   ELSE(WOLFSSL)
