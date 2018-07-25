@@ -237,7 +237,7 @@ int pcre_keyvalue_buffer_append(server *srv, pcre_keyvalue_buffer *kvb, const ch
 	UNUSED(value);
 	UNUSED(srv);
 
-****return -1;
+	return -1;
 #endif
 }
 
