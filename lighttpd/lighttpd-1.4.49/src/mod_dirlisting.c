@@ -323,7 +323,7 @@ SETDEFAULTS_FUNC(mod_dirlisting_set_defaults) {
 				}
 			}
 #endif
-			(void)(j);
+	UNUSED(j);
 		}
 
 		if (!buffer_string_is_empty(s->show_readme)) {
@@ -1048,7 +1048,7 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 		memcpy(DIRLIST_ENT_NAME(tmp), dent->d_name, i + 1);
 
 		list->ent[list->used++] = tmp;
-		UNUSED(exclude_match);
+	UNUSED(exclude_match);
 	}
 	closedir(dp);
 
