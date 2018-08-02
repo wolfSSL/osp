@@ -7,6 +7,7 @@ set(SSF_VERSION_MINOR 0)
 set(SSF_VERSION_BOUNCE 1)
 set(SSF_VERSION_TRANSPORT 1)
 
+
 # --- Set client/server security
 if(SSF_SECURITY STREQUAL "FORCE_TCP_ONLY")
   message("** SSF_SECURITY is FORCE_TCP_ONLY")
@@ -159,9 +160,24 @@ set(BOOST_ROOT
       "${project_THIRDPARTY_DIR}/boost" CACHE PATH "Path of boost library")
 message("** BOOST_ROOT: ${BOOST_ROOT}")
 
+if(WOLFSSL)
+  find_library(WOLFSSL_LIB wolfssl
+             HINTS "${WOLFSSL}/lib")
+message("** USING_WOLFSSL")
+elseif()
 set(OPENSSL_ROOT_DIR
       "${project_THIRDPARTY_DIR}/openssl" CACHE PATH "Path of openssl library")
 message("** OPENSSL_ROOT_DIR: ${OPENSSL_ROOT_DIR}")
+endif()
+
+if(WOLFSSL)
+  include_directories(${WOLFSSL}/include)
+  include_directories(${WOLFSSL}/include/wolfssl)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASIO_USE_WOLFSSL")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBOOST_COROUTINES_NO_DEPRECATION_WARNING")
+elseif()
+  include_directories(${OPENSSL_INCLUDE_DIR})
+endif()
 
 # --- Include platform specific CMakeList
 
@@ -208,6 +224,7 @@ find_package(
     ${BOOST_PLATFORM_COMPONENTS}
 )
 
+if(NOT WOLFSSL)
 # --- OpenSSL components
 find_package(
   OpenSSL REQUIRED
@@ -215,10 +232,12 @@ find_package(
     STATIC
     ${OPENSSL_PLATFORM_FLAGS}
 )
+endif()
+
 
 # --- Setup version.h file
 set(SSF_VERSION_BOOST ${Boost_VERSION})
-set(SSF_VERSION_OPENSSL ${OpenSSL_VERSION})
+#set(SSF_VERSION_OPENSSL ${OpenSSL_VERSION})
 
 configure_file(${project_SRC_DIR}/versions.h.in ${project_BINARY_DIR}/versions.h)
 include_directories(${project_BINARY_DIR})
@@ -256,7 +275,7 @@ set(SSF_SOURCES
       ${SERVER_FILES}
 )
 
-set (BUILD_UNIT_TESTS ON)
+
 if (BUILD_UNIT_TESTS)
   include(GTest)
 
