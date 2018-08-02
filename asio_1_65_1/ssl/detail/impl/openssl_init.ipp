@@ -37,6 +37,9 @@ public:
   do_init()
   {
 #if (OPENSSL_VERSION_NUMBER < 0x10100000L)
+#if defined(ASIO_USE_WOLFSSL) && defined(DEBUG_WOLFSSL)
+    ::wolfSSL_Debugging_ON();
+#endif
     ::SSL_library_init();
     ::SSL_load_error_strings();        
     ::OpenSSL_add_all_algorithms();
@@ -85,7 +88,7 @@ public:
     ::SSL_COMP_free_compression_methods();
 #endif // (OPENSSL_VERSION_NUMBER >= 0x10002000L)
        // && (OPENSSL_VERSION_NUMBER < 0x10100000L)
-#if !defined(OPENSSL_IS_BORINGSSL)
+#if !defined(OPENSSL_IS_BORINGSSL) && !defined(ASIO_USE_WOLFSSL)
     ::CONF_modules_unload(1);
 #endif // !defined(OPENSSL_IS_BORINGSSL)
 #if !defined(OPENSSL_NO_ENGINE) \

@@ -15,6 +15,10 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
+#if defined(ASIO_USE_WOLFSSL)
+#include <wolfssl/options.h>
+#endif
+
 #include <boost/asio/ssl/basic_context.hpp>
 #include <boost/asio/ssl/context.hpp>
 #include <boost/asio/ssl/context_base.hpp>
