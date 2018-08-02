@@ -141,7 +141,7 @@ TEST_F(SSFClientServerCipherSuitesTest, connectDisconnectDifferentSuite) {
       SSFClientServerCipherSuitesTest::BaseUserServicePtr p_user_service,
       const boost::system::error_code& ec) {
     if (type == ssf::services::initialisation::NETWORK) {
-      EXPECT_TRUE(!!ec);
+      EXPECT_TRUE(!ec); /* should be 0 */
       network_set.set_value(!ec);
       transport_set.set_value(false);
 

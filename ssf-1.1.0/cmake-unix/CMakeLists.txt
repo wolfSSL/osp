@@ -21,18 +21,23 @@ if (UNIX)
   set(COPY_FILE_SERVICE_FILES
       ${COPY_FILE_SERVICE_FILES}
       ${COPY_FILE_SERVICE_LINUX_FILES})
-  
+
   # --- Flags for compilation
   if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
     set(CLANG_NO_BOOST_WARNINGS "-Wno-unneeded-internal-declaration -Wno-unused-variable")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -std=c++11 -stdlib=libc++ ${CLANG_NO_BOOST_WARNINGS}")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -Wall -ggdb -std=c++11 -stdlib=libc++ ${CLANG_NO_BOOST_WARNINGS}")
-    set(PLATFORM_SPECIFIC_LIB_DEP "pthread")
+    set(PLATFORM_SPECIFIC_LIB_DEP "pthread" "rt")
   else()
     set(GCC_NO_BOOST_WARNINGS "-Wno-long-long -Wno-unused-value -Wno-unused-local-typedefs")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -std=c++11 ${GCC_NO_BOOST_WARNINGS}")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -Wall -ggdb -std=c++0x ${GCC_NO_BOOST_WARNINGS}")
     set(PLATFORM_SPECIFIC_LIB_DEP "pthread" "rt" ${CMAKE_DL_LIBS})
   endif ()
+
+  # --- Compilation flag for wolfSSL support
+  if(WOLFSSL)
+    set(PLATFORM_SPECIFIC_LIB_DEP ${PLATFORM_SPECIFIC_LIB_DEP} "wolfssl")
+  endif()
 endif(UNIX)
 
