@@ -1,4 +1,4 @@
-if (OPENSSL_FOUND)
+if (OPENSSL_FOUND OR WOLFSSL)
 
 # Test transport integration
 file (GLOB SOURCE integration.cpp)

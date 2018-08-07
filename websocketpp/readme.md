@@ -44,17 +44,6 @@ http://groups.google.com/group/websocketpp-announcements/
 **Discussion / Development / Support Mailing List / Forum**
 http://groups.google.com/group/websocketpp/
 
-
 Author
 ======
 Peter Thorson - websocketpp@zaphoyd.com
-
-##Building WebSocket++ with unit tests and examples using wolfSSL
-Note: You will need to have the wolfSSL compatible Boost.Asio version installed and wolfSSL installed configured with
-$ configure --enable-asio
-
- $ cd /path/to/websocketpp/root
- 
- $ cmake -DBUILD\_TESTS=ON -DBUILD\_EXAMPLES=ON -DWOLFSSL=<wolfssl installed directory>
- 
- $ sudo make install
