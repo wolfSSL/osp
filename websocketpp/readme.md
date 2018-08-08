@@ -47,3 +47,40 @@ http://groups.google.com/group/websocketpp/
 Author
 ======
 Peter Thorson - websocketpp@zaphoyd.com
+
+Building and testing WebSocket++ with wolfSSL
+=============================================
+Note: You will need to have the wolfSSL compatible version of Boost.Asio installed.
+
+Install wolfSSL with the following commands:
+
+* $ git clone https://github.com/wolfSSL/wolfssl.git
+* $ ./autogen.sh
+* $ ./configure --enable-opensslall --enable-opensslextra
+* $ make
+* $ sudo make install
+
+To run the unit tests with ctest, execute the following commands from the root directory of WebSocket++:
+
+Note: CMake must be installed.
+
+* $ cmake -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON -DWOLFSSL=/path/to/wolfSSL/installation .
+* $ make
+* $ ctest .
+* $ sudo make install       (if installing)
+
+To run the unit tests with SCons, execute the following commands from the root directory of WebSocket++:
+
+Note: CMake and SCons must be installed.
+
+* $ cmake -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON -DWOLFSSL=/path/to/wolfSSL/installation .
+* $ make
+* $ sudo make install       (if installing)
+* $ export BOOST_ROOT=/path/to/boost/root
+* $ export WOLFSSL_PATH=/path/to/wolfSSL/installation
+* $ scons
+* $ scons test
+
+Testing with Scons conducts more tests but requires more third party software.
+
+If CTest passes 100% of the tests, it is more than likely that SCons will too.
