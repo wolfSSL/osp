@@ -2,7 +2,7 @@
 file (GLOB SOURCE_FILES *.cpp)
 file (GLOB HEADER_FILES *.hpp)
 
-if (OPENSSL_FOUND)
+if (OPENSSL_FOUND OR WOLFSSL)
 
 init_target (debug_client)
 

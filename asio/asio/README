@@ -2,3 +2,14 @@ asio version 1.12.0
 Released Sunday, 04 March 2018.
 
 See doc/index.html for API documentation and a tutorial.
+
+To boostify asio for wolfSSL compatibility with Boost.asio do as follows:
+
+Run the command `./boostify.pl` in `asio/asio`.
+
+The boostified version of asio is now located in `asio/asio/boostified/libs/asio/include/boost`.
+
+Replace the asio folder in your Boost download with this boostified version of asio.
+
+Compile Boost.
+

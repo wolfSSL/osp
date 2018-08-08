@@ -39,6 +39,10 @@ if os.environ.has_key('OPENSSL_PATH'):
    env.Append(CPPPATH = os.path.join(os.environ['OPENSSL_PATH'], 'include'))
    env.Append(LIBPATH = os.environ['OPENSSL_PATH'])
 
+if os.environ.has_key('WOLFSSL_PATH'):
+   env.Append(CPPPATH = os.path.join(os.environ['WOLFSSL_PATH'], 'include/wolfssl'))
+   env.Append(LIBPATH = os.environ['WOLFSSL_PATH'])
+
 if os.environ.has_key('WSPP_ENABLE_CPP11'):
    env['WSPP_ENABLE_CPP11'] = True
 else:
@@ -138,10 +142,22 @@ tls_build = False
 
 if env['PLATFORM'] == 'posix':
    platform_libs = ['pthread', 'rt']
-   tls_libs = ['ssl', 'crypto']
+   if os.environ.has_key('WOLFSSL_PATH'):
+      tls_libs = ['wolfssl']
+      env.Append(CCFLAGS = ['-DBOOST_ASIO_USE_WOLFSSL'])
+      env.Append(CCFLAGS = ['-DASIO_USE_WOLFSSL'])
+      env.Append(CCFLAGS = ['-DWOLFSSL_ASIO'])
+   else:
+      tls_libs = ['ssl', 'crypto']
    tls_build = True
 elif env['PLATFORM'] == 'darwin':
-   tls_libs = ['ssl', 'crypto']
+   if os.environ.has_key('WOLFSSL_PATH'):
+      tls_libs = ['wolfssl']
+      env.Append(CCFLAGS = ['-DBOOST_ASIO_USE_WOLFSSL'])
+      env.Append(CCFLAGS = ['-DASIO_USE_WOLFSSL'])
+      env.Append(CCFLAGS = ['-DWOLFSSL_ASIO'])
+   else:
+      tls_libs = ['ssl', 'crypto']
    tls_build = True
 elif env['PLATFORM'].startswith('win'):
    # Win/VC++ supports autolinking. nothing to do.
