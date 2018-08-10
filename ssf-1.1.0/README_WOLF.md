@@ -1,4 +1,4 @@
-# Building SSF with wolfSSL README is currently incomplete, use this in the meantime
+# Building SSF with wolfSSL
 
 Port of SSF 1.1.0 with Boost/Asio 1.65.1 for wolfSSL. Project completed 07/2018.
 
@@ -27,6 +27,9 @@ The build option `ASIO_USE_WOLFSSL` is used to indicate wolfSSL as the TLS provi
     $ `make check`
     $ `sudo make install`
     $ `sudo ldconfig`
+
+   To Enable Intel Optimizations use:
+   $ `./configure --enable-asio --enable-sp --enable-intelasm --enable-aesni --enable-intelrand`
 
 3. Download SSF 1.1.0 and extract
 
