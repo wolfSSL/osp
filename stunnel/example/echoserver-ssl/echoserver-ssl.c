@@ -23,6 +23,7 @@
     #include <config.h>
 #endif
 
+#include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
 #include <wolfssl/wolfcrypt/settings.h>
 

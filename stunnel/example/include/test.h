@@ -11,6 +11,8 @@
 #include <wolfssl/wolfcrypt/error-crypt.h>
 #include <wolfssl/wolfcrypt/random.h>
 
+#define INLINE    WC_INLINE
+
 #ifdef ATOMIC_USER
     #include <wolfssl/wolfcrypt/aes.h>
     #include <wolfssl/wolfcrypt/arc4.h>

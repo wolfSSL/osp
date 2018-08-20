@@ -426,6 +426,7 @@ extern char *sys_errlist[];
 #include <wolfssl/wolfcrypt/dh.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
 #include <wolfssl/openssl/ec.h>
+#include <wolfssl/openssl/objects.h>
 #endif /* defined(WITH_WOLFSSL) */
 
 /**************************************** OpenSSL headers */
@@ -497,6 +498,10 @@ extern char *sys_errlist[];
 #ifndef OPENSSL_NO_SSL2
 #define OPENSSL_NO_SSL2
 #endif /* !defined(OPENSSL_NO_SSL2) */
+
+#ifndef OPENSSL_NO_MD4
+#define OPENSSL_NO_MD4
+#endif /* OPENSSL_NO_MD4 */
 
 #endif /* defined (WITH_WOLFSSL) */
 
