@@ -201,7 +201,7 @@ int data_config_pcre_compile(data_config *dc) {
 int data_config_pcre_exec(data_config *dc, cond_cache_t *cache, buffer *b) {
 #ifdef HAVE_PCRE_H
     #ifndef elementsof
-    #define elementsof(x) (sizeof(x) / sizeof(x[0]))
+        #define elementsof(x) (sizeof(x) / sizeof(x[0]))
     #endif
     cache->patterncount =
       pcre_exec(dc->regex, dc->regex_study, CONST_BUF_LEN(b), 0, 0,
@@ -210,6 +210,9 @@ int data_config_pcre_exec(data_config *dc, cond_cache_t *cache, buffer *b) {
         cache->comp_value = b; /* holds pointer to b (!) for pattern subst */
     return cache->patterncount;
 #else
+    (void)dc;
+    (void)cache;
+    (void)b;
     return 0;
-#endif
 }
+#endif

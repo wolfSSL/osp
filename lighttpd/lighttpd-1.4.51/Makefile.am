@@ -1,6 +1,6 @@
 SUBDIRS=src doc tests
 
-EXTRA_DIST=autogen.sh SConstruct CMakeLists.txt meson.build meson_options.txt README.FreeBSD scripts
+EXTRA_DIST=autogen.sh SConstruct CMakeLists.txt meson.build meson_options.txt README.FreeBSD scripts wolfStartUp
 
 ACLOCAL_AMFLAGS = -I m4 -I scripts/m4
 

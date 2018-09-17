@@ -2048,6 +2048,10 @@ int main (int argc, char **argv) {
     }
   #endif
 
+  #ifdef DEBUG_WOLFSSL
+    wolfSSL_Debugging_ON();
+  #endif
+
     /* for nice %b handling in strftime() */
     setlocale(LC_TIME, "C");
 

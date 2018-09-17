@@ -88,6 +88,9 @@ int pcre_keyvalue_buffer_append(server *srv, pcre_keyvalue_buffer *kvb, buffer *
 	UNUSED(kvb);
 	UNUSED(key);
 	UNUSED(value);
+	UNUSED(srv);
+
+	return -1;
 #endif
 
 	return 0;

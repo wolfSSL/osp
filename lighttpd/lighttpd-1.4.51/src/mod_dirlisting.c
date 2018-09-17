@@ -87,6 +87,7 @@ static excludes_buffer *excludes_buffer_init(void) {
 	return exb;
 }
 
+#ifndef USE_WOLFSSL
 static int excludes_buffer_append(excludes_buffer *exb, buffer *string) {
 #ifdef HAVE_PCRE_H
 	size_t i;
@@ -133,6 +134,7 @@ static int excludes_buffer_append(excludes_buffer *exb, buffer *string) {
 	return -1;
 #endif
 }
+#endif
 
 static void excludes_buffer_free(excludes_buffer *exb) {
 #ifdef HAVE_PCRE_H
@@ -325,6 +327,7 @@ SETDEFAULTS_FUNC(mod_dirlisting_set_defaults) {
 				}
 			}
 #endif
+	UNUSED(j);
 		}
 
 		if (!buffer_string_is_empty(s->show_readme)) {
@@ -1049,6 +1052,7 @@ static int http_list_directory(server *srv, connection *con, plugin_data *p, buf
 		memcpy(DIRLIST_ENT_NAME(tmp), dent->d_name, i + 1);
 
 		list->ent[list->used++] = tmp;
+	UNUSED(exclude_match);
 	}
 	closedir(dp);
 

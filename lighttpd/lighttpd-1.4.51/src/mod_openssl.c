@@ -17,6 +17,11 @@
 #ifndef OPENSSL_NO_DH
 #include <openssl/dh.h>
 #endif
+#ifdef HAVE_WOLFSSL_SSL_H
+#include <openssl/bio.h>
+#include <openssl/objects.h>
+#include <openssl/pem.h>
+#endif
 
 #if ! defined OPENSSL_NO_TLSEXT && ! defined SSL_CTRL_SET_TLSEXT_HOSTNAME
 #define OPENSSL_NO_TLSEXT
@@ -546,6 +551,163 @@ network_openssl_ssl_conf_cmd (server *srv, plugin_config *s)
   #endif
 }
 
+#if defined(HAVE_WOLFSSL_SSL_H) && defined(HAVE_PK_CALLBACKS)
+
+static int tls_create_key_cb(WOLFSSL* ssl, ecc_key* key, word32 keySz,
+    int ecc_curve, void* ctx)
+{
+    int     ret;
+    server* srv = (server*)ctx;
+    WC_RNG  rng;
+
+    (void)ssl;
+    (void)srv;
+
+    /* use software as reference */
+    ret = wc_InitRng(&rng);
+    if (ret == 0) {
+        ret = wc_ecc_make_key_ex(&rng, keySz, key, ecc_curve);
+
+        wc_FreeRng(&rng);
+    }
+
+    return ret;
+}
+
+static int tls_create_pms_cb(WOLFSSL* ssl, ecc_key* otherKey,
+        unsigned char* pubKeyDer, unsigned int* pubKeySz,
+        unsigned char* out, unsigned int* outlen,
+        int side, void* ctx)
+{
+    int       ret;
+    server*   srv = (server*)ctx;
+    ecc_key   tmpKey;
+    ecc_key*  privKey = NULL;
+    ecc_key*  pubKey = NULL;
+
+    if (pubKeyDer == NULL || pubKeySz == NULL || out == NULL || outlen == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    (void)ssl;
+    (void)srv;
+    (void)otherKey;
+
+    ret = wc_ecc_init(&tmpKey);
+    if (ret != 0) {
+        return ret;
+    }
+
+    /* use software as reference */
+    /* for client: create and export public key */
+    if (side == WOLFSSL_CLIENT_END) {
+        WC_RNG rng;
+
+        privKey = &tmpKey;
+        pubKey = otherKey;
+
+        ret = wc_InitRng(&rng);
+        if (ret == 0) {
+            ret = wc_ecc_make_key_ex(&rng, 0, privKey, otherKey->dp->id);
+            if (ret == 0)
+                ret = wc_ecc_export_x963(privKey, pubKeyDer, pubKeySz);
+            wc_FreeRng(&rng);
+        }
+    }
+
+    /* for server: import public key */
+    else if (side == WOLFSSL_SERVER_END) {
+        privKey = otherKey;
+        pubKey = &tmpKey;
+
+        ret = wc_ecc_import_x963_ex(pubKeyDer, *pubKeySz, pubKey,
+            otherKey->dp->id);
+    }
+    else {
+        ret = BAD_FUNC_ARG;
+    }
+
+    /* generate shared secret and return it */
+    if (ret == 0) {
+        ret = wc_ecc_shared_secret(privKey, pubKey, out, outlen);
+    }
+
+    return ret;
+}
+
+
+/**
+ * \brief Sign received digest so far for private key to be proved.
+ */
+static int tls_sign_certificate_cb(WOLFSSL* ssl, const byte* in, word32 inSz,
+    byte* out, word32* outSz, const byte* key, word32 keySz, void* ctx)
+{
+    int     ret;
+    server* srv = (server*)ctx;
+    ecc_key tmpKey;
+    WC_RNG  rng;
+    word32  idx = 0;
+
+    (void)ssl;
+    (void)inSz;
+    (void)key;
+    (void)keySz;
+    (void)srv;
+
+    if (in == NULL || out == NULL || outSz == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    /* use software as reference */
+    ret = wc_InitRng(&rng);
+    if (ret != 0)
+        return ret;
+
+    ret = wc_ecc_init(&tmpKey);
+    if (ret == 0) {
+        ret = wc_EccPrivateKeyDecode(key, &idx, &tmpKey, keySz);
+        if (ret == 0)
+            ret = wc_ecc_sign_hash(in, inSz, out, outSz, &rng, &tmpKey);
+        wc_ecc_free(&tmpKey);
+    }
+    wc_FreeRng(&rng);
+
+    return ret;
+}
+
+/**
+ * \brief Verify signature received from peers to prove peer's private key.
+ */
+static int tls_verify_signature_cb(WOLFSSL* ssl, const byte* sig, word32 sigSz,
+    const byte* hash, word32 hashSz, const byte* key, word32 keySz, int* result,
+    void* ctx)
+{
+    int     ret;
+    server* srv = (server*)ctx;
+    ecc_key tmpKey;
+    word32  idx = 0;
+
+    (void)sigSz;
+    (void)hashSz;
+    (void)srv;
+
+    if (ssl == NULL || key == NULL || sig == NULL || hash == NULL || result == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    /* use software as reference */
+    ret = wc_ecc_init(&tmpKey);
+    if (ret == 0) {
+        ret = wc_EccPublicKeyDecode(key, &idx, &tmpKey, keySz);
+        if (ret == 0)
+            ret = wc_ecc_verify_hash(sig, sigSz, hash, hashSz, result, &tmpKey);
+        wc_ecc_free(&tmpKey);
+    }
+
+    return ret;
+}
+
+#endif /* HAVE_WOLFSSL_SSL_H && HAVE_PK_CALLBACKS */
 
 static int
 network_init_ssl (server *srv, void *p_d)
@@ -695,6 +857,17 @@ network_init_ssl (server *srv, void *p_d)
             return -1;
         }
 
+#if defined(HAVE_WOLFSSL_SSL_H) && defined(HAVE_PK_CALLBACKS)
+        log_error_write(srv, __FILE__, __LINE__, "ss", "SSL:",
+                                "setting PK callbacks");
+
+        /* Setup PK Callbacks */
+        wolfSSL_CTX_SetEccKeyGenCb(s->ssl_ctx, tls_create_key_cb);
+        wolfSSL_CTX_SetEccVerifyCb(s->ssl_ctx, tls_verify_signature_cb);
+        wolfSSL_CTX_SetEccSignCb(s->ssl_ctx, tls_sign_certificate_cb);
+        wolfSSL_CTX_SetEccSharedSecretCb(s->ssl_ctx, tls_create_pms_cb);
+#endif
+
         /* completely useless identifier;
          * required for client cert verification to work with sessions */
         if (0 == SSL_CTX_set_session_id_context(
@@ -719,6 +892,7 @@ network_init_ssl (server *srv, void *p_d)
         SSL_CTX_set_options(s->ssl_ctx, ssloptions);
         SSL_CTX_set_info_callback(s->ssl_ctx, ssl_info_callback);
 
+#ifndef HAVE_WOLFSSL_SSL_H /* wolfSSL doesn't support SSLV2 */
         if (!s->ssl_use_sslv2 && 0 != SSL_OP_NO_SSLv2) {
             /* disable SSLv2 */
             if ((SSL_OP_NO_SSLv2
@@ -729,6 +903,7 @@ network_init_ssl (server *srv, void *p_d)
                 return -1;
             }
         }
+#endif
 
         if (!s->ssl_use_sslv3 && 0 != SSL_OP_NO_SSLv3) {
             /* disable SSLv3 */
@@ -1539,6 +1714,14 @@ CONNECTION_FUNC(mod_openssl_handle_con_accept)
                         ERR_error_string(ERR_get_error(), NULL));
         return HANDLER_ERROR;
     }
+
+#if defined(HAVE_WOLFSSL_SSL_H) && defined(HAVE_PK_CALLBACKS)
+        /* Setup PK Callbacks context */
+        wolfSSL_SetEccKeyGenCtx(hctx->ssl, srv);
+        wolfSSL_SetEccVerifyCtx(hctx->ssl, srv);
+        wolfSSL_SetEccSignCtx(hctx->ssl, srv);
+        wolfSSL_SetEccSharedSecretCtx(hctx->ssl, srv);
+#endif
 
     buffer_copy_string_len(con->proto, CONST_STR_LEN("https"));
     con->network_read = connection_read_cq_ssl;
