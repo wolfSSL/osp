@@ -87,7 +87,6 @@ static excludes_buffer *excludes_buffer_init(void) {
 	return exb;
 }
 
-#ifndef USE_WOLFSSL
 static int excludes_buffer_append(excludes_buffer *exb, buffer *string) {
 #ifdef HAVE_PCRE_H
 	size_t i;
@@ -134,7 +133,6 @@ static int excludes_buffer_append(excludes_buffer *exb, buffer *string) {
 	return -1;
 #endif
 }
-#endif
 
 static void excludes_buffer_free(excludes_buffer *exb) {
 #ifdef HAVE_PCRE_H

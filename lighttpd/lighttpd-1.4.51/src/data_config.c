@@ -214,5 +214,5 @@ int data_config_pcre_exec(data_config *dc, cond_cache_t *cache, buffer *b) {
     (void)cache;
     (void)b;
     return 0;
-}
 #endif
+}
