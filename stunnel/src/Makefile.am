@@ -42,7 +42,7 @@ stunnel_CPPFLAGS = -I/usr/kerberos/include
 
 # Additional preprocesor definitions
 if WOLFSSL
-stunnel_CPPFLAGS += -I$(SSLDIR)/include  -I$(SSLDIR)/include/wolfssl
+stunnel_CPPFLAGS += -I$(SSLDIR)/include/wolfssl -I$(SSLDIR)/include
 else
 stunnel_CPPFLAGS += -I$(SSLDIR)/include
 endif
