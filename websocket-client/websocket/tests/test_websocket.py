@@ -42,6 +42,9 @@ TEST_WITH_INTERNET = os.environ.get('TEST_WITH_INTERNET', '0') == '1'
 TEST_SECURE_WS = True
 TRACEABLE = True
 
+# Skip Secure WebSocket test with wolfSSL, TEST_SECURE_WS must be True to run
+TEST_SECURE_WS_WOLFSSL = True
+
 
 def create_mask_key(_):
     return "abcd"
@@ -442,6 +445,39 @@ class WebSocketTest(unittest.TestCase):
             s.close()
         #except:
         #    pass
+
+    @unittest.skipUnless(TEST_WITH_INTERNET, "Internet-requiring tests are disabled")
+    @unittest.skipUnless(TEST_SECURE_WS, "wss://echo.websocket.org doesn't work well.")
+    @unittest.skipUnless(TEST_SECURE_WS_WOLFSSL, "wolfSSL tests are disabled")
+    def testSecureWebSocketWolfSSL(self):
+        if 1:
+            import wolfssl
+            # inject wolfSSL, use instead of Python ssl
+            ws._ssl_compat.inject_wolfssl()
+            s = ws.create_connection("wss://echo.websocket.org/")
+            self.assertNotEqual(s, None)
+            self.assertTrue(isinstance(s.sock, wolfssl.SSLSocket))
+            s.send("Hello, World")
+            result = s.recv()
+            self.assertEqual(result, "Hello, World")
+            s.send(u"こにゃにゃちは、世界")
+            result = s.recv()
+            self.assertEqual(result, "こにゃにゃちは、世界")
+            s.close()
+
+            import ssl
+            # extract wolfSSL, should use normal ssl now
+            ws._ssl_compat.extract_wolfssl()
+            s = ws.create_connection("wss://echo.websocket.org/")
+            self.assertNotEqual(s, None)
+            self.assertTrue(isinstance(s.sock, ssl.SSLSocket))
+            s.send("Hello, World")
+            result = s.recv()
+            self.assertEqual(result, "Hello, World")
+            s.send(u"こにゃにゃちは、世界")
+            result = s.recv()
+            self.assertEqual(result, "こにゃにゃちは、世界")
+            s.close()
 
     @unittest.skipUnless(TEST_WITH_INTERNET, "Internet-requiring tests are disabled")
     def testWebSocketWihtCustomHeader(self):

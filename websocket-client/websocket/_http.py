@@ -197,15 +197,15 @@ def _can_use_sni():
 
 
 def _wrap_sni_socket(sock, sslopt, hostname, check_hostname):
-    context = ssl.SSLContext(sslopt.get('ssl_version', ssl.PROTOCOL_SSLv23))
+    context = get_ssl().SSLContext(sslopt.get('ssl_version', get_ssl().PROTOCOL_SSLv23))
 
-    if sslopt.get('cert_reqs', ssl.CERT_NONE) != ssl.CERT_NONE:
+    if sslopt.get('cert_reqs', get_ssl().CERT_NONE) != get_ssl().CERT_NONE:
         cafile = sslopt.get('ca_certs', None)
         capath = sslopt.get('ca_cert_path', None)
         if cafile or capath:
             context.load_verify_locations(cafile=cafile, capath=capath)
         elif hasattr(context, 'load_default_certs'):
-            context.load_default_certs(ssl.Purpose.SERVER_AUTH)
+            context.load_default_certs(get_ssl().Purpose.SERVER_AUTH)
     if sslopt.get('certfile', None):
         context.load_cert_chain(
             sslopt['certfile'],
@@ -234,7 +234,7 @@ def _wrap_sni_socket(sock, sslopt, hostname, check_hostname):
 
 
 def _ssl_socket(sock, user_sslopt, hostname):
-    sslopt = dict(cert_reqs=ssl.CERT_REQUIRED)
+    sslopt = dict(cert_reqs=get_ssl().CERT_REQUIRED)
     sslopt.update(user_sslopt)
 
     certPath = os.environ.get('WEBSOCKET_CLIENT_CA_BUNDLE')
@@ -246,14 +246,14 @@ def _ssl_socket(sock, user_sslopt, hostname):
             and user_sslopt.get('ca_cert_path', None) is None:
         sslopt['ca_cert_path'] = certPath
 
-    check_hostname = sslopt["cert_reqs"] != ssl.CERT_NONE and sslopt.pop(
+    check_hostname = sslopt["cert_reqs"] != get_ssl().CERT_NONE and sslopt.pop(
         'check_hostname', True)
 
     if _can_use_sni():
         sock = _wrap_sni_socket(sock, sslopt, hostname, check_hostname)
     else:
         sslopt.pop('check_hostname', True)
-        sock = ssl.wrap_socket(sock, **sslopt)
+        sock = get_ssl().wrap_socket(sock, **sslopt)
 
     if not HAVE_CONTEXT_CHECK_HOSTNAME and check_hostname:
         match_hostname(sock.getpeercert(), hostname)
