@@ -59,7 +59,8 @@ log.addHandler(logging.StreamHandler(sys.stdout))
 
 class TestHTTPS(HTTPSDummyServerTestCase):
     def setUp(self):
-        self._pool = HTTPSConnectionPool(self.host, self.port)
+        self._pool = HTTPSConnectionPool(self.host, self.port,
+                                         ca_certs=DEFAULT_CA)
         self.addCleanup(self._pool.close)
 
     def test_simple(self):
@@ -68,14 +69,20 @@ class TestHTTPS(HTTPSDummyServerTestCase):
 
     @fails_on_travis_gce
     def test_dotted_fqdn(self):
-        pool = HTTPSConnectionPool(self.host + '.', self.port)
+        pool = HTTPSConnectionPool(self.host + '.', self.port,
+                                   ca_certs=DEFAULT_CA)
         r = pool.request('GET', '/')
         self.assertEqual(r.status, 200, r.data)
 
     def test_set_ssl_version_to_tlsv1(self):
         self._pool.ssl_version = ssl.PROTOCOL_TLSv1
-        r = self._pool.request('GET', '/')
-        self.assertEqual(r.status, 200, r.data)
+        try:
+            r = self._pool.request('GET', '/')
+            self.assertEqual(r.status, 200, r.data)
+        except ValueError as e:
+            # wolfSSL has TLS 1.0 disabled by default
+            if not ('this protocol is not supported') in str(e):
+                raise
 
     def test_client_intermediate(self):
         client_cert, client_key = (
@@ -84,7 +91,8 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         )
         https_pool = HTTPSConnectionPool(self.host, self.port,
                                          key_file=client_key,
-                                         cert_file=client_cert)
+                                         cert_file=client_cert,
+                                         ca_certs=DEFAULT_CA)
         r = https_pool.request('GET', '/certificate')
         subject = json.loads(r.data.decode('utf-8'))
         assert subject['organizationalUnitName'].startswith(
@@ -106,7 +114,9 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                     'unknown Cert Authority' in str(e) or
                     # https://github.com/urllib3/urllib3/issues/1422
                     'connection closed via error' in str(e) or
-                    'WSAECONNRESET' in str(e)):
+                    'WSAECONNRESET' in str(e) or
+                    # expected string from wolfSSL
+                    'error state on socket' in str(e)):
                 raise
         except ProtocolError as e:
             # https://github.com/urllib3/urllib3/issues/1422
@@ -466,13 +476,13 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                                          timeout=timeout, retries=False,
                                          cert_reqs='CERT_REQUIRED')
         self.addCleanup(https_pool.close)
-        https_pool.ca_certs = DEFAULT_CA
-        https_pool.assert_fingerprint = '92:81:FE:85:F7:0C:26:60:EC:D6:B3:' \
-                                        'BF:93:CF:F9:71:CC:07:7D:0A'
 
         timeout = Timeout(total=None)
         https_pool = HTTPSConnectionPool(self.host, self.port, timeout=timeout,
                                          cert_reqs='CERT_NONE')
+        https_pool.ca_certs = DEFAULT_CA
+        https_pool.assert_fingerprint = '92:81:FE:85:F7:0C:26:60:EC:D6:B3:' \
+                                        'BF:93:CF:F9:71:CC:07:7D:0A'
         self.addCleanup(https_pool.close)
         https_pool.request('GET', '/')
 
@@ -481,6 +491,9 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         timeout = Timeout(total=None)
         https_pool = HTTPSConnectionPool(self.host, self.port, timeout=timeout,
                                          cert_reqs='CERT_NONE')
+        https_pool.ca_certs = DEFAULT_CA
+        https_pool.assert_fingerprint = '92:81:FE:85:F7:0C:26:60:EC:D6:B3:' \
+                                        'BF:93:CF:F9:71:CC:07:7D:0A'
         self.addCleanup(https_pool.close)
         conn = https_pool._new_conn()
         self.addCleanup(conn.close)
@@ -519,6 +532,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         fingerprint = '92:81:FE:85:F7:0C:26:60:EC:D6:B3:BF:93:CF:F9:71:CC:07:7D:0A'
 
         conn = VerifiedHTTPSConnection(self.host, self.port)
+        conn.set_cert(ca_certs=DEFAULT_CA)
         self.addCleanup(conn.close)
         https_pool = HTTPSConnectionPool(self.host, self.port,
                                          cert_reqs='CERT_REQUIRED',

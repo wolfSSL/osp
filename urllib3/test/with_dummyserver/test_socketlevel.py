@@ -15,6 +15,7 @@ from urllib3.util.ssl_ import HAS_SNI
 from urllib3.util.timeout import Timeout
 from urllib3.util.retry import Retry
 from urllib3._collections import HTTPHeaderDict
+from urllib3.util import ssl_
 
 from dummyserver.testcase import SocketDummyServerTestCase, consume_socket
 from dummyserver.server import (
@@ -36,7 +37,6 @@ import ssl
 import pytest
 
 from test import fails_on_travis_gce
-
 
 class TestCookies(SocketDummyServerTestCase):
 
@@ -158,6 +158,13 @@ class TestClientCerts(SocketDummyServerTestCase):
         """
         done_receiving = Event()
         client_certs = []
+
+        # wolfSSL does not support loading a certificate file that contains
+        # both the certificate and private key together. For this case,
+        # users need to use individual files for each. Skipping this test,
+        # since dummyserver/certs/server.combined.pem contains both.
+        if ssl_.IS_WOLFSSL:
+            pytest.skip('wolfSSL does not support cert and key in same file')
 
         def socket_handler(listener):
             sock = listener.accept()[0]
@@ -900,6 +907,7 @@ class TestProxyManager(SocketDummyServerTestCase):
 
         url = 'https://{0}'.format(self.host)
         conn = proxy.connection_from_url(url)
+        conn.ca_certs = DEFAULT_CA
         r = conn.urlopen('GET', url, retries=0)
         self.assertEqual(r.status, 200)
         r = conn.urlopen('GET', url, retries=0)
@@ -944,6 +952,8 @@ class TestProxyManager(SocketDummyServerTestCase):
 
         url = 'https://[{0}]'.format(ipv6_addr)
         conn = proxy.connection_from_url(url)
+        conn.ca_certs = DEFAULT_CA
+        conn.assert_hostname = False
         try:
             r = conn.urlopen('GET', url, retries=0)
             self.assertEqual(r.status, 200)
@@ -978,7 +988,7 @@ class TestSSL(SocketDummyServerTestCase):
             ssl_sock.close()
 
         self._start_server(socket_handler)
-        pool = HTTPSConnectionPool(self.host, self.port)
+        pool = HTTPSConnectionPool(self.host, self.port, ca_certs=DEFAULT_CA)
         self.addCleanup(pool.close)
 
         with self.assertRaises(MaxRetryError) as cm:
@@ -1013,7 +1023,7 @@ class TestSSL(SocketDummyServerTestCase):
             ssl_sock.close()
 
         self._start_server(socket_handler)
-        pool = HTTPSConnectionPool(self.host, self.port)
+        pool = HTTPSConnectionPool(self.host, self.port, ca_certs=DEFAULT_CA)
         self.addCleanup(pool.close)
 
         response = pool.urlopen('GET', '/', retries=0, preload_content=False,
@@ -1103,7 +1113,7 @@ class TestSSL(SocketDummyServerTestCase):
 
         self._start_server(socket_handler)
 
-        pool = HTTPSConnectionPool(self.host, self.port)
+        pool = HTTPSConnectionPool(self.host, self.port, ca_certs=DEFAULT_CA)
         self.addCleanup(pool.close)
         response = pool.urlopen('GET', '/', retries=1)
         self.assertEqual(response.data, b'Success')
