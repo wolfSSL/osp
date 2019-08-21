@@ -418,6 +418,7 @@ extern char *sys_errlist[];
 /**************************************** wolfSSL headers */
 #ifdef WITH_WOLFSSL
 #include <wolfssl/options.h>
+#include <wolfssl/openssl/ssl.h>
 #include <wolfssl/wolfcrypt/wc_port.h>
 #include <wolfssl/wolfcrypt/coding.h>
 #ifdef WOLFSSL_DEBUG_ON
