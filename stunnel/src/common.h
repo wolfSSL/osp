@@ -499,6 +499,22 @@ extern char *sys_errlist[];
 #define OPENSSL_NO_SSL2
 #endif /* !defined(OPENSSL_NO_SSL2) */
 
+#ifndef CRYPTO_w_lock
+#define CRYPTO_w_lock CRYPTO_THREAD_lock
+#endif /* CRYPTO_w_lock */
+
+#if defined(NO_OLD_TLS) || !defined(WOLFSSL_ALLOW_TLSV10)
+#define OPENSSL_NO_TLS1
+#endif
+
+#ifdef NO_OLD_TLS
+#define OPENSSL_NO_TLS1_1
+#endif
+
+#ifdef WOLFSSL_NO_TLS12
+#define OPENSSL_NO_TLS1_2
+#endif
+
 #endif /* defined (WITH_WOLFSSL) */
 
 #if defined(USE_WIN32) && defined(OPENSSL_FIPS)

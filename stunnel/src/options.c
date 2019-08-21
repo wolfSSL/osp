@@ -2659,22 +2659,22 @@ NOEXPORT char *parse_service_option(CMD cmd, SERVICE_OPTIONS *section,
             return "SSLv3 not supported";
 #endif /* !defined(OPENSSL_NO_SSL3) */
         } else if(!strcasecmp(arg, "TLSv1")) {
-#if (!defined(WITH_WOLFSSL) && !defined(OPENSSL_NO_TLS1)) || (defined(WITH_WOLFSSL) && defined(NO_OLD_TLS) && defined(WOLFSSL_ALLOW_TLSV10))
+#ifndef OPENSSL_NO_TLS1
             section->client_method=(SSL_METHOD *)TLSv1_client_method();
             section->server_method=(SSL_METHOD *)TLSv1_server_method();
 #else /* defined(OPENSSL_NO_TLS1) */
             return "TLSv1 not supported";
 #endif /* !defined(OPENSSL_NO_TLS1) */
         } else if(!strcasecmp(arg, "TLSv1.1")) {
-#if (!defined(WITH_WOLFSSL) && !defined(OPENSSL_NO_TLS1_1)) || (defined(WITH_WOLFSSL) && defined(NO_OLD_TLS))
+#ifndef OPENSSL_NO_TLS1_1
             section->client_method=(SSL_METHOD *)TLSv1_1_client_method();
             section->server_method=(SSL_METHOD *)TLSv1_1_server_method();
 #else /* defined(OPENSSL_NO_TLS1_1) */
             return "TLSv1.1 not supported";
 #endif /* !defined(OPENSSL_NO_TLS1_1) */
         } else if(!strcasecmp(arg, "TLSv1.2")) {
-#if (!defined(WITH_WOLFSSL) && !defined(OPENSSL_NO_TLS1_2)) || (defined(WITH_WOLFSSL) && !defined(WOLFSSL_NO_TLS12))
-            section->client_method=(SSL_METHOD *)TLSv1_2_client_method();
+#ifndef OPENSSL_NO_TLS1_2
+        	section->client_method=(SSL_METHOD *)TLSv1_2_client_method();
             section->server_method=(SSL_METHOD *)TLSv1_2_server_method();
 #else /* defined(OPENSSL_NO_TLS1_2) */
             return "TLSv1.2 not supported";

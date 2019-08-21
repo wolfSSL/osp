@@ -452,11 +452,7 @@ NOEXPORT int getaddrinfo(const char *node, const char *service,
     /* not numerical: need to call resolver library */
     *res=NULL;
     ai=NULL;
-#ifdef WITH_WOLFSSL
-    CRYPTO_THREAD_lock(stunnel_locks[LOCK_INET]);
-#else
     CRYPTO_w_lock(stunnel_locks[LOCK_INET]);
-#endif
 #ifdef HAVE_GETHOSTBYNAME2
     h=gethostbyname2(node, AF_INET6);
     if(h) /* some IPv6 addresses found */
