@@ -503,6 +503,10 @@ extern char *sys_errlist[];
 #define CRYPTO_w_lock CRYPTO_THREAD_lock
 #endif /* CRYPTO_w_lock */
 
+#ifndef CRYPTO_w_unlock
+#define CRYPTO_w_unlock CRYPTO_THREAD_unlock
+#endif /* CRYPTO_w_lock */
+
 #if defined(NO_OLD_TLS) || !defined(WOLFSSL_ALLOW_TLSV10)
 #define OPENSSL_NO_TLS1
 #endif

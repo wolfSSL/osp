@@ -470,11 +470,7 @@ NOEXPORT int getaddrinfo(const char *node, const char *service,
 #ifdef HAVE_ENDHOSTENT
     endhostent();
 #endif
-#ifdef WITH_WOLFSSL
-    CRYPTO_THREAD_unlock(stunnel_locks[LOCK_INET]);
-#else
     CRYPTO_w_unlock(stunnel_locks[LOCK_INET]);
-#endif
     if(retval) { /* error: free allocated memory */
         freeaddrinfo(*res);
         *res=NULL;
