@@ -2674,7 +2674,7 @@ NOEXPORT char *parse_service_option(CMD cmd, SERVICE_OPTIONS *section,
 #endif /* !defined(OPENSSL_NO_TLS1_1) */
         } else if(!strcasecmp(arg, "TLSv1.2")) {
 #ifndef OPENSSL_NO_TLS1_2
-        	section->client_method=(SSL_METHOD *)TLSv1_2_client_method();
+            section->client_method=(SSL_METHOD *)TLSv1_2_client_method();
             section->server_method=(SSL_METHOD *)TLSv1_2_server_method();
 #else /* defined(OPENSSL_NO_TLS1_2) */
             return "TLSv1.2 not supported";
