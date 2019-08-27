@@ -418,6 +418,7 @@ extern char *sys_errlist[];
 /**************************************** wolfSSL headers */
 #ifdef WITH_WOLFSSL
 #include <wolfssl/options.h>
+#include <wolfssl/openssl/ssl.h>
 #include <wolfssl/wolfcrypt/wc_port.h>
 #include <wolfssl/wolfcrypt/coding.h>
 #ifdef WOLFSSL_DEBUG_ON
@@ -497,6 +498,26 @@ extern char *sys_errlist[];
 #ifndef OPENSSL_NO_SSL2
 #define OPENSSL_NO_SSL2
 #endif /* !defined(OPENSSL_NO_SSL2) */
+
+#ifndef CRYPTO_w_lock
+#define CRYPTO_w_lock CRYPTO_THREAD_lock
+#endif /* CRYPTO_w_lock */
+
+#ifndef CRYPTO_w_unlock
+#define CRYPTO_w_unlock CRYPTO_THREAD_unlock
+#endif /* CRYPTO_w_lock */
+
+#if defined(NO_OLD_TLS) || !defined(WOLFSSL_ALLOW_TLSV10)
+#define OPENSSL_NO_TLS1
+#endif
+
+#ifdef NO_OLD_TLS
+#define OPENSSL_NO_TLS1_1
+#endif
+
+#ifdef WOLFSSL_NO_TLS12
+#define OPENSSL_NO_TLS1_2
+#endif
 
 #endif /* defined (WITH_WOLFSSL) */
 

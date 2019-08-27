@@ -684,13 +684,13 @@ extern STUNNEL_RWLOCK stunnel_locks[STUNNEL_LOCKS];
 #define CRYPTO_THREAD_write_unlock(type) CRYPTO_THREAD_unlock(type)
 #elif defined(WITH_WOLFSSL)
 #define CRYPTO_THREAD_read_lock(type) \
-    if(type) CRYPTO_lock(type)
+    if(type) CRYPTO_THREAD_lock(type)
 #define CRYPTO_THREAD_read_unlock(type) \
-    if(type) CRYPTO_lock(type)
+    if(type) CRYPTO_THREAD_unlock(type)
 #define CRYPTO_THREAD_write_lock(type) \
-    if(type) CRYPTO_lock(type)
+    if(type) CRYPTO_THREAD_lock(type)
 #define CRYPTO_THREAD_write_unlock(type) \
-    if(type) CRYPTO_lock(type)
+    if(type) CRYPTO_THREAD_unlock(type)
 #define CRYPTO_atomic_add(addr,amount,result,type) \
     *result = type ? CRYPTO_add(addr,amount,type) : (*addr+=amount)
 #else
