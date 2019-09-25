@@ -23,7 +23,6 @@ Apache httpd is enabled with wolfSSL support using the option `--with-wolfssl[=D
 3. If APR and APR-Util are already installed, skip to step 4. Otherwise, get the Apache Portable Runtime library (APR):
     ```
     $   svn co http://svn.apache.org/repos/asf/apr/apr/trunk srclib/apr
-
     ```
 4. Build with wolfSSL and install:
     ```
@@ -33,7 +32,24 @@ Apache httpd is enabled with wolfSSL support using the option `--with-wolfssl[=D
     ```
     The default install directory is `/usr/local/apache2`.
 
-    See httpd-2.4.39/INSTALL for more information.
+See `httpd-2.4.39/INSTALL` for more information.
 
 ## Running Tests
-TODO: add test information
+
+1. Get Apache httpd test repo and configure:
+    ```
+    $   svn co http://svn.apache.org/repos/asf/httpd/test/framework/trunk/ httpd-test
+    $   cd httpd-test
+    $   perl Makefile.PL /usr/local/apache2/bin/apxs 
+    $   make
+    ```
+2. Run all tests through SSL:
+    ```
+    $   t/TEST -ssl -apxs /usr/local/apache2/bin/apxs 
+    ```
+To run only SSL tests:
+    ```
+    $   t/TEST t/ssl/
+    ```
+More information about apache httpd testing can be found under `httpd-test/README`
+
