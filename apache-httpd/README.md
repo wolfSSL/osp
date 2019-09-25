@@ -36,6 +36,8 @@ See `httpd-2.4.39/INSTALL` for more information.
 
 ## Running Tests
 
+NOTE: Apache httpd tests require the openssl command line utility.
+
 1. Get Apache httpd test repo and configure:
     ```
     $   svn co http://svn.apache.org/repos/asf/httpd/test/framework/trunk/ httpd-test
