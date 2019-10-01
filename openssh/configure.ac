@@ -3655,10 +3655,6 @@ DIGEST_SSL="digest-wolfssl.o"
 SSL_COMPAT="wolfssl-compat.o"
 RAND_MSG="WolfSSL Internal"
 AC_DEFINE([USING_WOLFSSL], [1], [Defined if using WolfSSL])
-AC_DEFINE([WOLFSSL_AES_DIRECT], [1], [Defined if using WolfSSL])
-AC_DEFINE([WOLFSSL_SHA384], [1], [Defined if using WolfSSL])
-AC_DEFINE([WOLFSSL_SHA512], [1], [Defined if using WolfSSL])
-AC_DEFINE([WOLFSSL_RIPEMD], [1], [Defined if using WolfSSL])
 AC_DEFINE([UNSUPPORTED_POSIX_THREADS_HACK], [1], [Defined if using WolfSSL])
 # OpenSSL tests for these. Just assume these are present for wolfSSL.
 AC_DEFINE([HAVE_BN_IS_PRIME_EX], [1], [Defined if using WolfSSL])
