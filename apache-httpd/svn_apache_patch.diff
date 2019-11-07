@@ -1,0 +1,167 @@
+Index: acinclude.m4
+===================================================================
+--- acinclude.m4	(revision 1869082)
++++ acinclude.m4	(working copy)
+@@ -477,6 +477,89 @@
+   fi
+ ])
+ 
++dnl Check for wolfSSL
++ENABLED_WOLFSSL=no
++AC_MSG_NOTICE([----------------------------------------])
++AC_MSG_CHECKING([for wolfSSL])
++AC_ARG_WITH([wolfssl],
++  [AC_HELP_STRING([--with-wolfssl@<:@=DIR@:>@],
++    [Include wolfSSL support (default no, yes=/usr/local)]
++  )],
++  [
++    if test "x$withval" != "xno" ; then
++      dnl local variables
++      ap_wolfssl_mod_ldflags=""
++      ap_wolfssl_mod_cflags=""
++      ap_wolfssl_libs=""
++
++      dnl backup flags
++      saved_CPPFLAGS="$CPPFLAGS"
++      saved_LDFLAGS="$LDFLAGS"
++      saved_LIBS="$LIBS"
++
++      dnl determine wolfSSL location and flags
++      if test "x$withval" == "xyes" || test "x$withval" == "x" ; then
++          ap_wolfssl_mod_ldflags="-L/usr/local/lib"
++          ap_wolfssl_mod_cflags="-I/usr/local/include -I/usr/local/include/wolfssl"
++      else
++        if test -d "$withval/lib" ; then
++            ap_wolfssl_mod_ldflags="-L$withval/lib"
++        else
++            ap_wolfssl_mod_ldflags="-L$withval"
++        fi
++        if test -d "$withval/include"; then
++            ap_wolfssl_mod_cflags="-I$withval/include -I$withval/include/wolfssl"
++        else
++            ap_wolfssl_mod_cflags="-I$withval -I$withval/wolfssl"
++        fi
++      fi
++      ap_wolfssl_libs="-lwolfssl"
++      ap_wolfssl_mod_cflags="$ap_wolfssl_mod_cflags -DUSE_WOLFSSL"
++
++      dnl test for wolfSSL
++      CPPFLAGS="$CPPFLAGS $ap_wolfssl_mod_cflags"
++      LDFLAGS="$LDFLAGS $ap_wolfssl_mod_ldflags"
++      LIBS="$LIBS $ap_wolfssl_libs"
++      AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <wolfssl/ssl.h>]], [[ wolfSSL_Init(); ]])], [ wolfssl_linked=yes ],[ wolfssl_linked=no ])
++
++      dnl restore flags
++      CPPFLAGS="$saved_CPPFLAGS"
++      LIBS="$saved_LIBS"
++      LDFLAGS="$saved_LDFLAGS"
++
++      if test "x$wolfssl_linked" == "xno" ; then
++        dnl handle library not found error
++        AC_MSG_ERROR([wolfSSL Library not found.
++            If it's already installed, specify its path using --with-wolfssl=/dir/])
++
++      else
++        ENABLED_WOLFSSL=yes
++
++        dnl make sure the SSL module is included
++        ac_cv_openssl=yes
++
++        AC_DEFINE(HAVE_WOLFSSL, 1, [Define if wolfSSL is available])
++
++        dnl add lib to module LDFLAGS and LIBS
++        MOD_LDFLAGS="$MOD_LDFLAGS $ap_wolfssl_libs"
++        LIBS="$LIBS $ap_wolfssl_libs"
++        APR_SETVAR(ab_LIBS, [$MOD_LDFLAGS])
++        APACHE_SUBST(ab_CFLAGS)
++        APACHE_SUBST(ab_LIBS)
++
++        dnl add CFLAGS and LDFLAGS to module and global
++        MOD_CFLAGS="$MOD_CFLAGS $ap_wolfssl_mod_cflags"
++        MOD_LDFLAGS="$MOD_LDFLAGS $ap_wolfssl_mod_ldflags"
++        CPPFLAGS="$CPPFLAGS $ap_wolfssl_mod_cflags"
++        LDFLAGS="$LDFLAGS $ap_wolfssl_mod_ldflags"
++      fi
++    fi
++  ]
++)
++AC_MSG_RESULT([$ENABLED_WOLFSSL])
++
++
++
+ dnl
+ dnl APACHE_CHECK_OPENSSL
+ dnl
+Index: modules/ssl/ssl_engine_io.c
+===================================================================
+--- modules/ssl/ssl_engine_io.c	(revision 1869082)
++++ modules/ssl/ssl_engine_io.c	(working copy)
+@@ -1354,8 +1354,12 @@
+             outctx->rc = APR_EAGAIN;
+             return APR_EAGAIN;
+         }
+-        else if (ERR_GET_LIB(ERR_peek_error()) == ERR_LIB_SSL &&
+-                 ERR_GET_REASON(ERR_peek_error()) == SSL_R_HTTP_REQUEST) {
++        else if ((ERR_GET_LIB(ERR_peek_error()) == ERR_LIB_SSL &&
++                 ERR_GET_REASON(ERR_peek_error()) == SSL_R_HTTP_REQUEST)
++#ifdef HAVE_WOLFSSL
++                 || (ssl_err = UNKNOWN_RECORD_TYPE))
++#endif
++        {
+             /*
+              * The case where OpenSSL has recognized a HTTP request:
+              * This means the client speaks plain HTTP on our HTTPS port.
+Index: modules/ssl/ssl_engine_kernel.c
+===================================================================
+--- modules/ssl/ssl_engine_kernel.c	(revision 1869082)
++++ modules/ssl/ssl_engine_kernel.c	(working copy)
+@@ -1005,7 +1005,9 @@
+              * Peeking 0 bytes actually works.
+              * See: http://marc.info/?t=145493359200002&r=1&w=2
+              */
++#if !defined(HAVE_WOLFSSL)
+             SSL_peek(ssl, peekbuf, 0);
++#endif
+ 
+             sslconn->reneg_state = RENEG_REJECT;
+ 
+Index: modules/ssl/ssl_private.h
+===================================================================
+--- modules/ssl/ssl_private.h	(revision 1869082)
++++ modules/ssl/ssl_private.h	(working copy)
+@@ -81,6 +81,10 @@
+ 
+ #include "ap_expr.h"
+ 
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#endif
++
+ /* OpenSSL headers */
+ #include <openssl/opensslv.h>
+ #if (OPENSSL_VERSION_NUMBER >= 0x10001000)
+Index: support/ab.c
+===================================================================
+--- support/ab.c	(revision 1869082)
++++ support/ab.c	(working copy)
+@@ -158,6 +158,10 @@
+ 
+ #if defined(HAVE_OPENSSL)
+ 
++#if defined(HAVE_WOLFSSL)
++#include <wolfssl/options.h>
++#endif
++
+ #include <openssl/rsa.h>
+ #include <openssl/crypto.h>
+ #include <openssl/x509.h>
+@@ -2554,7 +2558,9 @@
+                     meth = TLSv1_2_client_method();
+ #endif
+                 } else if (strncasecmp(opt_arg, "TLS1", 4) == 0) {
++#if !defined(HAVE_WOLFSSL) || (!defined(NO_OLD_TLS) && defined(WOLFSSL_ALLOW_TLSV10))
+                     meth = TLSv1_client_method();
++#endif
+                 }
+ #else /* #if OPENSSL_VERSION_NUMBER < 0x10100000L */
+                 meth = TLS_client_method();
