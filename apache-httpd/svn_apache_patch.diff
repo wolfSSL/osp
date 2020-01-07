@@ -1,11 +1,11 @@
-diff --git a/acinclude.m4 b/acinclude.m4
-index ce1d637..9058e91 100644
---- a/acinclude.m4
-+++ b/acinclude.m4
-@@ -477,6 +477,88 @@ AC_DEFUN([APACHE_REQUIRE_CXX],[
+Index: acinclude.m4
+===================================================================
+--- acinclude.m4	(revision 1869082)
++++ acinclude.m4	(working copy)
+@@ -477,6 +477,89 @@
    fi
  ])
-
+ 
 +dnl Check for wolfSSL
 +ENABLED_WOLFSSL=no
 +AC_MSG_NOTICE([----------------------------------------])
@@ -88,15 +88,34 @@ index ce1d637..9058e91 100644
 +AC_MSG_RESULT([$ENABLED_WOLFSSL])
 +
 +
++
  dnl
  dnl APACHE_CHECK_OPENSSL
  dnl
-
-diff --git a/modules/ssl/ssl_engine_kernel.c b/modules/ssl/ssl_engine_kernel.c
-index 41c4015..3b77691 100644
---- a/modules/ssl/ssl_engine_kernel.c
-+++ b/modules/ssl/ssl_engine_kernel.c
-@@ -1005,7 +1005,9 @@ static int ssl_hook_Access_classic(request_rec *r, SSLSrvConfigRec *sc, SSLDirCo
+Index: modules/ssl/ssl_engine_io.c
+===================================================================
+--- modules/ssl/ssl_engine_io.c	(revision 1869082)
++++ modules/ssl/ssl_engine_io.c	(working copy)
+@@ -1354,8 +1354,12 @@
+             outctx->rc = APR_EAGAIN;
+             return APR_EAGAIN;
+         }
+-        else if (ERR_GET_LIB(ERR_peek_error()) == ERR_LIB_SSL &&
+-                 ERR_GET_REASON(ERR_peek_error()) == SSL_R_HTTP_REQUEST) {
++        else if ((ERR_GET_LIB(ERR_peek_error()) == ERR_LIB_SSL &&
++                 ERR_GET_REASON(ERR_peek_error()) == SSL_R_HTTP_REQUEST)
++#ifdef HAVE_WOLFSSL
++                 || (ssl_err = UNKNOWN_RECORD_TYPE))
++#endif
++        {
+             /*
+              * The case where OpenSSL has recognized a HTTP request:
+              * This means the client speaks plain HTTP on our HTTPS port.
+Index: modules/ssl/ssl_engine_kernel.c
+===================================================================
+--- modules/ssl/ssl_engine_kernel.c	(revision 1869082)
++++ modules/ssl/ssl_engine_kernel.c	(working copy)
+@@ -1005,7 +1005,9 @@
               * Peeking 0 bytes actually works.
               * See: http://marc.info/?t=145493359200002&r=1&w=2
               */
@@ -105,66 +124,42 @@ index 41c4015..3b77691 100644
 +#endif
  
              sslconn->reneg_state = RENEG_REJECT;
-
-diff --git a/modules/ssl/ssl_private.h b/modules/ssl/ssl_private.h
-index f46814d..8bcf2d9 100644
---- a/modules/ssl/ssl_private.h
-+++ b/modules/ssl/ssl_private.h
-@@ -82,6 +82,7 @@
+ 
+Index: modules/ssl/ssl_private.h
+===================================================================
+--- modules/ssl/ssl_private.h	(revision 1869082)
++++ modules/ssl/ssl_private.h	(working copy)
+@@ -81,6 +81,10 @@
+ 
  #include "ap_expr.h"
  
- /* OpenSSL headers */
++#ifdef HAVE_WOLFSSL
 +#include <wolfssl/options.h>
++#endif
++
+ /* OpenSSL headers */
  #include <openssl/opensslv.h>
  #if (OPENSSL_VERSION_NUMBER >= 0x10001000)
- /* must be defined before including ssl.h */
-
-diff --git a/modules/ssl/ssl_engine_io.c b/modules/ssl/ssl_engine_io.c
-index 9f9b6c8..1371603 100644
---- a/modules/ssl/ssl_engine_io.c
-+++ b/modules/ssl/ssl_engine_io.c
-@@ -480,7 +480,11 @@ static int bio_filter_in_read(BIO *bio, char *in, int inlen)
-         if (APR_STATUS_IS_EAGAIN(inctx->rc) || APR_STATUS_IS_EINTR(inctx->rc)
-                || (inctx->rc == APR_SUCCESS && APR_BRIGADE_EMPTY(inctx->bb))) {
-             BIO_set_retry_read(bio);
-+#if defined(HAVE_WOLFSSL)
-+            return WOLFSSL_CBIO_ERR_WANT_READ;
-+#else
-             return -1;
-+#endif
-         }
- 
-         if (block == APR_BLOCK_READ 
-@@ -1356,8 +1360,9 @@ static apr_status_t ssl_io_filter_handshake(ssl_filter_ctx_t *filter_ctx)
-             outctx->rc = APR_EAGAIN;
-             return APR_EAGAIN;
-         }
--        else if (ERR_GET_LIB(ERR_peek_error()) == ERR_LIB_SSL &&
--                 ERR_GET_REASON(ERR_peek_error()) == SSL_R_HTTP_REQUEST) {
-+        else if ((ERR_GET_LIB(ERR_peek_error()) == ERR_LIB_SSL &&
-+                 ERR_GET_REASON(ERR_peek_error()) == SSL_R_HTTP_REQUEST) ||
-+                 (ssl_err = UNKNOWN_RECORD_TYPE)) {
-             /*
-              * The case where OpenSSL has recognized a HTTP request:
-              * This means the client speaks plain HTTP on our HTTPS port.
-
-diff --git a/support/ab.c b/support/ab.c
-index 779ef4c..80c1e15 100644
---- a/support/ab.c
-+++ b/support/ab.c
-@@ -158,6 +158,7 @@
+Index: support/ab.c
+===================================================================
+--- support/ab.c	(revision 1869082)
++++ support/ab.c	(working copy)
+@@ -158,6 +158,10 @@
  
  #if defined(HAVE_OPENSSL)
  
++#if defined(HAVE_WOLFSSL)
 +#include <wolfssl/options.h>
++#endif
++
  #include <openssl/rsa.h>
  #include <openssl/crypto.h>
  #include <openssl/x509.h>
-@@ -2554,7 +2555,9 @@ int main(int argc, const char * const argv[])
+@@ -2554,7 +2558,9 @@
                      meth = TLSv1_2_client_method();
  #endif
                  } else if (strncasecmp(opt_arg, "TLS1", 4) == 0) {
-+#if !defined(NO_OLD_TLS) && defined(WOLFSSL_ALLOW_TLSV10)
++#if !defined(HAVE_WOLFSSL) || (!defined(NO_OLD_TLS) && defined(WOLFSSL_ALLOW_TLSV10))
                      meth = TLSv1_client_method();
 +#endif
                  }

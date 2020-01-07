@@ -10,15 +10,14 @@ $   make && sudo make install
 ### Building Apache httpd
 Apache httpd is enabled with wolfSSL support using the option `--with-wolfssl[=DIR]`. The default directory is `/usr/local`.
 
-1. From the base directory, clone and unzip the repository:
+1. From the base directory, checkout the httpd branch:
     ```console
-    $   curl -o httpd-2.4.39.tar.gz http://apache.cs.utah.edu//httpd/httpd-2.4.39.tar.gz
-    $   tar -xzvf httpd-2.4.39.tar.gz
+    $   svn checkout https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x httpd-2.4.x/
     ```
 2. Apply patch:
     ```
-    $   cd httpd-2.4.39
-    $   patch -p1 < ../apache_httpd_patch.diff
+    $   cd httpd-2.4.x
+    $   svn patch ../svn_apache_patch.diff
     ```
 3. If APR and APR-Util are already installed, skip to step 4. Otherwise, get the Apache Portable Runtime library (APR):
     ```
@@ -38,10 +37,10 @@ See `httpd-2.4.39/INSTALL` for more information.
 
 NOTE: Apache httpd tests require the openssl command line utility.
 
-1. Get Apache httpd test repo and configure:
+1. Clone the wolfSSL testing repository and configure:
     ```
-    $   svn co http://svn.apache.org/repos/asf/httpd/test/framework/trunk/ httpd-test
-    $   cd httpd-test
+    $   git clone https://github.com/wolfssl/testing.git
+    $   cd testing/third-party/apache_httpd/httpd-test
     $   perl Makefile.PL /usr/local/apache2/bin/apxs 
     $   make
     ```
