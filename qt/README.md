@@ -1,4 +1,4 @@
-# wolfSSL Supoort for Qt 5.12
+# wolfSSL Support for Qt 5.12
 ## Building
 Requirements:
 * Linux environment - this version was tested on Ubuntu 18.04.3 LTS (GNU/Linux 4.15.0-62-generic x86\_64)
@@ -25,7 +25,7 @@ make install
 export WOLFSSL_LIBS="-L/path/to/wolfssl-install/lib -lwolfssl"
 ```
 
-###Building Qt 5.12 with wolfSSL
+### Building Qt 5.12 with wolfSSL
 
 1. Clone Qt library from base directory:
 ```
@@ -35,14 +35,14 @@ git clone git://code.qt.io/qt/qt5.git
 2. Checkout Qt version and init repository:
 ```
 cd qt5
-git checkout 5.13
+git checkout 5.12
 perl init-repository
 ```
 
 3. Apply patch:
 ```
 cd qtbase
-git apply -v ../../wolfssl-qt-513.patch
+git apply -v ../../wolfssl-qt-512.patch
 ```
 
 4. Configure:
@@ -56,15 +56,14 @@ git apply -v ../../wolfssl-qt-513.patch
 make -j4
 ```
 
+## Running tests
 
-##Running tests
-
-###To run all tests:
+### To run all tests:
 ```
 make check
 ```
 
-###SSL unit tests
+### SSL unit tests
 
 The Qt SSL unit tests can be found from the root qt5 directory: `qt5/qtbase/tests/auto/network/ssl/`
 
