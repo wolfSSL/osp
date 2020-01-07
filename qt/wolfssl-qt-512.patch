@@ -1,0 +1,485 @@
+diff --git a/examples/network/network.pro b/examples/network/network.pro
+index 1556e26ab1..e70744a570 100644
+--- a/examples/network/network.pro
++++ b/examples/network/network.pro
+@@ -30,6 +30,7 @@ qtHaveModule(widgets) {
+     }
+ 
+     qtConfig(openssl): SUBDIRS += securesocketclient
++    qtConfig(wolfssl): SUBDIRS += securesocketclient
+     qtConfig(dtls): SUBDIRS += secureudpserver secureudpclient
+     qtConfig(sctp): SUBDIRS += multistreamserver multistreamclient
+ }
+diff --git a/src/network/configure.json b/src/network/configure.json
+index 2c005f0efb..fae9649162 100644
+--- a/src/network/configure.json
++++ b/src/network/configure.json
+@@ -7,13 +7,17 @@
+ 
+     "commandline": {
+         "assignments": {
+-            "OPENSSL_PATH": "openssl.prefix"
++            "OPENSSL_PATH": "openssl.prefix",
++            "WOLFSSL_PATH": "wolfssl.prefix"
+         },
+         "options": {
+             "libproxy": "boolean",
+             "openssl": { "type": "optionalString", "values": [ "no", "yes", "linked", "runtime" ] },
+             "openssl-linked": { "type": "void", "name": "openssl", "value": "linked" },
+             "openssl-runtime": { "type": "void", "name": "openssl", "value": "runtime" },
++            "wolfssl": { "type": "optionalString", "values": [ "no", "yes", "linked", "runtime" ] },
++            "wolfssl-linked": { "type": "void", "name": "wolfssl", "value": "linked" },
++            "wolfssl-runtime": { "type": "void", "name": "wolfssl", "value": "runtime" },
+             "dtls": "boolean",
+             "sctp": "boolean",
+             "securetransport": "boolean",
+@@ -96,6 +100,40 @@
+                     "condition": "!config.msvc"
+                 }
+             ]
++        },
++        "wolfssl_headers": {
++            "label": "wolfSSL Headers with OpenSSL Compatibility",
++            "export": "wolfssl",
++            "test": {
++                "tail": [
++                    "#if !defined(OPENSSL_VERSION_NUMBER) || OPENSSL_VERSION_NUMBER-0 < 0x10000000L",
++                    "#  error OpenSSL >= 1.0.0 is required",
++                    "#endif",
++                    "#if OPENSSL_VERSION_NUMBER-0 >= 0x10002000L && !defined(OPENSSL_NO_EC) && !defined(SSL_CTRL_SET_CURVES)",
++                    "#  error OpenSSL was reported as >= 1.0.2 but is missing required features, possibly it's libressl which is unsupported",
++                    "#endif"
++                ]
++            },
++            "headers": [ "wolfssl/options.h", "wolfssl/ssl.h" ],
++            "sources": [
++                {
++                    "comment": "placeholder for OPENSSL_PATH",
++                    "libs": ""
++                }
++            ]
++        },
++        "wolfssl": {
++            "label": "wolfSSL with OpenSSL Compatibility",
++            "test": {
++                "inherit": "wolfssl_headers",
++                "main": "SSL_free(SSL_new(0));"
++            },
++            "sources": [
++                { "type": "wolfssl" },
++                {
++                    "libs": "-lwolfssl"
++                }
++            ]
+         }
+     },
+ 
+@@ -222,7 +260,7 @@
+             "output": [
+                 "privateFeature",
+                 { "type": "publicQtConfig", "condition": "!features.openssl-linked" },
+-                { "type": "define", "negative": true, "name": "QT_NO_OPENSSL" }
++                { "type": "define", "negative": true, "condition": "!features.openssl && !features.wolfssl", "name": "QT_NO_OPENSSL" }
+             ]
+         },
+         "openssl-runtime": {
+@@ -241,10 +279,37 @@
+                 { "type": "define", "name": "QT_LINKED_OPENSSL" }
+             ]
+         },
++        "wolfssl": {
++            "label": "wolfSSL",
++            "enable": "false",
++            "condition": "features.wolfssl-runtime || features.wolfssl-linked",
++            "output": [
++                "privateFeature",
++                { "type": "publicQtConfig", "condition": "!features.wolfssl-linked" },
++                { "type": "define", "negative": true, "name": "QT_NO_WOLFSSL" }
++            ]
++        },
++        "wolfssl-runtime": {
++            "autoDetect": "!config.winrt && !config.wasm",
++            "enable": "input.wolfssl == 'yes' || input.wolfssl == 'runtime'",
++            "disable": "input.wolfssl == 'no' || input.wolfssl == 'linked' || input.ssl == 'no'",
++            "condition": "!features.securetransport && libs.wolfssl_headers"
++        },
++        "wolfssl-linked": {
++            "label": "  Qt directly linked to wolfSSL",
++            "autoDetect": false,
++            "enable": "input.wolfssl == 'linked'",
++            "condition": "!features.securetransport && libs.wolfssl",
++            "output": [
++                "privateFeature",
++                { "type": "define", "name": "QT_LINKED_WOLFSSL" },
++                { "type": "define", "name": "QT_LINKED_OPENSSL" }
++            ]
++        },
+         "securetransport": {
+             "label": "SecureTransport",
+             "disable": "input.securetransport == 'no' || input.ssl == 'no'",
+-            "condition": "config.darwin && (input.openssl == '' || input.openssl == 'no')",
++            "condition": "config.darwin && (input.openssl == '' || input.openssl == 'no') && (input.wolfssl == '' || input.wolfssl == 'no')",
+             "output": [
+                 "privateFeature",
+                 { "type": "define", "name": "QT_SECURETRANSPORT" }
+@@ -252,19 +317,19 @@
+         },
+         "ssl": {
+             "label": "SSL",
+-            "condition": "config.winrt || features.securetransport || features.openssl",
++            "condition": "config.winrt || features.securetransport || features.openssl || features.wolfssl",
+             "output": [ "publicFeature", "feature" ]
+         },
+         "dtls": {
+             "label": "DTLS",
+             "purpose": "Provides a DTLS implementation",
+             "section": "Networking",
+-            "condition": "features.openssl && tests.dtls",
++            "condition": "features.openssl && !features.wolfssl && tests.dtls",
+             "output": [ "publicFeature" ]
+         },
+         "opensslv11": {
+             "label": "OpenSSL 1.1",
+-            "condition": "features.openssl && tests.openssl11",
++            "condition": "features.openssl && !features.wolfssl && tests.openssl11",
+             "output": [ "publicFeature" ]
+         },
+         "sctp": {
+@@ -394,6 +459,8 @@ For example:
+                 "openssl",
+                 "openssl-linked",
+                 "opensslv11",
++                "wolfssl",
++                "wolfssl-linked",
+                 "dtls",
+                 "sctp",
+                 "system-proxies"
+diff --git a/src/network/configure.pri b/src/network/configure.pri
+index ad4d711cba..9190632afc 100644
+--- a/src/network/configure.pri
++++ b/src/network/configure.pri
+@@ -10,4 +10,14 @@ defineTest(qtConfLibrary_openssl) {
+     qtLog("$OPENSSL_LIBS is not set.")
+     return(false)
+ }
++defineTest(qtConfLibrary_wolfssl) {
++    eval(libs = $$getenv("WOLFSSL_LIBS"))
++    !isEmpty(libs) {
++        !qtConfResolveLibs($${1}.libs, $$libs): \
++            return(false)
++        return(true)
++    }
++    qtLog("$WOLFSSL_LIBS is not set.")
++    return(false)
++}
+ 
+diff --git a/src/network/ssl/qsslcontext_openssl_p.h b/src/network/ssl/qsslcontext_openssl_p.h
+index 48beebf134..d63133bd68 100644
+--- a/src/network/ssl/qsslcontext_openssl_p.h
++++ b/src/network/ssl/qsslcontext_openssl_p.h
+@@ -54,6 +54,9 @@
+ //
+ 
+ #include <QtNetwork/private/qtnetworkglobal_p.h>
++#if QT_CONFIG(wolfssl)
++#include "wolfssl/options.h"
++#endif
+ #include <QtCore/qvariant.h>
+ #include <QtNetwork/qsslcertificate.h>
+ #include <QtNetwork/qsslconfiguration.h>
+diff --git a/src/network/ssl/qsslkey_p.cpp b/src/network/ssl/qsslkey_p.cpp
+index 28e3e2efd8..8fa286c629 100644
+--- a/src/network/ssl/qsslkey_p.cpp
++++ b/src/network/ssl/qsslkey_p.cpp
+@@ -185,7 +185,7 @@ QByteArray QSslKeyPrivate::pemFromDer(const QByteArray &der, const QMap<QByteArr
+     if (isEncryptedPkcs8(der)) {
+         pem.prepend(pkcs8Header(true) + '\n' + extra);
+         pem.append(pkcs8Footer(true) + '\n');
+-#if !QT_CONFIG(openssl)
++#if !QT_CONFIG(openssl) && !QT_CONFIG(wolfssl)
+     } else if (isPkcs8) {
+         pem.prepend(pkcs8Header(false) + '\n' + extra);
+         pem.append(pkcs8Footer(false) + '\n');
+diff --git a/src/network/ssl/qsslkey_p.h b/src/network/ssl/qsslkey_p.h
+index 7ae2cc740b..706d1d992b 100644
+--- a/src/network/ssl/qsslkey_p.h
++++ b/src/network/ssl/qsslkey_p.h
+@@ -93,7 +93,7 @@ public:
+     Qt::HANDLE handle() const;
+ 
+     bool isEncryptedPkcs8(const QByteArray &der) const;
+-#if !QT_CONFIG(openssl)
++#if !QT_CONFIG(openssl) && !QT_CONFIG(wolfssl)
+     QByteArray decryptPkcs8(const QByteArray &encrypted, const QByteArray &passPhrase);
+     bool isPkcs8 = false;
+ #endif
+diff --git a/src/network/ssl/qsslsocket_openssl_p.h b/src/network/ssl/qsslsocket_openssl_p.h
+index c16b9d5f76..47f8f5a934 100644
+--- a/src/network/ssl/qsslsocket_openssl_p.h
++++ b/src/network/ssl/qsslsocket_openssl_p.h
+@@ -79,6 +79,11 @@
+ #endif
+ #endif // Q_OS_WIN
+ 
++#if QT_CONFIG(wolfssl)
++#include "wolfssl/options.h"
++#include "wolfssl/ssl.h"
++#endif
++
+ #include <openssl/asn1.h>
+ #include <openssl/bio.h>
+ #include <openssl/bn.h>
+diff --git a/src/network/ssl/qsslsocket_openssl_symbols_p.h b/src/network/ssl/qsslsocket_openssl_symbols_p.h
+index bfdfbf0efc..ac9a3652ef 100644
+--- a/src/network/ssl/qsslsocket_openssl_symbols_p.h
++++ b/src/network/ssl/qsslsocket_openssl_symbols_p.h
+@@ -69,6 +69,11 @@
+ //
+ 
+ #include <QtNetwork/private/qtnetworkglobal_p.h>
++#if QT_CONFIG(wolfssl)
++#include "wolfssl/options.h"
++#include "wolfssl/ssl.h"
++#endif
++
+ #include "qsslsocket_openssl_p.h"
+ #include <QtCore/qglobal.h>
+ 
+diff --git a/src/network/ssl/qsslsocket_opensslpre11_symbols_p.h b/src/network/ssl/qsslsocket_opensslpre11_symbols_p.h
+index b7bac5d2a2..59d1bb694e 100644
+--- a/src/network/ssl/qsslsocket_opensslpre11_symbols_p.h
++++ b/src/network/ssl/qsslsocket_opensslpre11_symbols_p.h
+@@ -211,11 +211,18 @@ DSA *q_d2i_DSAPrivateKey(DSA **a, unsigned char **pp, long length);
+ #define q_X509_getm_notBefore(x) X509_get_notBefore(x)
+ 
+ // "Forward compatibility" with OpenSSL 1.1 (to save on #if-ery elsewhere):
+-#define q_X509_get_version(x509) q_ASN1_INTEGER_get((x509)->cert_info->version)
++#if QT_CONFIG(wolfssl)
++    #define q_X509_get_version(x509) wolfSSL_X509_get_version(x509)
++    #define q_X509_get_pubkey(x509) wolfSSL_X509_get_pubkey(x509)
++    #define q_SSL_SESSION_get_ticket_lifetime_hint(s) wolfSSL_SESSION_get_timeout(s)
++
++#else
++    #define q_X509_get_version(x509) q_ASN1_INTEGER_get((x509)->cert_info->version)
++    #define q_X509_get_pubkey(x509) q_X509_PUBKEY_get((x509)->cert_info->key)
++    #define q_SSL_SESSION_get_ticket_lifetime_hint(s) ((s)->tlsext_tick_lifetime_hint)
++#endif
+ #define q_ASN1_STRING_get0_data(x) q_ASN1_STRING_data(x)
+ #define q_EVP_PKEY_base_id(pkey) ((pkey)->type)
+-#define q_X509_get_pubkey(x509) q_X509_PUBKEY_get((x509)->cert_info->key)
+-#define q_SSL_SESSION_get_ticket_lifetime_hint(s) ((s)->tlsext_tick_lifetime_hint)
+ #define q_RSA_bits(rsa) q_BN_num_bits((rsa)->n)
+ #define q_DSA_bits(dsa) q_BN_num_bits((dsa)->p)
+ #define q_X509_STORE_set_verify_cb(s,c) X509_STORE_set_verify_cb_func((s),(c))
+diff --git a/src/network/ssl/ssl.pri b/src/network/ssl/ssl.pri
+index 6975264038..828e3bc7dd 100644
+--- a/src/network/ssl/ssl.pri
++++ b/src/network/ssl/ssl.pri
+@@ -13,7 +13,9 @@ SOURCES += ssl/qasn1element.cpp \
+            ssl/qsslcertificate.cpp \
+            ssl/qsslcertificateextension.cpp
+ 
+-!qtConfig(openssl): SOURCES += ssl/qsslcertificate_qt.cpp
++!qtConfig(openssl) {
++    !qtConfig(wolfssl): SOURCES += ssl/qsslcertificate_qt.cpp
++}
+ 
+ qtConfig(ssl) {
+     HEADERS += ssl/qsslconfiguration.h \
+@@ -116,6 +118,47 @@ qtConfig(ssl) {
+             SOURCES += ssl/qwindowscarootfetcher.cpp
+         }
+     }
++
++    qtConfig(wolfssl) {
++        HEADERS += ssl/qsslcontext_openssl_p.h \
++                   ssl/qsslsocket_openssl_p.h \
++                   ssl/qsslsocket_openssl_symbols_p.h
++        SOURCES += ssl/qsslsocket_openssl_symbols.cpp \
++                   ssl/qssldiffiehellmanparameters_openssl.cpp \
++                   ssl/qsslcertificate_openssl.cpp \
++                   ssl/qsslellipticcurve_openssl.cpp \
++                   ssl/qsslkey_openssl.cpp \
++                   ssl/qsslsocket_openssl.cpp \
++                   ssl/qsslcontext_openssl.cpp \
++
++
++        qtConfig(opensslv11) {
++            HEADERS += ssl/qsslsocket_openssl11_symbols_p.h
++            SOURCES += ssl/qsslsocket_openssl11.cpp \
++                       ssl/qsslcontext_openssl11.cpp
++
++            QMAKE_CXXFLAGS += -DOPENSSL_API_COMPAT=0x10100000L
++        } else {
++            HEADERS += ssl/qsslsocket_opensslpre11_symbols_p.h
++            SOURCES += ssl/qsslsocket_opensslpre11.cpp \
++                       ssl/qsslcontext_opensslpre11.cpp
++        }
++
++        darwin:SOURCES += ssl/qsslsocket_mac_shared.cpp
++
++        android:!android-embedded: SOURCES += ssl/qsslsocket_openssl_android.cpp
++
++        qtConfig(wolfssl-linked): \
++            QMAKE_USE_FOR_PRIVATE += wolfssl
++        else: \
++            QMAKE_USE_FOR_PRIVATE += wolfssl/nolink
++        win32 {
++            LIBS_PRIVATE += -lcrypt32
++            HEADERS += ssl/qwindowscarootfetcher_p.h
++            SOURCES += ssl/qwindowscarootfetcher.cpp
++        }
++    }
++
+ }
+ 
+ HEADERS += ssl/qpassworddigestor.h
+diff --git a/tests/auto/network/ssl/qsslcertificate/tst_qsslcertificate.cpp b/tests/auto/network/ssl/qsslcertificate/tst_qsslcertificate.cpp
+index 7f8580ddd6..167b0d0967 100644
+--- a/tests/auto/network/ssl/qsslcertificate/tst_qsslcertificate.cpp
++++ b/tests/auto/network/ssl/qsslcertificate/tst_qsslcertificate.cpp
+@@ -944,6 +944,9 @@ void tst_QSslCertificate::multipleCommonNames()
+         QSslCertificate::fromPath(testDataDir + "more-certificates/test-cn-two-cns-cert.pem");
+     QVERIFY(certList.count() > 0);
+ 
++#ifndef QT_NO_WOLFSSL
++    QSKIP("wolfSSL does not support multiple common names");
++#endif
+     QStringList commonNames = certList[0].subjectInfo(QSslCertificate::CommonName);
+     QVERIFY(commonNames.contains(QString("www.example.com")));
+     QVERIFY(commonNames.contains(QString("www2.example.com")));
+@@ -1315,6 +1318,9 @@ void tst_QSslCertificate::pkcs12()
+ 
+ #ifdef QT_NO_OPENSSL
+     QEXPECT_FAIL("", "QTBUG-40884: WinRT API does not support pkcs12 imports", Abort);
++#endif
++#ifndef QT_NO_WOLFSSL
++    QSKIP("wolfSSL supports PKCS#12, but not the RC2 cipher needed for this test.");
+ #endif
+     ok = QSslCertificate::importPkcs12(&f, &key, &cert, &caCerts);
+     QVERIFY(ok);
+diff --git a/tests/auto/network/ssl/qsslkey/tst_qsslkey.cpp b/tests/auto/network/ssl/qsslkey/tst_qsslkey.cpp
+index ddfe52c5e4..c36be6acc2 100644
+--- a/tests/auto/network/ssl/qsslkey/tst_qsslkey.cpp
++++ b/tests/auto/network/ssl/qsslkey/tst_qsslkey.cpp
+@@ -200,6 +200,14 @@ void tst_QSslKey::constructor()
+     QByteArray passphrase;
+     if (QByteArray(QTest::currentDataTag()).contains("-pkcs8-"))
+         passphrase = QByteArray("1234");
++    #ifndef QT_NO_WOLFSSL
++    if (QByteArray(QTest::currentDataTag()).contains("rc2") || QByteArray(QTest::currentDataTag()).contains("RC2"))
++        QSKIP("wolfSSL does not support the rc2 algorithm.");
++    if (QByteArray(QTest::currentDataTag()).contains("2des") || QByteArray(QTest::currentDataTag()).contains("2DES"))
++        QSKIP("wolfSSL does not support the 2des algorithm.");
++    if (QByteArray(QTest::currentDataTag()).contains("rc4-40") || QByteArray(QTest::currentDataTag()).contains("RC4"))
++        QSKIP("wolfSSL does not support the 40 bit key RC4 algorithm.");
++    #endif
+     QSslKey key(encoded, algorithm, format, type, passphrase);
+     QVERIFY(!key.isNull());
+ }
+@@ -232,6 +240,14 @@ void tst_QSslKey::constructorHandle()
+     QByteArray passphrase;
+     if (QByteArray(QTest::currentDataTag()).contains("-pkcs8-"))
+         passphrase = "1234";
++    #ifndef QT_NO_WOLFSSL
++    if (QByteArray(QTest::currentDataTag()).contains("rc2") || QByteArray(QTest::currentDataTag()).contains("RC2"))
++        QSKIP("wolfSSL does not support the rc2 algorithm.");
++    if (QByteArray(QTest::currentDataTag()).contains("2des") || QByteArray(QTest::currentDataTag()).contains("2DES"))
++        QSKIP("wolfSSL does not support the 2des algorithm.");
++    if (QByteArray(QTest::currentDataTag()).contains("rc4-40") || QByteArray(QTest::currentDataTag()).contains("RC4"))
++        QSKIP("wolfSSL does not support the 40 bit key RC4 algorithm.");
++    #endif
+     BIO* bio = q_BIO_new(q_BIO_s_mem());
+     q_BIO_write(bio, pem.constData(), pem.length());
+     QSslKey key(func(bio, nullptr, nullptr, static_cast<void *>(passphrase.data())), type);
+@@ -309,6 +325,14 @@ void tst_QSslKey::length()
+     QByteArray passphrase;
+     if (QByteArray(QTest::currentDataTag()).contains("-pkcs8-"))
+         passphrase = QByteArray("1234");
++    #ifndef QT_NO_WOLFSSL
++    if (QByteArray(QTest::currentDataTag()).contains("rc2") || QByteArray(QTest::currentDataTag()).contains("RC2"))
++        QSKIP("wolfSSL does not support the rc2 algorithm.");
++    if (QByteArray(QTest::currentDataTag()).contains("2des") || QByteArray(QTest::currentDataTag()).contains("2DES"))
++        QSKIP("wolfSSL does not support the 2des algorithm.");
++    if (QByteArray(QTest::currentDataTag()).contains("rc4-40") || QByteArray(QTest::currentDataTag()).contains("RC4"))
++        QSKIP("wolfSSL does not support the 40 bit key RC4 algorithm.");
++    #endif
+     QSslKey key(encoded, algorithm, format, type, passphrase);
+     QVERIFY(!key.isNull());
+     QCOMPARE(key.length(), length);
+@@ -432,7 +456,9 @@ void tst_QSslKey::passphraseChecks_data()
+ 
+     QTest::newRow("DES") << (testDataDir + "rsa-with-passphrase-des.pem");
+     QTest::newRow("3DES") << (testDataDir + "rsa-with-passphrase-3des.pem");
++    #ifdef QT_NO_WOLFSSL
+     QTest::newRow("RC2") << (testDataDir + "rsa-with-passphrase-rc2.pem");
++    #endif
+ }
+ 
+ void tst_QSslKey::passphraseChecks()
+@@ -561,7 +587,7 @@ void tst_QSslKey::encrypt_data()
+         << QSslKeyPrivate::DesEde3Cbc << QByteArray("0123456789abcdefghijklmn")
+         << QByteArray(8, 'a')
+         << QByteArray::fromHex("F2A5A87763C54A72A3224103D90CDB03");
+-
++#ifdef QT_NO_WOLFSSL
+     QTest::newRow("RC2-40-CBC, length 0")
+         << QSslKeyPrivate::Rc2Cbc << QByteArray("01234")
+         << QByteArray()
+@@ -588,6 +614,7 @@ void tst_QSslKey::encrypt_data()
+         << QSslKeyPrivate::Rc2Cbc << QByteArray("012345679abcdefg")
+         << QByteArray(8, 'a')
+         << QByteArray::fromHex("5AEC1A5B295660B02613454232F7DECE");
++#endif
+ }
+ 
+ void tst_QSslKey::encrypt()
+@@ -599,10 +626,12 @@ void tst_QSslKey::encrypt()
+     QByteArray iv("abcdefgh");
+ 
+ #ifdef Q_OS_WINRT
++#ifdef QT_NO_WOLFSSL
+     QEXPECT_FAIL("RC2-40-CBC, length 0", "WinRT treats RC2 as 128-bit", Abort);
+     QEXPECT_FAIL("RC2-40-CBC, length 8", "WinRT treats RC2 as 128-bit", Abort);
+     QEXPECT_FAIL("RC2-64-CBC, length 0", "WinRT treats RC2 as 128-bit", Abort);
+     QEXPECT_FAIL("RC2-64-CBC, length 8", "WinRT treats RC2 as 128-bit", Abort);
++#endif
+ #endif
+     QByteArray encrypted = QSslKeyPrivate::encrypt(cipher, plainText, key, iv);
+     QCOMPARE(encrypted, cipherText);
+diff --git a/tests/auto/network/ssl/qsslsocket/tst_qsslsocket.cpp b/tests/auto/network/ssl/qsslsocket/tst_qsslsocket.cpp
+index 307e3d82bd..52b6ae6087 100644
+--- a/tests/auto/network/ssl/qsslsocket/tst_qsslsocket.cpp
++++ b/tests/auto/network/ssl/qsslsocket/tst_qsslsocket.cpp
+@@ -3296,7 +3296,11 @@ void tst_QSslSocket::verifyClientCertificate_data()
+     QTest::newRow("ValidServerCert:AutoVerifyPeer") << QSslSocket::AutoVerifyPeer << serverCerts << serverKey << true;
+     QTest::newRow("ValidServerCert:QueryPeer") << QSslSocket::QueryPeer << serverCerts << serverKey << true;
+     QTest::newRow("ValidServerCert:VerifyNone") << QSslSocket::VerifyNone << serverCerts << serverKey << true;
++#ifdef QT_NO_WOLFSSL
+     QTest::newRow("ValidServerCert:VerifyPeer") << QSslSocket::VerifyPeer << serverCerts << serverKey << false;
++#else
++    QWARN("wolfSSL does not currently support parsing Netscape Cert Type Extensions.");
++#endif
+ 
+     // valid certificate, correct usage (client certificate)
+     QList<QSslCertificate> validCerts = QSslCertificate::fromPath(testDataDir + "certs/bogus-client.crt");
+diff --git a/src/network/ssl/qsslsocket_openssl.cpp b/src/network/ssl/qsslsocket_openssl.cpp
+index c8bc6e069a..1a0d5f03ba 100644
+--- a/src/network/ssl/qsslsocket_openssl.cpp
++++ b/src/network/ssl/qsslsocket_openssl.cpp
+@@ -138,6 +138,7 @@ static unsigned int q_ssl_psk_server_callback(SSL *ssl,
+ }
+ 
+ #ifdef TLS1_3_VERSION
++#if OPENSSL_VERSION_NUMBER >= 0x10101006L 
+ #ifndef OPENSSL_NO_PSK
+ static unsigned int q_ssl_psk_restore_client(SSL *ssl,
+                                              const char *hint,
+@@ -183,6 +184,7 @@ static int q_ssl_psk_use_session_callback(SSL *ssl, const EVP_MD *md, const unsi
+ 
+     return 1; // need to return 1 or else "the connection setup fails."
+ }
++#endif // OPENSSL_VERSION_NUMBER >= 0x10101006L 
+ #endif // TLS1_3_VERSION
+ 
+ #endif
