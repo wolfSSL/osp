@@ -40,7 +40,7 @@ NOTE: Apache httpd tests require the openssl command line utility.
 1. Clone the wolfSSL testing repository and configure:
     ```
     $   git clone https://github.com/wolfssl/testing.git
-    $   cd httpd-test/third-party/apache_httpd/httpd-test
+    $   cd testing/third-party/apache_httpd/httpd-test
     $   perl Makefile.PL /usr/local/apache2/bin/apxs 
     $   make
     ```
