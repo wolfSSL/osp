@@ -2,7 +2,7 @@
 ## Building
 Requirements:
 * Linux environment - this version was tested on Ubuntu 18.04.3 LTS (GNU/Linux 4.15.0-62-generic x86\_64)
-* See https://wiki.qt.io/Building\_Qt\_5\_from\_Git for a full list of requirements for building Qt
+* See https://wiki.qt.io/Building_Qt_5_from_Git for a full list of requirements for building Qt
 
 ### Building wolfSSL
 1. Clone wolfSSL Library:
