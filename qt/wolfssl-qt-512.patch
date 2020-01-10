@@ -11,7 +11,7 @@ index 1556e26ab1..e70744a570 100644
      qtConfig(sctp): SUBDIRS += multistreamserver multistreamclient
  }
 diff --git a/src/network/configure.json b/src/network/configure.json
-index 2c005f0efb..fae9649162 100644
+index 2c005f0efb..9ffa311459 100644
 --- a/src/network/configure.json
 +++ b/src/network/configure.json
 @@ -7,13 +7,17 @@
@@ -33,7 +33,7 @@ index 2c005f0efb..fae9649162 100644
              "dtls": "boolean",
              "sctp": "boolean",
              "securetransport": "boolean",
-@@ -96,6 +100,40 @@
+@@ -96,6 +100,37 @@
                      "condition": "!config.msvc"
                  }
              ]
@@ -43,11 +43,8 @@ index 2c005f0efb..fae9649162 100644
 +            "export": "wolfssl",
 +            "test": {
 +                "tail": [
-+                    "#if !defined(OPENSSL_VERSION_NUMBER) || OPENSSL_VERSION_NUMBER-0 < 0x10000000L",
-+                    "#  error OpenSSL >= 1.0.0 is required",
-+                    "#endif",
-+                    "#if OPENSSL_VERSION_NUMBER-0 >= 0x10002000L && !defined(OPENSSL_NO_EC) && !defined(SSL_CTRL_SET_CURVES)",
-+                    "#  error OpenSSL was reported as >= 1.0.2 but is missing required features, possibly it's libressl which is unsupported",
++                    "#if !defined(OPENSSL_VERSION_NUMBER) || OPENSSL_VERSION_NUMBER-0 < 0x10001000L",
++                    "#  error wolfSSL OPENSSL_VERSION_NUMBER >= 0x10001000L is required",
 +                    "#endif"
 +                ]
 +            },
@@ -74,7 +71,7 @@ index 2c005f0efb..fae9649162 100644
          }
      },
  
-@@ -222,7 +260,7 @@
+@@ -222,7 +257,7 @@
              "output": [
                  "privateFeature",
                  { "type": "publicQtConfig", "condition": "!features.openssl-linked" },
@@ -83,7 +80,7 @@ index 2c005f0efb..fae9649162 100644
              ]
          },
          "openssl-runtime": {
-@@ -241,10 +279,37 @@
+@@ -241,10 +276,37 @@
                  { "type": "define", "name": "QT_LINKED_OPENSSL" }
              ]
          },
@@ -122,7 +119,7 @@ index 2c005f0efb..fae9649162 100644
              "output": [
                  "privateFeature",
                  { "type": "define", "name": "QT_SECURETRANSPORT" }
-@@ -252,19 +317,19 @@
+@@ -252,19 +314,19 @@
          },
          "ssl": {
              "label": "SSL",
@@ -145,7 +142,7 @@ index 2c005f0efb..fae9649162 100644
              "output": [ "publicFeature" ]
          },
          "sctp": {
-@@ -394,6 +459,8 @@ For example:
+@@ -394,6 +456,8 @@ For example:
                  "openssl",
                  "openssl-linked",
                  "opensslv11",
@@ -212,6 +209,26 @@ index 7ae2cc740b..706d1d992b 100644
 +#if !QT_CONFIG(openssl) && !QT_CONFIG(wolfssl)
      QByteArray decryptPkcs8(const QByteArray &encrypted, const QByteArray &passPhrase);
      bool isPkcs8 = false;
+ #endif
+diff --git a/src/network/ssl/qsslsocket_openssl.cpp b/src/network/ssl/qsslsocket_openssl.cpp
+index c8bc6e069a..1a0d5f03ba 100644
+--- a/src/network/ssl/qsslsocket_openssl.cpp
++++ b/src/network/ssl/qsslsocket_openssl.cpp
+@@ -138,6 +138,7 @@ static unsigned int q_ssl_psk_server_callback(SSL *ssl,
+ }
+ 
+ #ifdef TLS1_3_VERSION
++#if OPENSSL_VERSION_NUMBER >= 0x10101006L
+ #ifndef OPENSSL_NO_PSK
+ static unsigned int q_ssl_psk_restore_client(SSL *ssl,
+                                              const char *hint,
+@@ -183,6 +184,7 @@ static int q_ssl_psk_use_session_callback(SSL *ssl, const EVP_MD *md, const unsi
+ 
+     return 1; // need to return 1 or else "the connection setup fails."
+ }
++#endif // OPENSSL_VERSION_NUMBER >= 0x10101006L
+ #endif // TLS1_3_VERSION
+ 
  #endif
 diff --git a/src/network/ssl/qsslsocket_openssl_p.h b/src/network/ssl/qsslsocket_openssl_p.h
 index c16b9d5f76..47f8f5a934 100644
@@ -335,7 +352,7 @@ index 6975264038..828e3bc7dd 100644
  
  HEADERS += ssl/qpassworddigestor.h
 diff --git a/tests/auto/network/ssl/qsslcertificate/tst_qsslcertificate.cpp b/tests/auto/network/ssl/qsslcertificate/tst_qsslcertificate.cpp
-index 7f8580ddd6..167b0d0967 100644
+index 7f8580ddd6..c2cc3e885e 100644
 --- a/tests/auto/network/ssl/qsslcertificate/tst_qsslcertificate.cpp
 +++ b/tests/auto/network/ssl/qsslcertificate/tst_qsslcertificate.cpp
 @@ -944,6 +944,9 @@ void tst_QSslCertificate::multipleCommonNames()
@@ -448,7 +465,7 @@ index ddfe52c5e4..c36be6acc2 100644
      QByteArray encrypted = QSslKeyPrivate::encrypt(cipher, plainText, key, iv);
      QCOMPARE(encrypted, cipherText);
 diff --git a/tests/auto/network/ssl/qsslsocket/tst_qsslsocket.cpp b/tests/auto/network/ssl/qsslsocket/tst_qsslsocket.cpp
-index 307e3d82bd..52b6ae6087 100644
+index 307e3d82bd..ab72c789f5 100644
 --- a/tests/auto/network/ssl/qsslsocket/tst_qsslsocket.cpp
 +++ b/tests/auto/network/ssl/qsslsocket/tst_qsslsocket.cpp
 @@ -3296,7 +3296,11 @@ void tst_QSslSocket::verifyClientCertificate_data()
@@ -463,23 +480,3 @@ index 307e3d82bd..52b6ae6087 100644
  
      // valid certificate, correct usage (client certificate)
      QList<QSslCertificate> validCerts = QSslCertificate::fromPath(testDataDir + "certs/bogus-client.crt");
-diff --git a/src/network/ssl/qsslsocket_openssl.cpp b/src/network/ssl/qsslsocket_openssl.cpp
-index c8bc6e069a..1a0d5f03ba 100644
---- a/src/network/ssl/qsslsocket_openssl.cpp
-+++ b/src/network/ssl/qsslsocket_openssl.cpp
-@@ -138,6 +138,7 @@ static unsigned int q_ssl_psk_server_callback(SSL *ssl,
- }
- 
- #ifdef TLS1_3_VERSION
-+#if OPENSSL_VERSION_NUMBER >= 0x10101006L 
- #ifndef OPENSSL_NO_PSK
- static unsigned int q_ssl_psk_restore_client(SSL *ssl,
-                                              const char *hint,
-@@ -183,6 +184,7 @@ static int q_ssl_psk_use_session_callback(SSL *ssl, const EVP_MD *md, const unsi
- 
-     return 1; // need to return 1 or else "the connection setup fails."
- }
-+#endif // OPENSSL_VERSION_NUMBER >= 0x10101006L 
- #endif // TLS1_3_VERSION
- 
- #endif
