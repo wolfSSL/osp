@@ -19,7 +19,9 @@ Copyright (C) 2010 Hiroki Ohtani(liris)
     Boston, MA 02110-1335  USA
 
 """
-__all__ = ["HAVE_SSL", "ssl", "SSLError", "SSLWantReadError", "SSLWantWriteError"]
+__all__ = ["HAVE_SSL", "ssl", "SSLError", "SSLWantReadError", "SSLWantWriteError", "get_ssl", "inject_wolfssl", "extract_wolfssl"]
+
+SSL_MODULE=None
 
 try:
     import ssl
@@ -38,6 +40,8 @@ try:
     __all__.append("HAVE_CONTEXT_CHECK_HOSTNAME")
 
     HAVE_SSL = True
+    SSL_MODULE = ssl
+
 except ImportError:
     # dummy class of SSLError for ssl none-support environment.
     class SSLError(Exception):
@@ -52,3 +56,16 @@ except ImportError:
     ssl = lambda: None
 
     HAVE_SSL = False
+
+def get_ssl():
+    return SSL_MODULE
+
+def inject_wolfssl():
+    import wolfssl
+    global SSL_MODULE
+    SSL_MODULE = wolfssl
+
+def extract_wolfssl():
+    global SSL_MODULE
+    SSL_MODULE = ssl
+
