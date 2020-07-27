@@ -179,7 +179,7 @@ class WebSocket(object):
             return None
 
     def is_ssl(self):
-        return isinstance(self.sock, get_ssl().SSLSocket)
+        return isinstance(self.sock, ssl.SSLSocket)
 
     headers = property(getheaders)
 
@@ -216,6 +216,9 @@ class WebSocket(object):
                  "socket" - pre-initialized stream socket.
 
         """
+        # FIXME: "subprotocols" are getting lost, not passed down
+        # FIXME: "header", "cookie", "origin" and "host" too
+        self.sock_opt.timeout = options.get('timeout', self.sock_opt.timeout)
         self.sock, addrs = connect(url, self.sock_opt, proxy_info(**options),
                                    options.pop('socket', None))
 
@@ -268,7 +271,8 @@ class WebSocket(object):
             frame.get_mask_key = self.get_mask_key
         data = frame.format()
         length = len(data)
-        trace("send: " + repr(data))
+        if (isEnabledForTrace()):
+            trace("send: " + repr(data))
 
         with self.lock:
             while data:
@@ -425,7 +429,7 @@ class WebSocket(object):
             except:
                 pass
 
-        self.shutdown()
+            self.shutdown()
 
     def abort(self):
         """
