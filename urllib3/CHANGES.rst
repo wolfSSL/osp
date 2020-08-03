@@ -1,14 +1,130 @@
 Changes
 =======
 
-dev (master)
-------------
+1.25.8 (2020-01-20)
+-------------------
 
-* Implemented a more efficient ``HTTPResponse.__iter__()`` method. (Issue #1483)
+* Drop support for EOL Python 3.4 (Pull #1774)
+
+* Optimize _encode_invalid_chars (Pull #1787)
+
+
+1.25.7 (2019-11-11)
+-------------------
+
+* Preserve ``chunked`` parameter on retries (Pull #1715, Pull #1734)
+
+* Allow unset ``SERVER_SOFTWARE`` in App Engine (Pull #1704, Issue #1470)
+
+* Fix issue where URL fragment was sent within the request target. (Pull #1732)
+
+* Fix issue where an empty query section in a URL would fail to parse. (Pull #1732)
+
+* Remove TLS 1.3 support in SecureTransport due to Apple removing support (Pull #1703)
+
+
+1.25.6 (2019-09-24)
+-------------------
+
+* Fix issue where tilde (``~``) characters were incorrectly
+  percent-encoded in the path. (Pull #1692)
+
+
+1.25.5 (2019-09-19)
+-------------------
+
+* Add mitigation for BPO-37428 affecting Python <3.7.4 and OpenSSL 1.1.1+ which
+  caused certificate verification to be enabled when using ``cert_reqs=CERT_NONE``.
+  (Issue #1682)
+
+
+1.25.4 (2019-09-19)
+-------------------
+
+* Propagate Retry-After header settings to subsequent retries. (Pull #1607)
+
+* Fix edge case where Retry-After header was still respected even when
+  explicitly opted out of. (Pull #1607)
+
+* Remove dependency on ``rfc3986`` for URL parsing.
+
+* Fix issue where URLs containing invalid characters within ``Url.auth`` would
+  raise an exception instead of percent-encoding those characters.
+
+* Add support for ``HTTPResponse.auto_close = False`` which makes HTTP responses
+  work well with BufferedReaders and other ``io`` module features. (Pull #1652)
+
+* Percent-encode invalid characters in URL for ``HTTPConnectionPool.request()`` (Pull #1673)
+
+
+1.25.3 (2019-05-23)
+-------------------
+
+* Change ``HTTPSConnection`` to load system CA certificates
+  when ``ca_certs``, ``ca_cert_dir``, and ``ssl_context`` are
+  unspecified. (Pull #1608, Issue #1603)
+
+* Upgrade bundled rfc3986 to v1.3.2. (Pull #1609, Issue #1605)
+
+
+1.25.2 (2019-04-28)
+-------------------
+
+* Change ``is_ipaddress`` to not detect IPvFuture addresses. (Pull #1583)
+
+* Change ``parse_url`` to percent-encode invalid characters within the
+  path, query, and target components. (Pull #1586)
+
+
+1.25.1 (2019-04-24)
+-------------------
+
+* Add support for Google's ``Brotli`` package. (Pull #1572, Pull #1579)
+
+* Upgrade bundled rfc3986 to v1.3.1 (Pull #1578)
+
+
+1.25 (2019-04-22)
+-----------------
+
+* Require and validate certificates by default when using HTTPS (Pull #1507)
 
 * Upgraded ``urllib3.utils.parse_url()`` to be RFC 3986 compliant. (Pull #1487)
 
-* ... [Short description of non-trivial change.] (Issue #)
+* Added support for ``key_password`` for ``HTTPSConnectionPool`` to use
+  encrypted ``key_file`` without creating your own ``SSLContext`` object. (Pull #1489)
+
+* Add TLSv1.3 support to CPython, pyOpenSSL, and SecureTransport ``SSLContext``
+  implementations. (Pull #1496)
+
+* Switched the default multipart header encoder from RFC 2231 to HTML 5 working draft. (Issue #303, PR #1492)
+
+* Fixed issue where OpenSSL would block if an encrypted client private key was
+  given and no password was given. Instead an ``SSLError`` is raised. (Pull #1489)
+
+* Added support for Brotli content encoding. It is enabled automatically if
+  ``brotlipy`` package is installed which can be requested with
+  ``urllib3[brotli]`` extra. (Pull #1532)
+
+* Drop ciphers using DSS key exchange from default TLS cipher suites.
+  Improve default ciphers when using SecureTransport. (Pull #1496)
+
+* Implemented a more efficient ``HTTPResponse.__iter__()`` method. (Issue #1483)
+
+1.24.3 (2019-05-01)
+-------------------
+
+* Apply fix for CVE-2019-9740. (Pull #1591)
+
+1.24.2 (2019-04-17)
+-------------------
+
+* Don't load system certificates by default when any other ``ca_certs``, ``ca_certs_dir`` or
+  ``ssl_context`` parameters are specified.
+
+* Remove Authorization header regardless of case when redirecting to cross-site. (Issue #1510)
+
+* Add support for IPv6 addresses in subjectAltName section of certificates. (Issue #1269)
 
 
 1.24.1 (2018-11-02)
@@ -16,7 +132,7 @@ dev (master)
 
 * Remove quadratic behavior within ``GzipDecoder.decompress()`` (Issue #1467)
 
-* Restored functionality of `ciphers` parameter for `create_urllib3_context()`. (Issue #1462)
+* Restored functionality of ``ciphers`` parameter for ``create_urllib3_context()``. (Issue #1462)
 
 
 1.24 (2018-10-16)

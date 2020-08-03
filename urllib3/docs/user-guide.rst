@@ -77,6 +77,20 @@ to a byte string representing the response content::
 .. note:: For larger responses, it's sometimes better to :ref:`stream <stream>`
     the response.
 
+Using io Wrappers with Response content
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes you want to use :class:`io.TextIOWrapper` or similar objects like a CSV reader
+directly with :class:`~response.HTTPResponse` data. Making these two interfaces play nice
+together requires using the :attr:`~response.HTTPResponse.auto_close` attribute by setting it
+to ``False``. By default HTTP responses are closed after reading all bytes, this disables that behavior::
+
+    >>> import io
+    >>> r = http.request('GET', 'https://example.com', preload_content=False)
+    >>> r.auto_close = False
+    >>> for line in io.TextIOWrapper(r):
+    >>>     print(line)
+
 .. _request_data:
 
 Request data
@@ -140,7 +154,7 @@ dictionary in the ``fields`` argument provided to
 JSON
 ~~~~
 
-You can sent JSON a request by specifying the encoded data as the ``body``
+You can send a JSON request by specifying the encoded data as the ``body``
 argument and setting the ``Content-Type`` header when calling
 :meth:`~poolmanager.PoolManager.request`::
 
@@ -202,11 +216,15 @@ recommended to set the ``Content-Type`` header::
 Certificate verification
 ------------------------
 
-It is highly recommended to always use SSL certificate verification.
-**By default, urllib3 does not verify HTTPS requests**.
+ .. note:: *New in version 1.25*
 
-In order to enable verification you will need a set of root certificates. The easiest
-and most reliable method is to use the `certifi <https://certifi.io/>`_ package which provides Mozilla's root certificate bundle::
+    HTTPS connections are now verified by default (``cert_reqs = 'CERT_REQUIRED'``).
+
+While you can disable certification verification, it is highly recommend to leave it on.
+
+Unless otherwise specified urllib3 will try to load the default system certificate stores.
+The most reliable cross-platform method is to use the `certifi <https://certifi.io/>`_
+package which provides Mozilla's root certificate bundle::
 
     pip install certifi
 
@@ -298,8 +316,8 @@ to the standard-library :mod:`ssl` module. You may experience
 Using timeouts
 --------------
 
-Timeouts allow you to control how long requests are allowed to run before
-being aborted. In simple cases, you can specify a timeout as a ``float``
+Timeouts allow you to control how long (in seconds) requests are allowed to run
+before being aborted. In simple cases, you can specify a timeout as a ``float``
 to :meth:`~poolmanager.PoolManager.request`::
 
     >>> http.request(
