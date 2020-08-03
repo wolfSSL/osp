@@ -138,6 +138,8 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                     # https://github.com/urllib3/urllib3/issues/1422
                     "connection closed via error" in str(e)
                     or "WSAECONNRESET" in str(e)
+                    # expected string from wolfSSL
+                    or "error state on socket" in str(e)
                 ):
                     raise
             except ProtocolError as e:
@@ -650,9 +652,13 @@ class TestHTTPS(HTTPSDummyServerTestCase):
             self.host, self.port, ca_certs=DEFAULT_CA
         ) as https_pool:
             https_pool.ssl_version = self.certs["ssl_version"]
-            r = https_pool.request("GET", "/")
-            assert r.status == 200, r.data
-
+            try:
+                r = https_pool.request("GET", "/")
+                assert r.status == 200, r.data
+            except ValueError as e:
+                # wolfSSL has TLS 1.0 disabled by default
+                if not ('this protocol is not supported') in str(e):
+                    raise
     def test_set_cert_default_cert_required(self):
         conn = VerifiedHTTPSConnection(self.host, self.port)
         conn.set_cert()

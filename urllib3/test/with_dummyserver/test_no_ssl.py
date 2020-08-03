@@ -7,6 +7,7 @@ import pytest
 from ..test_no_ssl import TestWithoutSSL
 
 from dummyserver.testcase import HTTPDummyServerTestCase, HTTPSDummyServerTestCase
+from dummyserver.server import (DEFAULT_CA)
 
 import urllib3
 
@@ -24,7 +25,7 @@ class TestHTTPWithoutSSL(HTTPDummyServerTestCase, TestWithoutSSL):
 class TestHTTPSWithoutSSL(HTTPSDummyServerTestCase, TestWithoutSSL):
     def test_simple(self):
         with urllib3.HTTPSConnectionPool(
-            self.host, self.port, cert_reqs="NONE"
+            self.host, self.port, ca_certs=DEFAULT_CA, cert_reqs="NONE"
         ) as pool:
             try:
                 pool.request("GET", "/")

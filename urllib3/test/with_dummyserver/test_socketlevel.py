@@ -176,6 +176,12 @@ class TestClientCerts(SocketDummyServerTestCase):
         done_receiving = Event()
         client_certs = []
 
+        # wolfSSL does not support loading a certificate file that contains
+        # both the certificate and private key together. For this case,
+        # users need to use individual files for each. Skipping this test,
+        # since dummyserver/certs/server.combined.pem contains both.
+        if ssl_.IS_WOLFSSL:
+            pytest.skip('wolfSSL does not support cert and key in same file')
         def socket_handler(listener):
             sock = listener.accept()[0]
             sock = self._wrap_in_ssl(sock)
@@ -297,6 +303,9 @@ class TestClientCerts(SocketDummyServerTestCase):
     @requires_ssl_context_keyfile_password
     def test_load_keyfile_with_invalid_password(self):
         context = ssl_.SSLContext(ssl_.PROTOCOL_SSLv23)
+
+        if ssl_.IS_WOLFSSL:
+            pytest.skip('wolfSSL raises SSLError: Unnable to load private key. E(0)')
 
         # Different error is raised depending on context.
         if ssl_.IS_PYOPENSSL:
@@ -425,7 +434,7 @@ class TestSocketClosing(SocketDummyServerTestCase):
 
         self._start_server(socket_handler)
         with HTTPSConnectionPool(
-            self.host, self.port, timeout=SHORT_TIMEOUT, retries=False
+            self.host, self.port, timeout=SHORT_TIMEOUT, retries=False, ca_certs=DEFAULT_CA
         ) as pool:
             try:
                 with pytest.raises(ReadTimeoutError):
