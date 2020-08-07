@@ -1,0 +1,13 @@
+*.pyc
+*~
+*\#
+.\#*
+
+build
+dist
+*.egg-info
+
+.cache/
+compliance/reports/
+.eggs
+.vscode

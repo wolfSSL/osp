@@ -21,7 +21,7 @@ Copyright (C) 2010 Hiroki Ohtani(liris)
 """
 import six
 
-__all__ = ["NoLock", "validate_utf8", "extract_err_message"]
+__all__ = ["NoLock", "validate_utf8", "extract_err_message", "extract_error_code"]
 
 
 class NoLock(object):
@@ -31,6 +31,7 @@ class NoLock(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
+
 
 try:
     # If wsaccel is available we use compiled routines to validate UTF-8
@@ -103,3 +104,8 @@ def extract_err_message(exception):
         return exception.args[0]
     else:
         return None
+
+
+def extract_error_code(exception):
+    if exception.args and len(exception.args) > 1:
+        return exception.args[0] if isinstance(exception.args[0], int) else None

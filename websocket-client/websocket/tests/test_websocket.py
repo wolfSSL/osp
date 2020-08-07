@@ -45,7 +45,6 @@ TRACEABLE = True
 # Skip Secure WebSocket test with wolfSSL, TEST_SECURE_WS must be True to run
 TEST_SECURE_WS_WOLFSSL = True
 
-
 def create_mask_key(_):
     return "abcd"
 
@@ -57,6 +56,9 @@ class SockMock(object):
 
     def add_packet(self, data):
         self.data.append(data)
+
+    def gettimeout(self):
+        return None
 
     def recv(self, bufsize):
         if self.data:

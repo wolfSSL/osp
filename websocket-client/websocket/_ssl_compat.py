@@ -19,14 +19,15 @@ Copyright (C) 2010 Hiroki Ohtani(liris)
     Boston, MA 02110-1335  USA
 
 """
-__all__ = ["HAVE_SSL", "ssl", "SSLError", "get_ssl", "inject_wolfssl", "extract_wolfssl"]
+__all__ = ["HAVE_SSL", "ssl", "SSLError", "SSLWantReadError", "SSLWantWriteError", "get_ssl", "inject_wolfssl", "extract_wolfssl"]
 
 SSL_MODULE=None
 
 try:
     import ssl
-
     from ssl import SSLError
+    from ssl import SSLWantReadError
+    from ssl import SSLWantWriteError
     if hasattr(ssl, 'SSLContext') and hasattr(ssl.SSLContext, 'check_hostname'):
         HAVE_CONTEXT_CHECK_HOSTNAME = True
     else:
@@ -45,6 +46,14 @@ except ImportError:
     # dummy class of SSLError for ssl none-support environment.
     class SSLError(Exception):
         pass
+
+    class SSLWantReadError(Exception):
+        pass
+
+    class SSLWantWriteError(Exception):
+        pass
+
+    ssl = lambda: None
 
     HAVE_SSL = False
 
