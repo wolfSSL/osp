@@ -245,6 +245,10 @@ class wolfSSLContext(object):
             self._ctx.load_verify_locations(BytesIO(cadata=cadata))
 
     def load_cert_chain(self, certfile, keyfile=None, password=None):
+        if password is not None:
+            if not isinstance(password, six.binary_type):
+                password = password.encode("utf-8")
+            self._ctx.set_passwd_cb(lambda *_: password)
         self._ctx.load_cert_chain(certfile, keyfile=keyfile, password=password)
 
     def wrap_socket(self, sock, server_side=False,
