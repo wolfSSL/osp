@@ -80,6 +80,8 @@ orig_util_SSLContext = util.ssl_.SSLContext
 
 log = logging.getLogger(__name__)
 
+# 2^14, TLS max size by standard
+TLS_MAX_RECORD_SIZE = 16384
 
 def inject_into_urllib3():
     'Monkey-patch urllib3 with wolfssl-backed SSL-support.'
@@ -153,16 +155,22 @@ class WrappedSocket(object):
     def _send_until_done(self, data):
         while True:
             try:
-                return self.connection.send(data)
+                self.connection.sendall(data)
+                return len(data)
             except wolfssl.SSLWantWriteError:
                 if not util.wait_for_write(self.socket, self.connection.gettimeout()):
                     raise timeout('The write operation timed out')
                 continue
 
+
+
     def sendall(self, data):
         total_sent = 0
         while total_sent < len(data):
-            sent = self._send_until_done(data[total_sent:])
+            if (len(data[total_sent: ]) > total_sent + TLS_MAX_RECORD_SIZE):
+                sent = self._send_until_done(data[total_sent: total_sent + TLS_MAX_RECORD_SIZE])
+            else:
+                sent = self._send_until_done(data[total_sent: ])
             total_sent += sent
 
     def shutdown(self):
