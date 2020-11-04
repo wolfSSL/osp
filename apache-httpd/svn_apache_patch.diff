@@ -192,3 +192,126 @@ index 410d58e56e..b8d85974f0 100644
 -- 
 2.27.0
 
+From c055f9b8af9b7d0bbccc6af5e66ad08c1b48595a Mon Sep 17 00:00:00 2001
+From: David Garske <david@wolfssl.com>
+Date: Wed, 4 Nov 2020 13:40:28 -0800
+Subject: [PATCH] Added FIPS support to Apache v2.4.39.
+
+---
+ modules/ssl/ssl_engine_init.c | 29 +++++++++++++++++++++++++++++
+ modules/ssl/ssl_util_ssl.c    |  2 ++
+ 2 files changed, 31 insertions(+)
+
+diff --git a/modules/ssl/ssl_engine_init.c b/modules/ssl/ssl_engine_init.c
+index 48d7b96cd8..9be1e22cf7 100644
+--- a/modules/ssl/ssl_engine_init.c
++++ b/modules/ssl/ssl_engine_init.c
+@@ -71,6 +71,7 @@ static int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+ }
+ #endif
+ 
++#ifndef HAVE_FIPS
+ /*
+  * Grab well-defined DH parameters from OpenSSL, see the BN_get_rfc*
+  * functions in <openssl/bn.h> for all available primes.
+@@ -111,16 +112,21 @@ static struct dhparam {
+     { BN_get_rfc2409_prime_1024, NULL, 0 }
+ };
+ 
++#endif /* !HAVE_FIPS */
++
+ static void init_dh_params(void)
+ {
++#ifndef HAVE_FIPS
+     unsigned n;
+ 
+     for (n = 0; n < sizeof(dhparams)/sizeof(dhparams[0]); n++)
+         dhparams[n].dh = make_dh_params(dhparams[n].prime);
++#endif
+ }
+ 
+ static void free_dh_params(void)
+ {
++#ifndef HAVE_FIPS
+     unsigned n;
+ 
+     /* DH_free() is a noop for a NULL parameter, so these are harmless
+@@ -130,6 +136,7 @@ static void free_dh_params(void)
+         DH_free(dhparams[n].dh);
+         dhparams[n].dh = NULL;
+     }
++#endif
+ }
+ 
+ /* Hand out the same DH structure though once generated as we leak
+@@ -141,12 +148,14 @@ static void free_dh_params(void)
+  * to our copy. */
+ DH *modssl_get_dh_params(unsigned keylen)
+ {
++#ifndef HAVE_FIPS
+     unsigned n;
+ 
+     for (n = 0; n < sizeof(dhparams)/sizeof(dhparams[0]); n++)
+         if (keylen >= dhparams[n].min)
+             return dhparams[n].dh;
+         
++#endif
+     return NULL; /* impossible to reach. */
+ }
+ 
+@@ -194,6 +203,21 @@ static apr_status_t modssl_fips_cleanup(void *data)
+ /*
+  *  Per-module initialization
+  */
++
++#ifdef HAVE_FIPS
++static void myFipsCb(int ok, int err, const char* hash)
++{
++    printf("in my Fips callback, ok = %d, err = %d\n", ok, err);
++    printf("message = %s\n", wc_GetErrorString(err));
++    printf("hash = %s\n", hash);
++
++    if (err == IN_CORE_FIPS_E) {
++        printf("In core integrity hash check failure, copy above hash\n");
++        printf("into verifyCore[] in fips_test.c and rebuild\n");
++    }
++}
++#endif /* HAVE_FIPS */
++
+ apr_status_t ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
+                              apr_pool_t *ptemp,
+                              server_rec *base_server)
+@@ -204,6 +228,11 @@ apr_status_t ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
+     apr_status_t rv;
+     apr_array_header_t *pphrases;
+ 
++#ifdef HAVE_FIPS
++    wolfCrypt_SetCb_fips(myFipsCb);
++    //wolfSSL_Debugging_ON();
++#endif
++
+     if (SSLeay() < MODSSL_LIBRARY_VERSION) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, 0, base_server, APLOGNO(01882)
+                      "Init: this version of mod_ssl was compiled against "
+diff --git a/modules/ssl/ssl_util_ssl.c b/modules/ssl/ssl_util_ssl.c
+index b7f0eca173..178099e4a7 100644
+--- a/modules/ssl/ssl_util_ssl.c
++++ b/modules/ssl/ssl_util_ssl.c
+@@ -492,12 +492,14 @@ BOOL modssl_X509_match_name(apr_pool_t *p, X509 *x509, const char *name,
+ DH *ssl_dh_GetParamFromFile(const char *file)
+ {
+     DH *dh = NULL;
++#ifndef HAVE_FIPS
+     BIO *bio;
+ 
+     if ((bio = BIO_new_file(file, "r")) == NULL)
+         return NULL;
+     dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
+     BIO_free(bio);
++#endif
+     return (dh);
+ }
+ 
+-- 
+2.27.0
+

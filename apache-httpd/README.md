@@ -105,7 +105,7 @@ sudo yum install libpcap-devel
 2) Build wolfSSL with sniffer support and disable DH (just use ECDHE):
 
 ```sh
-./configure --enable-apachehttpd --enable-sniffer
+./configure --enable-apachehttpd --enable-sniffer CFLAGS="-DWOLFSSL_SNIFFER_WATCH"
 make
 sudo make install
 ```
@@ -132,13 +132,44 @@ Or capture with Wireshark or tcpdump:
 # Run capture
 sudo tcpdump -i eth0 -w 0001.pcap port 1443
 
-
-
+# Run sniffer
+cd ./sslSniffer/sslSnifferTest
+./snifftest 0001.pcap ../../certs/statickeys/ecc-secp256r1.pem
 ```
 
 ## Building Apache httpd with FIPS
 
+1) Build wolfSSL with FIPS enabled
 
+```sh
+./configure --enable-fips=v2 --enable-apachehttpd
+make
+./fips-hash.sh
+make
+sudo make install
+```
+
+2) Patch Apache to have FIPS callback
+
+```c
+#ifdef HAVE_FIPS
+static void myFipsCb(int ok, int err, const char* hash)
+{
+    printf("in my Fips callback, ok = %d, err = %d\n", ok, err);
+    printf("message = %s\n", wc_GetErrorString(err));
+    printf("hash = %s\n", hash);
+
+    if (err == IN_CORE_FIPS_E) {
+        printf("In core integrity hash check failure, copy above hash\n");
+        printf("into verifyCore[] in fips_test.c and rebuild\n");
+    }
+}
+#endif /* HAVE_FIPS */
+
+#ifdef HAVE_FIPS
+    wolfCrypt_SetCb_fips(myFipsCb);
+#endif
+```
 
 ## Debugging Apache httpd
 
