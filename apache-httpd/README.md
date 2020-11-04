@@ -60,6 +60,38 @@ Note: If having error with libxml use `--with-libxml2 CFLAGS="-I/usr/include/lib
 
 See `httpd-2.4.39/INSTALL` for more information.
 
+## Running Simple HTTPS
+
+1) Create a configuration file:
+
+```
+sudo vim /usr/local/apache2/ssl.conf
+
+ServerName 192.168.0.4
+Listen 80
+Listen 443
+
+<VirtualHost *:443>
+DocumentRoot /var/www/html
+ServerName 192.168.0.4
+SSLEngine on
+SSLCertificateFile /home/[username]/wolfssl/certs/server-cert.pem
+SSLCertificateKeyFile /home/[username]/wolfssl/certs/server-key.pem
+</VirtualHost>
+```
+
+2) Run standalone: `httpd -d /usr/local/apache2 -f ssl.conf`
+
+## Debugging httpd
+
+```sh
+# Build httpd with `--enable-debug`
+
+sudo gdb ./httpd
+b ap_process_request
+run -X -d /usr/local/apache2 -f ssl.conf
+```
+
 ## Running Tests
 
 NOTE: Apache httpd tests require some perl modules. Use `perl -MCPAN -e 'install Bundle::ApacheTest'` to install.
@@ -172,8 +204,6 @@ static void myFipsCb(int ok, int err, const char* hash)
 #endif
 ```
 
-## Debugging Apache httpd
+## Support
 
-Run `t/TEST -verbose=1`.
-
-/usr/local/apache2/bin/httpd  -d /home/dgarske/GitHub/httpd-test/t -f /home/dgarske/GitHub/httpd-test/t/conf/httpd.conf -D APACHE2 -D APACHE2_4 -D PERL_USEITHREADS
+For questions please email support@wolfssl.com.
