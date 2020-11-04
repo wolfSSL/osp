@@ -1,6 +1,7 @@
 # wolfSSL support for Apache httpd
 
-wolfSSL provides support for Apache httpd version 2.4.39.
+wolfSSL provides support for Apache httpd version 2.4.46.
+Requires wolfSSL v4.5.0 + patch (https://github.com/wolfSSL/wolfssl/pull/3421) or later
 
 ## Building
 
@@ -21,9 +22,9 @@ Apache httpd is enabled with wolfSSL support using the option `--with-wolfssl[=D
 1. From the base directory, checkout the httpd branch:
 
 ```sh
-wget https://archive.apache.org/dist/httpd/httpd-2.4.39.tar.gz
-tar xvf httpd-2.4.39.tar.gz
-mv httpd-2.4.39 httpd
+wget https://mirrors.sonic.net/apache/httpd/httpd-2.4.46.tar.gz
+tar xvf httpd-2.4.46.tar.gz
+mv httpd-2.4.46 httpd
 cd httpd
 ```
 
