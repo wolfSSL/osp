@@ -7,10 +7,15 @@ Requires wolfSSL v4.5.0 + patch (https://github.com/wolfSSL/wolfssl/pull/3421) o
 
 ### Building wolfSSL
 
-Build and install wolfSSL with the enable option `--enable-apachehttpd`:
-
+Apply the patch from the link above in the root directory of the wolfssl code:
 ```sh
-./configure --enable-apachehttpd
+wget https://github.com/wolfSSL/wolfssl/pull/3421.diff
+patch -p1 < 3421.diff
+```
+
+Build and install wolfSSL with the enable options `--enable-apachehttpd --enable-postauth`:
+```sh
+./configure --enable-apachehttpd --enable-postauth
 make
 sudo make install
 ```
@@ -30,10 +35,10 @@ cd httpd
 
 Note: The latest v2.4.x branch can be downloaded using: `svn checkout https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x httpd`
 
-2. Apply patch:
+2. Apply the patch svn_apache_patch.diff in the root directory of the checked out httpd code:
 
 ```sh
-patch -p1 < ../svn_apache_patch.diff
+patch -p1 < ../svn_apache_patch.diff # Assuming patch file is in the directory above
 ```
 
 3. If APR and APR-Util are already installed, skip to step 4. Otherwise, get the Apache Portable Runtime library (APR):
@@ -53,10 +58,11 @@ make
 sudo make install
 ```
 
+If you get an error from buildconf about libtool not being found, you may need to install the libtool binary (libtool-bin on Ubuntu/Debian).
+
 The default install directory is `/usr/local/apache2`.
 
-Note: If having error with libxml use `--with-libxml2 CFLAGS="-I/usr/include/libxml2"`
-    or use "expat" library and replace with `--with-expat=/usr`.
+Note: If having error with libxml2, make sure you have it installed (libxml2-dev on Ubuntu/Debian). You still might get an error about includes; if so, try `--with-libxml2 CFLAGS="-I/usr/include/libxml2"` or use "expat" library and replace with `--with-expat=/usr`.
 
 See `httpd-2.4.39/INSTALL` for more information.
 
@@ -97,7 +103,7 @@ run -X -d /usr/local/apache2 -f ssl.conf
 NOTE: Apache httpd tests require some perl modules. Use `perl -MCPAN -e 'install Bundle::ApacheTest'` to install.
 Also `sudo cpan install LWP::Protocol::https`
 
-1. Clone the wolfSSL testing repository and configure:
+1. Check out the httpd testing repository and configure:
 
 ```sh
 svn checkout http://svn.apache.org/repos/asf/httpd/test/framework/trunk/ httpd-test
@@ -132,13 +138,14 @@ More information about apache httpd testing can be found under `httpd-test/READM
 1) Make sure libpcap is installed:
 
 ```sh
-sudo yum install libpcap-devel
+sudo yum install libpcap-devel # CentOS
+sudo apt install libpcap-dev   # Debian/Ubuntu
 ```
 
 2) Build wolfSSL with sniffer support and disable DH (just use ECDHE):
 
 ```sh
-./configure --enable-apachehttpd --enable-sniffer CFLAGS="-DWOLFSSL_SNIFFER_WATCH"
+./configure --enable-apachehttpd --enable-postauth --enable-sniffer CFLAGS="-DWOLFSSL_SNIFFER_WATCH"
 make
 sudo make install
 ```
@@ -175,7 +182,7 @@ cd ./sslSniffer/sslSnifferTest
 1) Build wolfSSL with FIPS enabled
 
 ```sh
-./configure --enable-fips=v2 --enable-apachehttpd
+./configure --enable-fips=v2 --enable-apachehttpd --enable-postauth
 make
 ./fips-hash.sh
 make
