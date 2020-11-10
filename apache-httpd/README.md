@@ -150,9 +150,16 @@ make
 sudo make install
 ```
 
-3) Rebuild, install and start httpd
+3) Copy static ephemeral keys:
 
-4) Run sniffertest to see traffic
+```sh
+sudo cp ./certs/statickeys/dh-ffdhe2048.pem /usr/local/apache2/
+sudo cp ./certs/statickeys/ecc-secp256r1.pem /usr/local/apache2/
+```
+
+4) Rebuild, install and start httpd
+
+5) Run sniffertest to see traffic
 
 ```sh
 cd ./sslSniffer/sslSnifferTest
