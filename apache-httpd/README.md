@@ -136,6 +136,8 @@ More information about apache httpd testing can be found under `httpd-test/READM
 
 ## Building Apache httpd with Sniffer
 
+Apache httpd sniffer support tested with tested with Chrome, Firefox, Opera and Safari.
+
 Note: Requires at least wolfSSL v4.5.0 with PR https://github.com/wolfSSL/wolfssl/pull/3476
 
 1) Make sure libpcap is installed:
@@ -171,7 +173,7 @@ sudo ./snifftest
 1. eth0 (No description available)
 Enter the interface number (1-1) [default: 0]: 1
 Enter the port to scan [default: 11111]: 1443
-Enter alternate SNI: 
+Enter the server key [default: ]: /usr/local/apache2/ecc-secp256r1.pem,/usr/local/apache2/dh-ffdhe2048.pem
 
 # Decrypted traffic shown
 ```
@@ -184,7 +186,9 @@ sudo tcpdump -i eth0 -w 0001.pcap port 1443
 
 # Run sniffer
 cd ./sslSniffer/sslSnifferTest
-./snifftest 0001.pcap ../../certs/statickeys/ecc-secp256r1.pem
+./snifftest 0001.pcap /usr/local/apache2/ecc-secp256r1.pem,/usr/local/apache2/dh-ffdhe2048.pem
+
+
 ```
 
 ## Building Apache httpd with FIPS
