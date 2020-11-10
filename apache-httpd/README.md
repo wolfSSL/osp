@@ -54,7 +54,8 @@ Note: You can optionally add `--with-included-apr` to httpd ./configure in step 
 ```sh
 ./buildconf
 ./configure --enable-ssl --with-wolfssl --disable-shared --enable-mods-static=all --with-libxml2 CFLAGS="-I/usr/include/libxml2" --with-included-apr
-make
+make clean
+make -j4
 sudo make install
 ```
 
@@ -134,6 +135,8 @@ t/TEST t/ssl/
 More information about apache httpd testing can be found under `httpd-test/README`
 
 ## Building Apache httpd with Sniffer
+
+Note: Requires at least wolfSSL v4.5.0 with PR https://github.com/wolfSSL/wolfssl/pull/3476
 
 1) Make sure libpcap is installed:
 
