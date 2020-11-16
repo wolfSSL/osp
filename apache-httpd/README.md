@@ -1,7 +1,7 @@
 # wolfSSL support for Apache httpd
 
 wolfSSL provides support for Apache httpd version 2.4.46.
-Requires wolfSSL v4.5.0 + patch (https://github.com/wolfSSL/wolfssl/pull/3421) or later
+Requires wolfSSL v4.5.0 + patch (https://github.com/wolfSSL/wolfssl/pull/3421) or later.
 
 ## Building
 
@@ -9,11 +9,12 @@ Requires wolfSSL v4.5.0 + patch (https://github.com/wolfSSL/wolfssl/pull/3421) o
 
 Apply the patch from the link above in the root directory of the wolfssl code:
 ```sh
-wget https://github.com/wolfSSL/wolfssl/pull/3421.diff
+curl -O https://github.com/wolfSSL/wolfssl/pull/3421.diff
 patch -p1 < 3421.diff
 ```
 
 Build and install wolfSSL with the enable options `--enable-apachehttpd --enable-postauth`:
+
 ```sh
 ./configure --enable-apachehttpd --enable-postauth
 make
@@ -27,7 +28,7 @@ Apache httpd is enabled with wolfSSL support using the option `--with-wolfssl[=D
 1. From the base directory, checkout the httpd branch:
 
 ```sh
-wget https://mirrors.sonic.net/apache/httpd/httpd-2.4.46.tar.gz
+curl -O https://mirrors.sonic.net/apache/httpd/httpd-2.4.46.tar.gz
 tar xvf httpd-2.4.46.tar.gz
 mv httpd-2.4.46 httpd
 cd httpd
@@ -38,7 +39,7 @@ Note: The latest v2.4.x branch can be downloaded using: `svn checkout https://sv
 2. Apply the patch svn_apache_patch.diff in the root directory of the checked out httpd code:
 
 ```sh
-patch -p1 < ../svn_apache_patch.diff # Assuming patch file is in the directory above
+patch -p0 -i ../svn_apache_patch.diff # Assuming patch file is in the directory above
 ```
 
 3. If APR and APR-Util are already installed, skip to step 4. Otherwise, get the Apache Portable Runtime library (APR):
@@ -87,7 +88,9 @@ SSLCertificateKeyFile /home/[username]/wolfssl/certs/server-key.pem
 </VirtualHost>
 ```
 
-2) Run standalone: `httpd -d /usr/local/apache2 -f ssl.conf`
+2) Run standalone: `./httpd -d /usr/local/apache2 -f ssl.conf`
+
+Add sudo to the above command if you get "Permission denied" errors.
 
 ## Debugging httpd
 

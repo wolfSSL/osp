@@ -1,24 +1,8 @@
-From dccda2ad5df1954953b82d58e2fff3af7a8bc866 Mon Sep 17 00:00:00 2001
-From: David Garske <david@wolfssl.com>
-Date: Fri, 25 Sep 2020 13:48:23 -0700
-Subject: [PATCH] Added wolfSSL support using `./configure --enable-ssl
- --with-wolfssl`. Build wolfSSL using: `./configure --enable-apachehttpd &&
- make && sudo make install`.
-
----
- acinclude.m4              | 94 +++++++++++++++++++++++++++++++++++++++
- modules/http2/h2_push.c   |  1 +
- modules/md/md_crypt.c     |  1 +
- modules/md/mod_md.h       |  1 +
- modules/ssl/ssl_private.h |  1 +
- support/ab.c              |  3 ++
- 6 files changed, 101 insertions(+)
-
-diff --git a/acinclude.m4 b/acinclude.m4
-index ce1d637dd9..6bb7290aa0 100644
---- a/acinclude.m4
-+++ b/acinclude.m4
-@@ -477,6 +477,100 @@ AC_DEFUN([APACHE_REQUIRE_CXX],[
+Index: acinclude.m4
+===================================================================
+--- acinclude.m4	(revision 1883622)
++++ acinclude.m4	(working copy)
+@@ -477,6 +477,100 @@
    fi
  ])
  
@@ -119,10 +103,10 @@ index ce1d637dd9..6bb7290aa0 100644
  dnl
  dnl APACHE_CHECK_OPENSSL
  dnl
-diff --git a/modules/http2/h2_push.c b/modules/http2/h2_push.c
-index 9a3b19bdc2..8c6589a39a 100644
---- a/modules/http2/h2_push.c
-+++ b/modules/http2/h2_push.c
+Index: modules/http2/h2_push.c
+===================================================================
+--- modules/http2/h2_push.c	(revision 1883622)
++++ modules/http2/h2_push.c	(working copy)
 @@ -23,6 +23,7 @@
  #include <apr_time.h>
  
@@ -131,10 +115,10 @@ index 9a3b19bdc2..8c6589a39a 100644
  #include <openssl/sha.h>
  #endif
  
-diff --git a/modules/md/md_crypt.c b/modules/md/md_crypt.c
-index e0aac3ec99..9c1152aef6 100644
---- a/modules/md/md_crypt.c
-+++ b/modules/md/md_crypt.c
+Index: modules/md/md_crypt.c
+===================================================================
+--- modules/md/md_crypt.c	(revision 1883622)
++++ modules/md/md_crypt.c	(working copy)
 @@ -23,6 +23,7 @@
  #include <apr_file_io.h>
  #include <apr_strings.h>
@@ -143,10 +127,36 @@ index e0aac3ec99..9c1152aef6 100644
  #include <openssl/err.h>
  #include <openssl/evp.h>
  #include <openssl/pem.h>
-diff --git a/modules/md/mod_md.h b/modules/md/mod_md.h
-index 5ff8f5221c..22225a9569 100644
---- a/modules/md/mod_md.h
-+++ b/modules/md/mod_md.h
+@@ -64,7 +65,13 @@
+ #endif
+ #endif
+ 
++#if defined(USE_WOLFSSL)
+ #ifndef OPENSSL_NO_CT
++#define OPENSSL_NO_CT
++#endif
++#endif
++
++#ifndef OPENSSL_NO_CT
+ #include <openssl/ct.h>
+ #endif
+ 
+Index: modules/md/md_ocsp.c
+===================================================================
+--- modules/md/md_ocsp.c	(revision 1883622)
++++ modules/md/md_ocsp.c	(working copy)
+@@ -26,6 +26,7 @@
+ #include <apr_strings.h>
+ #include <apr_thread_mutex.h>
+ 
++#include <wolfssl/options.h>
+ #include <openssl/err.h>
+ #include <openssl/evp.h>
+ #include <openssl/ocsp.h>
+Index: modules/md/mod_md.h
+===================================================================
+--- modules/md/mod_md.h	(revision 1883622)
++++ modules/md/mod_md.h	(working copy)
 @@ -17,6 +17,7 @@
  #ifndef mod_md_mod_md_h
  #define mod_md_mod_md_h
@@ -155,58 +165,11 @@ index 5ff8f5221c..22225a9569 100644
  #include <openssl/evp.h>
  #include <openssl/x509v3.h>
  
-diff --git a/modules/ssl/ssl_private.h b/modules/ssl/ssl_private.h
-index f46814d0ad..8bcf2d9825 100644
---- a/modules/ssl/ssl_private.h
-+++ b/modules/ssl/ssl_private.h
-@@ -82,6 +82,7 @@
- #include "ap_expr.h"
- 
- /* OpenSSL headers */
-+#include <wolfssl/options.h>
- #include <openssl/opensslv.h>
- #if (OPENSSL_VERSION_NUMBER >= 0x10001000)
- /* must be defined before including ssl.h */
-diff --git a/support/ab.c b/support/ab.c
-index 410d58e56e..b8d85974f0 100644
---- a/support/ab.c
-+++ b/support/ab.c
-@@ -158,6 +158,7 @@
- 
- #if defined(HAVE_OPENSSL)
- 
-+#include <wolfssl/options.h>
- #include <openssl/rsa.h>
- #include <openssl/crypto.h>
- #include <openssl/x509.h>
-@@ -2554,7 +2555,9 @@ int main(int argc, const char * const argv[])
-                     meth = TLSv1_2_client_method();
- #endif
-                 } else if (strncasecmp(opt_arg, "TLS1", 4) == 0) {
-+#if !defined(NO_OLD_TLS) && defined(WOLFSSL_ALLOW_TLSV10)
-                     meth = TLSv1_client_method();
-+#endif
-                 }
- #else /* #if OPENSSL_VERSION_NUMBER < 0x10100000L */
-                 meth = TLS_client_method();
--- 
-2.27.0
-
-From c055f9b8af9b7d0bbccc6af5e66ad08c1b48595a Mon Sep 17 00:00:00 2001
-From: David Garske <david@wolfssl.com>
-Date: Wed, 4 Nov 2020 13:40:28 -0800
-Subject: [PATCH] Added FIPS support to Apache v2.4.39.
-
----
- modules/ssl/ssl_engine_init.c | 29 +++++++++++++++++++++++++++++
- modules/ssl/ssl_util_ssl.c    |  2 ++
- 2 files changed, 31 insertions(+)
-
-diff --git a/modules/ssl/ssl_engine_init.c b/modules/ssl/ssl_engine_init.c
-index 48d7b96cd8..9be1e22cf7 100644
---- a/modules/ssl/ssl_engine_init.c
-+++ b/modules/ssl/ssl_engine_init.c
-@@ -71,6 +71,7 @@ static int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+Index: modules/ssl/ssl_engine_init.c
+===================================================================
+--- modules/ssl/ssl_engine_init.c	(revision 1883622)
++++ modules/ssl/ssl_engine_init.c	(working copy)
+@@ -93,6 +93,7 @@
  }
  #endif
  
@@ -214,7 +177,7 @@ index 48d7b96cd8..9be1e22cf7 100644
  /*
   * Grab well-defined DH parameters from OpenSSL, see the BN_get_rfc*
   * functions in <openssl/bn.h> for all available primes.
-@@ -111,16 +112,21 @@ static struct dhparam {
+@@ -133,16 +134,21 @@
      { BN_get_rfc2409_prime_1024, NULL, 0 }
  };
  
@@ -236,7 +199,7 @@ index 48d7b96cd8..9be1e22cf7 100644
      unsigned n;
  
      /* DH_free() is a noop for a NULL parameter, so these are harmless
-@@ -130,6 +136,7 @@ static void free_dh_params(void)
+@@ -152,6 +158,7 @@
          DH_free(dhparams[n].dh);
          dhparams[n].dh = NULL;
      }
@@ -244,7 +207,7 @@ index 48d7b96cd8..9be1e22cf7 100644
  }
  
  /* Hand out the same DH structure though once generated as we leak
-@@ -141,12 +148,14 @@ static void free_dh_params(void)
+@@ -163,6 +170,7 @@
   * to our copy. */
  DH *modssl_get_dh_params(unsigned keylen)
  {
@@ -252,6 +215,7 @@ index 48d7b96cd8..9be1e22cf7 100644
      unsigned n;
  
      for (n = 0; n < sizeof(dhparams)/sizeof(dhparams[0]); n++)
+@@ -169,6 +177,7 @@
          if (keylen >= dhparams[n].min)
              return dhparams[n].dh;
          
@@ -259,7 +223,7 @@ index 48d7b96cd8..9be1e22cf7 100644
      return NULL; /* impossible to reach. */
  }
  
-@@ -194,6 +203,21 @@ static apr_status_t modssl_fips_cleanup(void *data)
+@@ -216,6 +225,21 @@
  /*
   *  Per-module initialization
   */
@@ -281,7 +245,7 @@ index 48d7b96cd8..9be1e22cf7 100644
  apr_status_t ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
                               apr_pool_t *ptemp,
                               server_rec *base_server)
-@@ -204,6 +228,11 @@ apr_status_t ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
+@@ -226,6 +250,11 @@
      apr_status_t rv;
      apr_array_header_t *pphrases;
  
@@ -293,11 +257,23 @@ index 48d7b96cd8..9be1e22cf7 100644
      if (SSLeay() < MODSSL_LIBRARY_VERSION) {
          ap_log_error(APLOG_MARK, APLOG_WARNING, 0, base_server, APLOGNO(01882)
                       "Init: this version of mod_ssl was compiled against "
-diff --git a/modules/ssl/ssl_util_ssl.c b/modules/ssl/ssl_util_ssl.c
-index b7f0eca173..178099e4a7 100644
---- a/modules/ssl/ssl_util_ssl.c
-+++ b/modules/ssl/ssl_util_ssl.c
-@@ -492,12 +492,14 @@ BOOL modssl_X509_match_name(apr_pool_t *p, X509 *x509, const char *name,
+Index: modules/ssl/ssl_private.h
+===================================================================
+--- modules/ssl/ssl_private.h	(revision 1883622)
++++ modules/ssl/ssl_private.h	(working copy)
+@@ -83,6 +83,7 @@
+ #include "ap_expr.h"
+ 
+ /* OpenSSL headers */
++#include <wolfssl/options.h>
+ #include <openssl/opensslv.h>
+ #if (OPENSSL_VERSION_NUMBER >= 0x10001000)
+ /* must be defined before including ssl.h */
+Index: modules/ssl/ssl_util_ssl.c
+===================================================================
+--- modules/ssl/ssl_util_ssl.c	(revision 1883622)
++++ modules/ssl/ssl_util_ssl.c	(working copy)
+@@ -467,6 +467,7 @@
  DH *ssl_dh_GetParamFromFile(const char *file)
  {
      DH *dh = NULL;
@@ -305,6 +281,7 @@ index b7f0eca173..178099e4a7 100644
      BIO *bio;
  
      if ((bio = BIO_new_file(file, "r")) == NULL)
+@@ -473,6 +474,7 @@
          return NULL;
      dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
      BIO_free(bio);
@@ -312,58 +289,25 @@ index b7f0eca173..178099e4a7 100644
      return (dh);
  }
  
--- 
-2.27.0
-
-From f302a77341ffd9a8291d38ed411f68ce530a5bba Mon Sep 17 00:00:00 2001
-From: David Garske <david@wolfssl.com>
-Date: Tue, 10 Nov 2020 13:17:05 -0800
-Subject: [PATCH] Support for sniffing TLS connections using a static ephermal
- key.
-
----
- modules/ssl/ssl_engine_init.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
-
-diff --git a/modules/ssl/ssl_engine_init.c b/modules/ssl/ssl_engine_init.c
-index 9be1e22cf7..33b0ad7e95 100644
---- a/modules/ssl/ssl_engine_init.c
-+++ b/modules/ssl/ssl_engine_init.c
-@@ -1258,6 +1258,10 @@ static apr_status_t ssl_init_server_certs(server_rec *s,
- #ifndef HAVE_SSL_CONF_CMD
-     SSL *ssl;
+Index: support/ab.c
+===================================================================
+--- support/ab.c	(revision 1883622)
++++ support/ab.c	(working copy)
+@@ -158,6 +158,7 @@
+ 
+ #if defined(HAVE_OPENSSL)
+ 
++#include <wolfssl/options.h>
+ #include <openssl/rsa.h>
+ #include <openssl/crypto.h>
+ #include <openssl/x509.h>
+@@ -2554,7 +2555,9 @@
+                     meth = TLSv1_2_client_method();
  #endif
-+#ifdef WOLFSSL_STATIC_EPHEMERAL
-+    const char staticKeyECC[] = "/usr/local/apache2/ecc-secp256r1.pem";
-+    const char staticKeyDH[]  = "/usr/local/apache2/dh-ffdhe2048.pem";
+                 } else if (strncasecmp(opt_arg, "TLS1", 4) == 0) {
++#if !defined(NO_OLD_TLS) && defined(WOLFSSL_ALLOW_TLSV10)
+                     meth = TLSv1_client_method();
 +#endif
- 
-     /* no OpenSSL default prompts for any of the SSL_CTX_use_* calls, please */
-     SSL_CTX_set_default_passwd_cb(mctx->ssl_ctx, ssl_no_passwd_prompt_cb);
-@@ -1333,6 +1337,23 @@ static apr_status_t ssl_init_server_certs(server_rec *s,
-             return APR_EGENERAL;
-         }
- 
-+#ifdef WOLFSSL_STATIC_EPHEMERAL
-+        /* Set a fixed ephemeral key for testing only */
-+        /* Allows use of sniffer to decrypt data if ephemeral key is known */
-+        if (wolfSSL_CTX_set_ephemeral_key(mctx->ssl_ctx, WC_PK_TYPE_ECDH,
-+            staticKeyECC, 0, WOLFSSL_FILETYPE_PEM) != 0) {
-+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s, APLOGNO(02563)
-+                "Error loading static ephemeral key %s", staticKeyECC);
-+            /* do not exit on failure */
-+        }
-+        if (wolfSSL_CTX_set_ephemeral_key(mctx->ssl_ctx, WC_PK_TYPE_DH,
-+            staticKeyDH, 0, WOLFSSL_FILETYPE_PEM) != 0) {
-+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s, APLOGNO(02563)
-+                "Error loading static ephemeral key %s", staticKeyDH);
-+            /* do not exit on failure */
-+        }
-+#endif
-+
- #ifdef HAVE_SSL_CONF_CMD
-         /* 
-          * workaround for those OpenSSL versions where SSL_CTX_get0_certificate
--- 
-2.27.0
-
+                 }
+ #else /* #if OPENSSL_VERSION_NUMBER < 0x10100000L */
+                 meth = TLS_client_method();
