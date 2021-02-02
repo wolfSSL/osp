@@ -293,14 +293,21 @@ Index: support/ab.c
 ===================================================================
 --- support/ab.c	(revision 1883622)
 +++ support/ab.c	(working copy)
-@@ -158,6 +158,7 @@
+@@ -158,12 +158,13 @@
  
  #if defined(HAVE_OPENSSL)
  
 +#include <wolfssl/options.h>
++#include <openssl/ssl.h>
  #include <openssl/rsa.h>
  #include <openssl/crypto.h>
  #include <openssl/x509.h>
+ #include <openssl/pem.h>
+ #include <openssl/err.h>
+-#include <openssl/ssl.h>
+ #include <openssl/rand.h>
+ #define USE_SSL
+ #define SK_NUM(x) sk_X509_num(x)
 @@ -2554,7 +2555,9 @@
                      meth = TLSv1_2_client_method();
  #endif
