@@ -1,0 +1,858 @@
+diff --git a/config.h.in b/config.h.in
+index 7292c01..4e6da7f 100644
+--- a/config.h.in
++++ b/config.h.in
+@@ -686,6 +686,9 @@
+ #undef WITH_FS
+ #undef WITH_OPENSSL
+ #undef WITH_OPENSSL_METHOD
++#undef WITH_WOLFSSL
++#undef WITH_WOLFSSL_DEBUG
++#undef OPENSSL_NO_COMP
+ #undef WITH_RES_DEPRECATED 	/* AAONLY,PRIMARY */
+ #define WITH_STREAMS 1
+ #undef WITH_FIPS
+diff --git a/configure.ac b/configure.ac
+index 53cebbd..0c4f4b7 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -497,233 +497,322 @@ if test -n "$WITH_READLINE"; then
+   fi
+ fi
+ 
+-AC_MSG_CHECKING(whether to include openssl support)
+-AC_ARG_ENABLE(openssl, [  --disable-openssl       disable OpenSSL support],
+-  [ case "$enableval" in
+-    no) AC_MSG_RESULT(no); WITH_OPENSSL= ;;
+-    *) AC_MSG_RESULT(yes); WITH_OPENSSL=1 ;;
+-   esac],
+-   [ AC_MSG_RESULT(yes);   WITH_OPENSSL=1 ])
+-AC_ARG_ENABLE(openssl_base, [  --enable-openssl-base   specify directory with include/ and lib/],
+-    [ OPENSSL_BASE="$enableval" ],
+-    [ unset OPENSSL_BASE ])
+-#
+-if test -n "$WITH_OPENSSL"; then
+- if test -n "$OPENSSL_BASE"; then
+-    sc_cv_have_openssl_ssl_h=yes; OPENSSL_BASE="$D"
+- else
+-  AC_MSG_NOTICE(checking for components of OpenSSL)
+-  # first, we need to find the include file <openssl/ssl.h>
+-  AC_CACHE_VAL(sc_cv_have_openssl_ssl_h,
+-    [AC_TRY_COMPILE([#include <openssl/ssl.h>],[;],
+-      [sc_cv_have_openssl_ssl_h=yes; OPENSSL_BASE=""; ],
+-      [sc_cv_have_openssl_ssl_h=no
+-       if [ "$OPENSSL_BASE" ]; then
+-	  s="$OPENSSL_BASE"
+-       else
+-          Ds="/sw /usr/local /opt/freeware /usr/sfw /usr/local/ssl"
+-       fi
+-       for D in $Ds; do
+-	I="$D/include"
+-	i="$I/openssl/ssl.h"
+-	if test -r "$i"; then
+-	  #V_INCL="$V_INCL -I$I"
+-	  CPPFLAGS="$CPPFLAGS -I$I"
+-	  AC_MSG_NOTICE(found $i)
+-	  sc_cv_have_openssl_ssl_h=yes; OPENSSL_BASE="$D"
+-	  break;
+-	fi
+-      done])
+-  ])
+-  if test "$sc_cv_have_openssl_ssl_h" = "yes"; then
+-    AC_DEFINE(HAVE_OPENSSL_SSL_H)
+-  fi
+-  AC_MSG_NOTICE(checked for openssl/ssl.h... $sc_cv_have_openssl_ssl_h)
+- fi
+-fi	# end checking for openssl/ssl.h
+-#
++AC_MSG_CHECKING(whether to include wolfSSL support)
++WOLFSSL_URL="https://www.wolfssl.com/download/"
++AC_ARG_WITH(wolfssl,
++    [  --with-wolfssl=PATH     PATH to wolfssl install (default /usr/local) ],
++    [
++        if test "x$withval" != "xno"; then
++           if test -d "$withval/lib"; then
++                LDFLAGS="-L${withval}/lib ${LDFLAGS}"
++           fi
++           if test -d "$withval/include"; then
++               CPPFLAGS="$CPPFLAGS -I${withval}/include -I${withval}/include/wolfssl"
++           fi
++        fi
+ 
+-#if test -n "$WITH_OPENSSL"; then
+-#  AC_CHECK_FUNCS(OPENSSL_init_ssl, SSL_library_init)
+-#fi
++        if test "x$withval" == "xyes" ; then
++            LDFLAGS="-L/usr/local/lib $LDFLAGS"
++            CPPFLAGS="-I/usr/local/include -I/usr/local/include/wolfssl $CPPFLAGS"
++        fi
+ 
+-if test -n "$WITH_OPENSSL" -a "$sc_cv_have_openssl_ssl_h" = 'yes'; then
+-  # next, we search for the openssl library (libssl.*)
+-  # interesting: Linux only requires -lssl, FreeBSD requires -lssl -lcrypto
+-  # Note, version OpenSSL 0.9.7j and higher requires -lcrypto even on Linux.
+-  AC_MSG_CHECKING(for libssl)
+-  AC_CACHE_VAL(sc_cv_have_libssl,
+-    [ LIBS0="$LIBS"
+-      if test -n "$OPENSSL_BASE"; then
+-	L="$OPENSSL_BASE/lib"; LIBS="$LIBS -L$L -lssl -lcrypto"
+-      else
+-	LIBS="$LIBS -lssl -lcrypto"
++        LIBS="$LIBS -lwolfssl"
++
++        AC_MSG_RESULT([yes])
++
++        AC_DEFINE([WITH_WOLFSSL])
++        AC_DEFINE([WITH_OPENSSL])
++        AC_DEFINE([WITH_OPENSSL_METHOD])
++
++        # Note that we are disabling compression when using wolfSSL.
++        AC_DEFINE([OPENSSL_NO_COMP])
++
++        AC_CHECK_FUNC([wolfTLS_client_method],             [AC_DEFINE([HAVE_TLS_client_method])], [])
++        AC_CHECK_FUNC([wolfTLS_server_method],             [AC_DEFINE([HAVE_TLS_server_method])], [])
++        AC_CHECK_FUNC([wolfDTLS_client_method],            [AC_DEFINE([HAVE_DTLS_client_method])], [])
++        AC_CHECK_FUNC([wolfDTLS_server_method],            [AC_DEFINE([HAVE_DTLS_server_method])], [])
++        AC_CHECK_FUNC([wolfSSLv2_client_method],           [AC_DEFINE([HAVE_SSLv2_client_method])], [])
++        AC_CHECK_FUNC([wolfSSLv2_server_method],           [AC_DEFINE([HAVE_SSLv2_server_method])], [])
++        AC_CHECK_FUNC([wolfSSLv3_client_method],           [AC_DEFINE([HAVE_SSLv3_client_method])], [])
++        AC_CHECK_FUNC([wolfSSLv3_server_method],           [AC_DEFINE([HAVE_SSLv3_server_method])], [])
++        AC_CHECK_FUNC([wolfSSLv23_client_method],          [AC_DEFINE([HAVE_SSLv23_client_method])], [])
++        AC_CHECK_FUNC([wolfSSLv23_server_method],          [AC_DEFINE([HAVE_SSLv23_server_method])], [])
++        AC_CHECK_FUNC([wolfTLSv1_client_method],           [AC_DEFINE([HAVE_TLSv1_client_method])], [])
++        AC_CHECK_FUNC([wolfTLSv1_server_method],           [AC_DEFINE([HAVE_TLSv1_server_method])], [])
++        AC_CHECK_FUNC([wolfTLSv1_1_client_method],         [AC_DEFINE([HAVE_TLSv1_1_client_method])], [])
++        AC_CHECK_FUNC([wolfTLSv1_1_server_method],         [AC_DEFINE([HAVE_TLSv1_1_server_method])], [])
++        AC_CHECK_FUNC([wolfTLSv1_2_client_method],         [AC_DEFINE([HAVE_TLSv1_2_client_method])], [])
++        AC_CHECK_FUNC([wolfTLSv1_2_server_method],         [AC_DEFINE([HAVE_TLSv1_2_server_method])], [])
++        AC_CHECK_FUNC([wolfDTLSv1_client_method],          [AC_DEFINE([HAVE_DTLSv1_client_method])], [])
++        AC_CHECK_FUNC([wolfDTLSv1_server_method],          [AC_DEFINE([HAVE_DTLSv1_server_method])], [])
++        AC_CHECK_FUNC([wolfDTLSv1_2_client_method],        [AC_DEFINE([HAVE_DTLSv1_2_client_method])], [])
++        AC_CHECK_FUNC([wolfDTLSv1_2_server_method],        [AC_DEFINE([HAVE_DTLSv1_2_server_method])], [])
++        AC_CHECK_FUNC([wolfSSL_RAND_egd],                  [AC_DEFINE([HAVE_RAND_egd])], [])
++        AC_CHECK_FUNC([wolfSSL_DH_set0_pqg],               [AC_DEFINE([HAVE_DH_set0_pqg])], [])
++        AC_CHECK_FUNC([wolfSSL_ASN1_STRING_data],          [AC_DEFINE([HAVE_ASN1_STRING_get0_data])], [])
++        AC_CHECK_FUNC([wolfSSL_RAND_status],               [AC_DEFINE([HAVE_RAND_status])], [])
++        AC_CHECK_FUNC([wolfSSL_set_tlsext_host_name],      [AC_DEFINE([HAVE_SSL_set_tlsext_host_name])], [])
++        AC_CHECK_FUNC([wolfSSL_library_init],              [AC_DEFINE([HAVE_SSL_library_init])], [])
++        AC_CHECK_FUNC([wolfSSL_OPENSSL_init_ssl],          [AC_DEFINE([HAVE_OPENSSL_init_ssl])], [])
++        AC_CHECK_FUNC([wolfSSL_ERR_error_string],          [AC_DEFINE([HAVE_ERR_error_string])], [])
++        AC_CHECK_FUNC([wolfSSL_CTX_set_min_proto_version], [AC_DEFINE([HAVE_SSL_CTX_set_min_proto_version])], [])
++        AC_CHECK_FUNC([wolfSSL_CTX_set_max_proto_version], [AC_DEFINE([HAVE_SSL_CTX_set_max_proto_version])], [])
++
++        AC_MSG_CHECKING(for type WOLFSSL_EC_KEY)
++        AC_TRY_COMPILE([#include <wolfssl/openssl/ec.h>], [EC_KEY *s;], [HAVE_TYPE_EC_KEY=yes], [HAVE_TYPE_EC_KEY=no])
++        if test "$HAVE_TYPE_EC_KEY" = "yes"
++        then
++           AC_DEFINE([HAVE_TYPE_EC_KEY])
++           AC_MSG_RESULT([yes])
++        else
++           AC_MSG_RESULT([no])
++        fi
++    ],
++    [AC_MSG_RESULT([no])]
++)
++
++AC_ARG_ENABLE([wolfssldebug],
++    [  --enable-wolfssldebug   Enable wolfSSL debugging information (default: disabled)],
++    [ ENABLED_WOLFSSLDEBUG=$enableval ],
++    [ ENABLED_WOLFSSLDEBUG=$no ])
++if test "x$ENABLED_WOLFSSLDEBUG" = "xyes"
++then
++    AC_DEFINE([WITH_WOLFSSL_DEBUG])
++fi
++
++if test "$WITH_WOLFSSL" = "no"
++then
++    AC_MSG_CHECKING(whether to include openssl support)
++    AC_ARG_ENABLE(openssl, [  --disable-openssl       disable OpenSSL support],
++      [ case "$enableval" in
++        no) AC_MSG_RESULT(no); WITH_OPENSSL= ;;
++        *) AC_MSG_RESULT(yes); WITH_OPENSSL=1 ;;
++       esac],
++       [ AC_MSG_RESULT(yes);   WITH_OPENSSL=1 ])
++    AC_ARG_ENABLE(openssl_base, [  --enable-openssl-base   specify directory with include/ and lib/],
++        [ OPENSSL_BASE="$enableval" ],
++        [ unset OPENSSL_BASE ])
++    #
++    if test -n "$WITH_OPENSSL"; then
++     if test -n "$OPENSSL_BASE"; then
++        sc_cv_have_openssl_ssl_h=yes; OPENSSL_BASE="$D"
++     else
++      AC_MSG_NOTICE(checking for components of OpenSSL)
++      # first, we need to find the include file <openssl/ssl.h>
++      AC_CACHE_VAL(sc_cv_have_openssl_ssl_h,
++        [AC_TRY_COMPILE([#include <openssl/ssl.h>],[;],
++          [sc_cv_have_openssl_ssl_h=yes; OPENSSL_BASE=""; ],
++          [sc_cv_have_openssl_ssl_h=no
++           if [ "$OPENSSL_BASE" ]; then
++          s="$OPENSSL_BASE"
++           else
++              Ds="/sw /usr/local /opt/freeware /usr/sfw /usr/local/ssl"
++           fi
++           for D in $Ds; do
++        I="$D/include"
++        i="$I/openssl/ssl.h"
++        if test -r "$i"; then
++          #V_INCL="$V_INCL -I$I"
++          CPPFLAGS="$CPPFLAGS -I$I"
++          AC_MSG_NOTICE(found $i)
++          sc_cv_have_openssl_ssl_h=yes; OPENSSL_BASE="$D"
++          break;
++        fi
++          done])
++      ])
++      if test "$sc_cv_have_openssl_ssl_h" = "yes"; then
++        AC_DEFINE(HAVE_OPENSSL_SSL_H)
+       fi
+-      AC_TRY_LINK([#include <openssl/ssl.h>],
+-       [SSL_library_init();ERR_error_string()],
+-       [sc_cv_have_libssl='yes'],
+-       [ LIBS="$LIBS -lcrypto"
+-       AC_TRY_LINK([#include <openssl/ssl.h>],
+-       [SSL_library_init()],
+-	  [sc_cv_have_libssl='yes'],
+-	  [sc_cv_have_libssl='no'])
+-        ])
+-      if test "$sc_cv_have_libssl" != 'yes'; then
+-	LIBS="$LIBS0"
++      AC_MSG_NOTICE(checked for openssl/ssl.h... $sc_cv_have_openssl_ssl_h)
++     fi
++    fi	# end checking for openssl/ssl.h
++    #
++
++    #if test -n "$WITH_OPENSSL"; then
++    #  AC_CHECK_FUNCS(OPENSSL_init_ssl, SSL_library_init)
++    #fi
++
++    if test -n "$WITH_OPENSSL" -a "$sc_cv_have_openssl_ssl_h" = 'yes'; then
++      # next, we search for the openssl library (libssl.*)
++      # interesting: Linux only requires -lssl, FreeBSD requires -lssl -lcrypto
++      # Note, version OpenSSL 0.9.7j and higher requires -lcrypto even on Linux.
++      AC_MSG_CHECKING(for libssl)
++      AC_CACHE_VAL(sc_cv_have_libssl,
++        [ LIBS0="$LIBS"
++          if test -n "$OPENSSL_BASE"; then
++        L="$OPENSSL_BASE/lib"; LIBS="$LIBS -L$L -lssl -lcrypto"
++          else
++        LIBS="$LIBS -lssl -lcrypto"
++          fi
++          AC_TRY_LINK([#include <openssl/ssl.h>],
++           [SSL_library_init();ERR_error_string()],
++           [sc_cv_have_libssl='yes'],
++           [ LIBS="$LIBS -lcrypto"
++           AC_TRY_LINK([#include <openssl/ssl.h>],
++           [SSL_library_init()],
++          [sc_cv_have_libssl='yes'],
++          [sc_cv_have_libssl='no'])
++            ])
++          if test "$sc_cv_have_libssl" != 'yes'; then
++        LIBS="$LIBS0"
++          fi
++        ]
++      )
++      if test "$sc_cv_have_libssl" = 'yes'; then
++        AC_DEFINE(HAVE_LIBSSL)
+       fi
+-    ]
+-  )
+-  if test "$sc_cv_have_libssl" = 'yes'; then
+-    AC_DEFINE(HAVE_LIBSSL)
+-  fi
+-  AC_MSG_RESULT($sc_cv_have_libssl)
+-fi
+-#
+-#    # a possible location for openssl (on Sourceforge/Solaris)
+-#    AC_CHECK_FILE(/usr/local/ssl/lib, LIBS="$LIBS -L/usr/local/ssl/lib/")
+-#    # sometimes on Solaris:
+-#    AC_CHECK_FILE(/pkgs/lib, LIBS="$LIBS -L/pkgs/lib/")
+-#    # for AIX 5.1 with Linux toolbox:
+-#    AC_CHECK_FILE(/opt/freeware/lib, LIBS="$LIBS -L/opt/freeware/lib/")
+-#
+-#    AC_CHECK_LIB(crypto, main)
+-#    AC_CHECK_LIB(ssl, main)
+-#
+-#    # MacOSX has openssl includes in another directory
+-#    if test -d /sw/include/; then
+-#	V_INCL="$V_INCL -I/sw/include"
+-#    # and Solaris at sourceforge here:
+-#    elif test -d /usr/local/ssl/include/; then
+-#	V_INCL="$V_INCL -I/usr/local/ssl/include"
+-#    # and AIX 5.1 with Linux toolbox:
+-#    elif test -d /opt/freeware/include; then
+-#	V_INCL="$V_INCL -I/opt/freeware/include"
+-#    fi
+-#fi
+-if test -n "$WITH_OPENSSL"; then
+-  if test "$sc_cv_have_openssl_ssl_h" = "yes" -a "$sc_cv_have_libssl" = "yes"; then
+-    AC_DEFINE(WITH_OPENSSL)
+-  else
+-    AC_MSG_WARN([not all components of OpenSSL found, disabling it]);
+-  fi
+-fi
+-
+-AC_CHECK_FUNCS(OPENSSL_init_ssl SSL_library_init)
+-
+-#; sc_cv_have_SSL_library_init='yes'; AC_DEFINE(HAVE_SSL_library_init)
+-#if test -n "$WITH_OPENSSL"; then
+-#     AC_CHECK_LIB(crypto, CRYPTO_new_ex_data, [], [AC_MSG_ERROR([library 'crypto' is required for OpenSSL])])
+-#     FOUND_SSL_LIB="no"
+-#     AC_CHECK_LIB(ssl, OPENSSL_init_ssl, [FOUND_SSL_LIB="yes"])
+-#     AC_CHECK_LIB(ssl, SSL_library_init, [FOUND_SSL_LIB="yes"])
+-#     AS_IF([test "x$FOUND_SSL_LIB" = xno], [AC_MSG_ERROR([library 'ssl' is required for OpenSSL; WITH_OPENSSL=])])
+-#     AS_IF([test "x$FOUND_SSL_LIB" = xyes], [LIBS="$LIBS -L$L -lssl -lcrypto"])
+-#fi
++      AC_MSG_RESULT($sc_cv_have_libssl)
++    fi
++    #
++    #    # a possible location for openssl (on Sourceforge/Solaris)
++    #    AC_CHECK_FILE(/usr/local/ssl/lib, LIBS="$LIBS -L/usr/local/ssl/lib/")
++    #    # sometimes on Solaris:
++    #    AC_CHECK_FILE(/pkgs/lib, LIBS="$LIBS -L/pkgs/lib/")
++    #    # for AIX 5.1 with Linux toolbox:
++    #    AC_CHECK_FILE(/opt/freeware/lib, LIBS="$LIBS -L/opt/freeware/lib/")
++    #
++    #    AC_CHECK_LIB(crypto, main)
++    #    AC_CHECK_LIB(ssl, main)
++    #
++    #    # MacOSX has openssl includes in another directory
++    #    if test -d /sw/include/; then
++    #	V_INCL="$V_INCL -I/sw/include"
++    #    # and Solaris at sourceforge here:
++    #    elif test -d /usr/local/ssl/include/; then
++    #	V_INCL="$V_INCL -I/usr/local/ssl/include"
++    #    # and AIX 5.1 with Linux toolbox:
++    #    elif test -d /opt/freeware/include; then
++    #	V_INCL="$V_INCL -I/opt/freeware/include"
++    #    fi
++    #fi
++    if test -n "$WITH_OPENSSL"; then
++      if test "$sc_cv_have_openssl_ssl_h" = "yes" -a "$sc_cv_have_libssl" = "yes"; then
++        AC_DEFINE(WITH_OPENSSL)
++      else
++        AC_MSG_WARN([not all components of OpenSSL found, disabling it]);
++      fi
++    fi
+ 
+-if test -n "$WITH_OPENSSL"; then
+-AC_MSG_CHECKING(whether to include OpenSSL method option)
+-AC_ARG_ENABLE(openssl-method, [  --enable-openssl-method       enable OpenSSL method option],
+-	      [case "$enableval" in
+-	       no) AC_MSG_RESULT(no);;
+-	       *) AC_DEFINE(WITH_OPENSSL_METHOD) WITH_OPENSSL_METHOD=1; AC_MSG_RESULT(yes);;
+-	       esac],
+-	       [AC_MSG_RESULT(no)])
++    AC_CHECK_FUNCS(OPENSSL_init_ssl SSL_library_init)
++
++    #; sc_cv_have_SSL_library_init='yes'; AC_DEFINE(HAVE_SSL_library_init)
++    #if test -n "$WITH_OPENSSL"; then
++    #     AC_CHECK_LIB(crypto, CRYPTO_new_ex_data, [], [AC_MSG_ERROR([library 'crypto' is required for OpenSSL])])
++    #     FOUND_SSL_LIB="no"
++    #     AC_CHECK_LIB(ssl, OPENSSL_init_ssl, [FOUND_SSL_LIB="yes"])
++    #     AC_CHECK_LIB(ssl, SSL_library_init, [FOUND_SSL_LIB="yes"])
++    #     AS_IF([test "x$FOUND_SSL_LIB" = xno], [AC_MSG_ERROR([library 'ssl' is required for OpenSSL; WITH_OPENSSL=])])
++    #     AS_IF([test "x$FOUND_SSL_LIB" = xyes], [LIBS="$LIBS -L$L -lssl -lcrypto"])
++    #fi
++
++    if test -n "$WITH_OPENSSL"; then
++    AC_MSG_CHECKING(whether to include OpenSSL method option)
++    AC_ARG_ENABLE(openssl-method, [  --enable-openssl-method       enable OpenSSL method option],
++              [case "$enableval" in
++               no) AC_MSG_RESULT(no);;
++               *) AC_DEFINE(WITH_OPENSSL_METHOD) WITH_OPENSSL_METHOD=1; AC_MSG_RESULT(yes);;
++               esac],
++               [AC_MSG_RESULT(no)])
++    fi
+ fi
+ 
+ AC_MSG_CHECKING(whether to include deprecated resolver option)
+ AC_ARG_ENABLE(res-deprecated, [  --enable-res-deprecated       enable deprecated resolver options],
+-	      [case "$enableval" in
+-	       no) AC_MSG_RESULT(no);;
+-	       *) AC_DEFINE(WITH_RES_DEPRECATED) WITH_RES_DEPRECATED=1; AC_MSG_RESULT(yes);;
+-	       esac],
+-	       [AC_MSG_RESULT(no)])
++          [case "$enableval" in
++           no) AC_MSG_RESULT(no);;
++           *) AC_DEFINE(WITH_RES_DEPRECATED) WITH_RES_DEPRECATED=1; AC_MSG_RESULT(yes);;
++           esac],
++           [AC_MSG_RESULT(no)])
++
++if test "$WITH_WOLFSSL" = "no"
++then
++    # check for fips support
++    AC_MSG_CHECKING(whether to include openssl fips support)
++    AC_ARG_ENABLE(fips, [  --enable-fips          enable OpenSSL FIPS support],
++      [ case "$enableval" in
++        yes) AC_MSG_RESULT(yes); WITH_FIPS=1 ;;
++        *) AC_MSG_RESULT(no); WITH_FIPS= ;;
++       esac],
++       [ AC_MSG_RESULT(no);   WITH_FIPS= ])
++
++    if test -n "$WITH_FIPS"; then
++      if test -n "$WITH_OPENSSL"; then
++        AC_CHECK_PROG(HAVE_FIPSLD, fipsld, 1)
++        if test "$sc_cv_have_openssl_ssl_h" != "yes" -o "$sc_cv_have_libssl" != "yes" -o ! "$HAVE_FIPSLD";
++     then
++          AC_MSG_WARN([not all components of OpenSSL found, disabling FIPS]);
++          WITH_FIPS=
++        fi
++      else
++        AC_MSG_WARN([must enable OpenSSL to enable FIPS; use --enable-openssl]);
++      fi
++    fi
+ 
+-# check for fips support
+-AC_MSG_CHECKING(whether to include openssl fips support)
+-AC_ARG_ENABLE(fips, [  --enable-fips          enable OpenSSL FIPS support],
+-  [ case "$enableval" in
+-    yes) AC_MSG_RESULT(yes); WITH_FIPS=1 ;;
+-    *) AC_MSG_RESULT(no); WITH_FIPS= ;;
+-   esac],
+-   [ AC_MSG_RESULT(no);   WITH_FIPS= ])
+-
+-if test -n "$WITH_FIPS"; then
+-  if test -n "$WITH_OPENSSL"; then
+-    AC_CHECK_PROG(HAVE_FIPSLD, fipsld, 1)
+-    if test "$sc_cv_have_openssl_ssl_h" != "yes" -o "$sc_cv_have_libssl" != "yes" -o ! "$HAVE_FIPSLD";
+- then
+-      AC_MSG_WARN([not all components of OpenSSL found, disabling FIPS]);
+-      WITH_FIPS=
++    if test -n "$WITH_FIPS"; then
++      AC_MSG_CHECKING(for components of OpenSSL FIPS)
++      # first, we need to find the include file <openssl/fips.h>
++      AC_CACHE_VAL(sc_cv_have_openssl_fips_h,
++        [AC_TRY_COMPILE([#define OPENSSL_FIPS
++    #include <stddef.h>
++    #include <openssl/fips.h>],[;],
++          [sc_cv_have_openssl_fips_h=yes; ],
++          [sv_cv_have_openssl_fips_h=no
++            if test -n "$OPENSSL_BASE"; then
++              I="$OPENSSL_BASE/include"
++              i="$I/openssl/fips.h"
++              if test -r "$i"; then
++                AC_MSG_NOTICE(found $i)
++                sc_cv_have_openssl_fips_h=yes;
++              fi
++            fi
++          ]
++        )]
++      )
++      if test "$sv_cv_have_openssl_fips_h" = "yes"; then
++        AC_DEFINE(HAVE_OPENSSL_FIPS_H)
++      fi
++      AC_MSG_NOTICE(checked for openssl/fips.h... $sc_cv_have_openssl_ssl_h)
+     fi
+-  else
+-    AC_MSG_WARN([must enable OpenSSL to enable FIPS; use --enable-openssl]);
+-  fi
+-fi
+ 
+-if test -n "$WITH_FIPS"; then
+-  AC_MSG_CHECKING(for components of OpenSSL FIPS)
+-  # first, we need to find the include file <openssl/fips.h>
+-  AC_CACHE_VAL(sc_cv_have_openssl_fips_h,
+-    [AC_TRY_COMPILE([#define OPENSSL_FIPS
+-#include <stddef.h>
+-#include <openssl/fips.h>],[;],
+-      [sc_cv_have_openssl_fips_h=yes; ],
+-      [sv_cv_have_openssl_fips_h=no
+-        if test -n "$OPENSSL_BASE"; then
+-          I="$OPENSSL_BASE/include"
+-          i="$I/openssl/fips.h"
+-          if test -r "$i"; then
+-            AC_MSG_NOTICE(found $i)
+-            sc_cv_have_openssl_fips_h=yes;
++    if test -n "$WITH_FIPS" -a "$sc_cv_have_openssl_fips_h" = 'yes'; then
++      # check for the libcrypto library with fips support
++      AC_MSG_CHECKING(for libcrypto with FIPS support)
++      AC_CACHE_VAL(sc_cv_have_libcrypto,
++        [ LIBS0="$LIBS"
++          echo $LIBS | grep -q "\-lcrypto"
++          if test $? -ne 0; then
++            if test -n "$OPENSSL_BASE"; then
++              L="$OPENSSL_BASE/lib"; LIBS="$LIBS -L$L -lcrypto"
++            else
++              LIBS="$LIBS -lcrypto"
++            fi
+           fi
+-        fi
+-      ]
+-    )]
+-  )
+-  if test "$sv_cv_have_openssl_fips_h" = "yes"; then
+-    AC_DEFINE(HAVE_OPENSSL_FIPS_H)
+-  fi
+-  AC_MSG_NOTICE(checked for openssl/fips.h... $sc_cv_have_openssl_ssl_h)
+-fi
+-
+-if test -n "$WITH_FIPS" -a "$sc_cv_have_openssl_fips_h" = 'yes'; then
+-  # check for the libcrypto library with fips support
+-  AC_MSG_CHECKING(for libcrypto with FIPS support)
+-  AC_CACHE_VAL(sc_cv_have_libcrypto,
+-    [ LIBS0="$LIBS"
+-      echo $LIBS | grep -q "\-lcrypto"
+-      if test $? -ne 0; then
+-        if test -n "$OPENSSL_BASE"; then
+-          L="$OPENSSL_BASE/lib"; LIBS="$LIBS -L$L -lcrypto"
+-        else
+-          LIBS="$LIBS -lcrypto"
+-        fi
+-      fi
+-      AC_TRY_LINK([#define OPENSSL_FIPS
+-#include <openssl/ssl.h>
+-#include <openssl/fips.h>],
+-        [int res = FIPS_mode_set(1);],
+-        [sc_cv_have_libcrypto='yes'],
+-        [sc_cv_have_libcrypto='no']
++          AC_TRY_LINK([#define OPENSSL_FIPS
++    #include <openssl/ssl.h>
++    #include <openssl/fips.h>],
++            [int res = FIPS_mode_set(1);],
++            [sc_cv_have_libcrypto='yes'],
++            [sc_cv_have_libcrypto='no']
++          )
++          if test "$sc_cv_have_libcrypto" != 'yes'; then
++            LIBS="$LIBS0"
++          fi
++        ]
+       )
+-      if test "$sc_cv_have_libcrypto" != 'yes'; then
+-        LIBS="$LIBS0"
++      if test "$sc_cv_have_libcrypto" = 'yes'; then
++        AC_DEFINE(HAVE_LIBCRYPTO)
+       fi
+-    ]
+-  )
+-  if test "$sc_cv_have_libcrypto" = 'yes'; then
+-    AC_DEFINE(HAVE_LIBCRYPTO)
+-  fi
+-  AC_MSG_RESULT($sc_cv_have_libcrypto)
+-fi
++      AC_MSG_RESULT($sc_cv_have_libcrypto)
++    fi
+ 
+-if test -n "$WITH_FIPS"; then
+-  if test "$sc_cv_have_openssl_fips_h" = 'yes' -a "$sc_cv_have_libcrypto" = 'yes'; then
+-    AC_DEFINE(WITH_FIPS)
+-    AC_DEFINE(OPENSSL_FIPS)
+-  else
+-    AC_MSG_WARN([not all components of OpenSSL FIPS found, disabling it]);
+-  fi
++    if test -n "$WITH_FIPS"; then
++      if test "$sc_cv_have_openssl_fips_h" = 'yes' -a "$sc_cv_have_libcrypto" = 'yes'; then
++        AC_DEFINE(WITH_FIPS)
++        AC_DEFINE(OPENSSL_FIPS)
++      else
++        AC_MSG_WARN([not all components of OpenSSL FIPS found, disabling it]);
++      fi
++    fi
+ fi
+ 
+ AC_MSG_CHECKING(whether to include tun/tap address support)
+@@ -1506,51 +1595,54 @@ AC_CHECK_FUNC(setenv, AC_DEFINE(HAVE_SETENV),
+ dnl Search for unsetenv()
+ AC_CHECK_FUNC(unsetenv, AC_DEFINE(HAVE_UNSETENV))
+ 
+-AC_CHECK_FUNC(TLS_client_method, AC_DEFINE(HAVE_TLS_client_method) ac_cv_have_tls_client_method=yes, AC_CHECK_LIB(crypt, TLS_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(TLS_server_method, AC_DEFINE(HAVE_TLS_server_method) ac_cv_have_tls_server_method=yes, AC_CHECK_LIB(crypt, TLS_server_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(DTLS_client_method, AC_DEFINE(HAVE_DTLS_client_method), AC_CHECK_LIB(crypt, DTLS_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(DTLS_server_method, AC_DEFINE(HAVE_DTLS_server_method), AC_CHECK_LIB(crypt, DTLS_server_method, [LIBS=-lcrypt $LIBS]))
+-if test -n "$WITH_OPENSSL_METHOD" -o -z "$ac_cv_have_tls_client_method" -o -z "$ac_cv_have_tls_server_method" ; then
+-dnl Search for SSLv2_client_method, SSLv2_server_method
+-AC_CHECK_FUNC(SSLv2_client_method, AC_DEFINE(HAVE_SSLv2_client_method), AC_CHECK_LIB(crypt, SSLv2_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(SSLv2_server_method, AC_DEFINE(HAVE_SSLv2_server_method), AC_CHECK_LIB(crypt, SSLv2_server_method, [LIBS=-lcrypt $LIBS]))
+-dnl 
+-AC_CHECK_FUNC(SSLv3_client_method, AC_DEFINE(HAVE_SSLv3_client_method), AC_CHECK_LIB(crypt, SSLv3_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(SSLv3_server_method, AC_DEFINE(HAVE_SSLv3_server_method), AC_CHECK_LIB(crypt, SSLv3_server_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(SSLv23_client_method, AC_DEFINE(HAVE_SSLv23_client_method), AC_CHECK_LIB(crypt, SSLv23_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(SSLv23_server_method, AC_DEFINE(HAVE_SSLv23_server_method), AC_CHECK_LIB(crypt, SSLv23_server_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(TLSv1_client_method, AC_DEFINE(HAVE_TLSv1_client_method), AC_CHECK_LIB(crypt, TLSv1_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(TLSv1_server_method, AC_DEFINE(HAVE_TLSv1_server_method), AC_CHECK_LIB(crypt, TLSv1_server_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(TLSv1_1_client_method, AC_DEFINE(HAVE_TLSv1_1_client_method), AC_CHECK_LIB(crypt, TLSv1_1_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(TLSv1_1_server_method, AC_DEFINE(HAVE_TLSv1_1_server_method), AC_CHECK_LIB(crypt, TLSv1_1_server_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(TLSv1_2_client_method, AC_DEFINE(HAVE_TLSv1_2_client_method), AC_CHECK_LIB(crypt, TLSv1_2_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(TLSv1_2_server_method, AC_DEFINE(HAVE_TLSv1_2_server_method), AC_CHECK_LIB(crypt, TLSv1_2_server_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(DTLSv1_client_method, AC_DEFINE(HAVE_DTLSv1_client_method), AC_CHECK_LIB(crypt, DTLSv1_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(DTLSv1_server_method, AC_DEFINE(HAVE_DTLSv1_server_method), AC_CHECK_LIB(crypt, DTLSv1_server_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(DTLSv1_2_client_method, AC_DEFINE(HAVE_DTLSv1_2_client_method), AC_CHECK_LIB(crypt, DTLSv1_2_client_method, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(DTLSv1_2_server_method, AC_DEFINE(HAVE_DTLSv1_2_server_method), AC_CHECK_LIB(crypt, DTLSv1_2_server_method, [LIBS=-lcrypt $LIBS]))
+-fi # $WITH_OPENSSL_METHOD
+-
+-AC_CHECK_FUNC(SSL_CTX_set_default_verify_paths, AC_DEFINE(HAVE_SSL_CTX_set_default_verify_paths))
+-AC_CHECK_FUNC(RAND_egd, AC_DEFINE(HAVE_RAND_egd), AC_CHECK_LIB(crypt, RAND_egd, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(DH_set0_pqg, AC_DEFINE(HAVE_DH_set0_pqg), AC_CHECK_LIB(crypt, DH_set0_pqg, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(ASN1_STRING_get0_data, AC_DEFINE(HAVE_ASN1_STRING_get0_data), AC_CHECK_LIB(crypt, ASN1_STRING_get0_data, [LIBS=-lcrypt $LIBS]))
+-AC_CHECK_FUNC(RAND_status, AC_DEFINE(HAVE_RAND_status))
+-AC_CHECK_FUNC(SSL_CTX_clear_mode, AC_DEFINE(HAVE_SSL_CTX_clear_mode))
+-AC_CHECK_FUNC(SSL_set_tlsext_host_name, AC_DEFINE(HAVE_SSL_set_tlsext_host_name))
+-AC_CHECK_FUNC(SSL_library_init, AC_DEFINE(HAVE_SSL_library_init))
+-AC_CHECK_FUNC(ERR_error_string, AC_DEFINE(HAVE_ERR_error_string))
+-
+-AC_MSG_CHECKING(for type EC_KEY)
+-AC_CACHE_VAL(sc_cv_type_EC_TYPE,
+-[AC_TRY_COMPILE([#include <openssl/ec.h>
+-],[EC_KEY *s;],
+-[sc_cv_type_EC_KEY=yes],
+-[sc_cv_type_EC_KEY=no])])
+-if test $sc_cv_type_EC_KEY = yes; then
+-   AC_DEFINE(HAVE_TYPE_EC_KEY)
+-fi
+-AC_MSG_RESULT($sc_cv_type_EC_KEY)
++if test "$WITH_WOLFSSL" = "no"
++then
++    AC_CHECK_FUNC(TLS_client_method, AC_DEFINE(HAVE_TLS_client_method) ac_cv_have_tls_client_method=yes, AC_CHECK_LIB(crypt, TLS_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(TLS_server_method, AC_DEFINE(HAVE_TLS_server_method) ac_cv_have_tls_server_method=yes, AC_CHECK_LIB(crypt, TLS_server_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(DTLS_client_method, AC_DEFINE(HAVE_DTLS_client_method), AC_CHECK_LIB(crypt, DTLS_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(DTLS_server_method, AC_DEFINE(HAVE_DTLS_server_method), AC_CHECK_LIB(crypt, DTLS_server_method, [LIBS=-lcrypt $LIBS]))
++    if test -n "$WITH_OPENSSL_METHOD" -o -z "$ac_cv_have_tls_client_method" -o -z "$ac_cv_have_tls_server_method" ; then
++    dnl Search for SSLv2_client_method, SSLv2_server_method
++    AC_CHECK_FUNC(SSLv2_client_method, AC_DEFINE(HAVE_SSLv2_client_method), AC_CHECK_LIB(crypt, SSLv2_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(SSLv2_server_method, AC_DEFINE(HAVE_SSLv2_server_method), AC_CHECK_LIB(crypt, SSLv2_server_method, [LIBS=-lcrypt $LIBS]))
++    dnl
++    AC_CHECK_FUNC(SSLv3_client_method, AC_DEFINE(HAVE_SSLv3_client_method), AC_CHECK_LIB(crypt, SSLv3_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(SSLv3_server_method, AC_DEFINE(HAVE_SSLv3_server_method), AC_CHECK_LIB(crypt, SSLv3_server_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(SSLv23_client_method, AC_DEFINE(HAVE_SSLv23_client_method), AC_CHECK_LIB(crypt, SSLv23_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(SSLv23_server_method, AC_DEFINE(HAVE_SSLv23_server_method), AC_CHECK_LIB(crypt, SSLv23_server_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(TLSv1_client_method, AC_DEFINE(HAVE_TLSv1_client_method), AC_CHECK_LIB(crypt, TLSv1_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(TLSv1_server_method, AC_DEFINE(HAVE_TLSv1_server_method), AC_CHECK_LIB(crypt, TLSv1_server_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(TLSv1_1_client_method, AC_DEFINE(HAVE_TLSv1_1_client_method), AC_CHECK_LIB(crypt, TLSv1_1_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(TLSv1_1_server_method, AC_DEFINE(HAVE_TLSv1_1_server_method), AC_CHECK_LIB(crypt, TLSv1_1_server_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(TLSv1_2_client_method, AC_DEFINE(HAVE_TLSv1_2_client_method), AC_CHECK_LIB(crypt, TLSv1_2_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(TLSv1_2_server_method, AC_DEFINE(HAVE_TLSv1_2_server_method), AC_CHECK_LIB(crypt, TLSv1_2_server_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(DTLSv1_client_method, AC_DEFINE(HAVE_DTLSv1_client_method), AC_CHECK_LIB(crypt, DTLSv1_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(DTLSv1_server_method, AC_DEFINE(HAVE_DTLSv1_server_method), AC_CHECK_LIB(crypt, DTLSv1_server_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(DTLSv1_2_client_method, AC_DEFINE(HAVE_DTLSv1_2_client_method), AC_CHECK_LIB(crypt, DTLSv1_2_client_method, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(DTLSv1_2_server_method, AC_DEFINE(HAVE_DTLSv1_2_server_method), AC_CHECK_LIB(crypt, DTLSv1_2_server_method, [LIBS=-lcrypt $LIBS]))
++    fi # $WITH_OPENSSL_METHOD
++
++    AC_CHECK_FUNC(SSL_CTX_set_default_verify_paths, AC_DEFINE(HAVE_SSL_CTX_set_default_verify_paths))
++    AC_CHECK_FUNC(RAND_egd, AC_DEFINE(HAVE_RAND_egd), AC_CHECK_LIB(crypt, RAND_egd, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(DH_set0_pqg, AC_DEFINE(HAVE_DH_set0_pqg), AC_CHECK_LIB(crypt, DH_set0_pqg, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(ASN1_STRING_get0_data, AC_DEFINE(HAVE_ASN1_STRING_get0_data), AC_CHECK_LIB(crypt, ASN1_STRING_get0_data, [LIBS=-lcrypt $LIBS]))
++    AC_CHECK_FUNC(RAND_status, AC_DEFINE(HAVE_RAND_status))
++    AC_CHECK_FUNC(SSL_CTX_clear_mode, AC_DEFINE(HAVE_SSL_CTX_clear_mode))
++    AC_CHECK_FUNC(SSL_set_tlsext_host_name, AC_DEFINE(HAVE_SSL_set_tlsext_host_name))
++    AC_CHECK_FUNC(SSL_library_init, AC_DEFINE(HAVE_SSL_library_init))
++    AC_CHECK_FUNC(ERR_error_string, AC_DEFINE(HAVE_ERR_error_string))
++
++    AC_MSG_CHECKING(for type EC_KEY)
++    AC_CACHE_VAL(sc_cv_type_EC_TYPE,
++    [AC_TRY_COMPILE([#include <openssl/ec.h>
++    ],[EC_KEY *s;],
++    [sc_cv_type_EC_KEY=yes],
++    [sc_cv_type_EC_KEY=no])])
++    if test $sc_cv_type_EC_KEY = yes; then
++       AC_DEFINE(HAVE_TYPE_EC_KEY)
++    fi
++    AC_MSG_RESULT($sc_cv_type_EC_KEY)
++fi
+ 
+ 
+ dnl Run time checks
+@@ -2059,18 +2151,21 @@ if test "$GCC" = yes; then
+    CFLAGS="$CFLAGS"
+ fi
+ 
+-# FIPS support requires compiling with fipsld.
+-# fipsld requires the FIPSLD_CC variable to be set to the original CC.
+-# This check must be done after all other checks that require compiling
+-# so that fipsld is not used by the configure script itself.
+-if test -n "$WITH_FIPS"; then
+-  if test "$sc_cv_have_openssl_fips_h" = 'yes' -a "$sc_cv_have_libcrypto" = 'yes'; then
+-    FIPSLD_CC=$CC
+-    if test "${FIPSLD+set}" != set ; then
+-        FIPSLD=fipsld
+-    fi
+-    CC="FIPSLD_CC=$CC $FIPSLD"
+-  fi
++if test "$WITH_WOLFSSL" = "no"
++then
++	# FIPS support requires compiling with fipsld.
++	# fipsld requires the FIPSLD_CC variable to be set to the original CC.
++	# This check must be done after all other checks that require compiling
++	# so that fipsld is not used by the configure script itself.
++	if test -n "$WITH_FIPS"; then
++	  if test "$sc_cv_have_openssl_fips_h" = 'yes' -a "$sc_cv_have_libcrypto" = 'yes'; then
++	    FIPSLD_CC=$CC
++	    if test "${FIPSLD+set}" != set ; then
++	        FIPSLD=fipsld
++	    fi
++	    CC="FIPSLD_CC=$CC $FIPSLD"
++	  fi
++	fi
+ fi
+ AC_SUBST(FIPSLD_CC)
+ 
+@@ -2101,7 +2196,7 @@ AC_MSG_RESULT($sc_cv_var_environ)
+ if test "$BUILD_DATE"; then
+   AC_DEFINE_UNQUOTED(BUILD_DATE, ["$BUILD_DATE"])
+ else
+-  AC_DEFINE(BUILD_DATE, [__DATE__" "__TIME__])
++  AC_DEFINE([BUILD_DATE], [__DATE__" "__TIME__], [])
+ fi
+ 
+ AC_OUTPUT(Makefile)
+diff --git a/sslcls.c b/sslcls.c
+index a05e382..2e9d6cb 100644
+--- a/sslcls.c
++++ b/sslcls.c
+@@ -189,7 +189,11 @@ const SSL_METHOD *sycTLSv1_2_server_method(void) {
+ const SSL_METHOD *sycDTLS_client_method(void) {
+    const SSL_METHOD *result;
+    Debug("DTLS_client_method()");
++#if WITH_WOLFSSL
++   result = wolfDTLS_client_method();
++#else
+    result = DTLS_client_method();
++#endif
+    Debug1("DTLS_client_method() -> %p", result);
+    return result;
+ }
+@@ -199,7 +203,11 @@ const SSL_METHOD *sycDTLS_client_method(void) {
+ const SSL_METHOD *sycDTLS_server_method(void) {
+    const SSL_METHOD *result;
+    Debug("DTLS_server_method()");
++#if WITH_WOLFSSL
++   result = wolfDTLS_server_method();
++#else
+    result = DTLS_server_method();
++#endif
+    Debug1("DTLS_server_method() -> %p", result);
+    return result;
+ }
+diff --git a/sysincludes.h b/sysincludes.h
+index 4170f27..ee294ef 100644
+--- a/sysincludes.h
++++ b/sysincludes.h
+@@ -181,6 +181,9 @@
+ #  endif
+ #endif /* WITH_READLINE */
+ #if WITH_OPENSSL
++#if WITH_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/ssl.h>
+ #include <openssl/err.h>
+ #include <openssl/rand.h>
+diff --git a/xio-openssl.c b/xio-openssl.c
+index bc22b8c..0133f66 100644
+--- a/xio-openssl.c
++++ b/xio-openssl.c
+@@ -167,7 +167,11 @@ int xio_reset_fips_mode(void) {
+ static void openssl_conn_loginfo(SSL *ssl) {
+    const char *string;
+ 
++#if WITH_WOLFSSL
++   string = SSL_get_version(ssl);
++#else
+    string = SSL_get_cipher_version(ssl);
++#endif
+    Notice1("SSL proto version used: %s", string);
+    xiosetenv("OPENSSL_PROTO_VERSION", string, 1, NULL);
+ 
+@@ -709,9 +713,14 @@ int _xioopen_openssl_listen(struct single *xfd,
+ 	    Msg(level, "I/O error");	/*!*/
+ 	    while (err = ERR_get_error()) {
+ 	       ERR_error_string_n(err, error_string, sizeof(error_string));
+-	       Msg4(level, "SSL_accept(): %s / %s / %s / %s", error_string,
+-		    ERR_lib_error_string(err), ERR_func_error_string(err),
+-		    ERR_reason_error_string(err));
++       #ifdef WITH_WOLFSSL
++          Msg2(level, "SSL_accept(): %s / %s", error_string,
++               ERR_reason_error_string(err));
++       #else
++          Msg4(level, "SSL_accept(): %s / %s / %s / %s", error_string,
++               ERR_lib_error_string(err), ERR_func_error_string(err),
++               ERR_reason_error_string(err));
++       #endif
+ 	    }
+ 	    /* Msg1(level, "SSL_accept(): %s", ERR_error_string(e, buf));*/
+ 	 }
+@@ -915,7 +924,12 @@ int
+    bool opt_fips = false;
+    const SSL_METHOD *method = NULL;
+    char *me_str = NULL;	/* method string */
++/* By default, let wolfSSL pick the strongest cipher */
++#ifdef WITH_WOLFSSL
++   char *ci_str = NULL;
++#else
+    char *ci_str = "HIGH:-NULL:-PSK:-aNULL";	/* cipher string */
++#endif
+    char *opt_key  = NULL;	/* file name of client private key */
+    char *opt_dhparam = NULL;	/* file name of DH params */
+    char *opt_cafile = NULL;	/* certificate authority file */
+@@ -960,6 +974,10 @@ int
+ 
+    openssl_delete_cert_info();
+ 
++#ifdef WITH_WOLFSSL_DEBUG
++   wolfSSL_Debugging_ON();
++#endif
++
+    /* OpenSSL preparation */
+ #if HAVE_OPENSSL_init_ssl
+    {
+@@ -1412,7 +1430,7 @@ static int openssl_SSL_ERROR_SSL(int level, const char *funcname) {
+       Debug1("ERR_get_error(): %lx", e);
+       if
+ 	 (
+-#if defined(OPENSSL_IS_BORINGSSL)
++#if defined(OPENSSL_IS_BORINGSSL) || defined(WITH_WOLFSSL)
+ 	  0  /* BoringSSL's RNG always succeeds. */
+ #elif defined(HAVE_RAND_status)
+ 	  ERR_GET_LIB(e) == ERR_LIB_RAND && RAND_status() != 1
+@@ -1885,9 +1903,14 @@ static int xioSSL_connect(struct single *xfd, const char *opt_commonname,
+ 	    Msg(level, "I/O error");	/*!*/
+ 	    while (err = ERR_get_error()) {
+ 	       ERR_error_string_n(err, error_string, sizeof(error_string));
+-	       Msg4(level, "SSL_connect(): %s / %s / %s / %s", error_string,
+-		    ERR_lib_error_string(err), ERR_func_error_string(err),
+-		    ERR_reason_error_string(err));
++       #ifdef WITH_WOLFSSL
++          Msg2(level, "SSL_connect(): %s / %s", error_string,
++               ERR_reason_error_string(err));
++       #else
++          Msg4(level, "SSL_connect(): %s / %s / %s / %s", error_string,
++               ERR_lib_error_string(err), ERR_func_error_string(err),
++               ERR_reason_error_string(err));
++       #endif
+ 	    }
+ 	 }
+ 	 status = STAT_RETRYLATER;
+@@ -1945,9 +1968,14 @@ ssize_t xioread_openssl(struct single *pipe, void *buff, size_t bufsiz) {
+ 	    Error("I/O error");	/*!*/
+ 	    while (err = ERR_get_error()) {
+ 	       ERR_error_string_n(err, error_string, sizeof(error_string));
+-	       Error4("SSL_read(): %s / %s / %s / %s", error_string,
+-		      ERR_lib_error_string(err), ERR_func_error_string(err),
+-		      ERR_reason_error_string(err));
++       #ifdef WITH_WOLFSSL
++          Error2("SSL_read(): %s / %s", error_string,
++                 ERR_reason_error_string(err));
++       #else
++          Error4("SSL_read(): %s / %s / %s / %s", error_string,
++                 ERR_lib_error_string(err), ERR_func_error_string(err),
++                 ERR_reason_error_string(err));
++       #endif
+ 	    }
+ 	 }
+ 	 break;
+@@ -2004,9 +2032,14 @@ ssize_t xiowrite_openssl(struct single *pipe, const void *buff, size_t bufsiz) {
+ 	    Error("I/O error");	/*!*/
+ 	    while (err = ERR_get_error()) {
+ 	       ERR_error_string_n(err, error_string, sizeof(error_string));
+-	       Error4("SSL_write(): %s / %s / %s / %s", error_string,
+-		      ERR_lib_error_string(err), ERR_func_error_string(err),
+-		      ERR_reason_error_string(err));
++       #ifdef WITH_WOLFSSL
++          Error2("SSL_write(): %s / %s", error_string,
++                 ERR_reason_error_string(err));
++       #else
++          Error4("SSL_write(): %s / %s / %s / %s", error_string,
++                 ERR_lib_error_string(err), ERR_func_error_string(err),
++                 ERR_reason_error_string(err));
++       #endif
+ 	    }
+ 	 }
+ 	 break;
