@@ -33,7 +33,7 @@ Unless your user has root access, commands modifying stuff under /usr will need 
 + Initialize an empty database with `slapadd -l /dev/null -f slapd.conf`.
 + Create the directory slapd.d with `mkdir slapd.d`.
 + Generate the configuration for the server in slap.d with `slaptest -f slapd.conf -F slapd.d`.
-+ Start the server in a terminal window with `/usr/local/libexec/slapd -d any -F /usr/local/etc/openldap/slapd.d -h "ldaps:///127.0.0.1"`.
++ Start the server in a terminal window with `/usr/local/libexec/slapd -d any -F /usr/local/etc/openldap/slapd.d -h "ldaps://127.0.0.1"`.
 
 ## Client Setup
 + The client setup is very simple. Edit the client configuration file /usr/local/etc/openldap/ldap.conf to add the line `TLS_REQCERT allow`. Without this, the TLS connection will fail because the server's certificate is self-signed.
@@ -55,4 +55,4 @@ result: 32 No such object
 
 # numResponses: 1
 ```
-+ If you were to observe this traffic in Wireshark, you'd see that it was encrypted with TLS. If you start the server without the `-h "ldaps:///127.0.0.1"` part and remove the `-H ldaps://127.0.0.1` from the search command, the traffic is unencrypted in Wireshark, and the protocol would be shown as LDAP.
++ If you were to observe this traffic in Wireshark, you'd see that it was encrypted with TLS. If you start the server without the `-h "ldaps://127.0.0.1"` part and remove the `-H ldaps://127.0.0.1` from the search command, the traffic is unencrypted in Wireshark, and the protocol would be shown as LDAP.
