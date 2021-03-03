@@ -1,0 +1,44 @@
+--- openresty-1.13.6.2/configure	2018-05-14 22:24:39.000000000 +0200
++++ openresty-1.13.6.2-wolfssl/configure	2021-02-05 13:12:11.159235385 +0100
+@@ -297,7 +297,7 @@
+         my $mod_path = File::Spec->rel2abs($1);
+         push @ngx_opts, "--add-dynamic-module=$mod_path";
+ 
+-    } elsif ($opt =~ /^--with-(openssl|pcre|zlib|libatomic|md5|sha1)=(.*)/) {
++    } elsif ($opt =~ /^--with-(wolfssl|openssl|pcre|zlib|libatomic|md5|sha1)=(.*)/) {
+ 
+         my ($lib, $path) = ($1, $2);
+         if ($lib eq 'openssl' && $OS eq 'darwin') {
+@@ -306,6 +306,9 @@
+                 push @extra_make_env, 'KERNEL_BITS=64';
+             }
+         }
++        if ($lib eq 'wolfssl') {
++            $resty_opts{wolfssl} = 1;
++        }
+         $path = File::Spec->rel2abs($path);
+         push @ngx_opts, "--with-$lib=$path";
+ 
+@@ -566,6 +569,13 @@
+         shell "patch -p0 < nginx-no_pool.patch";
+     }
+ 
++    if ($opts->{wolfssl}) {
++        $ngx_dir = auto_complete "nginx";
++        cd $ngx_dir;
++        shell "patch -p1 < ../nginx-wolfssl.patch";
++        cd '..';
++    }
++
+     if (my $drizzle_prefix = $opts->{libdrizzle}) {
+         my $drizzle_lib = "$drizzle_prefix/lib";
+         env LIBDRIZZLE_LIB => $drizzle_lib;
+@@ -1426,6 +1436,8 @@
+   --with-openssl=DIR                 set path to OpenSSL library sources
+   --with-openssl-opt=OPTIONS         set additional build options for OpenSSL
+ 
++  --with-wolfssl=DIR                 set path to wolfSSL library sources
++
+   --dry-run                          dry running the configure, for testing only
+   --platform=PLATFORM                forcibly specify a platform name, for testing only
+ _EOC_
