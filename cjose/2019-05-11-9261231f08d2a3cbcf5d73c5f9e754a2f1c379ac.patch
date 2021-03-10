@@ -1,0 +1,431 @@
+From eb36828f690f6c8bc5a069255e8aebecf5dde774 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 19 Feb 2021 17:34:39 +0100
+Subject: [PATCH] wolfSSL changes
+
+This patch was implemented and tested on commit 9261231f08d2a3cbcf5d73c5f9e754a2f1c379ac of the master cjose branch
+
+Compile wolfSSL with:
+```
+./configure --enable-opensslall CPPFLAGS='-DHAVE_EX_DATA -DWOLFSSL_KEY_GEN'
+make
+make install
+```
+
+Compile cjose with:
+```
+patch -p1 < <path/to/this/patch>
+./configure --with-wolfssl=/usr/local
+make
+make install
+```
+
+cjose should pass all tests run with `make check`
+---
+ configure.ac          | 46 ++++++++++++++++++++++++++++++++-----------
+ include/cjose/jwk.h   |  3 ++-
+ include/cjose/util.h  |  3 ++-
+ src/concatkdf.c       |  2 +-
+ src/error.c           |  4 +++-
+ src/include/jwk_int.h | 16 +++------------
+ src/jwe.c             | 17 ++++++++--------
+ src/jwk.c             | 15 +++++++-------
+ src/jws.c             |  8 ++++----
+ src/util.c            |  8 ++------
+ test/Makefile.am      |  1 +
+ test/check_cjose.c    |  5 +++--
+ test/check_cjose.h    |  1 +
+ test/check_header.c   |  6 +++---
+ test/check_jwe.c      |  6 +++---
+ test/check_jwk.c      |  2 +-
+ test/check_jws.c      |  2 +-
+ 17 files changed, 81 insertions(+), 64 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 799f273..fe25ff9 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -27,26 +27,47 @@ PKG_CHECK_MODULES([CHECK],
+ AM_CONDITIONAL(HAVE_CHECK, test x"$have_check" = "xyes")
+ 
+ #### Find OpenSSL
+-AC_MSG_CHECKING([for --with-openssl])
++#AC_MSG_CHECKING([for --with-openssl])
++#AC_ARG_WITH(
++#    [openssl],
++#    [AS_HELP_STRING([--with-openssl],[Location where OpenSSL can be found])],
++#    [ LDFLAGS="$LDFLAGS -L$with_openssl/lib";
++#      CFLAGS="$CFLAGS -I$with_openssl/include/";
++#      CPPFLAGS="$CPPFLAGS -I$with_openssl/include/";
++#      AC_MSG_RESULT([$with_openssl])
++#    ],
++#    [ AC_MSG_RESULT([no])]
++#)
++
++#AC_CHECK_LIB([crypto],
++#    [CRYPTO_new_ex_data],
++#    [],
++#    [AC_MSG_ERROR([OpenSSL is missing; it is required for this software])]
++#)
++
++##### Check for Fundamental EC #####
++#AC_CHECK_HEADERS([openssl/fec.h])
++
++
++#### Find wolfSSL
++AC_MSG_CHECKING([for --with-wolfssl])
+ AC_ARG_WITH(
+-    [openssl],
+-    [AS_HELP_STRING([--with-openssl],[Location where OpenSSL can be found])],
+-    [ LDFLAGS="$LDFLAGS -L$with_openssl/lib";
+-      CFLAGS="$CFLAGS -I$with_openssl/include/";
+-      CPPFLAGS="$CPPFLAGS -I$with_openssl/include/";
+-      AC_MSG_RESULT([$with_openssl])
++    [wolfssl],
++    [AS_HELP_STRING([--with-wolfssl],[Location where wolfSSL can be found])],
++    [ LDFLAGS="$LDFLAGS -L$with_wolfssl/lib";
++      CFLAGS="$CFLAGS -I$with_wolfssl/include/";
++      CPPFLAGS="$CPPFLAGS -I$with_wolfssl/include/";
++      AC_MSG_RESULT([$with_wolfssl])
+     ],
+     [ AC_MSG_RESULT([no])]
+ )
+ 
+-AC_CHECK_LIB([crypto],
+-    [CRYPTO_new_ex_data],
++AC_CHECK_LIB([wolfssl],
++    [wolfSSL_CTX_get_ex_data],
+     [],
+-    [AC_MSG_ERROR([OpenSSL is missing; it is required for this software])]
++    [AC_MSG_ERROR([wolfSSL is missing; it is required for this software])]
+ )
+ 
+-##### Check for Fundamental EC #####
+-AC_CHECK_HEADERS([openssl/fec.h])
+ 
+ #### Find Jansson
+ AC_MSG_CHECKING([for --with-jansson])
+@@ -82,6 +103,7 @@ echo "
+   ($PACKAGE_NAME) version $PACKAGE_VERSION
+   Prefix.........: $prefix
+   Using OpenSSL..: $with_openssl
++  Using wolfSSL..: $with_wolfssl  
+   Using Jansson..: $with_jansson
+   Unit tests.....: $have_check
+ "
+diff --git a/include/cjose/jwk.h b/include/cjose/jwk.h
+index c255efa..6ed1695 100644
+--- a/include/cjose/jwk.h
++++ b/include/cjose/jwk.h
+@@ -17,7 +17,8 @@
+ #include <stdbool.h>
+ #include <stdint.h>
+ #include <stddef.h>
+-#include <openssl/obj_mac.h>
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/ec.h>
+ #include "cjose/error.h"
+ #include "cjose/header.h"
+ 
+diff --git a/include/cjose/util.h b/include/cjose/util.h
+index c8e6f07..4f8b229 100644
+--- a/include/cjose/util.h
++++ b/include/cjose/util.h
+@@ -18,7 +18,8 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ 
+-#include <openssl/rsa.h>
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/rsa.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+diff --git a/src/concatkdf.c b/src/concatkdf.c
+index 59b845a..50ae6c4 100644
+--- a/src/concatkdf.c
++++ b/src/concatkdf.c
+@@ -15,10 +15,10 @@
+ #include <arpa/inet.h>
+ #include <alloca.h>
+ #endif
+-#include <openssl/evp.h>
+ #include <string.h>
+ #include <cjose/base64.h>
+ #include <cjose/util.h>
++#include <wolfssl/openssl/evp.h>
+ 
+ #ifdef _WIN32
+ #define STACK_ALLOC _alloca
+diff --git a/src/error.c b/src/error.c
+index 950a870..4bc5162 100644
+--- a/src/error.c
++++ b/src/error.c
+@@ -6,7 +6,9 @@
+  * Copyright (c) 2014-2016 Cisco Systems, Inc.  All Rights Reserved.
+  */
+ 
+-#include <openssl/err.h>
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/ssl.h>
++#include <wolfssl/openssl/err.h>
+ #include "cjose/error.h"
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+diff --git a/src/include/jwk_int.h b/src/include/jwk_int.h
+index c99df6e..521651f 100644
+--- a/src/include/jwk_int.h
++++ b/src/include/jwk_int.h
+@@ -9,19 +9,9 @@
+ 
+ #include <jansson.h>
+ 
+-#ifdef HAVE_OPENSSL_FEC_H
+-
+-#include <openssl/fec.h>
+-#include <openssl/fecdh.h>
+-#include <openssl/fecdsa.h>
+-
+-#else
+-
+-#include <openssl/ec.h>
+-#include <openssl/ecdh.h>
+-#include <openssl/ecdsa.h>
+-
+-#endif
++#include <wolfssl/openssl/ec.h>
++#include <wolfssl/openssl/ecdh.h>
++#include <wolfssl/openssl/ecdsa.h>
+ 
+ #ifndef SRC_JWK_INT_H
+ #define SRC_JWK_INT_H
+diff --git a/src/jwe.c b/src/jwe.c
+index 822d408..4b0d845 100644
+--- a/src/jwe.c
++++ b/src/jwe.c
+@@ -13,11 +13,11 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <assert.h>
+-#include <openssl/rand.h>
+-#include <openssl/rsa.h>
+-#include <openssl/evp.h>
+-#include <openssl/aes.h>
+-#include <openssl/hmac.h>
++#include <wolfssl/openssl/rand.h>
++#include <wolfssl/openssl/rsa.h>
++#include <wolfssl/openssl/evp.h>
++#include <wolfssl/openssl/aes.h>
++#include <wolfssl/openssl/hmac.h>
+ 
+ #include "include/concatkdf_int.h"
+ #include "include/header_int.h"
+@@ -26,7 +26,6 @@
+ #include "include/util_int.h"
+ 
+ 
+-
+ ////////////////////////////////////////////////////////////////////////////////
+ static bool _cjose_jwe_set_cek_a256gcm(cjose_jwe_t *jwe, const cjose_jwk_t *jwk, bool random, cjose_err *err);
+ 
+@@ -974,11 +973,12 @@ static bool _cjose_jwe_encrypt_dat_a256gcm(cjose_jwe_t *jwe, const uint8_t *plai
+     jwe->enc_ct.raw_len = bytes_encrypted;
+ 
+     // finalize the encryption and set the ciphertext length to correct value
+-    if (EVP_EncryptFinal_ex(ctx, NULL, &bytes_encrypted) != 1)
++    if (EVP_EncryptFinal_ex(ctx, jwe->enc_ct.raw + jwe->enc_ct.raw_len, &bytes_encrypted) != 1)
+     {
+         CJOSE_ERROR(err, CJOSE_ERR_CRYPTO);
+         goto _cjose_jwe_encrypt_dat_fail;
+     }
++    jwe->enc_ct.raw_len += bytes_encrypted;
+ 
+     // allocate buffer for the authentication tag
+     cjose_get_dealloc()(jwe->enc_auth_tag.raw);
+@@ -1258,11 +1258,12 @@ static bool _cjose_jwe_decrypt_dat_a256gcm(cjose_jwe_t *jwe, cjose_err *err)
+     jwe->dat_len = bytes_decrypted;
+ 
+     // finalize the decryption
+-    if (EVP_DecryptFinal_ex(ctx, NULL, &bytes_decrypted) != 1)
++    if (EVP_DecryptFinal_ex(ctx, jwe->dat + jwe->dat_len, &bytes_decrypted) != 1)
+     {
+         CJOSE_ERROR(err, CJOSE_ERR_CRYPTO);
+         goto _cjose_jwe_decrypt_dat_a256gcm_fail;
+     }
++    jwe->dat_len += bytes_decrypted;
+ 
+     EVP_CIPHER_CTX_free(ctx);
+     return true;
+diff --git a/src/jwk.c b/src/jwk.c
+index 860f0e7..57f1399 100644
+--- a/src/jwk.c
++++ b/src/jwk.c
+@@ -17,13 +17,14 @@
+ #include <math.h>
+ #include <stdio.h>
+ 
+-#include <openssl/bn.h>
+-#include <openssl/obj_mac.h>
+-#include <openssl/rand.h>
+-#include <openssl/rsa.h>
+-#include <openssl/evp.h>
+-#include <openssl/hmac.h>
+-#include <openssl/evp.h>
++#include <wolfssl/openssl/bn.h>
++#define HAVE_ECC
++#include <wolfssl/openssl/ec.h>
++#include <wolfssl/openssl/rand.h>
++#include <wolfssl/openssl/rsa.h>
++#include <wolfssl/openssl/evp.h>
++#include <wolfssl/openssl/hmac.h>
++#include <wolfssl/openssl/evp.h>
+ 
+ // internal data structures
+ 
+diff --git a/src/jws.c b/src/jws.c
+index 4e03554..3594269 100644
+--- a/src/jws.c
++++ b/src/jws.c
+@@ -13,10 +13,10 @@
+ 
+ #include <string.h>
+ #include <assert.h>
+-#include <openssl/evp.h>
+-#include <openssl/rsa.h>
+-#include <openssl/err.h>
+-#include <openssl/hmac.h>
++#include <wolfssl/openssl/evp.h>
++#include <wolfssl/openssl/rsa.h>
++#include <wolfssl/openssl/err.h>
++#include <wolfssl/openssl/hmac.h>
+ 
+ #include "include/jwk_int.h"
+ #include "include/header_int.h"
+diff --git a/src/util.c b/src/util.c
+index bfe6231..2931a32 100644
+--- a/src/util.c
++++ b/src/util.c
+@@ -10,7 +10,8 @@
+ #include <cjose/util.h>
+ 
+ #include <jansson.h>
+-#include <openssl/crypto.h>
++#include <wolfssl/ssl.h>
++#include <wolfssl/openssl/crypto.h>
+ #include <stdlib.h>
+ #include <string.h>
+ 
+@@ -50,11 +51,6 @@ static void cjose_apply_allocs()
+ {
+     // set upstream
+     json_set_alloc_funcs(cjose_get_alloc(), cjose_get_dealloc());
+-#if defined(CJOSE_OPENSSL_11X)
+-    CRYPTO_set_mem_functions(cjose_get_alloc3(), cjose_get_realloc3(), cjose_get_dealloc3());
+-#else
+-    CRYPTO_set_mem_functions(cjose_get_alloc(), cjose_get_realloc(), cjose_get_dealloc());
+-#endif
+ }
+ 
+ void cjose_set_alloc_funcs(cjose_alloc_fn_t alloc, cjose_realloc_fn_t realloc, cjose_dealloc_fn_t dealloc)
+diff --git a/test/Makefile.am b/test/Makefile.am
+index d68cd09..9ad8039 100644
+--- a/test/Makefile.am
++++ b/test/Makefile.am
+@@ -19,5 +19,6 @@ check_cjose_SOURCES = check_cjose.c \
+                       check_jws.c \
+                       check_header.c \
+                       check_cjose.h 
++all: check_cjose
+ 
+ endif
+diff --git a/test/check_cjose.c b/test/check_cjose.c
+index edc42ac..0e0fd81 100644
+--- a/test/check_cjose.c
++++ b/test/check_cjose.c
+@@ -5,8 +5,9 @@
+ #include "check_cjose.h"
+ 
+ #include <stdlib.h>
+-#include <openssl/err.h>
+-#include <openssl/evp.h>
++
++#include <wolfssl/openssl/err.h>
++#include <wolfssl/openssl/evp.h>
+ 
+ Suite *cjose_suite()
+ {
+diff --git a/test/check_cjose.h b/test/check_cjose.h
+index 5139d7c..61e8451 100644
+--- a/test/check_cjose.h
++++ b/test/check_cjose.h
+@@ -7,6 +7,7 @@
+ #pragma GCC diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
+ #pragma GCC diagnostic ignored "-Wpointer-sign"
+ 
++#include <wolfssl/options.h>
+ #include <check.h>
+ 
+ Suite *cjose_version_suite();
+diff --git a/test/check_header.c b/test/check_header.c
+index bbe6803..93abacc 100644
+--- a/test/check_header.c
++++ b/test/check_header.c
+@@ -12,9 +12,9 @@
+ #include <jansson.h>
+ #include "include/jwk_int.h"
+ #include "include/jwe_int.h"
+-#include <openssl/rsa.h>
+-#include <openssl/err.h>
+-#include <openssl/rand.h>
++#include <wolfssl/openssl/rsa.h>
++#include <wolfssl/openssl/err.h>
++#include <wolfssl/openssl/rand.h>
+ 
+ START_TEST(test_cjose_header_new_release)
+ {
+diff --git a/test/check_jwe.c b/test/check_jwe.c
+index 459dce1..9d4ae72 100644
+--- a/test/check_jwe.c
++++ b/test/check_jwe.c
+@@ -11,9 +11,9 @@
+ #include <jansson.h>
+ #include "include/jwk_int.h"
+ #include "include/jwe_int.h"
+-#include <openssl/rsa.h>
+-#include <openssl/err.h>
+-#include <openssl/rand.h>
++#include <wolfssl/openssl/rsa.h>
++#include <wolfssl/openssl/err.h>
++#include <wolfssl/openssl/rand.h>
+ #include <cjose/error.h>
+ 
+ // a JWK of type RSA
+diff --git a/test/check_jwk.c b/test/check_jwk.c
+index b060f67..124d5dd 100644
+--- a/test/check_jwk.c
++++ b/test/check_jwk.c
+@@ -5,7 +5,7 @@
+ #include "check_cjose.h"
+ 
+ #include <stdlib.h>
+-#include <openssl/evp.h>
++#include <wolfssl/openssl/evp.h>
+ #include <jansson.h>
+ #include <check.h>
+ #include <cjose/jwk.h>
+diff --git a/test/check_jws.c b/test/check_jws.c
+index 869c3bf..4feefe8 100644
+--- a/test/check_jws.c
++++ b/test/check_jws.c
+@@ -11,7 +11,7 @@
+ #include <jansson.h>
+ #include "include/jwk_int.h"
+ #include "include/jws_int.h"
+-#include <openssl/rand.h>
++#include <wolfssl/openssl/rand.h>
+ 
+ // a JWK to be re-used for unit tests
+ static const char *JWK_COMMON
+-- 
+2.25.1
+
