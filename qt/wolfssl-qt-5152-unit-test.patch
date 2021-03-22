@@ -1,0 +1,12 @@
+diff --git a/tests/auto/network/ssl/ssl.pro b/tests/auto/network/ssl/ssl.pro
+index 169e9bce83..527284e3f4 100644
+--- a/tests/auto/network/ssl/ssl.pro
++++ b/tests/auto/network/ssl/ssl.pro
+@@ -8,6 +8,7 @@ SUBDIRS=\
+    qsslellipticcurve \
+    qsslerror \
+    qsslkey \
++   qssl_wolf \
+ 
+ qtConfig(ssl) {
+     qtConfig(private_tests) {
