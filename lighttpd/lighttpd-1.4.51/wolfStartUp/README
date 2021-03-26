@@ -97,6 +97,10 @@ Browser: in the browser type:
 Accept the complaints about unrecognized certs to see the page without server.
 Page should show same congratulatory text as above.
 
+3.3 Server Name Indication
+
+Make sure and configure “server_name” in lighttpd.conf to match certificate common name (CN)
+
 4.0 Debugging
 
 To get debug messages from wolfSSL code you must configure with the 
