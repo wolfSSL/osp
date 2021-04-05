@@ -99,7 +99,7 @@ Page should show same congratulatory text as above.
 
 3.3 Server Name Indication
 
-Make sure and configure “server_name” in lighttpd.conf to match certificate common name (CN)
+Make sure and configure “server.name” in lighttpd.conf to match certificate common name (CN)
 
 4.0 Debugging
 
@@ -119,6 +119,6 @@ The following line in the lighttpd.conf will specify the lighttpd log file:
 Prior to the log being opened, log messages will be directed to stderr.
 
 To use lighttpd logging the following function is called with a lighttpd
-server *srv arguement:
+server *srv argument:
     log_error_write(srv, __FILE__, __LINE__, "ss", "", "desired message");
 
