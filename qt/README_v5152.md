@@ -26,6 +26,13 @@ make install
 export WOLFSSL_LIBS="-L/path/to/wolfssl-install/lib -lwolfssl"
 ```
 
+5. Add wolfSSL install path to LD_LIBRARY_PATH
+
+Depending on the environment, adding wolfSSL install path to LD_LIBRARY_PATH
+```
+LD_LIBRARY_PATH=/path/to/wolfssl\install/lib:$LD_LIBRARY_PATH
+```
+
 ### Building Qt 5.15 with wolfSSL
 
 1. Clone Qt library from base directory:
