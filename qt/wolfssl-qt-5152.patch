@@ -178,6 +178,28 @@ index ca9d61ccb1..9b0ee9983b 100644
          q_CRYPTO_free(data, nullptr, 0);
  #else
          q_CRYPTO_free(data);
+diff --git a/src/network/ssl/qsslcontext_openssl.cpp b/src/network/ssl/qsslcontext_openssl.cpp
+index c9f202f573..f0a041cfdc 100644
+--- a/src/network/ssl/qsslcontext_openssl.cpp
++++ b/src/network/ssl/qsslcontext_openssl.cpp
+@@ -487,7 +487,7 @@ init_context:
+         ciphers = isDtls ? q_getDefaultDtlsCiphers() : QSslSocketPrivate::defaultCiphers();
+ 
+     const QByteArray preTls13Ciphers = filterCiphers(ciphers, false);
+-
++#if !QT_CONFIG(wolfssl)/* wolfssl doesn't need to set cipher list separately.*/
+     if (preTls13Ciphers.size()) {
+         if (!q_SSL_CTX_set_cipher_list(sslContext->ctx, preTls13Ciphers.data())) {
+             sslContext->errorStr = QSslSocket::tr("Invalid or empty cipher list (%1)").arg(QSslSocketBackendPrivate::getErrorsFromOpenSsl());
+@@ -511,7 +511,7 @@ init_context:
+         sslContext->errorCode = QSslError::UnspecifiedError;
+         return;
+     }
+-
++#endif
+     const QDateTime now = QDateTime::currentDateTimeUtc();
+ 
+     // Add all our CAs to this store.
 diff --git a/src/network/ssl/qsslcontext_openssl_p.h b/src/network/ssl/qsslcontext_openssl_p.h
 index 70cb97aad8..f66008b997 100644
 --- a/src/network/ssl/qsslcontext_openssl_p.h
@@ -219,7 +241,7 @@ index dd1a31b0e5..d2dae9fc2b 100644
      bool isPkcs8 = false;
  #endif
 diff --git a/src/network/ssl/qsslsocket_openssl.cpp b/src/network/ssl/qsslsocket_openssl.cpp
-index 277037e59c..c8bbec9a01 100644
+index 277037e59c..d0eadf678a 100644
 --- a/src/network/ssl/qsslsocket_openssl.cpp
 +++ b/src/network/ssl/qsslsocket_openssl.cpp
 @@ -197,6 +197,7 @@ static unsigned int q_ssl_psk_server_callback(SSL *ssl,
@@ -239,6 +261,32 @@ index 277037e59c..c8bbec9a01 100644
  int q_ssl_sess_set_new_cb(SSL *ssl, SSL_SESSION *session)
  {
      if (!ssl) {
+@@ -647,18 +648,25 @@ bool QSslSocketBackendPrivate::initSslContext()
+     q_SSL_set_ex_data(ssl, s_indexForSSLExtraData, this);
+ 
+ #ifndef OPENSSL_NO_PSK
++#if !QT_CONFIG(wolfssl)
+     // Set the client callback for PSK
+     if (mode == QSslSocket::SslClientMode)
+         q_SSL_set_psk_client_callback(ssl, &q_ssl_psk_client_callback);
+     else if (mode == QSslSocket::SslServerMode)
+         q_SSL_set_psk_server_callback(ssl, &q_ssl_psk_server_callback);
++#else
++    (void)q_ssl_psk_client_callback;
++    (void)q_ssl_psk_server_callback;
++#endif
+ 
+ #if OPENSSL_VERSION_NUMBER >= 0x10101006L
++#if !QT_CONFIG(wolfssl)
+     // Set the client callback for TLSv1.3 PSK
+     if (mode == QSslSocket::SslClientMode
+         && QSslSocket::sslLibraryBuildVersionNumber() >= 0x10101006L) {
+         q_SSL_set_psk_use_session_callback(ssl, &q_ssl_psk_use_session_callback);
+     }
++#endif
+ #endif // openssl version >= 0x10101006L
+ 
+ #endif // OPENSSL_NO_PSK
 diff --git a/src/network/ssl/qsslsocket_openssl_p.h b/src/network/ssl/qsslsocket_openssl_p.h
 index 67f267aec1..a33e649a01 100644
 --- a/src/network/ssl/qsslsocket_openssl_p.h
