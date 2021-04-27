@@ -341,7 +341,7 @@ index c46afcf53e..69cca9d7be 100644
  
  #ifdef TLS1_3_VERSION
 diff --git a/src/network/ssl/ssl.pri b/src/network/ssl/ssl.pri
-index 230c45c26f..5c10218634 100644
+index 230c45c26f..132b0e356d 100644
 --- a/src/network/ssl/ssl.pri
 +++ b/src/network/ssl/ssl.pri
 @@ -13,7 +13,9 @@ SOURCES += ssl/qasn1element.cpp \
@@ -371,7 +371,7 @@ index 230c45c26f..5c10218634 100644
 +                   ssl/qsslsocket_openssl.cpp \
 +                   ssl/qsslcontext_openssl.cpp \
 +
-+        QMAKE_CXXFLAGS += -DOPENSSL_API_COMPAT=0x10100000L
++        QMAKE_CXXFLAGS += -DOPENSSL_API_COMPAT=0x10100000L -DOPENSSL_NO_NEXTPROTONEG
 +
 +        darwin:SOURCES += ssl/qsslsocket_mac_shared.cpp
 +
