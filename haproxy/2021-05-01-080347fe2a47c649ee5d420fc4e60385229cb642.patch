@@ -1,0 +1,837 @@
+From 51f39a16c498a47670716c02752b87f06eba5c83 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 27 Apr 2021 14:55:50 +0200
+Subject: [PATCH] Patch for wolfSSL
+
+This patch was implemented and tested on commit 080347fe2a47c649ee5d420fc4e60385229cb642 of the master HaProxy branch.
+
+- `reg-tests` - Tests requiring `OPENSSL` should also check for `WOLFSSL`
+    - `ssl_client_samples.vtc` - Modified client1.pem means diffent DER should be expected
+    - `tls_health_check.vtc` - Increase timeout as unoptimized wolfSSL was timing out and failing tests
+    - `client1.pem` - Remove expired certs
+- `haproxy.c` - Add wolfSSL debug logging
+- `sample.c` - wolfSSL uses different types for SHA init-update-final API
+- `ssl_ckch.c`- Duplicate DH parameters instead of up-refing
+- `ssl_sock.c`
+    - Use `tlsextStatusCb` to have consistent types (and to silence GCC warnings)
+    - `SSL_set_client_CA_list` not necessary in wolfSSL
+    - `chain` needs to be `free`'d after `X509_chain_up_ref`
+
+# Building wolfSSL
+
+Compile wolfSSL with:
+```
+./configure --enable-haproxy
+make
+make install
+```
+
+# Building HaProxy
+
+Compile HaProxy with (on linux):
+```
+make TARGET=linux-glibc USE_WOLFSSL=1 USE_ZLIB=1 USE_LUA=1 USE_PCRE=1 USE_SYSTEMD=1
+```
+
+# Testing
+
+HaProxy should pass all tests run with (read the reg-tests/README for more details on HaProxy testing):
+```
+VTEST_PROGRAM=/path/to/vtest/binary make reg-tests
+```
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ Makefile                                      |  43 ++++++-
+ include/haproxy/openssl-compat.h              |   5 +
+ reg-tests/checks/ssl-hello-check.vtc          |   2 +-
+ reg-tests/checks/tcp-check-ssl.vtc            |   2 +-
+ reg-tests/checks/tls_health_checks.vtc        |  14 +--
+ reg-tests/compression/lua_validation.vtc      |   2 +-
+ reg-tests/connection/http_reuse_conn_hash.vtc |   2 +-
+ .../connection/proxy_protocol_random_fail.vtc |   2 +-
+ .../proxy_protocol_send_unique_id_alpn.vtc    |   2 +-
+ reg-tests/converter/digest.vtc                |   2 +-
+ reg-tests/converter/hmac.vtc                  |   2 +-
+ reg-tests/converter/secure_memcmp.vtc         |   2 +-
+ reg-tests/converter/sha2.vtc                  |   2 +-
+ reg-tests/lua/txn_get_priv-thread.vtc         |   2 +-
+ reg-tests/lua/txn_get_priv.vtc                |   2 +-
+ reg-tests/peers/tls_basic_sync.vtc            |   2 +-
+ .../peers/tls_basic_sync_wo_stkt_backend.vtc  |   2 +-
+ reg-tests/server/cli_set_ssl.vtc              |   2 +-
+ reg-tests/ssl/add_ssl_crt-list.vtc            |   2 +-
+ reg-tests/ssl/client1.pem                     | 106 ------------------
+ reg-tests/ssl/del_ssl_crt-list.vtc            |   2 +-
+ reg-tests/ssl/set_ssl_cert.vtc                |   2 +-
+ reg-tests/ssl/set_ssl_cert_bundle.vtc         |   2 +-
+ reg-tests/ssl/set_ssl_cert_noext.vtc          |   2 +-
+ reg-tests/ssl/set_ssl_server_cert.vtc         |   2 +-
+ reg-tests/ssl/ssl_client_auth.vtc             |   2 +-
+ reg-tests/ssl/ssl_client_samples.vtc          |   4 +-
+ reg-tests/ssl/ssl_crt-list_filters.vtc        |   2 +-
+ reg-tests/ssl/ssl_frontend_samples.vtc        |   2 +-
+ reg-tests/ssl/ssl_server_samples.vtc          |   2 +-
+ reg-tests/ssl/ssl_simple_crt-list.vtc         |   2 +-
+ reg-tests/ssl/wrong_ctx_storage.vtc           |   2 +-
+ src/haproxy.c                                 |  11 ++
+ src/sample.c                                  |  10 +-
+ src/ssl_ckch.c                                |   6 +
+ src/ssl_sock.c                                |   9 +-
+ 36 files changed, 115 insertions(+), 147 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 46ae734d9..910f27c43 100644
+--- a/Makefile
++++ b/Makefile
+@@ -34,6 +34,9 @@
+ #   USE_CRYPT_H          : set it if your system requires including crypt.h
+ #   USE_GETADDRINFO      : use getaddrinfo() to resolve IPv6 host names.
+ #   USE_OPENSSL          : enable use of OpenSSL. Recommended, but see below.
++#   USE_WOLFSSL          : enable use of wolfSSL.
++#   USE_GDBSERVER        : the `haproxy` file starts a gdbserver. this is helpful for 
++#                          debugging the reg-tests
+ #   USE_LUA              : enable Lua support.
+ #   USE_FUTEX            : enable use of futex on kernel 2.6. Automatic.
+ #   USE_ACCEPT4          : enable use of accept4() on linux. Automatic.
+@@ -100,6 +103,8 @@
+ #                                                               pcre2-config)
+ #   SSL_LIB        : force the lib path to libssl/libcrypto
+ #   SSL_INC        : force the include path to libssl/libcrypto
++#   WOLFSSL_INC    : force the include path to wolfSSL
++#   WOLFSSL_LIB    : force the include path to wolfSSL
+ #   LUA_LIB        : force the lib path to lua
+ #   LUA_INC        : force the include path to lua
+ #   LUA_LIB_NAME   : force the lib name (or automatically evaluated, by order of
+@@ -177,7 +182,7 @@ LD = $(CC)
+ 
+ #### Debug flags (typically "-g").
+ # Those flags only feed CFLAGS so it is not mandatory to use this form.
+-DEBUG_CFLAGS = -g
++DEBUG_CFLAGS = -g3 -O0
+ 
+ #### Add -Werror when set to non-empty
+ ERR =
+@@ -309,7 +314,7 @@ use_opts = USE_EPOLL USE_KQUEUE USE_NETFILTER                                 \
+            USE_CLOSEFROM USE_ZLIB USE_SLZ USE_CPU_AFFINITY USE_TFO USE_NS     \
+            USE_DL USE_RT USE_DEVICEATLAS USE_51DEGREES USE_WURFL USE_SYSTEMD  \
+            USE_OBSOLETE_LINKER USE_PRCTL USE_THREAD_DUMP USE_EVPORTS USE_OT   \
+-           USE_QUIC USE_PROMEX
++           USE_QUIC USE_PROMEX USE_WOLFSSL
+ 
+ #### Target system options
+ # Depending on the target platform, some options are set, as well as some
+@@ -582,6 +587,24 @@ OPTIONS_LDFLAGS += -ldl
+ endif
+ OPTIONS_OBJS  += src/ssl_sample.o src/ssl_sock.o src/ssl_crtlist.o src/ssl_ckch.o src/ssl_utils.o src/cfgparse-ssl.o
+ endif
++
++
++ifneq ($(USE_WOLFSSL),)
++ifneq ($(WOLFSSL_INC),)
++OPTIONS_CFLAGS  += -I$(WOLFSSL_INC) -I$(WOLFSSL_INC)/wolfssl
++else
++OPTIONS_CFLAGS  += -I/usr/local/include -I/usr/local/include/wolfssl
++endif
++ifneq ($(WOLFSSL_LIB),)
++OPTIONS_LDFLAGS  += -L$(WOLFSSL_LIB)
++endif
++OPTIONS_LDFLAGS  += -lwolfssl
++OPTIONS_OBJS  += src/ssl_sample.o src/ssl_sock.o src/ssl_crtlist.o src/ssl_ckch.o src/ssl_utils.o src/cfgparse-ssl.o
++# Enable so that the compatibility layer gets used
++USE_OPENSSL = 1
++endif
++
++
+ ifneq ($(USE_QUIC),)
+ OPTIONS_OBJS += src/quic_sock.o src/proto_quic.o src/xprt_quic.o src/quic_tls.o \
+                 src/quic_frame.o src/quic_cc.o src/quic_cc_newreno.o
+@@ -853,7 +876,11 @@ all:
+ 	@echo
+ 	@exit 1
+ else
++ifeq ($(USE_GDBSERVER),)
+ all: haproxy dev/flags/flags $(EXTRA)
++else
++all: haproxy.exec dev/flags/flags $(EXTRA)
++endif
+ endif
+ endif
+ 
+@@ -934,11 +961,21 @@ else
+ .build_opts:
+ endif
+ 
++ifeq ($(USE_GDBSERVER),)
+ haproxy: $(OPTIONS_OBJS) $(OBJS)
+ 	$(cmd_LD) $(LDFLAGS) -o $@ $^ $(LDOPTS)
+-
++	
+ objsize: haproxy
+ 	$(Q)objdump -t $^|grep ' g '|grep -F '.text'|awk '{print $$5 FS $$6}'|sort
++else
++haproxy.exec: $(OPTIONS_OBJS) $(OBJS)
++	$(cmd_LD) $(LDFLAGS) -o $@ $^ $(LDOPTS)
++	cp haproxy.in haproxy
++	chmod +x haproxy
++
++objsize: haproxy.exec
++	$(Q)objdump -t $^|grep ' g '|grep -F '.text'|awk '{print $$5 FS $$6}'|sort
++endif
+ 
+ %.o:	%.c $(DEP)
+ 	$(cmd_CC) $(COPTS) -c -o $@ $<
+diff --git a/include/haproxy/openssl-compat.h b/include/haproxy/openssl-compat.h
+index d26deccc6..e8b9c8a44 100644
+--- a/include/haproxy/openssl-compat.h
++++ b/include/haproxy/openssl-compat.h
+@@ -2,6 +2,11 @@
+ #define _HAPROXY_OPENSSL_COMPAT_H
+ #ifdef USE_OPENSSL
+ 
++#ifdef USE_WOLFSSL
++#include <wolfssl/options.h>
++#include <openssl/ssl.h>
++#endif
++
+ #include <openssl/bn.h>
+ #include <openssl/crypto.h>
+ #include <openssl/ssl.h>
+diff --git a/reg-tests/checks/ssl-hello-check.vtc b/reg-tests/checks/ssl-hello-check.vtc
+index 7f8d9b90e..2cdabd846 100644
+--- a/reg-tests/checks/ssl-hello-check.vtc
++++ b/reg-tests/checks/ssl-hello-check.vtc
+@@ -1,5 +1,5 @@
+ varnishtest "Health-checks: ssl-hello health-check"
+-#REQUIRE_OPTION=OPENSSL
++#REQUIRE_OPTION=OPENSSL|WOLFSSL
+ #REQUIRE_VERSION=2.2
+ #REGTEST_TYPE=slow
+ feature ignore_unknown_macro
+diff --git a/reg-tests/checks/tcp-check-ssl.vtc b/reg-tests/checks/tcp-check-ssl.vtc
+index 02dc6f010..683fa5fae 100644
+--- a/reg-tests/checks/tcp-check-ssl.vtc
++++ b/reg-tests/checks/tcp-check-ssl.vtc
+@@ -1,5 +1,5 @@
+ varnishtest "Health-checks: tcp-check health-check with ssl options"
+-#REQUIRE_OPTION=OPENSSL
++#REQUIRE_OPTION=OPENSSL|WOLFSSL
+ #REQUIRE_VERSION=2.2
+ #REGTEST_TYPE=slow
+ feature ignore_unknown_macro
+diff --git a/reg-tests/checks/tls_health_checks.vtc b/reg-tests/checks/tls_health_checks.vtc
+index 75d7114e5..48f289f9e 100644
+--- a/reg-tests/checks/tls_health_checks.vtc
++++ b/reg-tests/checks/tls_health_checks.vtc
+@@ -1,5 +1,5 @@
+ varnishtest "Health-check test over TLS/SSL"
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ #REGTEST_TYPE=slow
+ feature ignore_unknown_macro
+ 
+@@ -38,9 +38,9 @@ haproxy h1 -conf {
+ 
+     defaults
+         mode http
+-        timeout client 20
+-        timeout server 20
+-        timeout connect 20
++        timeout client 40
++        timeout server 40
++        timeout connect 40
+ 
+     backend be1
+         server srv1 ${s1_addr}:${s1_port}
+@@ -88,9 +88,9 @@ haproxy h2 -conf {
+         tune.ssl.default-dh-param 2048
+ 
+     defaults
+-        timeout client 20
+-        timeout server 20
+-        timeout connect 20
++        timeout client 40
++        timeout server 40
++        timeout connect 40
+         default-server downinter 1s inter 500 rise 1 fall 1
+ 
+     backend be2
+diff --git a/reg-tests/compression/lua_validation.vtc b/reg-tests/compression/lua_validation.vtc
+index af234b3d1..68b3df424 100644
+--- a/reg-tests/compression/lua_validation.vtc
++++ b/reg-tests/compression/lua_validation.vtc
+@@ -2,7 +2,7 @@
+ 
+ varnishtest "Compression validation"
+ #REQUIRE_VERSION=1.6
+-#REQUIRE_OPTIONS=ZLIB|SLZ,LUA,OPENSSL
++#REQUIRE_OPTIONS=ZLIB|SLZ,LUA,OPENSSL|WOLFSSL
+ #REGTEST_TYPE=slow
+ 
+ feature ignore_unknown_macro
+diff --git a/reg-tests/connection/http_reuse_conn_hash.vtc b/reg-tests/connection/http_reuse_conn_hash.vtc
+index 991e86f7a..d470c3d89 100644
+--- a/reg-tests/connection/http_reuse_conn_hash.vtc
++++ b/reg-tests/connection/http_reuse_conn_hash.vtc
+@@ -1,6 +1,6 @@
+ varnishtest "Test the http-reuse with special connection parameters"
+ #REQUIRE_VERSION=2.4
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ 
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/connection/proxy_protocol_random_fail.vtc b/reg-tests/connection/proxy_protocol_random_fail.vtc
+index 983857733..3b4e3eae2 100644
+--- a/reg-tests/connection/proxy_protocol_random_fail.vtc
++++ b/reg-tests/connection/proxy_protocol_random_fail.vtc
+@@ -9,7 +9,7 @@
+ # without storing it first.
+ 
+ varnishtest "PROXY protocol random failures"
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ 
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/connection/proxy_protocol_send_unique_id_alpn.vtc b/reg-tests/connection/proxy_protocol_send_unique_id_alpn.vtc
+index 87e590a9b..481fee9c5 100644
+--- a/reg-tests/connection/proxy_protocol_send_unique_id_alpn.vtc
++++ b/reg-tests/connection/proxy_protocol_send_unique_id_alpn.vtc
+@@ -1,7 +1,7 @@
+ varnishtest "Check that the unique ID TLV is properly sent for servers with ALPN option"
+ 
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ 
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/converter/digest.vtc b/reg-tests/converter/digest.vtc
+index a14f1ccfd..6a3c09734 100644
+--- a/reg-tests/converter/digest.vtc
++++ b/reg-tests/converter/digest.vtc
+@@ -1,7 +1,7 @@
+ varnishtest "digest converter Test"
+ 
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTION=OPENSSL
++#REQUIRE_OPTION=OPENSSL|WOLFSSL
+ 
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/converter/hmac.vtc b/reg-tests/converter/hmac.vtc
+index f9d9d354a..ca18f5d45 100644
+--- a/reg-tests/converter/hmac.vtc
++++ b/reg-tests/converter/hmac.vtc
+@@ -1,7 +1,7 @@
+ varnishtest "HMAC converter Test"
+ 
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTION=OPENSSL
++#REQUIRE_OPTION=OPENSSL|WOLFSSL
+ 
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/converter/secure_memcmp.vtc b/reg-tests/converter/secure_memcmp.vtc
+index f9341f942..0a3ce04e9 100644
+--- a/reg-tests/converter/secure_memcmp.vtc
++++ b/reg-tests/converter/secure_memcmp.vtc
+@@ -1,7 +1,7 @@
+ varnishtest "secure_memcmp converter Test"
+ 
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTION=OPENSSL
++#REQUIRE_OPTION=OPENSSL|WOLFSSL
+ 
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/converter/sha2.vtc b/reg-tests/converter/sha2.vtc
+index 6ca021a8b..47af2dcd1 100644
+--- a/reg-tests/converter/sha2.vtc
++++ b/reg-tests/converter/sha2.vtc
+@@ -1,7 +1,7 @@
+ varnishtest "sha2 converter Test"
+ 
+ #REQUIRE_VERSION=2.1
+-#REQUIRE_OPTION=OPENSSL
++#REQUIRE_OPTION=OPENSSL|WOLFSSL
+ 
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/lua/txn_get_priv-thread.vtc b/reg-tests/lua/txn_get_priv-thread.vtc
+index 77e333dcf..205bd1f04 100644
+--- a/reg-tests/lua/txn_get_priv-thread.vtc
++++ b/reg-tests/lua/txn_get_priv-thread.vtc
+@@ -1,5 +1,5 @@
+ varnishtest "Lua: txn:get_priv() scope"
+-#REQUIRE_OPTIONS=LUA,OPENSSL
++#REQUIRE_OPTIONS=LUA,OPENSSL|WOLFSSL
+ #REQUIRE_VERSION=2.4
+ #REGTEST_TYPE=bug
+ 
+diff --git a/reg-tests/lua/txn_get_priv.vtc b/reg-tests/lua/txn_get_priv.vtc
+index 25fb063b2..4b4f761d8 100644
+--- a/reg-tests/lua/txn_get_priv.vtc
++++ b/reg-tests/lua/txn_get_priv.vtc
+@@ -1,5 +1,5 @@
+ varnishtest "Lua: txn:get_priv() scope"
+-#REQUIRE_OPTIONS=LUA,OPENSSL
++#REQUIRE_OPTIONS=LUA,OPENSSL|WOLFSSL
+ #REGTEST_TYPE=bug
+ 
+ feature ignore_unknown_macro
+diff --git a/reg-tests/peers/tls_basic_sync.vtc b/reg-tests/peers/tls_basic_sync.vtc
+index 035abbe6c..64dcad561 100644
+--- a/reg-tests/peers/tls_basic_sync.vtc
++++ b/reg-tests/peers/tls_basic_sync.vtc
+@@ -1,5 +1,5 @@
+ vtest "Basic test for peers protocol over SSL/TLS"
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ #REQUIRE_VERSION=2.0
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/peers/tls_basic_sync_wo_stkt_backend.vtc b/reg-tests/peers/tls_basic_sync_wo_stkt_backend.vtc
+index b145ac862..03e82e903 100644
+--- a/reg-tests/peers/tls_basic_sync_wo_stkt_backend.vtc
++++ b/reg-tests/peers/tls_basic_sync_wo_stkt_backend.vtc
+@@ -2,7 +2,7 @@ vtest "Basic test for peers protocol over SSL/TLS with stick-table declared in p
+ feature ignore_unknown_macro
+ 
+ #REQUIRE_VERSION=2.0
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ #REGTEST_TYPE=slow
+ 
+ haproxy h1 -arg "-L A" -conf {
+diff --git a/reg-tests/server/cli_set_ssl.vtc b/reg-tests/server/cli_set_ssl.vtc
+index 638debea0..c62d4a076 100644
+--- a/reg-tests/server/cli_set_ssl.vtc
++++ b/reg-tests/server/cli_set_ssl.vtc
+@@ -5,7 +5,7 @@ feature ignore_unknown_macro
+ # for "set server <srv> ssl"
+ #REQUIRE_VERSION=2.4
+ #REGTEST_TYPE=devel
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ 
+ # Do nothing. Is there only to create s1_* macros
+ server s1 {
+diff --git a/reg-tests/ssl/add_ssl_crt-list.vtc b/reg-tests/ssl/add_ssl_crt-list.vtc
+index f42e3af53..24d007472 100644
+--- a/reg-tests/ssl/add_ssl_crt-list.vtc
++++ b/reg-tests/ssl/add_ssl_crt-list.vtc
+@@ -12,7 +12,7 @@
+ 
+ varnishtest "Test the 'add ssl crt-list' feature of the CLI"
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ #REQUIRE_BINARIES=socat
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/ssl/client1.pem b/reg-tests/ssl/client1.pem
+index d830a4236..3725f79f4 100644
+--- a/reg-tests/ssl/client1.pem
++++ b/reg-tests/ssl/client1.pem
+@@ -28,112 +28,6 @@ LpmkYVHWhADLY4q06PUz8gFGsfDHnx9RQIV01SXbcFxhmAjJBequBbTpucW4UAK4
+ sTmg59wlYEeNdomLBPW8f0zkY3Nm/IbyJ8kEofUa4kbwdD/osS5fgWgARiVQXEMW
+ W4oMGWpplJan6qe+hInvd+5syZXtO+K/uSOj63H6BwAu
+ -----END CERTIFICATE-----
+------BEGIN CERTIFICATE-----
+-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
+-lSem1ngKYQSEzjVsTE4c
+------END CERTIFICATE-----
+------BEGIN CERTIFICATE-----
+-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
+-gCN9CPQlyEFKI9Q2QVUC
+------END CERTIFICATE-----
+ -----BEGIN RSA PRIVATE KEY-----
+ MIIJKQIBAAKCAgEAwJSerjL+tgafYE9i601391BfcpXWpUopcGxdeoHMTziqMGDp
+ J5BBXBxU3RRgr6XZGqeS32b6xX4LEDAMBUe2z9CYP/i1uO4/y0xCJlxSyXuHFHMt
+diff --git a/reg-tests/ssl/del_ssl_crt-list.vtc b/reg-tests/ssl/del_ssl_crt-list.vtc
+index c61adc28d..6a38e656e 100644
+--- a/reg-tests/ssl/del_ssl_crt-list.vtc
++++ b/reg-tests/ssl/del_ssl_crt-list.vtc
+@@ -11,7 +11,7 @@
+ 
+ varnishtest "Test the 'del ssl crt-list' feature of the CLI"
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ feature ignore_unknown_macro
+ 
+ server s1 -repeat 2 {
+diff --git a/reg-tests/ssl/set_ssl_cert.vtc b/reg-tests/ssl/set_ssl_cert.vtc
+index a606b477d..f9f915ec8 100644
+--- a/reg-tests/ssl/set_ssl_cert.vtc
++++ b/reg-tests/ssl/set_ssl_cert.vtc
+@@ -21,7 +21,7 @@
+ 
+ varnishtest "Test the 'set ssl cert' feature of the CLI"
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ #REQUIRE_BINARIES=socat
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/ssl/set_ssl_cert_bundle.vtc b/reg-tests/ssl/set_ssl_cert_bundle.vtc
+index bbc34a400..da9c8fb46 100644
+--- a/reg-tests/ssl/set_ssl_cert_bundle.vtc
++++ b/reg-tests/ssl/set_ssl_cert_bundle.vtc
+@@ -16,7 +16,7 @@
+ 
+ varnishtest "Test the 'set ssl cert' feature of the CLI with bundles"
+ #REQUIRE_VERSION=2.3
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ #REQUIRE_BINARIES=socat
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/ssl/set_ssl_cert_noext.vtc b/reg-tests/ssl/set_ssl_cert_noext.vtc
+index 80736bb4c..feed5c165 100644
+--- a/reg-tests/ssl/set_ssl_cert_noext.vtc
++++ b/reg-tests/ssl/set_ssl_cert_noext.vtc
+@@ -13,7 +13,7 @@
+ 
+ varnishtest "Test the 'set ssl cert' feature of the CLI with separate key and crt"
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ #REQUIRE_BINARIES=socat
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/ssl/set_ssl_server_cert.vtc b/reg-tests/ssl/set_ssl_server_cert.vtc
+index ccf78873b..0f1118c9b 100644
+--- a/reg-tests/ssl/set_ssl_server_cert.vtc
++++ b/reg-tests/ssl/set_ssl_server_cert.vtc
+@@ -5,7 +5,7 @@
+ 
+ varnishtest "Test the 'set ssl cert' feature of the CLI"
+ #REQUIRE_VERSION=2.4
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ #REQUIRE_BINARIES=socat
+ feature ignore_unknown_macro
+ 
+diff --git a/reg-tests/ssl/ssl_client_auth.vtc b/reg-tests/ssl/ssl_client_auth.vtc
+index 849e8781e..d31a308f1 100644
+--- a/reg-tests/ssl/ssl_client_auth.vtc
++++ b/reg-tests/ssl/ssl_client_auth.vtc
+@@ -16,7 +16,7 @@
+ 
+ varnishtest "Test the client auth"
+ #REQUIRE_VERSION=1.6
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ feature ignore_unknown_macro
+ 
+ server s1 -repeat 3 {
+diff --git a/reg-tests/ssl/ssl_client_samples.vtc b/reg-tests/ssl/ssl_client_samples.vtc
+index ccefa7940..10223e2bb 100644
+--- a/reg-tests/ssl/ssl_client_samples.vtc
++++ b/reg-tests/ssl/ssl_client_samples.vtc
+@@ -2,7 +2,7 @@
+ 
+ varnishtest "Test the ssl_c_* sample fetches"
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ feature ignore_unknown_macro
+ 
+ server s1 -repeat 3 {
+@@ -59,7 +59,7 @@ client c1 -connect ${h1_clearlst_sock} {
+     rxresp
+     expect resp.status == 200
+     expect resp.http.x-ssl-der ~ 3082052D30820315020102300D0.*995ED3BE2BFB923A3EB71FA07002E
+-    expect resp.http.x-ssl-chain-der ~ 3082096B30820553A0030201020.*0237D08F425C8414A23D436415502
++    expect resp.http.x-ssl-chain-der ~ 3082052D30820315020102300D0.*DA0CE7953F8C6777C785F7921F2D5
+     expect resp.http.x-ssl-sha1 == "D9C3BAE37EA5A7EDB7B3C9BDD4DCB2FE58A412E4"
+     expect resp.http.x-ssl-notafter == "500421185942Z"
+     expect resp.http.x-ssl-notbefore == "200428185942Z"
+diff --git a/reg-tests/ssl/ssl_crt-list_filters.vtc b/reg-tests/ssl/ssl_crt-list_filters.vtc
+index a5ba189c9..200e2b9bd 100644
+--- a/reg-tests/ssl/ssl_crt-list_filters.vtc
++++ b/reg-tests/ssl/ssl_crt-list_filters.vtc
+@@ -5,7 +5,7 @@ varnishtest "Test for the bug #810 and #818"
+ 
+ 
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ feature ignore_unknown_macro
+ 
+ server s1 -repeat 3 {
+diff --git a/reg-tests/ssl/ssl_frontend_samples.vtc b/reg-tests/ssl/ssl_frontend_samples.vtc
+index 5a7a0ee9b..362ce29e2 100644
+--- a/reg-tests/ssl/ssl_frontend_samples.vtc
++++ b/reg-tests/ssl/ssl_frontend_samples.vtc
+@@ -2,7 +2,7 @@
+ 
+ varnishtest "Test the ssl_f_* sample fetches"
+ #REQUIRE_VERSION=1.5
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ feature ignore_unknown_macro
+ 
+ server s1 -repeat 3 {
+diff --git a/reg-tests/ssl/ssl_server_samples.vtc b/reg-tests/ssl/ssl_server_samples.vtc
+index 53dd1b81c..28dc584e4 100644
+--- a/reg-tests/ssl/ssl_server_samples.vtc
++++ b/reg-tests/ssl/ssl_server_samples.vtc
+@@ -2,7 +2,7 @@
+ 
+ varnishtest "Test the ssl_s_* sample fetches"
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ feature ignore_unknown_macro
+ 
+ server s1 -repeat 3 {
+diff --git a/reg-tests/ssl/ssl_simple_crt-list.vtc b/reg-tests/ssl/ssl_simple_crt-list.vtc
+index d3353a129..f191a5262 100644
+--- a/reg-tests/ssl/ssl_simple_crt-list.vtc
++++ b/reg-tests/ssl/ssl_simple_crt-list.vtc
+@@ -3,7 +3,7 @@ varnishtest "Test for the bug #940"
+ # Test that the SNI are correctly inserted with the same file multiple times.
+ 
+ #REQUIRE_VERSION=2.2
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ feature ignore_unknown_macro
+ 
+ server s1 -repeat 4 {
+diff --git a/reg-tests/ssl/wrong_ctx_storage.vtc b/reg-tests/ssl/wrong_ctx_storage.vtc
+index 9f0bdd789..e6dfa41ff 100644
+--- a/reg-tests/ssl/wrong_ctx_storage.vtc
++++ b/reg-tests/ssl/wrong_ctx_storage.vtc
+@@ -18,7 +18,7 @@
+ #REGTEST_TYPE=bug
+ 
+ varnishtest "OpenSSL bug: Random crashes"
+-#REQUIRE_OPTIONS=OPENSSL
++#REQUIRE_OPTIONS=OPENSSL|WOLFSSL
+ feature ignore_unknown_macro
+ 
+ 
+diff --git a/src/haproxy.c b/src/haproxy.c
+index 5d3e735e2..44835f317 100644
+--- a/src/haproxy.c
++++ b/src/haproxy.c
+@@ -2590,12 +2590,23 @@ static void set_identity(const char *program_name)
+ 	}
+ }
+ 
++static void logMsg(const int logLevel, const char* const msg)
++{
++    (void)logLevel;
++    ha_notice("wolfSSL debug log: %s\n", msg);
++}
++
+ int main(int argc, char **argv)
+ {
+ 	int err, retry;
+ 	struct rlimit limit;
+ 	int pidfd = -1;
+ 
++#ifdef USE_WOLFSSL
++	wolfSSL_Debugging_ON();
++	wolfSSL_SetLoggingCb(logMsg);
++#endif
++
+ 	setvbuf(stdout, NULL, _IONBF, 0);
+ 
+ 	/* this can only safely be done here, though it's optimized away by
+diff --git a/src/sample.c b/src/sample.c
+index b48cf71c2..4bcb6ffe0 100644
+--- a/src/sample.c
++++ b/src/sample.c
+@@ -1673,7 +1673,11 @@ static int sample_conv_sha2(const struct arg *arg_p, struct sample *smp, void *p
+ 
+ 	switch (bits) {
+ 	case 224: {
++#ifdef USE_WOLFSSL
++		SHA224_CTX ctx;
++#else
+ 		SHA256_CTX ctx;
++#endif
+ 
+ 		memset(&ctx, 0, sizeof(ctx));
+ 
+@@ -1695,7 +1699,11 @@ static int sample_conv_sha2(const struct arg *arg_p, struct sample *smp, void *p
+ 		break;
+ 	}
+ 	case 384: {
+-		SHA512_CTX ctx;
++#ifdef USE_WOLFSSL
++	    SHA384_CTX ctx;
++#else
++	    SHA512_CTX ctx;
++#endif
+ 
+ 		memset(&ctx, 0, sizeof(ctx));
+ 
+diff --git a/src/ssl_ckch.c b/src/ssl_ckch.c
+index c41c1789c..c73bb88bb 100644
+--- a/src/ssl_ckch.c
++++ b/src/ssl_ckch.c
+@@ -668,8 +668,14 @@ struct cert_key_and_chain *ssl_sock_copy_cert_key_and_chain(struct cert_key_and_
+ 	}
+ 
+ 	if (src->dh) {
++#ifndef USE_WOLFSSL
+ 		DH_up_ref(src->dh);
+ 		dst->dh = src->dh;
++#else
++		dst->dh = wolfSSL_DH_dup(src->dh);
++		if (!dst->dh)
++		    goto error;
++#endif
+ 	}
+ 
+ 	if (src->sctl) {
+diff --git a/src/ssl_sock.c b/src/ssl_sock.c
+index fbf23d5bf..99a5dbf26 100644
+--- a/src/ssl_sock.c
++++ b/src/ssl_sock.c
+@@ -1321,7 +1321,7 @@ int ssl_sock_ocsp_stapling_cbk(SSL *ssl, void *arg)
+ 		return SSL_TLSEXT_ERR_NOACK;
+ 
+ 	memcpy(ssl_buf, ocsp->response.area, ocsp->response.data);
+-	SSL_set_tlsext_status_ocsp_resp(ssl, ssl_buf, ocsp->response.data);
++	SSL_set_tlsext_status_ocsp_resp(ssl, (unsigned char*)ssl_buf, ocsp->response.data);
+ 
+ 	return SSL_TLSEXT_ERR_OK;
+ }
+@@ -1371,7 +1371,11 @@ static int ssl_sock_load_ocsp(SSL_CTX *ctx, const struct cert_key_and_chain *ckc
+ 	struct certificate_ocsp *ocsp = NULL, *iocsp;
+ 	char *warn = NULL;
+ 	unsigned char *p;
++#ifndef USE_WOLFSSL
+ 	void (*callback) (void);
++#else
++	tlsextStatusCb callback;
++#endif
+ 
+ 
+ 	x = ckch->cert;
+@@ -2290,7 +2294,9 @@ struct methodVersions methodVersions[] = {
+ static void ssl_sock_switchctx_set(SSL *ssl, SSL_CTX *ctx)
+ {
+ 	SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ctx), ssl_sock_bind_verifycbk);
++#ifndef USE_WOLFSSL
+ 	SSL_set_client_CA_list(ssl, SSL_dup_CA_list(SSL_CTX_get_client_CA_list(ctx)));
++#endif
+ 	SSL_set_SSL_CTX(ssl, ctx);
+ }
+ 
+@@ -3157,6 +3163,7 @@ static int ssl_sock_load_cert_chain(const char *path, const struct cert_key_and_
+ 				errcode |= ERR_ALERT | ERR_FATAL;
+ 				goto end;
+ 			}
++		sk_X509_free(chain);
+ 	}
+ #endif
+ 
+-- 
+2.25.1
+
