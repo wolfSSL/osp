@@ -30,21 +30,26 @@ make tests
 ```
 
 Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+
+Updated February 5, 2021 by Hayden Roche <hayden@wolfssl.com>
+- Added support for --without-rpath to the wolfSSL portion of configure.ac.
+- Added include for openssl/ssl.h to includes.h to fix compile-time errors.
+
 ---
  Makefile.in                                 |   1 +
- configure.ac                                | 167 +++++++++++++++++++-
- includes.h                                  |   5 +
+ configure.ac                                | 174 +++++++++++++++++++++++++++++++++++++++++++++++--
+ includes.h                                  |   6 ++
  kex.c                                       |   2 +
- log.c                                       |   9 ++
- openbsd-compat/libressl-api-compat.c        |   4 +
+ log.c                                       |   9 +++
+ openbsd-compat/libressl-api-compat.c        |   4 ++
  openbsd-compat/openbsd-compat.h             |   2 +
- regress/Makefile                            |   4 +
+ regress/Makefile                            |   4 ++
  regress/ssh-com.sh                          |   2 +-
  regress/unittests/sshkey/test_file.c        |   3 +
- regress/unittests/sshkey/test_fuzz.c        |   9 ++
+ regress/unittests/sshkey/test_fuzz.c        |   9 +++
  regress/unittests/sshkey/test_sshkey.c      |   3 +
- regress/unittests/test_helper/test_helper.c |   5 +
- 13 files changed, 211 insertions(+), 5 deletions(-)
+ regress/unittests/test_helper/test_helper.c |   5 ++
+ 13 files changed, 219 insertions(+), 5 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
 index acfb919d..a25a4c00 100644
@@ -59,7 +64,7 @@ index acfb919d..a25a4c00 100644
  		PATH="$${BUILDDIR}:$${PATH}" \
  		TEST_ENV=MALLOC_OPTIONS="@TEST_MALLOC_OPTIONS@" \
 diff --git a/configure.ac b/configure.ac
-index 35d1aca9..a202aa5e 100644
+index 35d1aca9..0401efe9 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -533,6 +533,8 @@ SPP_MSG="no"
@@ -103,7 +108,7 @@ index 35d1aca9..a202aa5e 100644
  	SHA256Update \
  	SHA384Update \
  	SHA512Update \
-@@ -2576,7 +2589,124 @@ AC_CHECK_FUNCS([getpgrp],[
+@@ -2576,7 +2589,131 @@ AC_CHECK_FUNCS([getpgrp],[
  	)
  ])
  
@@ -112,34 +117,41 @@ index 35d1aca9..a202aa5e 100644
 +AC_ARG_WITH(wolfssl,
 +    [  --with-wolfssl=PATH      PATH to wolfssl install (default /usr/local) ],
 +    [
-+    if test "x$withval" != "xno" ; then
-+    if test -d "$withval/lib"; then
-+    LDFLAGS="$LDFLAGS -L${withval}/lib"
-+    LD="$LD -Wl,-rpath,${withval}/lib"
++    if test "x$withval" != "xno"; then
++       if test -d "$withval/lib"; then
++           if test -n "${rpath_opt}"; then
++               LDFLAGS="-L${withval}/lib ${rpath_opt}${withval}/lib ${LDFLAGS}"
++           else
++               LDFLAGS="-L${withval}/lib ${LDFLAGS}"
++           fi
++       fi
++       if test -d "$withval/include"; then
++           CPPFLAGS="$CPPFLAGS -I${withval}/include -I${withval}/include/wolfssl"
++       fi
 +    fi
-+    if test -d "$withval/include"; then
-+    CPPFLAGS="$CPPFLAGS -I${withval}/include -I${withval}/include/wolfssl"
-+    fi
-+    fi
-+    
++
 +    if test "x$withval" == "xyes" ; then
-+    LDFLAGS="-L/usr/local/lib $LDFLAGS"
-+    CPPFLAGS="-I/usr/local/include -I/usr/local/include/wolfssl $CPPFLAGS"
-+    LD="$LD -Wl,-rpath,/usr/local/lib"
++       if test -n "${rpath_opt}"; then
++           LDFLAGS="-L/usr/local/lib ${rpath_opt}${withval}/lib ${LDFLAGS}"
++       else
++           LDFLAGS="-L/usr/local/lib $LDFLAGS"
++       fi
++
++       CPPFLAGS="-I/usr/local/include -I/usr/local/include/wolfssl $CPPFLAGS"
 +    fi
-+    
++
 +    AC_MSG_CHECKING([for wolfSSL])
 +    LIBS="$LIBS -lwolfssl"
-+    
++
 +    AC_TRY_LINK([#include <openssl/ssl.h>], [ wolfSSL_Init(); ],
 +    [ wolfssl_linked=yes ], [ wolfssl_linked=no ])
-+    
++
 +    if test "x$wolfssl_linked" == "xno" ; then
 +    AC_MSG_ERROR([WolfSSL isn't found.  You can get it from $WOLFSSL_URL
-+    
++
 +    If it's already installed, specify its path using --with-wolfssl=/dir/])
 +    fi
-+    
++
 +    AC_MSG_RESULT([yes])
 +    ENABLE_WOLFSSL="yes"
 +    DIGEST_SSL="digest-wolfssl.o"
@@ -168,7 +180,7 @@ index 35d1aca9..a202aa5e 100644
 +    AC_DEFINE([HAVE_EVP_SHA384], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([HAVE_EVP_SHA512], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([HAVE_OPENSSL_VERSION_NUM], [1], [Defined if using WolfSSL])
-+    
++
 +    # Dummy RSA method functions
 +    AC_DEFINE([HAVE_RSA_METH_SET_PRIV_ENC], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([HAVE_RSA_METH_SET_PRIV_DEC], [1], [Defined if using WolfSSL])
@@ -176,23 +188,23 @@ index 35d1aca9..a202aa5e 100644
 +    AC_DEFINE([HAVE_RSA_METH_SET_PUB_DEC], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([HAVE_RSA_METH_SET_FINISH], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([HAVE_EVP_PKEY_GET0_RSA], [1], [Defined if using WolfSSL])
-+    
++
 +    AC_DEFINE([OPENSSL_HAS_ECC], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([OPENSSL_HAS_NISTP256], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([OPENSSL_HAS_NISTP384], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([OPENSSL_HAS_NISTP521], [1], [Defined if using WolfSSL])
 +    AC_DEFINE([OPENSSL_HAVE_EVPCTR], [1], [Defined if using WolfSSL])
-+    
++
 +    # Leave in place in case we use this in the future, AC_COMPILE_IFELSE works
 +    # for now.
 +    #AC_CHECK_LIB([wolfssl], [wc_wolfHasAesni], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
-+    
++
 +    AC_MSG_CHECKING([is wolfssl configured with aesni])
 +    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
 +    #include <wolfssl/options.h>
 +    #ifndef WOLFSSL_AESNI
 +    # error macro not defined
-+    #endif 
++    #endif
 +    ]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
 +
 +    if test "x$wolf_has_aesni" == "xyes" ; then
@@ -228,7 +240,7 @@ index 35d1aca9..a202aa5e 100644
  saved_CPPFLAGS="$CPPFLAGS"
  saved_LDFLAGS="$LDFLAGS"
  AC_ARG_WITH([ssl-dir],
-@@ -3122,14 +3252,19 @@ else
+@@ -3122,14 +3259,19 @@ else
  	AC_CHECK_FUNCS([crypt])
  fi
  
@@ -250,18 +262,18 @@ index 35d1aca9..a202aa5e 100644
  	enable_sk="disabled; OpenSSL has no ECC support"
  fi
  if test "x$ac_cv_func_dlopen" != "xyes" ; then
-@@ -3338,7 +3473,9 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
+@@ -3338,7 +3480,9 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
  	AC_DEFINE([OPENSSL_PRNG_ONLY], [1],
  		[Define if you want the OpenSSL internally seeded PRNG only])
  	RAND_MSG="OpenSSL internal ONLY"
 -elif test "x$openssl" = "xno" ; then
 +elif test "x$ENABLE_WOLFSSL" = "xyes"; then
-+    AC_MSG_WARN([OpenSSH will use /dev/urandom or /dev/random as a source of random numbers. It will fail if both devices are not supported or accessible])	
++    AC_MSG_WARN([OpenSSH will use /dev/urandom or /dev/random as a source of random numbers. It will fail if both devices are not supported or accessible])
 +elif test "x$openssl" = "xno"; then
  	AC_MSG_WARN([OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible])
  else
  	AC_MSG_ERROR([OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options])
-@@ -3365,6 +3502,9 @@ AC_ARG_WITH([pam],
+@@ -3365,6 +3509,9 @@ AC_ARG_WITH([pam],
  			PAM_MSG="yes"
  
  			SSHDLIBS="$SSHDLIBS -lpam"
@@ -271,7 +283,7 @@ index 35d1aca9..a202aa5e 100644
  			AC_DEFINE([USE_PAM], [1],
  				[Define if you want to enable PAM support])
  
-@@ -5426,6 +5566,8 @@ AC_SUBST([TEST_SSH_UTF8], [$TEST_SSH_UTF8])
+@@ -5426,6 +5573,8 @@ AC_SUBST([TEST_SSH_UTF8], [$TEST_SSH_UTF8])
  AC_SUBST([TEST_MALLOC_OPTIONS], [$TEST_MALLOC_OPTIONS])
  AC_SUBST([UNSUPPORTED_ALGORITHMS], [$unsupported_algorithms])
  AC_SUBST([DEPEND], [$(cat $srcdir/.depend)])
@@ -280,7 +292,7 @@ index 35d1aca9..a202aa5e 100644
  
  CFLAGS="${CFLAGS} ${CFLAGS_AFTER}"
  LDFLAGS="${LDFLAGS} ${LDFLAGS_AFTER}"
-@@ -5492,13 +5634,13 @@ echo "         Solaris privilege support: $SPP_MSG"
+@@ -5492,13 +5641,13 @@ echo "         Solaris privilege support: $SPP_MSG"
  echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
  echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
  echo "                  BSD Auth support: $BSD_AUTH_MSG"
@@ -295,7 +307,7 @@ index 35d1aca9..a202aa5e 100644
  echo "              Host: ${host}"
  echo "          Compiler: ${CC}"
  echo "    Compiler flags: ${CFLAGS}"
-@@ -5538,3 +5680,20 @@ if test "$AUDIT_MODULE" = "bsm" ; then
+@@ -5538,3 +5687,20 @@ if test "$AUDIT_MODULE" = "bsm" ; then
  	echo "WARNING: BSM audit support is currently considered EXPERIMENTAL."
  	echo "See the Solaris section in README.platform for details."
  fi
@@ -317,15 +329,16 @@ index 35d1aca9..a202aa5e 100644
 +    echo ""
 +fi
 diff --git a/includes.h b/includes.h
-index 0fd71792..27bc07c4 100644
+index 0fd71792..52e664be 100644
 --- a/includes.h
 +++ b/includes.h
-@@ -164,6 +164,11 @@
+@@ -164,6 +164,12 @@
  # endif
  #endif
  
 +#ifdef USING_WOLFSSL
 +#include <wolfssl/options.h>
++#include <openssl/ssl.h>
 +#include <openssl/dh.h>
 +#endif
 +
