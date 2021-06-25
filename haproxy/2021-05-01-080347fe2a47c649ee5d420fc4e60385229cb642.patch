@@ -1,4 +1,4 @@
-From 51f39a16c498a47670716c02752b87f06eba5c83 Mon Sep 17 00:00:00 2001
+From a0f32c7c14333e1f8408138e3f0648fa456d6894 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Tue, 27 Apr 2021 14:55:50 +0200
 Subject: [PATCH] Patch for wolfSSL
@@ -43,7 +43,7 @@ VTEST_PROGRAM=/path/to/vtest/binary make reg-tests
 Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
 ---
  Makefile                                      |  43 ++++++-
- include/haproxy/openssl-compat.h              |   5 +
+ include/haproxy/openssl-compat.h              |   7 ++
  reg-tests/checks/ssl-hello-check.vtc          |   2 +-
  reg-tests/checks/tcp-check-ssl.vtc            |   2 +-
  reg-tests/checks/tls_health_checks.vtc        |  14 +--
@@ -74,11 +74,11 @@ Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
  reg-tests/ssl/ssl_server_samples.vtc          |   2 +-
  reg-tests/ssl/ssl_simple_crt-list.vtc         |   2 +-
  reg-tests/ssl/wrong_ctx_storage.vtc           |   2 +-
- src/haproxy.c                                 |  11 ++
+ src/haproxy.c                                 |  13 +++
  src/sample.c                                  |  10 +-
  src/ssl_ckch.c                                |   6 +
  src/ssl_sock.c                                |   9 +-
- 36 files changed, 115 insertions(+), 147 deletions(-)
+ 36 files changed, 119 insertions(+), 147 deletions(-)
 
 diff --git a/Makefile b/Makefile
 index 46ae734d9..910f27c43 100644
@@ -182,7 +182,7 @@ index 46ae734d9..910f27c43 100644
  %.o:	%.c $(DEP)
  	$(cmd_CC) $(COPTS) -c -o $@ $<
 diff --git a/include/haproxy/openssl-compat.h b/include/haproxy/openssl-compat.h
-index d26deccc6..e8b9c8a44 100644
+index d26deccc6..fa0d7396d 100644
 --- a/include/haproxy/openssl-compat.h
 +++ b/include/haproxy/openssl-compat.h
 @@ -2,6 +2,11 @@
@@ -197,6 +197,19 @@ index d26deccc6..e8b9c8a44 100644
  #include <openssl/bn.h>
  #include <openssl/crypto.h>
  #include <openssl/ssl.h>
+@@ -319,10 +324,12 @@ static inline void SSL_CTX_up_ref(SSL_CTX *ctx)
+ #define SSL_OP_CIPHER_SERVER_PREFERENCE 0
+ #endif
+ 
++#ifndef USE_WOLFSSL
+ #ifndef SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION   /* needs OpenSSL >= 0.9.7 */
+ #define SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION 0
+ #define SSL_renegotiate_pending(arg) 0
+ #endif
++#endif
+ 
+ #ifndef SSL_OP_SINGLE_ECDH_USE                          /* needs OpenSSL >= 0.9.8 */
+ #define SSL_OP_SINGLE_ECDH_USE 0
 diff --git a/reg-tests/checks/ssl-hello-check.vtc b/reg-tests/checks/ssl-hello-check.vtc
 index 7f8d9b90e..2cdabd846 100644
 --- a/reg-tests/checks/ssl-hello-check.vtc
@@ -627,7 +640,7 @@ index 849e8781e..d31a308f1 100644
  
  server s1 -repeat 3 {
 diff --git a/reg-tests/ssl/ssl_client_samples.vtc b/reg-tests/ssl/ssl_client_samples.vtc
-index ccefa7940..10223e2bb 100644
+index ccefa7940..c0e3a506c 100644
 --- a/reg-tests/ssl/ssl_client_samples.vtc
 +++ b/reg-tests/ssl/ssl_client_samples.vtc
 @@ -2,7 +2,7 @@
@@ -644,7 +657,7 @@ index ccefa7940..10223e2bb 100644
      expect resp.status == 200
      expect resp.http.x-ssl-der ~ 3082052D30820315020102300D0.*995ED3BE2BFB923A3EB71FA07002E
 -    expect resp.http.x-ssl-chain-der ~ 3082096B30820553A0030201020.*0237D08F425C8414A23D436415502
-+    expect resp.http.x-ssl-chain-der ~ 3082052D30820315020102300D0.*DA0CE7953F8C6777C785F7921F2D5
++    expect resp.http.x-ssl-chain-der ~ 308205CB308203B3A0030201020.*DA0CE7953F8C6777C785F7921F2D5
      expect resp.http.x-ssl-sha1 == "D9C3BAE37EA5A7EDB7B3C9BDD4DCB2FE58A412E4"
      expect resp.http.x-ssl-notafter == "500421185942Z"
      expect resp.http.x-ssl-notbefore == "200428185942Z"
@@ -714,18 +727,20 @@ index 9f0bdd789..e6dfa41ff 100644
  
  
 diff --git a/src/haproxy.c b/src/haproxy.c
-index 5d3e735e2..44835f317 100644
+index 5d3e735e2..1d2148ffa 100644
 --- a/src/haproxy.c
 +++ b/src/haproxy.c
-@@ -2590,12 +2590,23 @@ static void set_identity(const char *program_name)
+@@ -2590,12 +2590,25 @@ static void set_identity(const char *program_name)
  	}
  }
  
++#ifdef USE_WOLFSSL
 +static void logMsg(const int logLevel, const char* const msg)
 +{
 +    (void)logLevel;
 +    ha_notice("wolfSSL debug log: %s\n", msg);
 +}
++#endif
 +
  int main(int argc, char **argv)
  {
