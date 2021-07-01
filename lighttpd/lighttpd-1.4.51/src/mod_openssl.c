@@ -499,7 +499,7 @@ network_openssl_load_pemfile (server *srv, plugin_config *s, size_t ndx)
 static int
 network_openssl_ssl_conf_cmd (server *srv, plugin_config *s)
 {
-  #ifdef SSL_CONF_FLAG_CMDLINE
+  #if defined(SSL_CONF_FLAG_CMDLINE) && !defined(HAVE_WOLFSSL_SSL_H)
 
     int rc = 0;
     data_string *ds;
