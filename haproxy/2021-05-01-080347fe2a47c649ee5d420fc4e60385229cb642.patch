@@ -1,4 +1,4 @@
-From a0f32c7c14333e1f8408138e3f0648fa456d6894 Mon Sep 17 00:00:00 2001
+From 8b780a39f5fa221c96546cb43806f0f08fd156b4 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Tue, 27 Apr 2021 14:55:50 +0200
 Subject: [PATCH] Patch for wolfSSL
@@ -28,7 +28,7 @@ make install
 
 # Building HaProxy
 
-Compile HaProxy with (on linux):
+Compile HaProxy with wolfSSL (on linux):
 ```
 make TARGET=linux-glibc USE_WOLFSSL=1 USE_ZLIB=1 USE_LUA=1 USE_PCRE=1 USE_SYSTEMD=1
 ```
