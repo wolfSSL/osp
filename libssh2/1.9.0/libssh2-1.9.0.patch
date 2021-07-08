@@ -1,0 +1,194 @@
+diff --git a/Makefile.wolfSSL.inc b/Makefile.wolfSSL.inc
+new file mode 100644
+index 0000000..24fed51
+--- /dev/null
++++ b/Makefile.wolfSSL.inc
+@@ -0,0 +1,3 @@
++CRYPTO_CSOURCES = openssl.c
++CRYPTO_HHEADERS = openssl.h
++CRYPTO_LTLIBS = -lwolfssl
+diff --git a/configure.ac b/configure.ac
+index fe5054a..3534959 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -102,6 +102,26 @@ AC_ARG_WITH([crypto],
+   use_crypto=auto
+ )
+ 
++AC_ARG_WITH([wolfssl],
++  AC_HELP_STRING([--with-wolfssl],[Use wolfSSL for crypto.]),
++  [
++    wolfssl_path_set=yes
++    wolfssl_path=$withval
++    use_crypto=wolfssl
++  ],
++  [
++    wolfssl_path_set=no
++  ]
++)
++
++# wolfSSL uses a bespoke approach rather than adding a case stanza to
++# LIBSSH2_CHECK_CRYPTO. This is because AC_LIB_HAVE_LINKFLAGS will instruct the
++# linker to embed the rpath to libwolfssl.so in libssh2. This causes problems
++# when, for example, you're cross-compiling in a Yocto context and the path to
++# libwolfssl at build time will not be the same as the one needed at runtime.
++# One can use --disable-rpath to get around this, but the result is that the
++# compiler is just given the direct path to libwolfssl.so on the build host,
++# which has the same problem.
+ case "${use_crypto}" in
+   auto|m4_set_contents([crypto_backends], [|]))
+     m4_set_map([crypto_backends], [LIBSSH2_CHECK_CRYPTO])
+@@ -109,6 +129,25 @@ case "${use_crypto}" in
+   yes|"")
+     crypto_errors="No crypto backend specified!"
+     ;;
++  wolfssl)
++    if test "$wolfssl_path_set" = "no"; then
++      AC_MSG_ERROR([Unable to find wolfssl, must provide path with --with-wolfssl=PATH.])
++    else
++      AC_CHECK_HEADER([wolfssl/options.h])
++      if test "$ac_cv_header_wolfssl_options_h" = "yes"; then
++        AC_DEFINE(LIBSSH2_OPENSSL, 1, [Use openssl])
++        AC_DEFINE(LIBSSH2_WOLFSSL, 1, [Use $1])
++        AC_DEFINE(HAVE_EVP_AES_128_CTR)
++        CPPFLAGS="$CPPFLAGS${CPPFLAGS:+ }-I$wolfssl_path/include -I$wolfssl_path/include/wolfssl"
++        LDFLAGS="$LDFLAGS${LDFLAGS:+ }-L$wolfssl_path/lib"
++        LIBSREQUIRED="$LIBSREQUIRED${LIBSREQUIRED:+ }libwolfssl"
++        found_crypto=wolfssl
++        AM_CONDITIONAL([WOLFSSL], [true])
++      else
++        AC_MSG_ERROR([Unable to find wolfssl header options.h.])
++      fi
++    fi
++    ;;
+   *)
+     crypto_errors="Unknown crypto backend '${use_crypto}' specified!"
+     ;;
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 31d58ed..46cb88c 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -5,6 +5,9 @@ AUTOMAKE_OPTIONS = foreign nostdinc
+ if OPENSSL
+ include ../Makefile.OpenSSL.inc
+ endif
++if WOLFSSL
++include ../Makefile.wolfSSL.inc
++endif
+ if LIBGCRYPT
+ include ../Makefile.libgcrypt.inc
+ endif
+diff --git a/src/openssl.c b/src/openssl.c
+index 04d5ec2..3d5aabb 100644
+--- a/src/openssl.c
++++ b/src/openssl.c
+@@ -426,6 +426,13 @@ _libssh2_cipher_crypt(_libssh2_cipher_ctx * ctx,
+     ret = EVP_Cipher(*ctx, buf, block, blocksize);
+ #else
+     ret = EVP_Cipher(ctx, buf, block, blocksize);
++#endif
++#ifdef LIBSSH2_WOLFSSL
++    /* wolfSSL's implementation of EVP_Cipher returns the number of encrypted/
++     * decrypted bytes on success and -1 on failure. */
++    if (ret == (int)blocksize) {
++        ret = 1;
++    }
+ #endif
+     if(ret == 1) {
+         memcpy(block, buf, blocksize);
+diff --git a/src/openssl.h b/src/openssl.h
+index 15518e0..fcb6970 100644
+--- a/src/openssl.h
++++ b/src/openssl.h
+@@ -37,6 +37,19 @@
+  * OF SUCH DAMAGE.
+  */
+ 
++#ifdef LIBSSH2_WOLFSSL
++
++/* This prevents libssh2 from attempting to call any engine functions. wolfSSL
++ * doesn't have support for OpenSSL-style engines. */
++#ifndef OPENSSL_NO_ENGINE
++#define OPENSSL_NO_ENGINE
++#endif
++
++#include <wolfssl/options.h>
++#include <openssl/ecdh.h>
++
++#endif /* LIBSSH2_WOLFSSL */
++
+ #include <openssl/opensslconf.h>
+ #include <openssl/sha.h>
+ #include <openssl/rsa.h>
+@@ -66,7 +79,8 @@
+ # define LIBSSH2_RSA 1
+ #endif
+ 
+-#ifdef OPENSSL_NO_DSA
++#if defined(OPENSSL_NO_DSA) || (defined(LIBSSH2_WOLFSSL) && (defined(NO_DSA) \
++ || defined(HAVE_FIPS)))
+ # define LIBSSH2_DSA 0
+ #else
+ # define LIBSSH2_DSA 1
+@@ -79,20 +93,22 @@
+ #endif
+ 
+ #if OPENSSL_VERSION_NUMBER >= 0x10101000L && \
+-!defined(LIBRESSL_VERSION_NUMBER)
++    !defined(LIBRESSL_VERSION_NUMBER) && !defined(LIBSSH2_WOLFSSL)
+ # define LIBSSH2_ED25519 1
+ #else
+ # define LIBSSH2_ED25519 0
+ #endif
+ 
+ 
+-#ifdef OPENSSL_NO_MD5
++#if defined(OPENSSL_NO_MD5) || (defined(LIBSSH2_WOLFSSL) && \
++    (defined(HAVE_FIPS) || defined(NO_MD5)))
+ # define LIBSSH2_MD5 0
+ #else
+ # define LIBSSH2_MD5 1
+ #endif
+ 
+-#ifdef OPENSSL_NO_RIPEMD
++#if defined(OPENSSL_NO_RIPEMD) || (defined(LIBSSH2_WOLFSSL) && \
++    (defined(HAVE_FIPS) || !defined(WOLFSSL_RIPEMD)))
+ # define LIBSSH2_HMAC_RIPEMD 0
+ #else
+ # define LIBSSH2_HMAC_RIPEMD 1
+@@ -101,7 +117,8 @@
+ #define LIBSSH2_HMAC_SHA256 1
+ #define LIBSSH2_HMAC_SHA512 1
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x00907000L && !defined(OPENSSL_NO_AES)
++#if (OPENSSL_VERSION_NUMBER >= 0x00907000L && !defined(OPENSSL_NO_AES)) || \
++    (defined(LIBSSH2_WOLFSSL) && defined(WOLFSSL_AES_COUNTER))
+ # define LIBSSH2_AES_CTR 1
+ # define LIBSSH2_AES 1
+ #else
+@@ -109,19 +126,22 @@
+ # define LIBSSH2_AES 0
+ #endif
+ 
+-#ifdef OPENSSL_NO_BF
++/* wolfSSL doesn't support Blowfish. */
++#if defined(OPENSSL_NO_BF) || defined(LIBSSH2_WOLFSSL)
+ # define LIBSSH2_BLOWFISH 0
+ #else
+ # define LIBSSH2_BLOWFISH 1
+ #endif
+ 
+-#ifdef OPENSSL_NO_RC4
++#if defined(OPENSSL_NO_RC4) || (defined(LIBSSH2_WOLFSSL) && \
++    (defined(HAVE_FIPS) || defined(NO_RC4)))
+ # define LIBSSH2_RC4 0
+ #else
+ # define LIBSSH2_RC4 1
+ #endif
+ 
+-#ifdef OPENSSL_NO_CAST
++/* wolfSSL doesn't support CAST. */
++#if defined(OPENSSL_NO_CAST) || defined(LIBSSH2_WOLFSSL)
+ # define LIBSSH2_CAST 0
+ #else
+ # define LIBSSH2_CAST 1
