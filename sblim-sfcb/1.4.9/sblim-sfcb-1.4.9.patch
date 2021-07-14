@@ -1,0 +1,106 @@
+diff --git a/configure.ac b/configure.ac
+index ab2964e..5bc41b2 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -46,6 +46,16 @@ AC_ARG_ENABLE(ssl,
+ 	[AC_HELP_STRING([--enable-ssl],
+ 		[include ssl support for SFCB.])])
+ 
++AC_ARG_WITH(wolfssl,
++    AS_HELP_STRING([--with-wolfssl]=DIR,
++          [use wolfSSL (located in directory DIR)]),
++[
++   USE_WOLFSSL=yes
++   WOLFSSL_PREFIX=${withval}],
++[
++   USE_WOLFSSL=no
++])
++
+ AC_ARG_ENABLE(slp,
+ 	[AC_HELP_STRING([--enable-slp],
+ 		[include slp agent for SFCB.])])
+@@ -487,7 +497,15 @@ fi
+ AC_SUBST(LOAD_INDICATION_PROVIDER)
+ 
+ if test "$enable_ssl" = "yes"; then
+-   AC_CHECK_LIB(ssl,main)
++   if test "$USE_WOLFSSL" = "yes"; then
++      AC_DEFINE(HAVE_LIBSSL, 1, [])
++      AC_CHECK_LIB(wolfssl,wolfSSL_OPENSSL_init_ssl)
++      SFCB_LDFLAGS="-L${WOLFSSL_PREFIX}/lib $SFCB_LDFLAGS"
++      SFCB_CPPFLAGS="-I${WOLFSSL_PREFIX}/include -I${WOLFSSL_PREFIX}/include/wolfssl $SFCB_CPPFLAGS"
++      LIBS="-lwolfssl $LIBS"
++   else
++      AC_CHECK_LIB(ssl,main)
++   fi
+    SFCB_CONF_HTTPS=true
+    SFCB_CONF_HTTP=false
+ else
+diff --git a/genSslCert.sh b/genSslCert.sh
+index 9bf6320..f7e8b96 100644
+--- a/genSslCert.sh
++++ b/genSslCert.sh
+@@ -1,6 +1,6 @@
+ #!/bin/sh
+ TARGETDIR=${1:-.}
+-HOSTNAME=`uname -n`
++HOSTNAME=localhost
+ DO_SERVER=yes
+ DO_CLIENT=yes
+ DIR=`mktemp -d /var/tmp/sfcb.XXXXXX` || exit 1
+diff --git a/getSchema.sh.pre.in b/getSchema.sh.pre.in
+index 15b2c4d..26b9779 100644
+--- a/getSchema.sh.pre.in
++++ b/getSchema.sh.pre.in
+@@ -78,7 +78,7 @@ fetch_mof()
+     then
+         if [ -x /usr/bin/curl ]
+         then 
+-  	    /usr/bin/curl -o $TMPZIP $MOFZIPURL
++           /usr/bin/curl -L -o $TMPZIP $MOFZIPURL
+         else
+             echo "Need curl to get CIM schema files." 1>&2
+             return 1
+diff --git a/httpComm.c b/httpComm.c
+index 70288ae..aeed155 100644
+--- a/httpComm.c
++++ b/httpComm.c
+@@ -50,6 +50,10 @@ commInit()
+     }
+     SSL_load_error_strings();
+     RAND_load_file("/dev/urandom", 1024);
++
++  #if HAVE_LIBWOLFSSL && defined(DEBUG_WOLFSSL)
++    wolfSSL_Debugging_ON();
++  #endif
+   }
+ 
+   _SFCB_EXIT();
+diff --git a/httpComm.h b/httpComm.h
+index db214ae..3454541 100644
+--- a/httpComm.h
++++ b/httpComm.h
+@@ -54,6 +54,9 @@
+ #endif
+ 
+ #ifdef USE_SSL
++#if HAVE_LIBWOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/rand.h>
+ #include <openssl/ssl.h>
+ #include <openssl/err.h>
+diff --git a/sfcCertificateAuthentication.c b/sfcCertificateAuthentication.c
+index 7f3dd2e..250791e 100644
+--- a/sfcCertificateAuthentication.c
++++ b/sfcCertificateAuthentication.c
+@@ -27,6 +27,9 @@
+ 
+ #ifdef HAVE_LIBSSL
+ #include <stdlib.h>
++#if HAVE_LIBWOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/x509.h>
+ 
+ #include <sys/types.h>
