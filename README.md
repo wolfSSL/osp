@@ -24,11 +24,14 @@ Each project port included in this repository is contained in its own subdirecto
 | :--- | :--- | :--- | :--- | :--- |
 | apache-httpd | Apache HTTP Server | [Link](https://httpd.apache.org/) | [Link](https://www.wolfssl.com/support-apache-httpd-2-4-46-2/) | [README](./apache-httpd/README.md) |
 | asio | Asio C++ Library | [Link](http://think-async.com/Asio/) | [Link](https://www.wolfssl.com/wolfssl-support-asio-boost-asio-c-libraries/) | [README](./asio/asio/README) |
-| freeradius-server | FreeRADIUS Server Project | [Link](https://freeradius.org/) | | |
+| cjose | JOSE for C/C++ | [Link](https://github.com/cisco/cjose) | [Link](https://www.wolfssl.com/wolfssl-cisco-cjose-port/) | [README](./cjose/README) |
+| freeradius-server | FreeRADIUS Server Project | [Link](https://freeradius.org/) | | [README](.freeradius-server-2.1.12/README) |
+| haproxy | HAProxy | [Link](https://www.haproxy.org/) |  | [README](./haproxy/README) |
 | libest | Cisco EST stack written in C | [Link](https://github.com/cisco/libest) | [Link](https://www.wolfssl.com/wolfssl-cisco-libest-port/) | [README](./libest/README) |
 | libsignal-protocol-c | Signal Protocol C Library | [Link](https://github.com/signalapp/libsignal-protocol-c) | [Link](https://www.wolfssl.com/wolfssl-use-with-signal/) | [README](./libsignal-protocol-c/README.md) |
 | lighttpd | lighttpd web server | [Link](https://www.lighttpd.net/) | [Link](https://www.wolfssl.com/lighttpd-support-wolfssl/) | [README](./lighttpd/README) |
 | openldap | OpenLDAP | [Link](https://www.openldap.org/) | | [README](./openldap/2.4.47/README.md) |
+| openresty | OpenResty | [Link](https://openresty.org/en/) | | [README](./openresty/INSTRUCTIONS.md) |
 | openssh-patches | OpenSSH | [Link](https://www.openssh.com/) | [Link](https://www.wolfssl.com/wolfssl-openssh-expanded-openssl-compatibility/) | [README](./openssh-patches/README) |
 | ppp | Paul's PPP Package | [Link](https://ppp.samba.org/) | | [README](./ppp/README) |
 | qt | Qt | [Link](https://www.qt.io/) | [Link](https://www.wolfssl.com/building-qt-with-wolfssl/) | [README](./qt/README.md) |
@@ -36,7 +39,7 @@ Each project port included in this repository is contained in its own subdirecto
 | stunnel | stunnel Proxy | [Link](https://www.stunnel.org/) | [Link](https://www.wolfssl.com/securing-stunnel-tls-1-3/) | 5.57 Unix [README](./stunnel/5.57/README_UNIX.md)<br/>5.57 Windows [README](./stunnel/5.57/README_WIN.md) |
 | urllib3 | urllib3 HTTP client for Python | [Link](https://github.com/urllib3/urllib3) | | [README](./urllib3/README.rst) |
 | websocket-client | WebSocket client for python | [Link](https://github.com/websocket-client/websocket-client) | | [README](./websocket-client/README.rst) |
-| websocketpp | WebSocket++ | [Link](https://www.zaphoyd.com/projects/websocketpp/) | [Link](https://www.wolfssl.com/building-websocket-wolfssl-support/) | [README](websocketpp/readme.md) | 
+| websocketpp | WebSocket++ | [Link](https://www.zaphoyd.com/projects/websocketpp/) | [Link](https://www.wolfssl.com/building-websocket-wolfssl-support/) | [README](websocketpp/readme.md) |
 
 # Licensing
 
@@ -47,4 +50,3 @@ All non-wolfSSL projects in this repository are licensed under their respective 
 # Support
 
 For support or build issues, please contact the wolfSSL support team at support@wolfssl.com.
-
