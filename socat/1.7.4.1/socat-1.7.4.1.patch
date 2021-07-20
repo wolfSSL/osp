@@ -1,22 +1,21 @@
 diff --git a/config.h.in b/config.h.in
-index 7292c01..4e6da7f 100644
+index 7292c01..bf1daef 100644
 --- a/config.h.in
 +++ b/config.h.in
-@@ -686,6 +686,9 @@
+@@ -686,6 +686,8 @@
  #undef WITH_FS
  #undef WITH_OPENSSL
  #undef WITH_OPENSSL_METHOD
 +#undef WITH_WOLFSSL
-+#undef WITH_WOLFSSL_DEBUG
 +#undef OPENSSL_NO_COMP
  #undef WITH_RES_DEPRECATED 	/* AAONLY,PRIMARY */
  #define WITH_STREAMS 1
  #undef WITH_FIPS
 diff --git a/configure.ac b/configure.ac
-index 53cebbd..0c4f4b7 100644
+index 53cebbd..6f6558e 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -497,233 +497,322 @@ if test -n "$WITH_READLINE"; then
+@@ -497,233 +497,313 @@ if test -n "$WITH_READLINE"; then
    fi
  fi
  
@@ -152,15 +151,6 @@ index 53cebbd..0c4f4b7 100644
 +    ],
 +    [AC_MSG_RESULT([no])]
 +)
-+
-+AC_ARG_ENABLE([wolfssldebug],
-+    [  --enable-wolfssldebug   Enable wolfSSL debugging information (default: disabled)],
-+    [ ENABLED_WOLFSSLDEBUG=$enableval ],
-+    [ ENABLED_WOLFSSLDEBUG=$no ])
-+if test "x$ENABLED_WOLFSSLDEBUG" = "xyes"
-+then
-+    AC_DEFINE([WITH_WOLFSSL_DEBUG])
-+fi
 +
 +if test "$WITH_WOLFSSL" = "no"
 +then
@@ -550,7 +540,7 @@ index 53cebbd..0c4f4b7 100644
  fi
  
  AC_MSG_CHECKING(whether to include tun/tap address support)
-@@ -1506,51 +1595,54 @@ AC_CHECK_FUNC(setenv, AC_DEFINE(HAVE_SETENV),
+@@ -1506,51 +1586,54 @@ AC_CHECK_FUNC(setenv, AC_DEFINE(HAVE_SETENV),
  dnl Search for unsetenv()
  AC_CHECK_FUNC(unsetenv, AC_DEFINE(HAVE_UNSETENV))
  
@@ -650,7 +640,7 @@ index 53cebbd..0c4f4b7 100644
  
  
  dnl Run time checks
-@@ -2059,18 +2151,21 @@ if test "$GCC" = yes; then
+@@ -2059,18 +2142,21 @@ if test "$GCC" = yes; then
     CFLAGS="$CFLAGS"
  fi
  
@@ -684,7 +674,7 @@ index 53cebbd..0c4f4b7 100644
  fi
  AC_SUBST(FIPSLD_CC)
  
-@@ -2101,7 +2196,7 @@ AC_MSG_RESULT($sc_cv_var_environ)
+@@ -2101,7 +2187,7 @@ AC_MSG_RESULT($sc_cv_var_environ)
  if test "$BUILD_DATE"; then
    AC_DEFINE_UNQUOTED(BUILD_DATE, ["$BUILD_DATE"])
  else
@@ -736,7 +726,7 @@ index 4170f27..ee294ef 100644
  #include <openssl/err.h>
  #include <openssl/rand.h>
 diff --git a/xio-openssl.c b/xio-openssl.c
-index bc22b8c..0133f66 100644
+index bc22b8c..e9dfb65 100644
 --- a/xio-openssl.c
 +++ b/xio-openssl.c
 @@ -167,7 +167,11 @@ int xio_reset_fips_mode(void) {
@@ -786,14 +776,68 @@ index bc22b8c..0133f66 100644
  
     openssl_delete_cert_info();
  
-+#ifdef WITH_WOLFSSL_DEBUG
++#if defined(WITH_WOLFSSL) && defined(DEBUG_WOLFSSL)
 +   wolfSSL_Debugging_ON();
 +#endif
 +
     /* OpenSSL preparation */
  #if HAVE_OPENSSL_init_ssl
     {
-@@ -1412,7 +1430,7 @@ static int openssl_SSL_ERROR_SSL(int level, const char *funcname) {
+@@ -991,7 +1009,13 @@ int
+ #endif
+ #if HAVE_SSLv23_client_method
+ 	 } else if (!strcasecmp(me_str, "SSL23")) {
+-	    method = sycSSLv23_client_method();
++    #if defined(WITH_WOLFSSL) && defined(WOLFSSL_TLS13)
++      /* Can't use sycSSLv23_client_method because wolfSSL will default to
++       * TLS 1.3, which doesn't work with socat." */
++       method = sycTLSv1_2_client_method();
++    #else
++       method = sycSSLv23_client_method();
++    #endif
+ #endif
+ #if HAVE_TLSv1_client_method
+ 	 } else if (!strcasecmp(me_str, "TLS1") || !strcasecmp(me_str, "TLS1.0")) {
+@@ -1019,9 +1043,9 @@ int
+ 	    Error1("openssl-method=\"%s\": method unknown or not provided by library", me_str);
+ 	 }
+       } else if (!*use_dtls) {
+-#if   HAVE_TLS_client_method
++#if   HAVE_TLS_client_method && !(defined(WITH_WOLFSSL) && defined(WOLFSSL_TLS13))
+ 	 method = sycTLS_client_method();
+-#elif HAVE_SSLv23_client_method
++#elif HAVE_SSLv23_client_method && !(defined(WITH_WOLFSSL) && defined(WOLFSSL_TLS13))
+ 	 method = sycSSLv23_client_method();
+ #elif HAVE_TLSv1_2_client_method
+ 	 method = sycTLSv1_2_client_method();
+@@ -1062,7 +1086,13 @@ int
+ #endif
+ #if HAVE_SSLv23_server_method
+ 	 } else if (!strcasecmp(me_str, "SSL23")) {
+-	    method = sycSSLv23_server_method();
++    #if defined(WITH_WOLFSSL) && defined(WOLFSSL_TLS13)
++       /* Can't use sycSSLv23_server_method because wolfSSL will default to
++        * TLS 1.3, which doesn't work with socat." */
++       method = sycTLSv1_2_server_method();
++    #else
++       method = sycSSLv23_server_method();
++    #endif
+ #endif
+ #if HAVE_TLSv1_server_method
+ 	 } else if (!strcasecmp(me_str, "TLS1") || !strcasecmp(me_str, "TLS1.0")) {
+@@ -1090,9 +1120,9 @@ int
+ 	    Error1("openssl-method=\"%s\": method unknown or not provided by library", me_str);
+ 	 }
+       } else if (!*use_dtls) {
+-#if   HAVE_TLS_server_method
++#if   HAVE_TLS_server_method && !(defined(WITH_WOLFSSL) && defined(WOLFSSL_TLS13))
+ 	 method = sycTLS_server_method();
+-#elif HAVE_SSLv23_server_method
++#elif HAVE_SSLv23_server_method && !(defined(WITH_WOLFSSL) && defined(WOLFSSL_TLS13))
+ 	 method = sycSSLv23_server_method();
+ #elif HAVE_TLSv1_2_server_method
+ 	 method = sycTLSv1_2_server_method();
+@@ -1412,7 +1442,7 @@ static int openssl_SSL_ERROR_SSL(int level, const char *funcname) {
        Debug1("ERR_get_error(): %lx", e);
        if
  	 (
@@ -802,7 +846,7 @@ index bc22b8c..0133f66 100644
  	  0  /* BoringSSL's RNG always succeeds. */
  #elif defined(HAVE_RAND_status)
  	  ERR_GET_LIB(e) == ERR_LIB_RAND && RAND_status() != 1
-@@ -1885,9 +1903,14 @@ static int xioSSL_connect(struct single *xfd, const char *opt_commonname,
+@@ -1885,9 +1915,14 @@ static int xioSSL_connect(struct single *xfd, const char *opt_commonname,
  	    Msg(level, "I/O error");	/*!*/
  	    while (err = ERR_get_error()) {
  	       ERR_error_string_n(err, error_string, sizeof(error_string));
@@ -820,7 +864,7 @@ index bc22b8c..0133f66 100644
  	    }
  	 }
  	 status = STAT_RETRYLATER;
-@@ -1945,9 +1968,14 @@ ssize_t xioread_openssl(struct single *pipe, void *buff, size_t bufsiz) {
+@@ -1945,9 +1980,14 @@ ssize_t xioread_openssl(struct single *pipe, void *buff, size_t bufsiz) {
  	    Error("I/O error");	/*!*/
  	    while (err = ERR_get_error()) {
  	       ERR_error_string_n(err, error_string, sizeof(error_string));
@@ -838,7 +882,7 @@ index bc22b8c..0133f66 100644
  	    }
  	 }
  	 break;
-@@ -2004,9 +2032,14 @@ ssize_t xiowrite_openssl(struct single *pipe, const void *buff, size_t bufsiz) {
+@@ -2004,9 +2044,14 @@ ssize_t xiowrite_openssl(struct single *pipe, const void *buff, size_t bufsiz) {
  	    Error("I/O error");	/*!*/
  	    while (err = ERR_get_error()) {
  	       ERR_error_string_n(err, error_string, sizeof(error_string));
