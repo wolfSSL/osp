@@ -5,7 +5,7 @@
 + Unarchive this tar ball with `tar xvf socat-1.7.3.4.tar.gz`.
 + Apply the socat-1.7.3.4.patch file with `patch -p1 < socat-1.7.3.4.patch` (assuming the patch file is in the socat-1.7.3.4 directory; adjust the path according to your situation).
 + Regenerate the configure script with `autoconf`.
-+ Configure socat with `./configure --with-wolfssl=/usr/local`. Update the path if you've installed wolfSSL using a different prefix than /usr/local. Add `--enable-wolfssldebug` if you're debugging.
++ Configure socat with `./configure --with-wolfssl=/usr/local`. Update the path if you've installed wolfSSL using a different prefix than /usr/local.
 + Run `make clean` and `make` to compile. I'm not sure exactly how socat has set up its Makefile stuff, but I've found you typically have to run `make clean` before re-compiling. Otherwise, any changes you make won't be picked up, and make will think it has nothing to do.
 + At this point, you can optionally install into /usr/local with `make install`. The example below assumes you're running socat from the socat-1.7.3.4 directory, though.
 
