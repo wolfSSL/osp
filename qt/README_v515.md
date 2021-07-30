@@ -1,4 +1,4 @@
-# wolfSSL Support for Qt 5.15.2
+# wolfSSL Support for Qt 5.15
 ## Building
 Requirements:
 * Linux environment - this version was tested on 20.04.2 LTS (GNU/Linux 5.4.0-67-generic x86_64)
@@ -26,7 +26,7 @@ LOAD_FLAG_IGNORE_ZEROFILE
 make
 make install
 ```
-4. export wolfSSL library for linking:
+4. Export wolfSSL library for linking:
 ```
 export WOLFSSL_LIBS="-L/path/to/wolfssl-install/lib -lwolfssl"
 ```
@@ -41,7 +41,7 @@ LD_LIBRARY_PATH=/path/to/wolfssl\install/lib:$LD_LIBRARY_PATH
 
 1. Clone Qt library from base directory:
 ```
-git clone git://code.qt.io/qt/qt5.git --branch v5.15.2 
+git clone git://code.qt.io/qt/qt5.git --branch v5.15.x 
 ```
 
 2. Checkout Qt version and init repository:
@@ -50,27 +50,35 @@ cd qt5
 ./init-repository --module-subset=qtbase
 ```
 
-3. Apply patch:
+3. Apply patch to Qt5
 ```
-wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/wolfssl-qt-5152.patch
+wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/wolfssl-qt-515.patch
 cd qtbase
-git apply -v ../wolfssl-qt-5152.patch
+git apply -v ../wolfssl-qt-515.patch
 ```
-4. Add Unit test program(Optional):
-```
-Download patch and unit test program
-wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/wolfssl-qt-5152-unit-test.patch
-wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/qssl_wolf.zip
-unzip qssl_wolf.zip
-````
-```
-apply patch
-git apply -v ../wolfssl-qt-5152_unit_test.patch
-copy qssl_wolf folder to /path/to/qt5/qtbase/tests/auto/network/ssl
-copy crt, key and pem files from /path/to/qt5/qtbase/tests/auto/network/ssl/qsslsocket/certs to \
-   /path/to/qt5/qtbase/tests/auto/network/ssl/qssl_wolf/certs folder
-```
-5. Configure:
+4. Add unit test program(Optional):
+
+   4-1. Clone the OSP repository to get unit test program
+   ```
+   git clone https://github.com/wolfssl/osp.git /path/to/clone-osp-folder
+   ```
+   4-2. Download patch and get unit test program
+   ```
+   cd /path/to/qt5
+   wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/wolfssl-qt-515-unit-test.patch
+   ```
+   4-3. Apply patch
+   ```
+   cd qtbase
+   git apply -v ../wolfssl-qt-515_unit_test.patch
+   ```
+   4-4. Copy unit test folder and certificate files
+   ```
+   copy /path/to/osp-repo/qt/qssl_wolf folder to /path/to/qt5/qtbase/tests/auto/network/ssl
+   copy crt, key and pem files from /path/to/qt5/qtbase/tests/auto/network/ssl/qsslsocket/certs to \
+        /path/to/qt5/qtbase/tests/auto/network/ssl/qssl_wolf/certs folder
+   ```
+5. Configure Qt5
 ```
 cd ../../
 mkdir build
@@ -79,7 +87,7 @@ cd ./build
 -I/path/to/wolfssl-install/include/wolfssl -I/path/to/wolfssl-install/include
 ```
 
-5. Build and install
+6. Build and install
 ```
 make -j4
 ```
@@ -93,14 +101,16 @@ make check
 
 ### SSL unit tests
 
-The Qt SSL unit tests can be found from the root qt5 directory: `qt5/qtbase/tests/auto/network/ssl/`
+The Qt SSL unit tests can be found from the root qt5 directory: 
+
+`qt5/qtbase/tests/auto/network/ssl/`
 
 To run a single SSL test (i.e. qsslcipher) from the test ssl directory:
 ```
 ./qsslcipher
 ```
 
-#### wolfSSL unite test
+#### wolfSSL unit test
 When you set up wolfSSL unit test, please prepare the following step before it runs:
 1. Prepare a PC to run OpenSSL command
 2. Copy server-cert.pem and server-key.pem in qssl_wolf folder to the PC
@@ -117,4 +127,3 @@ $ openssl s_server -accept 11111 -key /path/to/server-key.pem -cert /path/to/ser
 ```
 make check -C qssl_wolf
 ```
-

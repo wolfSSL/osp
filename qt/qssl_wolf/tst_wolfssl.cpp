@@ -127,7 +127,7 @@ private slots:
     void wildcardCertificateNames();
     void isMatchingHostname();
     
-    /* serve 2 */
+    /* server 2 */
     void setEmptyKey();
     void spontaneousWrite();
     void setReadBufferSize();
@@ -413,7 +413,7 @@ bool tst_QSslWolfSSL::isMatchingHostname(const QSslCertificate &cert, const QStr
     if (!hostAddress.isNull()) {
         const auto subjectAlternativeNames = cert.subjectAlternativeNames();
         const auto ipAddresses = subjectAlternativeNames.equal_range(QSsl::AlternativeNameEntryType::IpAddressEntry);
-        //qDebug() << "subjectAlternativeNames " << subjectAlternativeNames;
+        qDebug() << "subjectAlternativeNames " << subjectAlternativeNames;
         
         for (auto it = ipAddresses.first; it != ipAddresses.second; it++) {
             qDebug() << "ipAddresses " << (*it);
