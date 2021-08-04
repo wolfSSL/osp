@@ -1,0 +1,572 @@
+diff --git a/cmake/mariadb_connector_c.cmake b/cmake/mariadb_connector_c.cmake
+index a9b103345cd..0daa8ad7b26 100644
+--- a/cmake/mariadb_connector_c.cmake
++++ b/cmake/mariadb_connector_c.cmake
+@@ -8,7 +8,9 @@ SET(CONC_WITH_SIGNCODE ${SIGNCODE})
+ SET(SIGN_OPTIONS ${SIGNTOOL_PARAMETERS})
+ SET(CONC_WITH_EXTERNAL_ZLIB ON)
+ 
+-IF(SSL_DEFINES MATCHES "WOLFSSL")
++if(SSL_DEFINES MATCHES "SYSTEM_WOLFSSL")
++  SET(CONC_WITH_SSL "SYSTEM_WOLFSSL")
++ELSEIF(SSL_DEFINES MATCHES "WOLFSSL")
+   IF(WIN32)
+     SET(CONC_WITH_SSL "SCHANNEL")
+   ELSE()
+diff --git a/cmake/ssl.cmake b/cmake/ssl.cmake
+index 5f54d77752c..7867f4326b5 100644
+--- a/cmake/ssl.cmake
++++ b/cmake/ssl.cmake
+@@ -36,6 +36,8 @@
+ # in order to find the .dll files at runtime.
+ 
+ SET(WITH_SSL_DOC "bundled (use wolfssl)")
++SET(WITH_SSL_DOC
++  "${WITH_SSL_DOC}, system-wolfssl (use system wolfssl)")
+ SET(WITH_SSL_DOC
+   "${WITH_SSL_DOC}, yes (prefer os library if present, otherwise use bundled)")
+ SET(WITH_SSL_DOC
+@@ -47,13 +49,31 @@ MACRO (CHANGE_SSL_SETTINGS string)
+   SET(WITH_SSL ${string} CACHE STRING ${WITH_SSL_DOC} FORCE)
+ ENDMACRO()
+ 
++MACRO (MYSQL_USE_SYSTEM_WOLFSSL)
++  find_path(WOLFSSL_INCLUDE_DIR wolfssl/options.h)
++  SET(INC_DIRS
++    ${WOLFSSL_INCLUDE_DIR}
++    ${WOLFSSL_INCLUDE_DIR}/wolfssl
++  )
++  SET(SSL_LIBRARIES wolfssl)
++  SET(SSL_INCLUDE_DIRS ${INC_DIRS})
++  SET(SSL_DEFINES "-DHAVE_OPENSSL -DHAVE_WOLFSSL -DHAVE_SYSTEM_WOLFSSL")
++  SET(HAVE_ERR_remove_thread_state ON CACHE INTERNAL "wolfssl doesn't have ERR_remove_thread_state")
++  SET(HAVE_EncryptAes128Ctr OFF CACHE INTERNAL "wolfssl does support AES-CTR, but differently from openssl")
++  SET(HAVE_EncryptAes128Gcm OFF CACHE INTERNAL "wolfssl does not support AES-GCM")
++  SET(HAVE_X509_check_host ON CACHE INTERNAL  "wolfssl does support X509_check_host")
++  CHANGE_SSL_SETTINGS("system-wolfssl")
++  ADD_SUBDIRECTORY(extra/system-wolfssl)
++  MESSAGE_ONCE(SSL_LIBRARIES "SSL_LIBRARIES = ${SSL_LIBRARIES}")
++ENDMACRO()
++
+ MACRO (MYSQL_USE_BUNDLED_SSL)
+   SET(INC_DIRS
+     ${CMAKE_BINARY_DIR}/extra/wolfssl
+     ${CMAKE_SOURCE_DIR}/extra/wolfssl/wolfssl
+     ${CMAKE_SOURCE_DIR}/extra/wolfssl/wolfssl/wolfssl
+   )
+-  SET(SSL_LIBRARIES  wolfssl wolfcrypt)
++  SET(SSL_LIBRARIES wolfssl)
+   SET(SSL_INCLUDE_DIRS ${INC_DIRS})
+   SET(SSL_DEFINES "-DHAVE_OPENSSL -DHAVE_WOLFSSL  -DWOLFSSL_USER_SETTINGS")
+   SET(HAVE_ERR_remove_thread_state ON CACHE INTERNAL "wolfssl doesn't have ERR_remove_thread_state")
+@@ -70,96 +90,100 @@ ENDMACRO()
+ # Provides the following configure options:
+ # WITH_SSL=[yes|bundled|system|<path/to/custom/installation>]
+ MACRO (MYSQL_CHECK_SSL)
+-  IF(NOT WITH_SSL)
+-   IF(WIN32)
+-     CHANGE_SSL_SETTINGS("bundled")
+-   ELSE()
+-     SET(WITH_SSL "yes")
+-   ENDIF()
+-  ENDIF()
+-
+-  # See if WITH_SSL is of the form </path/to/custom/installation>
+-  FILE(GLOB WITH_SSL_HEADER ${WITH_SSL}/include/openssl/ssl.h)
+-  IF (WITH_SSL_HEADER)
+-    SET(WITH_SSL_PATH ${WITH_SSL} CACHE PATH "path to custom SSL installation")
+-  ENDIF()
+-
+-  IF(WITH_SSL STREQUAL "bundled")
+-    MYSQL_USE_BUNDLED_SSL()
+-    # Reset some variables, in case we switch from /path/to/ssl to "bundled".
+-    IF (WITH_SSL_PATH)
+-      UNSET(WITH_SSL_PATH)
+-      UNSET(WITH_SSL_PATH CACHE)
+-    ENDIF()
+-    IF (OPENSSL_ROOT_DIR)
+-      UNSET(OPENSSL_ROOT_DIR)
+-      UNSET(OPENSSL_ROOT_DIR CACHE)
+-    ENDIF()
+-    IF (OPENSSL_INCLUDE_DIR)
+-      UNSET(OPENSSL_INCLUDE_DIR)
+-      UNSET(OPENSSL_INCLUDE_DIR CACHE)
+-    ENDIF()
+-    IF (WIN32 AND OPENSSL_APPLINK_C)
+-      UNSET(OPENSSL_APPLINK_C)
+-      UNSET(OPENSSL_APPLINK_C CACHE)
++  IF(WITH_SSL STREQUAL "system-wolfssl")
++    MYSQL_USE_SYSTEM_WOLFSSL()
++  ELSE()
++    IF(NOT WITH_SSL)
++     IF(WIN32)
++       CHANGE_SSL_SETTINGS("bundled")
++     ELSE()
++       SET(WITH_SSL "yes")
++     ENDIF()
+     ENDIF()
+-    IF (OPENSSL_SSL_LIBRARY)
+-      UNSET(OPENSSL_SSL_LIBRARY)
+-      UNSET(OPENSSL_SSL_LIBRARY CACHE)
++
++    # See if WITH_SSL is of the form </path/to/custom/installation>
++    FILE(GLOB WITH_SSL_HEADER ${WITH_SSL}/include/openssl/ssl.h)
++    IF (WITH_SSL_HEADER)
++      SET(WITH_SSL_PATH ${WITH_SSL} CACHE PATH "path to custom SSL installation")
+     ENDIF()
+-  ELSEIF(WITH_SSL STREQUAL "system" OR
+-         WITH_SSL STREQUAL "yes" OR
+-         WITH_SSL_PATH
+-         )
+-    IF(NOT OPENSSL_ROOT_DIR)
+-      IF(WITH_SSL_PATH)
+-        SET(OPENSSL_ROOT_DIR ${WITH_SSL_PATH})
++
++    IF(WITH_SSL STREQUAL "bundled")
++      MYSQL_USE_BUNDLED_SSL()
++      # Reset some variables, in case we switch from /path/to/ssl to "bundled".
++      IF (WITH_SSL_PATH)
++        UNSET(WITH_SSL_PATH)
++        UNSET(WITH_SSL_PATH CACHE)
+       ENDIF()
+-    ENDIF()
+-    FIND_PACKAGE(OpenSSL)
+-    IF(OPENSSL_FOUND)
+-      SET(OPENSSL_LIBRARY ${OPENSSL_SSL_LIBRARY})
+-      INCLUDE(CheckSymbolExists)
+-      SET(SSL_SOURCES "")
+-      SET(SSL_LIBRARIES ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
+-      IF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
+-        SET(SSL_LIBRARIES ${SSL_LIBRARIES} ${LIBSOCKET})
++      IF (OPENSSL_ROOT_DIR)
++        UNSET(OPENSSL_ROOT_DIR)
++        UNSET(OPENSSL_ROOT_DIR CACHE)
+       ENDIF()
+-      IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
+-        SET(SSL_LIBRARIES ${SSL_LIBRARIES} ${CMAKE_DL_LIBS})
++      IF (OPENSSL_INCLUDE_DIR)
++        UNSET(OPENSSL_INCLUDE_DIR)
++        UNSET(OPENSSL_INCLUDE_DIR CACHE)
+       ENDIF()
++      IF (WIN32 AND OPENSSL_APPLINK_C)
++        UNSET(OPENSSL_APPLINK_C)
++        UNSET(OPENSSL_APPLINK_C CACHE)
++      ENDIF()
++      IF (OPENSSL_SSL_LIBRARY)
++        UNSET(OPENSSL_SSL_LIBRARY)
++        UNSET(OPENSSL_SSL_LIBRARY CACHE)
++      ENDIF()
++    ELSEIF(WITH_SSL STREQUAL "system" OR
++           WITH_SSL STREQUAL "yes" OR
++           WITH_SSL_PATH
++           )
++      IF(NOT OPENSSL_ROOT_DIR)
++        IF(WITH_SSL_PATH)
++          SET(OPENSSL_ROOT_DIR ${WITH_SSL_PATH})
++        ENDIF()
++      ENDIF()
++      FIND_PACKAGE(OpenSSL)
++      IF(OPENSSL_FOUND)
++        SET(OPENSSL_LIBRARY ${OPENSSL_SSL_LIBRARY})
++        INCLUDE(CheckSymbolExists)
++        SET(SSL_SOURCES "")
++        SET(SSL_LIBRARIES ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
++        IF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
++          SET(SSL_LIBRARIES ${SSL_LIBRARIES} ${LIBSOCKET})
++        ENDIF()
++        IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
++          SET(SSL_LIBRARIES ${SSL_LIBRARIES} ${CMAKE_DL_LIBS})
++        ENDIF()
+ 
+-      MESSAGE_ONCE(OPENSSL_INCLUDE_DIR "OPENSSL_INCLUDE_DIR = ${OPENSSL_INCLUDE_DIR}")
+-      MESSAGE_ONCE(OPENSSL_SSL_LIBRARY "OPENSSL_SSL_LIBRARY = ${OPENSSL_SSL_LIBRARY}")
+-      MESSAGE_ONCE(OPENSSL_CRYPTO_LIBRARY "OPENSSL_CRYPTO_LIBRARY = ${OPENSSL_CRYPTO_LIBRARY}")
+-      MESSAGE_ONCE(OPENSSL_VERSION "OPENSSL_VERSION = ${OPENSSL_VERSION}")
+-      MESSAGE_ONCE(SSL_LIBRARIES "SSL_LIBRARIES = ${SSL_LIBRARIES}")
+-      SET(SSL_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR})
+-      SET(SSL_INTERNAL_INCLUDE_DIRS "")
+-      SET(SSL_DEFINES "-DHAVE_OPENSSL")
++        MESSAGE_ONCE(OPENSSL_INCLUDE_DIR "OPENSSL_INCLUDE_DIR = ${OPENSSL_INCLUDE_DIR}")
++        MESSAGE_ONCE(OPENSSL_SSL_LIBRARY "OPENSSL_SSL_LIBRARY = ${OPENSSL_SSL_LIBRARY}")
++        MESSAGE_ONCE(OPENSSL_CRYPTO_LIBRARY "OPENSSL_CRYPTO_LIBRARY = ${OPENSSL_CRYPTO_LIBRARY}")
++        MESSAGE_ONCE(OPENSSL_VERSION "OPENSSL_VERSION = ${OPENSSL_VERSION}")
++        MESSAGE_ONCE(SSL_LIBRARIES "SSL_LIBRARIES = ${SSL_LIBRARIES}")
++        SET(SSL_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR})
++        SET(SSL_INTERNAL_INCLUDE_DIRS "")
++        SET(SSL_DEFINES "-DHAVE_OPENSSL")
+ 
+-      SET(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
+-      SET(CMAKE_REQUIRED_LIBRARIES ${SSL_LIBRARIES})
+-      SET(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
+-      CHECK_SYMBOL_EXISTS(ERR_remove_thread_state "openssl/err.h"
+-                          HAVE_ERR_remove_thread_state)
+-      CHECK_SYMBOL_EXISTS(EVP_aes_128_ctr "openssl/evp.h"
+-                          HAVE_EncryptAes128Ctr)
+-      CHECK_SYMBOL_EXISTS(EVP_aes_128_gcm "openssl/evp.h"
+-                          HAVE_EncryptAes128Gcm)
+-      CHECK_SYMBOL_EXISTS(X509_check_host "openssl/x509v3.h"
+-                          HAVE_X509_check_host)
+-      SET(CMAKE_REQUIRED_INCLUDES)
+-      SET(CMAKE_REQUIRED_LIBRARIES)
+-    ELSE()
+-      IF(WITH_SSL STREQUAL "system")
+-        MESSAGE(FATAL_ERROR "Cannot find appropriate system libraries for SSL. Use WITH_SSL=bundled to enable SSL support")
++        SET(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
++        SET(CMAKE_REQUIRED_LIBRARIES ${SSL_LIBRARIES})
++        SET(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
++        CHECK_SYMBOL_EXISTS(ERR_remove_thread_state "openssl/err.h"
++                            HAVE_ERR_remove_thread_state)
++        CHECK_SYMBOL_EXISTS(EVP_aes_128_ctr "openssl/evp.h"
++                            HAVE_EncryptAes128Ctr)
++        CHECK_SYMBOL_EXISTS(EVP_aes_128_gcm "openssl/evp.h"
++                            HAVE_EncryptAes128Gcm)
++        CHECK_SYMBOL_EXISTS(X509_check_host "openssl/x509v3.h"
++                            HAVE_X509_check_host)
++        SET(CMAKE_REQUIRED_INCLUDES)
++        SET(CMAKE_REQUIRED_LIBRARIES)
++      ELSE()
++        IF(WITH_SSL STREQUAL "system")
++          MESSAGE(FATAL_ERROR "Cannot find appropriate system libraries for SSL. Use WITH_SSL=bundled to enable SSL support")
++        ENDIF()
++        MYSQL_USE_BUNDLED_SSL()
+       ENDIF()
+-      MYSQL_USE_BUNDLED_SSL()
++    ELSE()
++      MESSAGE(FATAL_ERROR
++        "Wrong option for WITH_SSL. Valid values are: ${WITH_SSL_DOC}")
+     ENDIF()
+-  ELSE()
+-    MESSAGE(FATAL_ERROR
+-      "Wrong option for WITH_SSL. Valid values are: ${WITH_SSL_DOC}")
+   ENDIF()
+ ENDMACRO()
+ 
+diff --git a/extra/system-wolfssl/CMakeLists.txt b/extra/system-wolfssl/CMakeLists.txt
+new file mode 100644
+index 00000000000..d88b4588ca2
+--- /dev/null
++++ b/extra/system-wolfssl/CMakeLists.txt
+@@ -0,0 +1,8 @@
++ADD_DEFINITIONS(${SSL_DEFINES})
++ADD_DEFINITIONS(-DWOLFSSL_LIB -DBUILDING_WOLFSSL)
++
++FIND_LIBRARY(LIBWOLFSSL wolfssl)
++ADD_LIBRARY(wolfssl SHARED IMPORTED GLOBAL)
++SET_PROPERTY(TARGET wolfssl PROPERTY IMPORTED_LOCATION ${LIBWOLFSSL})
++ADD_LIBRARY(wolfcrypt SHARED IMPORTED GLOBAL)
++SET_PROPERTY(TARGET wolfcrypt PROPERTY IMPORTED_LOCATION ${LIBWOLFSSL})
+diff --git a/include/mysql/service_my_crypt.h b/include/mysql/service_my_crypt.h
+index 930d12a7dd1..da216851c8a 100644
+--- a/include/mysql/service_my_crypt.h
++++ b/include/mysql/service_my_crypt.h
+@@ -45,7 +45,7 @@ extern "C" {
+ /* The max key length of all supported algorithms */
+ #define MY_AES_MAX_KEY_LENGTH 32
+ 
+-#define MY_AES_CTX_SIZE 640
++#define MY_AES_CTX_SIZE 1120
+ 
+ enum my_aes_mode {
+     MY_AES_ECB, MY_AES_CBC
+diff --git a/include/ssl_compat.h b/include/ssl_compat.h
+index 9f4b6be8d95..c107fe71969 100644
+--- a/include/ssl_compat.h
++++ b/include/ssl_compat.h
+@@ -14,6 +14,9 @@
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
+ 
++#ifdef HAVE_SYSTEM_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/opensslv.h>
+ 
+ /* OpenSSL version specific definitions */
+@@ -73,6 +76,9 @@
+ #define EVP_MD_CTX_SIZE                 sizeof(EVP_MD_CTX)
+ #endif
+ 
++#ifdef HAVE_WOLFSSL
++#undef DH_set0_pqg
++#endif
+ #define DH_set0_pqg(D,P,Q,G)            ((D)->p= (P), (D)->g= (G))
+ #define EVP_CIPHER_CTX_buf_noconst(ctx) ((ctx)->buf)
+ #define EVP_CIPHER_CTX_encrypting(ctx)  ((ctx)->encrypt)
+diff --git a/include/violite.h b/include/violite.h
+index 28e3ca08b0a..7aba233a849 100644
+--- a/include/violite.h
++++ b/include/violite.h
+@@ -148,6 +148,9 @@ int vio_getnameinfo(const struct sockaddr *sa,
+ typedef my_socket YASSL_SOCKET_T;
+ #define YASSL_SOCKET_T_DEFINED
+ #define template _template /* bug in WolfSSL 4.4.0, see also my_crypt.cc */
++#ifdef HAVE_SYSTEM_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/ssl.h>
+ #undef template
+ #include <openssl/err.h>
+Submodule libmariadb 180c543704d..62e2af2aab5:
+diff --git a/libmariadb/CMakeLists.txt b/libmariadb/CMakeLists.txt
+index 498eca0..154739c 100644
+--- a/libmariadb/CMakeLists.txt
++++ b/libmariadb/CMakeLists.txt
+@@ -302,6 +302,13 @@ IF(NOT WITH_SSL STREQUAL "OFF")
+       MESSAGE1(TLS_LIBRARY_VERSION "OpenSSL/LibreSSL not found")
+     ENDIF()
+   ENDIF()
++  IF(WITH_SSL STREQUAL "SYSTEM_WOLFSSL")
++    ADD_DEFINITIONS(-DHAVE_OPENSSL -DHAVE_TLS -DHAVE_WOLFSSL -DHAVE_SYSTEM_WOLFSSL)
++    SET(SSL_SOURCES "${CC_SOURCE_DIR}/libmariadb/secure/openssl.c")
++    SET(SSL_LIBRARIES wolfssl)
++    INCLUDE_DIRECTORIES(BEFORE ${WOLFSSL_INCLUDE_DIR}
++                               ${WOLFSSL_INCLUDE_DIR}/wolfssl)
++  ENDIF()
+   IF(WITH_SSL STREQUAL "GNUTLS")
+     FIND_PACKAGE(GnuTLS "3.3.24" REQUIRED)
+     IF(GNUTLS_FOUND)
+diff --git a/libmariadb/libmariadb/secure/openssl.c b/libmariadb/libmariadb/secure/openssl.c
+index 26113cc..0d13356 100644
+--- a/libmariadb/libmariadb/secure/openssl.c
++++ b/libmariadb/libmariadb/secure/openssl.c
+@@ -25,6 +25,9 @@
+ #include <string.h>
+ #include <mysql/client_plugin.h>
+ #include <string.h>
++#ifdef HAVE_SYSTEM_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/ssl.h> /* SSL and SSL_CTX */
+ #include <openssl/err.h> /* error reporting */
+ #include <openssl/conf.h>
+@@ -34,7 +37,7 @@
+ #include <openssl/applink.c>
+ #endif
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(LIBRESSL_VERSION_NUMBER)
++#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(LIBRESSL_VERSION_NUMBER) || defined(HAVE_WOLFSSL)
+ #include <openssl/x509v3.h>
+ #define HAVE_OPENSSL_CHECK_HOST 1
+ #endif
+@@ -74,7 +77,7 @@ extern unsigned int mariadb_deinitialize_ssl;
+ char tls_library_version[TLS_VERSION_LENGTH];
+ 
+ static pthread_mutex_t LOCK_openssl_config;
+-#ifndef HAVE_OPENSSL_1_1_API
++#if !defined(HAVE_OPENSSL_1_1_API) && !defined(HAVE_WOLFSSL)
+ static pthread_mutex_t *LOCK_crypto= NULL;
+ #endif
+ #if defined(OPENSSL_USE_BIOMETHOD)
+@@ -142,6 +145,7 @@ static void ma_tls_set_error(MYSQL *mysql)
+   return;
+ }
+ 
++#ifndef HAVE_WOLFSSL
+ #ifndef HAVE_OPENSSL_1_1_API
+ /*
+    thread safe callbacks for OpenSSL
+@@ -198,6 +202,7 @@ static int ssl_thread_init()
+   return 0;
+ }
+ #endif
++#endif /* !HAVE_WOLFSSL */
+ 
+ #if defined(_WIN32) || !defined(DISABLE_SIGPIPE)
+ #define disable_sigpipe()
+@@ -246,11 +251,13 @@ int ma_tls_start(char *errmsg __attribute__((unused)), size_t errmsg_len __attri
+   if (!OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL))
+     goto end;
+ #else
++#ifndef HAVE_WOLFSSL
+   if (ssl_thread_init())
+   {
+     strncpy(errmsg, "Not enough memory", errmsg_len);
+     goto end;
+   }
++#endif
+   SSL_library_init();
+ #if SSLEAY_VERSION_NUMBER >= 0x00907000L
+   OPENSSL_config(NULL);
+@@ -279,7 +286,9 @@ int ma_tls_start(char *errmsg __attribute__((unused)), size_t errmsg_len __attri
+     *p= 0;
+   rc= 0;
+   ma_tls_initialized= TRUE;
++#ifndef HAVE_WOLFSSL
+ end:
++#endif
+   pthread_mutex_unlock(&LOCK_openssl_config);
+   return rc;
+ }
+@@ -300,6 +309,7 @@ void ma_tls_end()
+ {
+   if (ma_tls_initialized)
+   {
++#ifndef HAVE_WOLFSSL
+     pthread_mutex_lock(&LOCK_openssl_config);
+ #ifndef HAVE_OPENSSL_1_1_API
+     if (LOCK_crypto)
+@@ -313,6 +323,7 @@ void ma_tls_end()
+       ma_free((gptr)LOCK_crypto);
+       LOCK_crypto= NULL;
+     }
++#endif
+ #endif
+     if (mariadb_deinitialize_ssl)
+     {
+@@ -369,8 +380,10 @@ static int ma_tls_set_certs(MYSQL *mysql, SSL_CTX *ctx)
+   {
+     if (mysql->options.ssl_ca || mysql->options.ssl_capath)
+       goto error;
++  #ifndef HAVE_WOLFSSL
+     if (SSL_CTX_set_default_verify_paths(ctx) == 0)
+       goto error;
++  #endif
+   }
+ 
+   if (mysql->options.extension &&
+@@ -439,6 +452,33 @@ error:
+   return 1;
+ }
+ 
++#ifdef HAVE_WOLFSSL
++static int wolfssl_recv(WOLFSSL* ssl, char* buf, int sz, void* pvio)
++{
++  size_t ret;
++  MARIADB_PVIO* pvioCast;
++  pvioCast = (MARIADB_PVIO *)pvio;
++  (void)ssl;
++  ret = pvioCast->methods->read((MARIADB_PVIO *)pvio, (uchar *)buf, sz);
++  /* check if connection was closed */
++  if (ret == 0)
++    return WOLFSSL_CBIO_ERR_CONN_CLOSE;
++
++  return (int)ret;
++}
++
++static int wolfssl_send(WOLFSSL* ssl, char* buf, int sz, void* pvio)
++{
++  int ret;
++  MARIADB_PVIO* pvioCast;
++  (void)ssl;
++  pvioCast = (MARIADB_PVIO *)pvio;
++  ret = (int)pvioCast->methods->write(pvioCast, (unsigned char*)buf, sz);
++  return ret;
++}
++#endif /* HAVE_WOLFSSL */
++
++
+ void *ma_tls_init(MYSQL *mysql)
+ {
+   SSL *ssl= NULL;
+@@ -454,6 +494,11 @@ void *ma_tls_init(MYSQL *mysql)
+   if (!(ctx= SSL_CTX_new(SSLv23_client_method())))
+ #endif
+     goto error;
++#ifdef HAVE_WOLFSSL
++  /* set IO functions used by wolfSSL */
++  wolfSSL_SetIORecv(ctx, wolfssl_recv);
++  wolfSSL_SetIOSend(ctx, wolfssl_send);
++#endif
+   if (mysql->options.extension)
+     options|= ma_tls_version_options(mysql->options.extension->tls_version);
+   SSL_CTX_set_options(ctx, options);
+@@ -511,6 +556,12 @@ my_bool ma_tls_connect(MARIADB_TLS *ctls)
+   SSL_set_fd(ssl, (int)mysql_get_socket(mysql));
+ #endif
+ 
++#ifdef HAVE_WOLFSSL
++  /* Set first argument of the transport functions. */
++  wolfSSL_SetIOReadCtx(ssl, pvio);
++  wolfSSL_SetIOWriteCtx(ssl, pvio);
++#endif
++
+   while (try_connect && (rc= SSL_connect(ssl)) == -1)
+   {
+     switch((SSL_get_error(ssl, rc))) {
+diff --git a/mysys_ssl/my_crypt.cc b/mysys_ssl/my_crypt.cc
+index e512eee9066..1793f0c8db9 100644
+--- a/mysys_ssl/my_crypt.cc
++++ b/mysys_ssl/my_crypt.cc
+@@ -19,6 +19,9 @@
+ #include <string.h>
+ 
+ #define template _template /* bug in WolfSSL 4.4.0, see also violite.h */
++#ifdef HAVE_SYSTEM_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/evp.h>
+ #undef template
+ #include <openssl/aes.h>
+diff --git a/mysys_ssl/my_md5.cc b/mysys_ssl/my_md5.cc
+index 407dee3bc69..66e5af98aa9 100644
+--- a/mysys_ssl/my_md5.cc
++++ b/mysys_ssl/my_md5.cc
+@@ -28,6 +28,9 @@
+ #include <stdarg.h>
+ 
+ #if defined(HAVE_WOLFSSL)
++#if defined(HAVE_SYSTEM_WOLFSSL)
++#include <wolfssl/options.h>
++#endif
+ #include <wolfssl/wolfcrypt/md5.h>
+ #include <ssl_compat.h>
+ typedef wc_Md5 EVP_MD_CTX;
+diff --git a/mysys_ssl/my_sha.ic b/mysys_ssl/my_sha.ic
+index 6bba614765e..c950efcfc79 100644
+--- a/mysys_ssl/my_sha.ic
++++ b/mysys_ssl/my_sha.ic
+@@ -29,6 +29,9 @@
+ #define HASH_SIZE (NUM > 1 ? NUM/8 : 20)
+ 
+ #if defined(HAVE_WOLFSSL)
++#if defined(HAVE_SYSTEM_WOLFSSL)
++#include <wolfssl/options.h>
++#endif
+ #define WOLFSSL_SHA512
+ #define WOLFSSL_SHA384
+ #define WOLFSSL_SHA224
+diff --git a/sql/des_key_file.h b/sql/des_key_file.h
+index 847cd767b4b..40bd89fcc3c 100644
+--- a/sql/des_key_file.h
++++ b/sql/des_key_file.h
+@@ -17,6 +17,9 @@
+ #define DES_KEY_FILE_INCLUDED
+ 
+ #ifdef HAVE_OPENSSL
++#ifdef HAVE_SYSTEM_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/des.h>
+ 
+ #include "violite.h"                /* DES_cblock, DES_key_schedule */
+diff --git a/storage/innobase/include/lock0lock.h b/storage/innobase/include/lock0lock.h
+index 3b63b06a9bb..48cac69ab85 100644
+--- a/storage/innobase/include/lock0lock.h
++++ b/storage/innobase/include/lock0lock.h
+@@ -712,8 +712,6 @@ struct lock_op_t{
+ 	lock_mode	mode;	/*!< lock mode */
+ };
+ 
+-typedef ib_mutex_t LockMutex;
+-
+ /** The lock system struct */
+ class lock_sys_t
+ {
+@@ -721,7 +719,7 @@ class lock_sys_t
+ 
+ public:
+ 	MY_ALIGNED(CACHE_LINE_SIZE)
+-	LockMutex	mutex;			/*!< Mutex protecting the
++	ib_mutex_t	mutex;			/*!< Mutex protecting the
+ 						locks */
+   /** record locks */
+   hash_table_t rec_hash;
+@@ -731,7 +729,7 @@ class lock_sys_t
+   hash_table_t prdt_page_hash;
+ 
+ 	MY_ALIGNED(CACHE_LINE_SIZE)
+-	LockMutex	wait_mutex;		/*!< Mutex protecting the
++	ib_mutex_t	wait_mutex;		/*!< Mutex protecting the
+ 						next two fields */
+ 	srv_slot_t*	waiting_threads;	/*!< Array  of user threads
+ 						suspended while waiting for
