@@ -1,12 +1,12 @@
-## Unix Build Instructions
+# Unix Build Instructions
 
-### Build wolfSSL
+## Build wolfSSL
 + Configure wolfSSL with `./configure --enable-stunnel`. Add `--enable-debug` if you want to enable the debug version of wolfSSL.
 + Compile with `make`.
 + Install wolfSSL into /usr/local with `sudo make install`.
 
-### Build stunnel
-+ Download stunnel 5.57 with `curl -O https://www.stunnel.org/downloads/stunnel-5.57.tar.gz`.
+## Build stunnel
++ Download stunnel 5.57 with `curl -O https://www.usenix.org.uk/mirrors/stunnel/archive/5.x/stunnel-5.57.tar.gz`.
 + Unarchive stunnel-5.57.tar.gz with `tar xvf stunnel-5.57.tar.gz`. cd into stunnel-5.57.
 + Patch the source code with `patch -p1 < stunnel-5.57.patch`, adjusting the path to the patch file accordingly. 
 + Regenerate the configure script with `autoreconf`.
@@ -14,7 +14,7 @@
 + Compile with `make`.
 + Install stunnel into /usr/local with `sudo make install`.
 
-### Try It Out
+## Try It Out
 To verify that stunnel built with wolfSSL is working, we'll use an example TCP server and client from the wolfSSL examples repository.
 
 + In a directory containing the stunnel-client.conf and stunnel-server.conf files, clone the wolfSSL examples repository with `git clone git@github.com:wolfSSL/wolfssl-examples.git`.
