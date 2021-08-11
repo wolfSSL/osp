@@ -1,0 +1,333 @@
+From 12fe930f15630d1294daebf32a9a7734f2bbbc81 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Mon, 12 Jul 2021 15:57:17 +0200
+Subject: [PATCH] wolfSSL patch
+
+Changes:
+- `configure.d/*`: add the `--with-wolfssl` option
+- The  `wolfssl/options.h` header is included by defining the `EXTERNAL_OPTS_OPENVPN` macro
+- `asn1.h`: some of the `ASN_*` tags are already defined by wolfSSL
+- `cert_util.h`: check for wolfSSL headers
+- `snmp_debug.c`: enable wolfSSL debug logging
+- `snmpDTLSUDPDomain.c`: wolfSSL does not provide callbacks for cookie generation
+
+Testing with publicly available server: https://gambitcomm.blogspot.com/2017/02/publically-accessible-simulated-snmp.html
+
+wolfSSL
+```
+./autogen.sh
+./configure --enable-net-snmp
+make
+make install
+```
+
+net-snmp
+```
+patch -p1 < <path/to/patch/file>
+autoreconf -ivf
+./configure --with-wolfssl
+make
+make test
+```
+---
+ configure.d/config_os_functions        |  2 ++
+ configure.d/config_os_libs2            | 38 ++++++++++++++++++++++++++
+ configure.d/config_os_misc2            |  7 +++++
+ configure.d/config_project_with_enable | 30 ++++++++++++++++++--
+ include/net-snmp/library/asn1.h        | 11 +++++++-
+ include/net-snmp/library/cert_util.h   |  4 +--
+ snmplib/cert_util.c                    |  2 ++
+ snmplib/snmp_debug.c                   | 13 +++++++++
+ snmplib/transports/snmpDTLSUDPDomain.c | 10 +++++++
+ 9 files changed, 112 insertions(+), 5 deletions(-)
+
+diff --git a/configure.d/config_os_functions b/configure.d/config_os_functions
+index 889e2c472..76c2acc29 100644
+--- a/configure.d/config_os_functions
++++ b/configure.d/config_os_functions
+@@ -348,6 +348,7 @@ esac
+ AC_DEFINE_UNQUOTED([NETSNMP_PRIz], ["$netsnmp_PRIz"],
+                    [Size prefix to use to printf a size_t or ssize_t])
+ 
++if test "x$trywolfssl" = "xno"; then
+ # check to see if the openssl is good enough for DTLS
+ # (BIO_dgram_get_peer is a macro, not a true function)
+ if echo " $transport_result_list " | $GREP "DTLS" > /dev/null; then
+@@ -368,4 +369,5 @@ if echo " $transport_result_list " | $GREP "DTLS" > /dev/null; then
+        AC_MSG_RESULT(yes)
+     )
+ fi
++fi
+ 
+diff --git a/configure.d/config_os_libs2 b/configure.d/config_os_libs2
+index 9fd51f75b..883b2a92d 100644
+--- a/configure.d/config_os_libs2
++++ b/configure.d/config_os_libs2
+@@ -374,6 +374,44 @@ if test "x$tryopenssl" != "xno" -a "x$tryopenssl" != "xinternal"; then
+             SSHPROG=yes
+         fi
+     fi
++elif test "x$trywolfssl" != "xno"; then
++    CRYPTO="wolfssl"
++    LIBCRYPTO="-l${CRYPTO}"
++    LIBS="$LIBCRYPTO"
++    AC_DEFINE(HAVE_AES_CFB128_ENCRYPT, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_EVP_SHA224, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_EVP_SHA384, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_EVP_MD_CTX_CREATE, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_EVP_MD_CTX_DESTROY, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_EVP_MD_CTX_NEW, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_EVP_MD_CTX_FREE, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_DH_SET0_PQG, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_DH_GET0_PQG, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_DH_GET0_KEY, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_ASN1_STRING_GET0_DATA, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_X509_NAME_ENTRY_GET_OBJECT, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_X509_NAME_ENTRY_GET_DATA, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_X509_GET_SIGNATURE_NID, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_TLS_METHOD, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_TLSV1_METHOD, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_DTLS_METHOD, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_DTLSV1_METHOD, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_SSL_LIBRARY_INIT, 1, [Defined as macro in wolfSSL])
++    AC_DEFINE(HAVE_SSL_LOAD_ERROR_STRINGS, 1, [Defined as macro in wolfSSL])
++    if echo " $transport_result_list " | $GREP "DTLS" > /dev/null; then
++        AC_DEFINE(HAVE_LIBSSL_DTLS, 1, [wolfSSL supports DTLS])
++    fi
++    if echo " $transport_result_list " | $GREP "TLS" > /dev/null; then
++        AC_DEFINE(HAVE_LIBSSL, 1, [wolfSSL supports SSL/TLS])
++    fi
++    if echo " $transport_result_list " | $GREP " SSH " > /dev/null; then
++    AC_CHECK_LIB(ssh2, libssh2_session_startup,
++            AC_DEFINE(HAVE_LIBSSH2, 1,
++                [Define to 1 if you have the `ssh2' library (-lssh2).])
++            LIBCRYPTO=" -lssh2 $LIBCRYPTO",
++            AC_MSG_ERROR([The SSH transport requires the libssh2 library to be available]),)
++        SSHPROG=yes
++    fi
+ elif test "x$askedpkcs" = "xyes"; then
+     AC_CHECK_LIB(pkcs11, C_Initialize,
+         AC_DEFINE(HAVE_LIBPKCS11)
+diff --git a/configure.d/config_os_misc2 b/configure.d/config_os_misc2
+index be0bccec0..b427bed2e 100644
+--- a/configure.d/config_os_misc2
++++ b/configure.d/config_os_misc2
+@@ -72,6 +72,13 @@ elif test "x$useopenssl" != "xno" ; then
+     AC_DEFINE(NETSNMP_USE_OPENSSL)
+     LNETSNMPLIBS="$LNETSNMPLIBS $LIBCRYPTO"
+     AC_MSG_RESULT(OpenSSL Support)
++elif test "x$trywolfssl" != "xno"; then
++    authmodes="MD5 SHA1 SHA224 SHA256 SHA384 SHA512"
++    encrmodes="DES AES"
++    AC_DEFINE(NETSNMP_USE_OPENSSL)
++    AC_DEFINE(NETSNMP_USE_WOLFSSL, 1, [Use wolfSSL])
++    LNETSNMPLIBS="$LNETSNMPLIBS $LIBCRYPTO"
++    AC_MSG_RESULT(wolfSSL Support)
+ elif test "x$usepkcs" != "xno" ; then
+     authmodes="MD5 SHA1"
+     if test "x$enable_privacy" != "xno" ; then
+diff --git a/configure.d/config_project_with_enable b/configure.d/config_project_with_enable
+index cdf56deb6..d4db22871 100644
+--- a/configure.d/config_project_with_enable
++++ b/configure.d/config_project_with_enable
+@@ -72,14 +72,40 @@ NETSNMP_ARG_WITH(rsaref,
+     fi,
+ )
+ 
+-tryopenssl=defaultyes
++trywolfssl=no
++wolfpath="/usr/local"
++NETSNMP_ARG_WITH(wolfssl,
++[  --with-wolfssl=PATH             Look for wolfssl in PATH/lib.],
++    if test "x$withval" = "xyes"; then
++      trywolfssl=yes
++    else
++      trywolfssl=yes
++      wolfpath=$withval
++    fi,
++)
++if test "x$trywolfssl" = "xyes"; then
++	  if test -d $wolfpath/lib && test -d $wolfpath/include/wolfssl ; then
++        LDFLAGS="-L$wolfpath/lib $LDFLAGS"
++        CPPFLAGS="-I$wolfpath/include -I$wolfpath/include/wolfssl -DEXTERNAL_OPTS_OPENVPN $CPPFLAGS"
++	  else
++	    AC_MSG_ERROR([Cannot find wolfSSL in $wolfpath.])
++	  fi
++fi
++
++if test "x$trywolfssl" = "xyes"; then
++      tryopenssl=no
++else
++      tryopenssl=defaultyes
++fi
+ askedopenssl=no
+ aes_capable=no
+ NETSNMP_ARG_WITH(openssl,
+ [  --with-openssl=PATH             Look for openssl in PATH/lib,
+                                   or PATH may be "internal" to build with
+                                   minimal copied OpenSSL code for USM only.],
+-    if test "x$withval" = "xyes"; then
++    if test "x$trywolfssl" = "xyes"; then
++	  AC_MSG_ERROR([Cannot specify both OpenSSL and wolfSSL])
++    elif test "x$withval" = "xyes"; then
+       tryopenssl=yes
+       askedopenssl=yes
+     elif test "x$withval" = "xinternal"; then
+diff --git a/include/net-snmp/library/asn1.h b/include/net-snmp/library/asn1.h
+index 227ee7849..398030fd1 100644
+--- a/include/net-snmp/library/asn1.h
++++ b/include/net-snmp/library/asn1.h
+@@ -3,6 +3,10 @@
+ 
+ #include <net-snmp/library/oid.h>
+ 
++#ifdef NETSNMP_USE_WOLFSSL
++#include <wolfssl/wolfcrypt/asn.h>
++#endif
++
+ #ifdef __cplusplus
+ extern          "C" {
+ #endif
+@@ -51,18 +55,23 @@ SOFTWARE.
+ 
+ #define OID_LENGTH(x)  (sizeof(x)/sizeof(oid))
+ 
+-
++#ifndef NETSNMP_USE_WOLFSSL
+ #define ASN_BOOLEAN	    0x01U
+ #define ASN_INTEGER	    0x02U
++#endif
+ #define ASN_BIT_STR	    0x03U
+ #define ASN_OCTET_STR	    0x04U
+ #define ASN_NULL	    0x05U
++#ifndef NETSNMP_USE_WOLFSSL
+ #define ASN_OBJECT_ID	    0x06U
+ #define ASN_SEQUENCE	    0x10U
+ #define ASN_SET		    0x11U
++#endif
+ 
+ #define ASN_UNIVERSAL	    0x00U
++#ifndef NETSNMP_USE_WOLFSSL
+ #define ASN_APPLICATION     0x40U
++#endif
+ #define ASN_CONTEXT	    0x80U
+ #define ASN_PRIVATE	    0xC0U
+ 
+diff --git a/include/net-snmp/library/cert_util.h b/include/net-snmp/library/cert_util.h
+index 80e2a19f9..268376c5b 100644
+--- a/include/net-snmp/library/cert_util.h
++++ b/include/net-snmp/library/cert_util.h
+@@ -2,10 +2,10 @@
+ 
+ #if defined(NETSNMP_USE_OPENSSL) && defined(HAVE_LIBSSL)
+ 
+-#ifndef HEADER_SSL_H
++#if !(defined(HEADER_SSL_H) || defined(WOLFSSL_OPENSSL_H_))
+ #error "must include <openssl/ssl.h> before cert_util.h"
+ #endif
+-#ifndef HEADER_X509_H
++#if !(defined(HEADER_X509_H) || defined(WOLFSSL_OPENSSL_509_H_))
+ #error "must include <openssl/x509.h> before cert_util.h"
+ #endif
+ 
+diff --git a/snmplib/cert_util.c b/snmplib/cert_util.c
+index e7b7114f6..d230dfe2f 100644
+--- a/snmplib/cert_util.c
++++ b/snmplib/cert_util.c
+@@ -45,6 +45,7 @@ netsnmp_feature_child_of(tls_fingerprint_build, cert_util_all);
+ #if HAVE_STDLIB_H
+ #include <stdlib.h>
+ #endif
++#include <stddef.h>
+ 
+ #if HAVE_STRING_H
+ #include <string.h>
+@@ -87,6 +88,7 @@ netsnmp_feature_child_of(tls_fingerprint_build, cert_util_all);
+ #include <net-snmp/library/read_config.h>
+ 
+ #include <openssl/ssl.h>
++#include <openssl/pem.h>
+ #include <openssl/err.h>
+ #include <openssl/x509v3.h>
+ #include <net-snmp/library/cert_util.h>
+diff --git a/snmplib/snmp_debug.c b/snmplib/snmp_debug.c
+index 08726574c..dc4a3dcd9 100644
+--- a/snmplib/snmp_debug.c
++++ b/snmplib/snmp_debug.c
+@@ -680,9 +680,22 @@ snmp_debug_shutdown(void)
+ 
+ #endif /* NETSNMP_NO_DEBUGGING */
+ 
++#ifdef NETSNMP_USE_WOLFSSL
++static void logMsg(const int logLevel, const char* const msg)
++{
++    (void)logLevel;
++    DEBUGMSGTL(("snmp_openssl", msg, "\n"));
++}
++#endif
++
+ void
+ snmp_debug_init(void)
+ {
++
++#ifdef NETSNMP_USE_WOLFSSL
++    wolfSSL_Debugging_ON();
++    wolfSSL_SetLoggingCb(logMsg);
++#endif
+     register_prenetsnmp_mib_handler("snmp", "doDebugging",
+                                     debug_config_turn_on_debugging, NULL,
+                                     "(1|0)");
+diff --git a/snmplib/transports/snmpDTLSUDPDomain.c b/snmplib/transports/snmpDTLSUDPDomain.c
+index c7032e6cb..541d536c5 100644
+--- a/snmplib/transports/snmpDTLSUDPDomain.c
++++ b/snmplib/transports/snmpDTLSUDPDomain.c
+@@ -121,12 +121,18 @@ static bio_cache *biocache = NULL;
+ 
+ static int openssl_addr_index = 0;
+ 
++#ifndef SECOND_APPVERIFY_COOKIE_CB_ARG_QUALIFIER
++#define SECOND_APPVERIFY_COOKIE_CB_ARG_QUALIFIER
++#endif
++#ifndef NETSNMP_USE_WOLFSSL
++/* no cookie callbacks in wolfSSL */
+ static int netsnmp_dtls_verify_cookie(SSL *ssl,
+                                       SECOND_APPVERIFY_COOKIE_CB_ARG_QUALIFIER
+                                       unsigned char *cookie,
+                                       unsigned int cookie_len);
+ static int netsnmp_dtls_gen_cookie(SSL *ssl, unsigned char *cookie,
+                                    unsigned int *cookie_len);
++#endif
+ 
+ /* this stores remote connections in a list to search through */
+ /* XXX: optimize for searching */
+@@ -337,10 +343,12 @@ start_new_cached_connection(netsnmp_transport *t,
+             DIEHERE("failed to create the SSL Context");
+         }
+ 
++#ifndef NETSNMP_USE_WOLFSSL
+         /* turn on cookie exchange */
+         /* Set DTLS cookie generation and verification callbacks */
+         SSL_CTX_set_cookie_generate_cb(ctx, netsnmp_dtls_gen_cookie);
+         SSL_CTX_set_cookie_verify_cb(ctx, netsnmp_dtls_verify_cookie);
++#endif
+ 
+         tlsdata->ssl = SSL_new(ctx);
+     }
+@@ -1692,6 +1700,7 @@ netsnmp_dtlsudp_ctor(void)
+ int cookie_initialized=0;
+ unsigned char cookie_secret[NETSNMP_COOKIE_SECRET_LENGTH];
+ 
++#ifndef NETSNMP_USE_WOLFSSL
+ int netsnmp_dtls_gen_cookie(SSL *ssl, unsigned char *cookie,
+                             unsigned int *cookie_len)
+ {
+@@ -1873,5 +1882,6 @@ int netsnmp_dtls_verify_cookie(SSL *ssl,
+ 
+     return rc;
+ }
++#endif
+ 
+ #endif /* HAVE_LIBSSL_DTLS */
+-- 
+2.25.1
+
