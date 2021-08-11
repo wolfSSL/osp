@@ -1,10 +1,10 @@
-## Windows Build Instructions
+# Windows Build Instructions
 These instructions assume that you have already built wolfssl.dll. For instructions on how to do this using Visual Studio, see https://www.wolfssl.com/docs/visual-studio/. You will need to set the appropriate settings for stunnel compatibility in user_settings.h. You can determine what these settings are by configuring on Linux using `./configure --enable-stunnel` and checking out the generated options.h file.
 
-### Build stunnel
+## Build stunnel
 We'll be cross-compiling on Linux for 32-bit Windows, using the MinGW compiler.
 
-+ Download stunnel 5.57 with `curl -O https://www.stunnel.org/downloads/stunnel-5.57.tar.gz`.
++ Download stunnel 5.57 with `curl -O https://www.usenix.org.uk/mirrors/stunnel/archive/5.x/stunnel-5.57.tar.gz`.
 + Unarchive stunnel-5.57.tar.gz with `tar xvf stunnel-5.57.tar.gz`. cd into stunnel-5.57.
 + Patch the source code with `patch -p1 < stunnel-5.57.patch`, adjusting the path to the patch file accordingly.
 + Regenerate the configure script with `autoreconf`.
@@ -12,7 +12,7 @@ We'll be cross-compiling on Linux for 32-bit Windows, using the MinGW compiler.
 + cd into the src directory and compile for 32-bit Windows using `make mingw`. By default, the build assumes the wolfSSL headers and DLL are in /opt/wolfssl_windows under the include and lib subdirectories, respectively. Adjust the `win32_ssl_dir = ` line in mingw_wolfssl.mk if these files are located elsewhere. If you want to enable wolfSSL debug logging in stunnel, edit mingw_wolfssl.mk and add `-DWOLFSSL_DEBUG_ON` to the `win32_cflags +=` line after `-DWITH_WOLFSSL`. This assumes you've built wolfssl.dll with debugging enabled, too.
 + `cd ../bin/win32/`. This directory should contain tstunnel.exe and stunnel.exe, which are the CLI and GUI versions of stunnel, respectively. Copy these over to your Windows machine/VM.
 
-### Try It Out (tstunnel.exe)
+## Try It Out (tstunnel.exe)
 To verify that stunnel built with wolfSSL is working, we'll use an example TCP server and client from the wolfSSL examples repository. This example assumes you have Cygwin or some other toolchain available that allows you to compile programs on Windows in a Unix-like fashion.
 
 + Clone the wolfSSL examples repository with `git clone git@github.com:wolfSSL/wolfssl-examples.git`.
