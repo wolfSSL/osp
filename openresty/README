@@ -13,17 +13,6 @@ Patches for the following versions are available in this directory:
 * 1.19.3.1
 * 1.13.6.2
 
-Patches are generated with the following command (where the `-wolfssl` directory contains modifications to link against wolfSSL):
-```
-diff -u openresty-<version>/configure openresty-<version>-wolfssl/configure > osp/openresty/<version>.patch
-```
-
-# Copy the corresponding patch
-Copy the appropriate Nginx patch from the wolfssl-nginx repo and rename it to `nginx-wolfssl.patch`. The patch file should be placed in the `bundle` directory.
-```
-cp <path/to/wolfssl/nginx/patch> bundle/nginx-wolfssl.patch
-```
-
 # Compiling wolfSSL
 ```
 ./configure --enable-openresty
@@ -35,5 +24,16 @@ make install
 ```
 ./configure --with-wolfssl=/usr/local
 make
+```
+
+# Developer notes
+When porting to a new version of OpenResty, you need to copy the appropriate Nginx patch from the wolfssl-nginx repo and rename it to `nginx-wolfssl.patch`. The patch file should be placed in the `bundle` directory.
+```
+cp <path/to/wolfssl/nginx/patch> bundle/nginx-wolfssl.patch
+```
+
+Patches are generated with the following command:
+```
+git format-patch -1
 ```
 
