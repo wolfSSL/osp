@@ -1,6 +1,316 @@
---- openresty-1.19.3.1/configure	2021-02-02 14:12:24.000000000 +0100
-+++ openresty-1.19.3.1-wolfssl/configure	2021-02-05 13:11:53.771415704 +0100
-@@ -338,7 +338,7 @@
+From 843e455ccfb1d626307c3ffaa0d5c423c1be3c00 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 2 Feb 2021 16:01:38 +0100
+Subject: [PATCH] Compile with wolfSSL
+
+---
+ bundle/nginx-wolfssl.patch | 291 +++++++++++++++++++++++++++++++++++++
+ configure                  |  14 +-
+ 2 files changed, 304 insertions(+), 1 deletion(-)
+ create mode 100644 bundle/nginx-wolfssl.patch
+
+diff --git a/bundle/nginx-wolfssl.patch b/bundle/nginx-wolfssl.patch
+new file mode 100644
+index 0000000..e756e34
+--- /dev/null
++++ b/bundle/nginx-wolfssl.patch
+@@ -0,0 +1,291 @@
++diff -ur nginx-1.19.6/auto/lib/openssl/conf nginx/auto/lib/openssl/conf
++--- nginx-1.19.6/auto/lib/openssl/conf	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/auto/lib/openssl/conf	2021-01-13 15:12:10.222632780 +0100
++@@ -62,8 +62,33 @@
++         ngx_feature_path=
++         ngx_feature_libs="-lssl -lcrypto $NGX_LIBDL $NGX_LIBPTHREAD"
++         ngx_feature_test="SSL_CTX_set_options(NULL, 0)"
+++
+++        if [ $WOLFSSL != NONE ]; then
+++            ngx_feature="wolfSSL library in $WOLFSSL"
+++            ngx_feature_path="$WOLFSSL/include/wolfssl $WOLFSSL/include"
+++
+++            if [ $NGX_RPATH = YES ]; then
+++                ngx_feature_libs="-R$WOLFSSL/lib -L$WOLFSSL/lib -lwolfssl $NGX_LIBDL"
+++            else
+++                ngx_feature_libs="-L$WOLFSSL/lib -lwolfssl $NGX_LIBDL"
+++            fi
+++
+++            CORE_INCS="$CORE_INCS $WOLFSSL/include/wolfssl"
+++            CFLAGS="$CFLAGS -DWOLFSSL_NGINX"
+++        fi
+++
++         . auto/feature
++ 
+++        if [ $WOLFSSL != NONE -a $ngx_found = no ]; then
+++cat << END
+++
+++$0: error: Could not find wolfSSL at $WOLFSSL/include/wolfssl.
+++SSL modules require the wolfSSL library.
+++
+++END
+++            exit 1
+++        fi
+++
++         if [ $ngx_found = no ]; then
++ 
++             # FreeBSD port
++diff -ur nginx-1.19.6/auto/options nginx/auto/options
++--- nginx-1.19.6/auto/options	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/auto/options	2021-01-13 15:12:10.226632715 +0100
++@@ -149,6 +149,7 @@
++ 
++ USE_OPENSSL=NO
++ OPENSSL=NONE
+++WOLFSSL=NONE
++ 
++ USE_ZLIB=NO
++ ZLIB=NONE
++@@ -358,6 +359,7 @@
++         --with-pcre-opt=*)               PCRE_OPT="$value"          ;;
++         --with-pcre-jit)                 PCRE_JIT=YES               ;;
++ 
+++        --with-wolfssl=*)                WOLFSSL="$value"           ;;
++         --with-openssl=*)                OPENSSL="$value"           ;;
++         --with-openssl-opt=*)            OPENSSL_OPT="$value"       ;;
++ 
++@@ -583,6 +585,7 @@
++   --with-libatomic                   force libatomic_ops library usage
++   --with-libatomic=DIR               set path to libatomic_ops library sources
++ 
+++  --with-wolfssl=DIR                 set path to wolfSSL headers and library
++   --with-openssl=DIR                 set path to OpenSSL library sources
++   --with-openssl-opt=OPTIONS         set additional build options for OpenSSL
++ 
++diff -ur nginx-1.19.6/src/event/ngx_event_openssl.c nginx/src/event/ngx_event_openssl.c
++--- nginx-1.19.6/src/event/ngx_event_openssl.c	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/src/event/ngx_event_openssl.c	2021-01-13 15:12:21.722446702 +0100
++@@ -390,6 +390,12 @@
++ 
++     SSL_CTX_set_info_callback(ssl->ctx, ngx_ssl_info_callback);
++ 
+++#ifdef WOLFSSL_NGINX
+++    SSL_CTX_set_verify(ssl->ctx, SSL_VERIFY_NONE, NULL);
+++    wolfSSL_CTX_allow_anon_cipher(ssl->ctx);
+++    wolfSSL_CTX_set_group_messages(ssl->ctx);
+++#endif
+++
++     return NGX_OK;
++ }
++ 
++@@ -869,6 +875,14 @@
++ 
++ 
++ ngx_int_t
+++ngx_ssl_set_verify_on(ngx_conf_t *cf, ngx_ssl_t *ssl)
+++{
+++    SSL_CTX_set_verify(ssl->ctx, SSL_VERIFY_PEER, ngx_ssl_verify_callback);
+++
+++    return NGX_OK;
+++}
+++
+++ngx_int_t
++ ngx_ssl_client_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
++     ngx_int_t depth)
++ {
++@@ -1371,7 +1385,8 @@
++      * maximum interoperability.
++      */
++ 
++-#if (defined SSL_CTX_set1_curves_list || defined SSL_CTRL_SET_CURVES_LIST)
+++#if (defined SSL_CTX_set1_curves_list || defined SSL_CTRL_SET_CURVES_LIST) || \
+++    defined(WOLFSSL_NGINX)
++ 
++     /*
++      * OpenSSL 1.0.2+ allows configuring a curve list instead of a single
++@@ -1563,10 +1578,26 @@
++ ngx_ssl_new_client_session(ngx_ssl_conn_t *ssl_conn, ngx_ssl_session_t *sess)
++ {
++     ngx_connection_t  *c;
+++#ifdef WOLFSSL_NGINX
+++    int len;
+++#endif
++ 
++     c = ngx_ssl_get_connection(ssl_conn);
++ 
++     if (c->ssl->save_session) {
+++#ifdef WOLFSSL_NGINX
+++        len = i2d_SSL_SESSION(sess, NULL);
+++
+++        /* do not cache too big session */
+++        if (len > NGX_SSL_MAX_SESSION_SIZE) {
+++            return -1;
+++        }
+++
+++        if (!(sess = SSL_SESSION_dup(sess))) {
+++            return -1;
+++        }
+++#endif
+++
++         c->ssl->session = sess;
++ 
++         c->ssl->save_session(c);
++@@ -1638,7 +1669,9 @@
++ {
++ #ifdef TLS1_3_VERSION
++     if (c->ssl->session) {
+++    #if !defined(WOLFSSL_NGINX)
++         SSL_SESSION_up_ref(c->ssl->session);
+++    #endif
++         return c->ssl->session;
++     }
++ #endif
++@@ -4106,7 +4139,8 @@
++             return -1;
++         }
++ 
++-#if OPENSSL_VERSION_NUMBER >= 0x10000000L
+++#if OPENSSL_VERSION_NUMBER >= 0x10000000L && \
+++    (!defined(WOLFSSL_NGINX) || !defined(HAVE_FIPS))
++         if (HMAC_Init_ex(hctx, key[0].hmac_key, size, digest, NULL) != 1) {
++             ngx_ssl_error(NGX_LOG_ALERT, c->log, 0, "HMAC_Init_ex() failed");
++             return -1;
++@@ -4149,7 +4183,8 @@
++             size = 32;
++         }
++ 
++-#if OPENSSL_VERSION_NUMBER >= 0x10000000L
+++#if OPENSSL_VERSION_NUMBER >= 0x10000000L && \
+++    (!defined(WOLFSSL_NGINX) || !defined(HAVE_FIPS))
++         if (HMAC_Init_ex(hctx, key[i].hmac_key, size, digest, NULL) != 1) {
++             ngx_ssl_error(NGX_LOG_ALERT, c->log, 0, "HMAC_Init_ex() failed");
++             return -1;
++diff -ur nginx-1.19.6/src/event/ngx_event_openssl.h nginx/src/event/ngx_event_openssl.h
++--- nginx-1.19.6/src/event/ngx_event_openssl.h	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/src/event/ngx_event_openssl.h	2021-01-13 15:12:10.222632780 +0100
++@@ -12,6 +12,10 @@
++ #include <ngx_config.h>
++ #include <ngx_core.h>
++ 
+++#ifdef WOLFSSL_NGINX
+++#include <wolfssl/options.h>
+++#include <openssl/pem.h>
+++#endif
++ #include <openssl/ssl.h>
++ #include <openssl/err.h>
++ #include <openssl/bn.h>
++@@ -59,7 +63,7 @@
++ #define ngx_ssl_conn_t          SSL
++ 
++ 
++-#if (OPENSSL_VERSION_NUMBER < 0x10002000L)
+++#if (OPENSSL_VERSION_NUMBER < 0x10002000L) && !defined(WOLFSSL_NGINX)
++ #define SSL_is_server(s)        (s)->server
++ #endif
++ 
++@@ -178,6 +182,7 @@
++ 
++ ngx_int_t ngx_ssl_ciphers(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *ciphers,
++     ngx_uint_t prefer_server_ciphers);
+++ngx_int_t ngx_ssl_set_verify_on(ngx_conf_t *cf, ngx_ssl_t *ssl);
++ ngx_int_t ngx_ssl_client_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
++     ngx_str_t *cert, ngx_int_t depth);
++ ngx_int_t ngx_ssl_trusted_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
++diff -ur nginx-1.19.6/src/event/ngx_event_openssl_stapling.c nginx/src/event/ngx_event_openssl_stapling.c
++--- nginx-1.19.6/src/event/ngx_event_openssl_stapling.c	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/src/event/ngx_event_openssl_stapling.c	2021-01-13 15:12:10.226632715 +0100
++@@ -379,7 +379,9 @@
++     for (i = 0; i < n; i++) {
++         issuer = sk_X509_value(staple->chain, i);
++         if (X509_check_issued(issuer, cert) == X509_V_OK) {
++-#if OPENSSL_VERSION_NUMBER >= 0x10100001L
+++#ifdef WOLFSSL_NGINX
+++            issuer = X509_dup(issuer);
+++#elif OPENSSL_VERSION_NUMBER >= 0x10100001L
++             X509_up_ref(issuer);
++ #else
++             CRYPTO_add(&issuer->references, 1, CRYPTO_LOCK_X509);
++diff -ur nginx-1.19.6/src/http/modules/ngx_http_proxy_module.c nginx/src/http/modules/ngx_http_proxy_module.c
++--- nginx-1.19.6/src/http/modules/ngx_http_proxy_module.c	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/src/http/modules/ngx_http_proxy_module.c	2021-01-22 11:29:49.561598897 +0100
++@@ -4931,7 +4931,9 @@
++                       "no proxy_ssl_trusted_certificate for proxy_ssl_verify");
++             return NGX_ERROR;
++         }
++-
+++#ifdef WOLFSSL_NGINX
+++        ngx_ssl_set_verify_on(cf, plcf->upstream.ssl);
+++#endif
++         if (ngx_ssl_trusted_certificate(cf, plcf->upstream.ssl,
++                                         &plcf->ssl_trusted_certificate,
++                                         plcf->ssl_verify_depth)
++diff -ur nginx-1.19.6/src/http/modules/ngx_http_ssl_module.c nginx/src/http/modules/ngx_http_ssl_module.c
++--- nginx-1.19.6/src/http/modules/ngx_http_ssl_module.c	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/src/http/modules/ngx_http_ssl_module.c	2021-01-13 15:12:10.226632715 +0100
++@@ -14,7 +14,11 @@
++     ngx_pool_t *pool, ngx_str_t *s);
++ 
++ 
+++#ifndef WOLFSSL_NGINX
++ #define NGX_DEFAULT_CIPHERS     "HIGH:!aNULL:!MD5"
+++#else
+++#define NGX_DEFAULT_CIPHERS     "ALL"
+++#endif
++ #define NGX_DEFAULT_ECDH_CURVE  "auto"
++ 
++ #define NGX_HTTP_NPN_ADVERTISE  "\x08http/1.1"
++@@ -892,8 +896,10 @@
++         return NGX_CONF_ERROR;
++     }
++ 
+++#ifndef WOLFSSL_NGINX
++     ngx_conf_merge_value(conf->builtin_session_cache,
++                          prev->builtin_session_cache, NGX_SSL_NONE_SCACHE);
+++#endif
++ 
++     if (conf->shm_zone == NULL) {
++         conf->shm_zone = prev->shm_zone;
++diff -ur nginx-1.19.6/src/mail/ngx_mail_ssl_module.c nginx/src/mail/ngx_mail_ssl_module.c
++--- nginx-1.19.6/src/mail/ngx_mail_ssl_module.c	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/src/mail/ngx_mail_ssl_module.c	2021-01-13 15:12:10.226632715 +0100
++@@ -10,7 +10,11 @@
++ #include <ngx_mail.h>
++ 
++ 
+++#ifndef WOLFSSL_NGINX
++ #define NGX_DEFAULT_CIPHERS     "HIGH:!aNULL:!MD5"
+++#else
+++#define NGX_DEFAULT_CIPHERS     "ALL"
+++#endif
++ #define NGX_DEFAULT_ECDH_CURVE  "auto"
++ 
++ 
++diff -ur nginx-1.19.6/src/stream/ngx_stream_proxy_module.c nginx/src/stream/ngx_stream_proxy_module.c
++--- nginx-1.19.6/src/stream/ngx_stream_proxy_module.c	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/src/stream/ngx_stream_proxy_module.c	2021-01-22 11:25:14.737696853 +0100
++@@ -2164,7 +2164,9 @@
++                       "no proxy_ssl_trusted_certificate for proxy_ssl_verify");
++             return NGX_ERROR;
++         }
++-
+++#ifdef WOLFSSL_NGINX
+++        ngx_ssl_set_verify_on(cf, pscf->ssl);
+++#endif
++         if (ngx_ssl_trusted_certificate(cf, pscf->ssl,
++                                         &pscf->ssl_trusted_certificate,
++                                         pscf->ssl_verify_depth)
++diff -ur nginx-1.19.6/src/stream/ngx_stream_ssl_module.c nginx/src/stream/ngx_stream_ssl_module.c
++--- nginx-1.19.6/src/stream/ngx_stream_ssl_module.c	2020-12-15 15:41:39.000000000 +0100
+++++ nginx/src/stream/ngx_stream_ssl_module.c	2021-01-13 15:12:10.226632715 +0100
++@@ -14,7 +14,11 @@
++     ngx_pool_t *pool, ngx_str_t *s);
++ 
++ 
+++#ifndef WOLFSSL_NGINX
++ #define NGX_DEFAULT_CIPHERS     "HIGH:!aNULL:!MD5"
+++#else
+++#define NGX_DEFAULT_CIPHERS     "ALL"
+++#endif
++ #define NGX_DEFAULT_ECDH_CURVE  "auto"
++ 
++ 
+diff --git a/configure b/configure
+index d461294..83acf54 100755
+--- a/configure
++++ b/configure
+@@ -338,7 +338,7 @@ for my $opt (@ARGV) {
          my $mod_path = File::Spec->rel2abs($1);
          push @ngx_opts, "--add-dynamic-module=$mod_path";
  
@@ -9,7 +319,7 @@
  
          my ($lib, $path) = ($1, $2);
          if ($lib eq 'openssl' && $OS eq 'darwin') {
-@@ -347,6 +347,9 @@
+@@ -347,6 +347,9 @@ for my $opt (@ARGV) {
                  push @extra_make_env, 'KERNEL_BITS=64';
              }
          }
@@ -19,7 +329,7 @@
          $path = File::Spec->rel2abs($path);
          push @ngx_opts, "--with-$lib=$path";
          $with_ext_lib{$lib} = 1;
-@@ -646,6 +649,13 @@
+@@ -646,6 +649,13 @@ _END_
          shell "patch -p0 < nginx-no_pool.patch";
      }
  
@@ -33,7 +343,7 @@
      if (my $drizzle_prefix = $opts->{libdrizzle}) {
          my $drizzle_lib = "$drizzle_prefix/lib";
          env LIBDRIZZLE_LIB => $drizzle_lib;
-@@ -1524,6 +1534,8 @@
+@@ -1524,6 +1534,8 @@ Options directly inherited from nginx
    --with-openssl=DIR                 set path to OpenSSL library sources
    --with-openssl-opt=OPTIONS         set additional build options for OpenSSL
  
@@ -42,3 +352,6 @@
    --dry-run                          dry running the configure, for testing only
    --platform=PLATFORM                forcibly specify a platform name, for testing only
  _EOC_
+-- 
+2.25.1
+
