@@ -1,0 +1,167 @@
+diff --git a/configure.ac b/configure.ac
+index 56e2a62..dd14e33 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -864,6 +864,33 @@ AC_LBL_SOCKADDR_SA_LEN
+ 
+ AC_LBL_UNALIGNED_ACCESS
+ 
++AC_ARG_WITH(wolfssl,
++    AS_HELP_STRING([--with-wolfssl]=DIR,
++		   [use wolfSSL (located in directory DIR) @<:@default=no@:>@]),
++[
++	CPPFLAGS="$CPPFLAGS -I${withval}/include/wolfssl -I${withval}/include/"
++	LDFLAGS="$LDFLAGS -L${withval}/lib"
++	LIBS="$LIBS -lwolfssl"
++	USE_WOLFSSL=yes],
++[
++	USE_WOLFSSL=no
++])
++
++if test $USE_WOLFSSL = yes
++then
++    AC_CHECK_HEADER([wolfssl/options.h])
++    if test $ac_cv_header_wolfssl_options_h = yes
++    then
++        AC_DEFINE(HAVE_WOLFSSL, 1, [define if you're using wolfSSL])
++        AC_DEFINE(HAVE_EVP_CIPHER_CTX_NEW, 1, [])
++        AC_DEFINE(HAVE_EVP_CIPHERINIT_EX, 1, [])
++        AC_DEFINE(HAVE_LIBCRYPTO, 1, [])
++        AC_DEFINE(HAVE_OPENSSL_EVP_H, 1, [])
++    else
++        AC_MSG_ERROR([Unable to find wolfssl.])
++    fi
++fi
++
+ # Check for OpenSSL/libressl libcrypto
+ AC_MSG_CHECKING(whether to use OpenSSL/libressl libcrypto)
+ # Specify location for both includes and libraries.
+@@ -872,7 +899,11 @@ AC_ARG_WITH(crypto,
+     AS_HELP_STRING([--with-crypto]@<:@=DIR@:>@,
+ 		   [use OpenSSL/libressl libcrypto (located in directory DIR, if specified) @<:@default=yes, if available@:>@]),
+ [
+-	if test $withval = no
++	if test $USE_WOLFSSL = yes
++	then
++		want_libcrypto=no
++		AC_MSG_RESULT(no)
++	elif test $withval = no
+ 	then
+ 		# User doesn't want to link with libcrypto.
+ 		want_libcrypto=no
+@@ -898,12 +929,18 @@ AC_ARG_WITH(crypto,
+ 		LIBS="-L$withval/lib $LIBS"
+ 	fi
+ ],[
++	if test $USE_WOLFSSL = yes
++	then
++		want_libcrypto=no
++		AC_MSG_RESULT(no)
+ 	#
+ 	# Use libcrypto if it's present, otherwise don't; no directory
+ 	# was specified.
+ 	#
+-	want_libcrypto=ifavailable
+-	AC_MSG_RESULT([yes, if available])
++	else
++		want_libcrypto=ifavailable
++		AC_MSG_RESULT([yes, if available])
++	fi
+ ])
+ if test "$want_libcrypto" != "no"; then
+ 	#
+diff --git a/print-esp.c b/print-esp.c
+index 6fabff1..71166bf 100644
+--- a/print-esp.c
++++ b/print-esp.c
+@@ -37,6 +37,10 @@
+  * is the simplest way of handling the dependency.
+  */
+ #ifdef HAVE_LIBCRYPTO
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#include <openssl/ssl.h>
++#endif
+ #ifdef HAVE_OPENSSL_EVP_H
+ #include <openssl/evp.h>
+ #else
+@@ -259,7 +263,13 @@ int esp_print_decrypt_buffer_by_ikev2(netdissect_options *ndo,
+ 		EVP_CIPHER_CTX_free(ctx);
+ 		(*ndo->ndo_error)(ndo, "can't allocate memory for decryption buffer");
+ 	}
++#ifdef HAVE_WOLFSSL
++	/* wolfSSL expects the length passed in to include the padding, so we use
++	 * buffer_size here instead of len. */
++	EVP_Cipher(ctx, output_buffer, input_buffer, buffer_size);
++#else
+ 	EVP_Cipher(ctx, output_buffer, input_buffer, len);
++#endif
+ 	EVP_CIPHER_CTX_free(ctx);
+ 
+ 	/*
+@@ -617,7 +627,11 @@ static void esp_init(netdissect_options *ndo _U_)
+ #if !defined(OPENSSL_API_COMPAT) || OPENSSL_API_COMPAT < 0x10100000L
+ 	OpenSSL_add_all_algorithms();
+ #endif
++/* wolfSSL doesn't support EVP_add_cipher_alias, and "3des" is already mapped
++ * correctly in wolfSSL_EVP_get_cipherbyname. */
++#ifndef HAVE_WOLFSSL
+ 	EVP_add_cipher_alias(SN_des_ede3_cbc, "3des");
++#endif
+ }
+ USES_APPLE_RST
+ 
+diff --git a/print-tcp.c b/print-tcp.c
+index b80a2f2..9d75026 100644
+--- a/print-tcp.c
++++ b/print-tcp.c
+@@ -52,6 +52,9 @@ __RCSID("$NetBSD: print-tcp.c,v 1.8 2007/07/24 11:53:48 drochner Exp $");
+ #include "rpc_msg.h"
+ 
+ #ifdef HAVE_LIBCRYPTO
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/md5.h>
+ #include "signature.h"
+ 
+diff --git a/signature.c b/signature.c
+index 204e345..0da2e3a 100644
+--- a/signature.c
++++ b/signature.c
+@@ -28,6 +28,9 @@
+ #include "signature.h"
+ 
+ #ifdef HAVE_LIBCRYPTO
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/md5.h>
+ #endif
+ 
+diff --git a/tcpdump.c b/tcpdump.c
+index 043bda1..c620f14 100644
+--- a/tcpdump.c
++++ b/tcpdump.c
+@@ -63,6 +63,10 @@ The Regents of the University of California.  All rights reserved.\n";
+ #endif
+ 
+ #ifdef HAVE_LIBCRYPTO
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#include <openssl/ssl.h>
++#endif
+ #include <openssl/crypto.h>
+ #endif
+ 
+@@ -1146,6 +1150,10 @@ main(int argc, char **argv)
+ 	ndo_set_function_pointers(ndo);
+ 	ndo->ndo_snaplen = DEFAULT_SNAPLEN;
+ 
++#if defined(HAVE_WOLFSSL) && defined(DEBUG_WOLFSSL)
++	wolfSSL_Debugging_ON();
++#endif
++
+ 	cnt = -1;
+ 	device = NULL;
+ 	infile = NULL;
