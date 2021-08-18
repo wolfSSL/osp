@@ -1,4 +1,4 @@
-From c47049504ab448d050a34d21a73b836a9fded3d8 Mon Sep 17 00:00:00 2001
+From f2f5a90deed996b8f3ff66e0e70bc38b4d2f8bd1 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Tue, 15 Jun 2021 17:14:31 +0200
 Subject: [PATCH] Patch for wolfSSL
@@ -35,7 +35,7 @@ Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
 ---
  bin/named/Makefile.in         |  6 ++-
  bin/tests/optional/lex_test.c |  2 +-
- configure.ac                  | 92 ++++++++++++++++++++++++++++++++++-
+ configure.ac                  | 94 ++++++++++++++++++++++++++++++++++-
  lib/dns/dst_openssl.h         |  8 ++-
  lib/dns/name.c                | 10 ++--
  lib/dns/openssl_link.c        |  3 +-
@@ -55,7 +55,7 @@ Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
  lib/isc/sockaddr.c            |  6 +--
  lib/isc/unix/socket.c         |  6 +--
  lib/isc/win32/socket.c        | 14 +++---
- 22 files changed, 202 insertions(+), 43 deletions(-)
+ 22 files changed, 204 insertions(+), 43 deletions(-)
 
 diff --git a/bin/named/Makefile.in b/bin/named/Makefile.in
 index e7a61c9086..2065de8da9 100644
@@ -99,10 +99,10 @@ index 4631242602..5311960512 100644
  	}
  }
 diff --git a/configure.ac b/configure.ac
-index 33bd76ac3b..1115b734be 100644
+index 33bd76ac3b..d79ccd3831 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -1474,6 +1474,70 @@ AC_ARG_WITH(openssl,
+@@ -1474,6 +1474,72 @@ AC_ARG_WITH(openssl,
  				(Crypto is required for DNSSEC)]),
  	    use_openssl="$withval", use_openssl="auto")
  
@@ -167,13 +167,15 @@ index 33bd76ac3b..1115b734be 100644
 +	AC_DEFINE([HAVE_DSA_GET0_PQG], [1], [wolfSSL includes])
 +	AC_DEFINE([HAVE_OPENSSL_EVP_AES], [1], [wolfSSL includes])
 +	AC_DEFINE([HAVE_OPENSSL_AES], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_ECDSA_SIG_GET0], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_ECDSA_SIG_SET0], [1], [wolfSSL includes])
 +	use_openssl="wolfssl"
 +fi
 +
  #
  # was --with-pkcs11 specified?
  #
-@@ -1587,6 +1651,25 @@ case "$use_openssl" in
+@@ -1587,6 +1653,25 @@ case "$use_openssl" in
  [OpenSSL was not found in any of $openssldirs; use --with-openssl=/path
  If you don't want OpenSSL, use --without-openssl])
  		;;
@@ -199,7 +201,7 @@ index 33bd76ac3b..1115b734be 100644
  	*)
  		if test "yes" = "$want_native_pkcs11"
  		then
-@@ -5508,8 +5591,13 @@ report() {
+@@ -5508,8 +5593,13 @@ report() {
      if test "yes" = "$enable_full_report"; then
  	test "no" = "$enable_ipv6" -o "no" = "$found_ipv6" || \
  	    echo "    IPv6 support (--enable-ipv6)"
