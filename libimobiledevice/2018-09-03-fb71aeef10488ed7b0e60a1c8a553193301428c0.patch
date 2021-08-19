@@ -1,4 +1,4 @@
-From 776f20111c6fe36b9a6c3f10f2a5a57dd111941d Mon Sep 17 00:00:00 2001
+From c568f1f7be013b899364fd4c88ba730854e4724d Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Fri, 13 Aug 2021 16:17:48 +0200
 Subject: [PATCH] Support for wolfSSL
@@ -19,12 +19,12 @@ make install
 ```
 ---
  common/Makefile.am    |  2 +-
- configure.ac          | 33 +++++++++++++++++++++++++++++++++
+ configure.ac          | 37 +++++++++++++++++++++++++++++++++++--
  cython/Makefile.am    |  4 ++--
  src/Makefile.am       |  4 ++--
  tools/Makefile.am     |  4 ++--
  tools/idevicebackup.c |  3 +++
- 6 files changed, 43 insertions(+), 7 deletions(-)
+ 6 files changed, 45 insertions(+), 9 deletions(-)
 
 diff --git a/common/Makefile.am b/common/Makefile.am
 index 054e2a1..e8f9120 100644
@@ -39,10 +39,10 @@ index 054e2a1..e8f9120 100644
  
  noinst_LTLIBRARIES = libinternalcommon.la
 diff --git a/configure.ac b/configure.ac
-index e41baa3..7e8831d 100644
+index e41baa3..69bee8e 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -118,11 +118,21 @@ fi
+@@ -118,14 +118,25 @@ fi
  AM_CONDITIONAL([HAVE_CYTHON],[test "x$CYTHON_SUB" = "xcython"])
  AC_SUBST([CYTHON_SUB])
  
@@ -57,14 +57,20 @@ index e41baa3..7e8831d 100644
              [Do not look for OpenSSL])],
              [use_openssl=$enableval],
              [use_openssl=yes])
-+            
+ 
+-pkg_req_openssl="openssl >= 0.9.8"
+-PKG_CHECK_MODULES(openssl, $pkg_req_openssl, have_openssl=yes, have_openssl=no)
 +if test "x$use_wolfssl" = "xyes"; then
 +  use_openssl=no
++else
++  pkg_req_openssl="openssl >= 0.9.8"
++  PKG_CHECK_MODULES(openssl, $pkg_req_openssl, have_openssl=yes, have_openssl=no)
 +fi
- 
- pkg_req_openssl="openssl >= 0.9.8"
- PKG_CHECK_MODULES(openssl, $pkg_req_openssl, have_openssl=yes, have_openssl=no)
-@@ -146,6 +156,29 @@ if test "x$enable_openssl" = "xyes"; then
++
+ if test "x$have_openssl" = "xyes"; then
+   if test "x$use_openssl" != "xyes"; then
+     enable_openssl=no
+@@ -146,6 +157,28 @@ if test "x$enable_openssl" = "xyes"; then
    ssl_provider="OpenSSL";
    ssl_requires="$pkg_req_openssl"
    AC_SUBST(ssl_requires)
@@ -90,7 +96,6 @@ index e41baa3..7e8831d 100644
 +  ssl_provider="wolfSSL";
 +  ssl_requires="wolfssl"
 +  AC_SUBST(ssl_requires)
-+  
  else
    pkg_req_gnutls="gnutls >= 2.2.0"
    pkg_req_libtasn1="libtasn1 >= 1.1"
