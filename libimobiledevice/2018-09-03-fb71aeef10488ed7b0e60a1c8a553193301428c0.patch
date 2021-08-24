@@ -1,6 +1,6 @@
-From c568f1f7be013b899364fd4c88ba730854e4724d Mon Sep 17 00:00:00 2001
-From: Juliusz Sosinowicz <juliusz@wolfssl.com>
-Date: Fri, 13 Aug 2021 16:17:48 +0200
+From 990fbf804c7daa2974bd1063366f674ff3957ab5 Mon Sep 17 00:00:00 2001
+From: Hayden Roche <hayden@wolfssl.com>
+Date: Mon, 23 Aug 2021 12:59:39 -0700
 Subject: [PATCH] Support for wolfSSL
 
 Compile wolfSSL with
@@ -19,12 +19,13 @@ make install
 ```
 ---
  common/Makefile.am    |  2 +-
+ common/userpref.c     | 21 +++++++++++++++++++++
  configure.ac          | 37 +++++++++++++++++++++++++++++++++++--
  cython/Makefile.am    |  4 ++--
  src/Makefile.am       |  4 ++--
  tools/Makefile.am     |  4 ++--
  tools/idevicebackup.c |  3 +++
- 6 files changed, 45 insertions(+), 9 deletions(-)
+ 7 files changed, 66 insertions(+), 9 deletions(-)
 
 diff --git a/common/Makefile.am b/common/Makefile.am
 index 054e2a1..e8f9120 100644
@@ -38,6 +39,62 @@ index 054e2a1..e8f9120 100644
  AM_LDFLAGS = $(libusbmuxd_LIBS) $(libplist_LIBS) ${libpthread_LIBS}
  
  noinst_LTLIBRARIES = libinternalcommon.la
+diff --git a/common/userpref.c b/common/userpref.c
+index be745cb..a67923b 100644
+--- a/common/userpref.c
++++ b/common/userpref.c
+@@ -347,6 +347,10 @@ static int X509_add_ext_helper(X509 *cert, int nid, char *value)
+ 	X509_EXTENSION *ex;
+ 	X509V3_CTX ctx;
+ 
++#ifdef HAVE_WOLFSSL
++	memset(&ctx, 0, sizeof(ctx));
++#endif
++
+ 	/* No configuration database */
+ 	X509V3_set_ctx_nodb(&ctx);
+ 
+@@ -411,7 +415,14 @@ userpref_error_t pair_record_generate_keys_and_certs(plist_t pair_record, key_da
+ 	{
+ 		/* set serial number */
+ 		ASN1_INTEGER* sn = ASN1_INTEGER_new();
++#ifdef HAVE_WOLFSSL
++		/* wolfSSL doesn't permit using 0 for serial numbers, in accordance with
++		 * RFC 5280:
++		 * https://datatracker.ietf.org/doc/html/rfc5280#section-4.1.2.2. */
++		ASN1_INTEGER_set(sn, 1);
++#else
+ 		ASN1_INTEGER_set(sn, 0);
++#endif
+ 		X509_set_serialNumber(root_cert, sn);
+ 		ASN1_INTEGER_free(sn);
+ 
+@@ -441,7 +452,12 @@ userpref_error_t pair_record_generate_keys_and_certs(plist_t pair_record, key_da
+ 	{
+ 		/* set serial number */
+ 		ASN1_INTEGER* sn = ASN1_INTEGER_new();
++#ifdef HAVE_WOLFSSL
++		/* See note above on 0 serial numbers. */
++		ASN1_INTEGER_set(sn, 2);
++#else
+ 		ASN1_INTEGER_set(sn, 0);
++#endif
+ 		X509_set_serialNumber(host_cert, sn);
+ 		ASN1_INTEGER_free(sn);
+ 
+@@ -528,7 +544,12 @@ userpref_error_t pair_record_generate_keys_and_certs(plist_t pair_record, key_da
+ 	if (pubkey && dev_cert) {
+ 		/* generate device certificate */
+ 		ASN1_INTEGER* sn = ASN1_INTEGER_new();
++#ifdef HAVE_WOLFSSL
++		/* See note above on 0 serial numbers. */
++		ASN1_INTEGER_set(sn, 3);
++#else
+ 		ASN1_INTEGER_set(sn, 0);
++#endif
+ 		X509_set_serialNumber(dev_cert, sn);
+ 		ASN1_INTEGER_free(sn);
+ 		X509_set_version(dev_cert, 2);
 diff --git a/configure.ac b/configure.ac
 index e41baa3..69bee8e 100644
 --- a/configure.ac
@@ -156,5 +213,5 @@ index 7e825de..c8dcb21 100644
  #include <openssl/sha.h>
  #else
 -- 
-2.25.1
+2.32.0
 
