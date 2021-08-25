@@ -269,10 +269,10 @@ index 930d12a7dd1..da216851c8a 100644
  enum my_aes_mode {
      MY_AES_ECB, MY_AES_CBC
 diff --git a/include/ssl_compat.h b/include/ssl_compat.h
-index 9f4b6be8d95..c107fe71969 100644
+index 9f4b6be8d95..dee058665ed 100644
 --- a/include/ssl_compat.h
 +++ b/include/ssl_compat.h
-@@ -14,6 +14,9 @@
+@@ -14,12 +14,15 @@
   along with this program; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
  
@@ -282,16 +282,34 @@ index 9f4b6be8d95..c107fe71969 100644
  #include <openssl/opensslv.h>
  
  /* OpenSSL version specific definitions */
-@@ -73,6 +76,9 @@
+ #if defined(OPENSSL_VERSION_NUMBER)
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER) && !defined(HAVE_WOLFSSL)
+ #define HAVE_OPENSSL11 1
+ #define SSL_LIBRARY OpenSSL_version(OPENSSL_VERSION)
+ #define ERR_remove_state(X) ERR_clear_error()
+@@ -65,7 +68,7 @@
+ #define EVP_MD_CTX_SIZE                 sizeof(wc_Md5)
+ #endif
+ 
+-#ifndef HAVE_OPENSSL11
++#if !defined(HAVE_OPENSSL11) || defined(HAVE_WOLFSSL)
+ #ifndef ASN1_STRING_get0_data
+ #define ASN1_STRING_get0_data(X)        ASN1_STRING_data(X)
+ #endif
+@@ -73,7 +76,11 @@
  #define EVP_MD_CTX_SIZE                 sizeof(EVP_MD_CTX)
  #endif
  
-+#ifdef HAVE_WOLFSSL
++#if defined(HAVE_WOLFSSL) && defined(DH_set0_pqg)
 +#undef DH_set0_pqg
 +#endif
  #define DH_set0_pqg(D,P,Q,G)            ((D)->p= (P), (D)->g= (G))
++
  #define EVP_CIPHER_CTX_buf_noconst(ctx) ((ctx)->buf)
  #define EVP_CIPHER_CTX_encrypting(ctx)  ((ctx)->encrypt)
+ #define EVP_CIPHER_CTX_SIZE             sizeof(EVP_CIPHER_CTX)
 diff --git a/include/violite.h b/include/violite.h
 index 28e3ca08b0a..7aba233a849 100644
 --- a/include/violite.h
@@ -306,7 +324,7 @@ index 28e3ca08b0a..7aba233a849 100644
  #include <openssl/ssl.h>
  #undef template
  #include <openssl/err.h>
-Submodule libmariadb 180c543704d..62e2af2aab5:
+Submodule libmariadb 180c543704d..6c2f73c2ffa:
 diff --git a/libmariadb/CMakeLists.txt b/libmariadb/CMakeLists.txt
 index 498eca0..154739c 100644
 --- a/libmariadb/CMakeLists.txt
@@ -326,7 +344,7 @@ index 498eca0..154739c 100644
      FIND_PACKAGE(GnuTLS "3.3.24" REQUIRED)
      IF(GNUTLS_FOUND)
 diff --git a/libmariadb/libmariadb/secure/openssl.c b/libmariadb/libmariadb/secure/openssl.c
-index 26113cc..0d13356 100644
+index 26113cc..962207d 100644
 --- a/libmariadb/libmariadb/secure/openssl.c
 +++ b/libmariadb/libmariadb/secure/openssl.c
 @@ -25,6 +25,9 @@
@@ -391,7 +409,7 @@ index 26113cc..0d13356 100644
      *p= 0;
    rc= 0;
    ma_tls_initialized= TRUE;
-+#ifndef HAVE_WOLFSSL
++#if defined(HAVE_OPENSSL_1_1_API) || !defined(HAVE_WOLFSSL)
  end:
 +#endif
    pthread_mutex_unlock(&LOCK_openssl_config);
