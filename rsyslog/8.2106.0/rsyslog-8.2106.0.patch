@@ -1,0 +1,454 @@
+diff --git a/Makefile.am b/Makefile.am
+index b3119fb31..d6a404582 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -486,8 +486,14 @@ DISTCHECK_CONFIGURE_FLAGS+= --disable-gnutls-tests
+ endif
+ 
+ if ENABLE_OPENSSL
++if !ENABLE_WOLFSSL
+ DISTCHECK_CONFIGURE_FLAGS+= --enable-openssl
+ endif
++endif
++
++if ENABLE_WOLFSSL
++DISTCHECK_CONFIGURE_FLAGS+= --with-wolfssl
++endif
+ 
+ if ENABLE_MYSQL
+ DISTCHECK_CONFIGURE_FLAGS+= --enable-mysql
+diff --git a/configure.ac b/configure.ac
+index 4343d431c..443ccf86d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1049,6 +1049,20 @@ AC_ARG_ENABLE(clickhouse_tests,
+ )
+ AM_CONDITIONAL(ENABLE_CLICKHOUSE_TESTS, test x$enable_clickhouse_tests = xyes)
+ 
++AC_ARG_WITH(wolfssl,
++    AS_HELP_STRING([--with-wolfssl]=DIR,
++		   [Enable wolfssl support @<:@default=no@:>@]),
++[
++	AC_SUBST(WOLFSSL_CFLAGS,  ["-I${withval}/include/wolfssl -I${withval}/include"])
++	AC_SUBST(WOLFSSL_LIBS,    ["-L${withval}/lib -lwolfssl"])
++	enable_wolfssl=yes
++	AC_DEFINE([ENABLE_OPENSSL], [1], [Indicator that openssl is present])
++	AC_DEFINE([ENABLE_WOLFSSL], [1], [Indicator that wolfssl is present])
++],
++[
++	enable_wolfssl=no
++])
++AM_CONDITIONAL(ENABLE_WOLFSSL, [test "x$enable_wolfssl" = "xyes"])
+ 
+ # openssl support
+ AC_ARG_ENABLE(openssl,
+@@ -1065,8 +1079,7 @@ if test "x$enable_openssl" = "xyes"; then
+ 	AC_DEFINE([ENABLE_OPENSSL], [1], [Indicator that openssl is present])
+ 	save_libs=$LIBS
+ fi
+-AM_CONDITIONAL(ENABLE_OPENSSL, test x$enable_openssl = xyes)
+-
++AM_CONDITIONAL(ENABLE_OPENSSL, [test "x$enable_openssl" = "xyes" || test "x$enable_wolfssl" = "xyes"])
+ 
+ # GnuTLS support
+ AC_ARG_ENABLE(gnutls,
+@@ -2813,6 +2826,7 @@ echo "    hiredis support enabled:                  $enable_omhiredis"
+ echo
+ echo "---{ protocol support }---"
+ echo "    openssl network stream driver enabled:    $enable_openssl"
++echo "    wolfssl network stream driver enabled:    $enable_wolfssl"
+ echo "    GnuTLS network stream driver enabled:     $enable_gnutls"
+ echo "    GSSAPI Kerberos 5 support enabled:        $enable_gssapi_krb5"
+ echo "    RELP support enabled:                     $enable_relp"
+diff --git a/runtime/Makefile.am b/runtime/Makefile.am
+index f62773952..867d31dca 100644
+--- a/runtime/Makefile.am
++++ b/runtime/Makefile.am
+@@ -207,10 +207,16 @@ endif # if ENABLE_INET
+ if ENABLE_OPENSSL
+ pkglib_LTLIBRARIES += lmnsd_ossl.la
+ lmnsd_ossl_la_SOURCES = nsd_ossl.c nsd_ossl.h nsdsel_ossl.c  nsdsel_ossl.h
+-lmnsd_ossl_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS) $(OPENSSL_CFLAGS)
+ lmnsd_ossl_la_LDFLAGS = -module -avoid-version
++
++if ENABLE_WOLFSSL
++lmnsd_ossl_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS) $(WOLFSSL_CFLAGS)
++lmnsd_ossl_la_LIBADD = $(WOLFSSL_LIBS)
++else
++lmnsd_ossl_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS) $(OPENSSL_CFLAGS)
+ lmnsd_ossl_la_LIBADD = $(OPENSSL_LIBS)
+ endif
++endif
+ 
+ #
+ # GnuTLS netstream driver
+diff --git a/runtime/nsd_ossl.c b/runtime/nsd_ossl.c
+index 79347916e..a6d699a12 100644
+--- a/runtime/nsd_ossl.c
++++ b/runtime/nsd_ossl.c
+@@ -28,6 +28,9 @@
+ #include <stdlib.h>
+ #include <assert.h>
+ #include <string.h>
++#ifdef ENABLE_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/ssl.h>
+ #include <openssl/x509v3.h>
+ #include <openssl/err.h>
+@@ -66,6 +69,9 @@ DEFobjCurrIf(datetime)
+ DEFobjCurrIf(nsd_ptcp)
+ 
+ /* OpenSSL API differences */
++#ifdef ENABLE_WOLFSSL
++#define RSYSLOG_X509_NAME_oneline(X509CERT) X509_get_subject_name(X509CERT)
++#else
+ #if OPENSSL_VERSION_NUMBER >= 0x10100000L
+ 	#define RSYSLOG_X509_NAME_oneline(X509CERT) X509_get_subject_name(X509CERT)
+ 	#define RSYSLOG_BIO_method_name(SSLBIO) BIO_method_name(SSLBIO)
+@@ -77,6 +83,7 @@ DEFobjCurrIf(nsd_ptcp)
+ 	#define RSYSLOG_BIO_number_read(SSLBIO) SSLBIO->num
+ 	#define RSYSLOG_BIO_number_written(SSLBIO) SSLBIO->num
+ #endif
++#endif /* ENABLE_WOLFSSL */
+ 
+ 
+ static int bGlblSrvrInitDone = 0;	/**< 0 - server global init not yet done, 1 - already done */
+@@ -92,6 +99,9 @@ static int bAnonInit;
+ static MUTEX_TYPE anonInit_mut = PTHREAD_MUTEX_INITIALIZER;
+ 
+ /*--------------------------------------MT OpenSSL helpers ------------------------------------------*/
++/* wolfSSL doesn't require any special setup to be used in a multi-threaded
++ * context, unlike OpenSSL. */
++#ifndef ENABLE_WOLFSSL
+ static MUTEX_TYPE *mutex_buf = NULL;
+ 
+ void locking_function(int mode, int n,
+@@ -187,6 +197,7 @@ int opensslh_THREAD_cleanup(void)
+ 	DBGPRINTF("openssl: multithread cleanup finished\n");
+ 	return 1;
+ }
++#endif /* !ENABLE_WOLFSSL */
+ /*-------------------------------------- MT OpenSSL helpers -----------------------------------------*/
+ 
+ /*--------------------------------------OpenSSL helpers ------------------------------------------*/
+@@ -226,8 +237,15 @@ int verify_callback(int status, X509_STORE_CTX *store)
+ 		/* Retrieve all needed pointers */
+ 		X509 *cert = X509_STORE_CTX_get_current_cert(store);
+ 		int depth = X509_STORE_CTX_get_error_depth(store);
+-		int err = X509_STORE_CTX_get_error(store);
+ 		SSL* ssl = X509_STORE_CTX_get_ex_data(store, SSL_get_ex_data_X509_STORE_CTX_idx());
++		/* In wolfSSL, the errors being checked below (e.g. 
++		 * X509_V_ERR_CERT_HAS_EXPIRED) are accessed via SSL_get_verify_result
++		 * rather than X509_STORE_CTX_get_error. */
++		#ifdef ENABLE_WOLFSSL
++		int err = SSL_get_verify_result(ssl);
++		#else
++		int err = X509_STORE_CTX_get_error(store);
++		#endif
+ 		int iVerifyMode = SSL_get_verify_mode(ssl);
+ 		nsd_ossl_t *pThis = (nsd_ossl_t*) SSL_get_ex_data(ssl, 0);
+ 		assert(pThis != NULL);
+@@ -296,6 +314,9 @@ int verify_callback(int status, X509_STORE_CTX *store)
+ 	return status;
+ }
+ 
++/* wolfSSL doesn't support all the functions being used in this debug code (e.g.
++ * BIO_number_read), so we don't compile it for the wolfSSL case. */
++#ifndef ENABLE_WOLFSSL
+ long BIO_debug_callback(BIO *bio, int cmd, const char __attribute__((unused)) *argp,
+ 			int argi, long __attribute__((unused)) argl, long ret)
+ {
+@@ -373,7 +394,7 @@ long BIO_debug_callback(BIO *bio, int cmd, const char __attribute__((unused)) *a
+ 
+ 	return (r);
+ }
+-
++#endif /* !ENABLE_WOLFSSL */
+ 
+ /* Convert a fingerprint to printable data. The  conversion is carried out
+  * according IETF I-D syslog-transport-tls-12. The fingerprint string is
+@@ -417,10 +438,17 @@ osslGlblInit(void)
+ 	const char *caFile, *certFile, *keyFile;
+ 
+ 	/* Setup OpenSSL library */
++	#ifndef ENABLE_WOLFSSL
+ 	if((opensslh_THREAD_setup() == 0) || !SSL_library_init()) {
++	#else
++	if(!SSL_library_init()) {
++	#endif
+ 		LogError(0, RS_RET_NO_ERRCODE, "Error: OpenSSL initialization failed!");
+ 	}
+ 
++	#if defined(ENABLE_WOLFSSL) && defined(DEBUG_WOLFSSL)
++	wolfSSL_Debugging_ON();
++	#endif
+ 	/* Load readable error strings */
+ 	SSL_load_error_strings();
+ 	ERR_load_BIO_strings();
+@@ -452,8 +480,16 @@ osslGlblInit(void)
+ 		bHaveKey = 1;
+ 	}
+ 
++/* wolfSSL will use TLS 1.3 if it's compiled in and we call SSLv23_method. This
++ * is at odds with the fact that rsyslog allows usage of anonymous cipher
++ * suites, which were deprecated in TLS 1.3. To continue to allow these suites,
++ * we explicitly request TLS 1.2 here. */
++#ifdef ENABLE_WOLFSSL
++	ctx = SSL_CTX_new(TLSv1_2_method());
++#else
+ 	/* Create main CTX Object */
+ 	ctx = SSL_CTX_new(SSLv23_method());
++#endif
+ 	if(bHaveCA == 1 && SSL_CTX_load_verify_locations(ctx, caFile, NULL) != 1) {
+ 		LogError(0, RS_RET_TLS_CERT_ERR, "Error: CA certificate could not be accessed. "
+ 				"Check at least: 1) file path is correct, 2) file exist, "
+@@ -501,6 +537,11 @@ finalize_it:
+ static rsRetVal
+ osslAnonInit(void)
+ {
++	#ifdef ENABLE_WOLFSSL
++	DH* dh;
++	BIGNUM* p;
++	BIGNUM* g;
++	#endif
+ 	DEFiRet;
+ 	pthread_mutex_lock(&anonInit_mut);
+ 	if (bAnonInit == 1) {
+@@ -509,7 +550,19 @@ osslAnonInit(void)
+ 	}
+ 	dbgprintf("osslAnonInit Init Anon OpenSSL helpers\n");
+ 
+-	#if OPENSSL_VERSION_NUMBER >= 0x10002000L
++	#ifdef ENABLE_WOLFSSL
++	/* wolfSSL doesn't have support for ECDH anonymous ciphers, just DH.
++	 * Accordingly, we need to generate an ephemeral DH key. This is done using
++	 * the parameters from RFC3526 prime 2048 (id 14).*/
++	dh = DH_new();
++	p = get_rfc3526_prime_2048(NULL);
++	g = BN_new();
++	BN_set_word(g, 2);
++	DH_set0_pqg(dh, p, NULL, g);
++	DH_generate_key(dh);
++	SSL_CTX_set_tmp_dh(ctx, dh);
++	DH_free(dh);
++	#elif OPENSSL_VERSION_NUMBER >= 0x10002000L
+ 	/* Enable Support for automatic EC temporary key parameter selection. */
+ 	SSL_CTX_set_ecdh_auto(ctx, 1);
+ 	#else
+@@ -636,8 +689,21 @@ osslInitSession(nsd_ossl_t *pThis) /* , nsd_ossl_t *pServer) */
+ 	}
+ 
+ 	if (bAnonInit == 1) { /* no mutex needed, read-only after init */
++		#ifdef ENABLE_WOLFSSL
++		if (bHaveCert == 0) {
++			/* To get wolfSSL to use the anonymous ciphers, they need to be
++			 * moved to the front of the list (or be the only items in the
++			 * list). But, we only want to do this if we don't have a cert.
++			 * Otherwise, we want to prefer non-anonymous ciphers. OpenSSL
++			 * defaults to anon ciphers when a cert is not available. */
++			strncpy(pristringBuf, "ADH-AES256-GCM-SHA384:ADH-AES128-SHA",
++				sizeof(pristringBuf));
++		}
++		else {
++			strncpy(pristringBuf, "ALL", sizeof(pristringBuf));
++		}
+ 		/* Allow ANON Ciphers */
+-		#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
++		#elif OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
+ 		 /* NOTE: do never use: +eNULL, it DISABLES encryption! */
+ 		strncpy(pristringBuf, "ALL:+COMPLEMENTOFDEFAULT:+ADH:+ECDH:+aNULL@SECLEVEL=0",
+ 			sizeof(pristringBuf));
+@@ -657,8 +723,10 @@ osslInitSession(nsd_ossl_t *pThis) /* , nsd_ossl_t *pServer) */
+ 	client = BIO_new_socket(pPtcp->sock, BIO_CLOSE /*BIO_NOCLOSE*/);
+ 	dbgprintf("osslInitSession: Init client BIO[%p] done\n", (void *)client);
+ 
++	#ifndef ENABLE_WOLFSSL
+ 	/* Set debug Callback for client BIO as well! */
+ 	BIO_set_callback(client, BIO_debug_callback);
++	#endif
+ 
+ /* TODO: still needed? Set to NON blocking ! */
+ BIO_set_nbio( client, 1 );
+@@ -1392,7 +1460,7 @@ osslPostHandshakeCheck(nsd_ossl_t *pNsd)
+ 	if (SSL_get_shared_ciphers(pNsd->ssl,szDbg, sizeof szDbg) != NULL)
+ 		dbgprintf("osslPostHandshakeCheck: Debug Shared ciphers = %s\n", szDbg);
+ 
+-	#if OPENSSL_VERSION_NUMBER >= 0x10002000L
++	#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(ENABLE_WOLFSSL)
+ 	if(SSL_get_shared_curve(pNsd->ssl, -1) == 0) {
+ 		LogError(0, RS_RET_NO_ERRCODE, "nsd_ossl:"
+ 		"No shared curve between syslog client and server.");
+@@ -1731,7 +1799,9 @@ Connect(nsd_t *pNsd, int family, uchar *port, uchar *host, char *device)
+ 	nsd_ossl_t* pThis = (nsd_ossl_t*) pNsd;
+ 	nsd_ptcp_t* pPtcp = (nsd_ptcp_t*) pThis->pTcp;
+ 	BIO *conn;
++#ifndef ENABLE_WOLFSSL
+ 	char pristringBuf[4096];
++#endif
+ 
+ 	ISOBJ_TYPE_assert(pThis, nsd_ossl);
+ 	assert(port != NULL);
+@@ -1772,6 +1842,11 @@ Connect(nsd_t *pNsd, int family, uchar *port, uchar *host, char *device)
+ 		}
+ 	}
+ 
++	/* If using wolfSSL, nothing needs to be done for the client side of anon
++	 * connections, aside from compiling libwolfssl with -DHAVE_ANON. The anon
++	 * ciphers will already be available and don't need to be enabled at
++	 * runtime. */
++	#ifndef ENABLE_WOLFSSL
+ 	if (bAnonInit == 1) { /* no mutex needed, read-only after init */
+ 		/* Allow ANON Ciphers */
+ 		#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
+@@ -1789,9 +1864,12 @@ Connect(nsd_t *pNsd, int family, uchar *port, uchar *host, char *device)
+ 			ABORT_FINALIZE(RS_RET_SYS_ERR);
+ 		}
+ 	}
++	#endif
+ 
++	#ifndef ENABLE_WOLFSSL
+ 	/* Set debug Callback for client BIO as well! */
+ 	BIO_set_callback(conn, BIO_debug_callback);
++	#endif
+ 
+ /* TODO: still needed? Set to NON blocking ! */
+ BIO_set_nbio( conn, 1 );
+@@ -1838,7 +1916,7 @@ SetGnutlsPriorityString(__attribute__((unused)) nsd_t *pNsd, __attribute__((unus
+ 		RETiRet;
+ 	} else {
+ 		dbgprintf("gnutlsPriorityString: set to '%s'\n", gnutlsPriorityString);
+-#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(LIBRESSL_VERSION_NUMBER)
++#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(LIBRESSL_VERSION_NUMBER) && !defined(ENABLE_WOLFSSL)
+ 		char *pCurrentPos;
+ 		char *pNextPos;
+ 		char *pszCmd;
+diff --git a/runtime/nsdsel_ossl.c b/runtime/nsdsel_ossl.c
+index 8f6a7927c..2c6284e95 100644
+--- a/runtime/nsdsel_ossl.c
++++ b/runtime/nsdsel_ossl.c
+@@ -28,6 +28,9 @@
+ #include <errno.h>
+ #include <string.h>
+ #include <sys/select.h>
++#ifdef ENABLE_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/ssl.h>
+ #include <openssl/bio.h>
+ 
+diff --git a/tests/Makefile.am b/tests/Makefile.am
+index fbe84ab04..6ad045257 100644
+--- a/tests/Makefile.am
++++ b/tests/Makefile.am
+@@ -2725,10 +2725,16 @@ tcpflood_CPPFLAGS += $(GNUTLS_CFLAGS)
+ tcpflood_LDADD += $(GNUTLS_LIBS)
+ endif
+ if ENABLE_OPENSSL
++if ENABLE_WOLFSSL
++tcpflood_CFLAGS += $(WOLFSSL_CFLAGS)
++tcpflood_CPPFLAGS += $(WOLFSSL_CFLAGS)
++tcpflood_LDADD += $(WOLFSSL_LIBS)
++else
+ tcpflood_CFLAGS += $(OPENSSL_CFLAGS)
+ tcpflood_CPPFLAGS += $(OPENSSL_CFLAGS)
+ tcpflood_LDADD += $(OPENSSL_LIBS)
+ endif
++endif
+ 
+ minitcpsrv_SOURCES = minitcpsrvr.c
+ minitcpsrv_LDADD = $(SOL_LIBS)
+diff --git a/tests/tcpflood.c b/tests/tcpflood.c
+index 4ad2a5c58..b02572a6f 100644
+--- a/tests/tcpflood.c
++++ b/tests/tcpflood.c
+@@ -123,11 +123,17 @@
+ #	endif
+ #endif
+ #ifdef ENABLE_OPENSSL
++#ifdef ENABLE_WOLFSSL
++	#include <wolfssl/options.h>
++#endif
+ 	#include <openssl/ssl.h>
+ 	#include <openssl/x509v3.h>
+ 	#include <openssl/err.h>
+ 	#include <openssl/engine.h>
+ 
++#ifdef ENABLE_WOLFSSL
++	#define RSYSLOG_X509_NAME_oneline(X509CERT) X509_get_subject_name(X509CERT)
++#else
+ 	/* OpenSSL API differences */
+ 	#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+ 		#define RSYSLOG_X509_NAME_oneline(X509CERT) X509_get_subject_name(X509CERT)
+@@ -141,6 +147,7 @@
+ 		#define RSYSLOG_BIO_number_written(SSLBIO) SSLBIO->num
+ 	#endif
+ 
++#endif /* ENABLE_WOLFSSL */
+ #endif
+ 
+ char *test_rs_strerror_r(int errnum, char *buf, size_t buflen) {
+@@ -1025,6 +1032,7 @@ runTests(void)
+  * alorbach, 2018-06-11
+  */
+ 
++#ifndef ENABLE_WOLFSSL
+ long BIO_debug_callback(BIO *bio, int cmd, const char __attribute__((unused)) *argp,
+ 			int argi, long __attribute__((unused)) argl, long ret)
+ {
+@@ -1100,6 +1108,7 @@ long BIO_debug_callback(BIO *bio, int cmd, const char __attribute__((unused)) *a
+ 
+ 	return (r);
+ }
++#endif /* !ENABLE_WOLFSSL */
+ 
+ void osslLastSSLErrorMsg(int ret, SSL *ssl, const char* pszCallSource)
+ {
+@@ -1189,13 +1198,25 @@ initTLS(void)
+ 		exit(1);
+ 	}
+ 
++#if defined(ENABLE_WOLFSSL) && defined(DEBUG_WOLFSSL)
++	wolfSSL_Debugging_ON();
++#endif
++
+ 	/* Load readable error strings */
+ 	SSL_load_error_strings();
+ 	ERR_load_BIO_strings();
+ 	ERR_load_crypto_strings();
+ 
++/* wolfSSL will use TLS 1.3 if it's compiled in and we call SSLv23_method. This
++ * is at odds with the fact that rsyslog allows usage of anonymous cipher
++ * suites, which were deprecated in TLS 1.3. To continue to allow these suites,
++ * we explicitly request TLS 1.2 here. */
++#ifdef ENABLE_WOLFSSL
++	ctx = SSL_CTX_new(TLSv1_2_method());
++#else
+ 	/* Create main CTX Object */
+ 	ctx = SSL_CTX_new(SSLv23_method());
++#endif
+ 
+ 	if(tlsCAFile != NULL && SSL_CTX_load_verify_locations(ctx, tlsCAFile, NULL) != 1) {
+ 		printf("tcpflood: Error, Failed loading CA certificate"
+@@ -1224,7 +1245,7 @@ initTLS(void)
+ 
+ 	/* Check for Custom Config string */
+ 	if (customConfig != NULL){
+-#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(LIBRESSL_VERSION_NUMBER)
++#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(LIBRESSL_VERSION_NUMBER) && !defined(ENABLE_WOLFSSL)
+ 	char *pCurrentPos;
+ 	char *pNextPos;
+ 	char *pszCmd;
+@@ -1349,10 +1370,12 @@ initTLSSess(int i)
+ 	//	printf("initTLSSess: Init client BIO[%p] done\n", (void *)client);
+ 	}
+ 
++#ifndef ENABLE_WOLFSSL
+ 	if(tlsLogLevel > 0) {
+ 		/* Set debug Callback for client BIO as well! */
+ 		BIO_set_callback(client, BIO_debug_callback);
+ 	}
++#endif
+ 
+ 	/* Blocking socket */
+ 	BIO_set_nbio( client, 0 );
