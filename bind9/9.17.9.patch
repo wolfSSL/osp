@@ -1,4 +1,4 @@
-From a89e24db5431e168e821d8484903de563e1117de Mon Sep 17 00:00:00 2001
+From c3a91d31202ac452597a40427bd5f832bec79f8c Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Fri, 21 May 2021 16:57:48 +0200
 Subject: [PATCH] Patch for wolfSSL
@@ -38,7 +38,7 @@ If any tests fail, please first try compiling with OpenSSL to check if your syst
 
 Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
 ---
- configure.ac                 | 65 ++++++++++++++++++++++++++++++++++++
+ configure.ac                 | 67 ++++++++++++++++++++++++++++++++++++
  doc/dev/unexpected           |  2 +-
  doc/misc/options             |  4 +--
  doc/misc/options.active      |  4 +--
@@ -58,13 +58,13 @@ Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
  lib/isc/sockaddr.c           |  6 ++--
  lib/isc/unix/socket.c        |  6 ++--
  lib/isc/win32/socket.c       | 14 ++++----
- 20 files changed, 159 insertions(+), 31 deletions(-)
+ 20 files changed, 161 insertions(+), 31 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index 154e023212..5cbc379846 100644
+index 154e023212a..a336a6d4eaf 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -612,6 +612,69 @@ AS_IF([test "$enable_pthread_rwlock" = "yes"],
+@@ -612,6 +612,71 @@ AS_IF([test "$enable_pthread_rwlock" = "yes"],
  
  CRYPTO=OpenSSL
  
@@ -106,35 +106,37 @@ index 154e023212..5cbc379846 100644
 +	# everything necessary available.
 +	#
 +	
-+	AC_DEFINE([HAVE_ECDSA_SIGN], [1], [])
-+	AC_DEFINE([HAVE_ECDSA_VERIFY], [1], [])
-+	AC_DEFINE([HAVE_EVP_AES_128_ECB], [1], [])
-+	AC_DEFINE([HAVE_EVP_AES_192_ECB], [1], [])
-+	AC_DEFINE([HAVE_EVP_AES_256_ECB], [1], [])
-+	AC_DEFINE([HAVE_EVP_CIPHER_CTX_FREE], [1], [])
-+	AC_DEFINE([HAVE_EVP_CIPHER_CTX_NEW], [1], [])
-+	AC_DEFINE([HAVE_EVP_MD_CTX_RESET], [1], [])
-+	AC_DEFINE([HAVE_EVP_MD_CTX_FREE], [1], [])
-+	AC_DEFINE([HAVE_EVP_MD_CTX_NEW], [1], [])
-+	AC_DEFINE([HAVE_EVP_SHA1], [1], [])
-+	AC_DEFINE([HAVE_EVP_SHA224], [1], [])
-+	AC_DEFINE([HAVE_EVP_SHA256], [1], [])
-+	AC_DEFINE([HAVE_EVP_SHA384], [1], [])
-+	AC_DEFINE([HAVE_EVP_SHA512], [1], [])
-+	AC_DEFINE([HAVE_RSA_SET0_KEY], [1], [])
-+	AC_DEFINE([HAVE_TLS_SERVER_METHOD], [1], [])
-+	AC_DEFINE([HAVE_HMAC_CTX_NEW], [1], [])
-+	AC_DEFINE([HAVE_HMAC_CTX_FREE], [1], [])
-+	AC_DEFINE([HAVE_HMAC_CTX_RESET], [1], [])
-+	AC_DEFINE([HAVE_HMAC_CTX_GET_MD], [1], [])
-+	AC_DEFINE([HAVE_DH_GET0_KEY], [1], [])
++	AC_DEFINE([HAVE_ECDSA_SIGN], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_ECDSA_VERIFY], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_AES_128_ECB], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_AES_192_ECB], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_AES_256_ECB], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_CIPHER_CTX_FREE], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_CIPHER_CTX_NEW], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_MD_CTX_RESET], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_MD_CTX_FREE], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_MD_CTX_NEW], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA1], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA224], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA256], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA384], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA512], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_RSA_SET0_KEY], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_TLS_SERVER_METHOD], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_HMAC_CTX_NEW], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_HMAC_CTX_FREE], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_HMAC_CTX_RESET], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_HMAC_CTX_GET_MD], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_DH_GET0_KEY], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_ECDSA_SIG_GET0], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_ECDSA_SIG_SET0], [1], [wolfSSL includes])
 +
 +else
 +
  #
  # OpenSSL/LibreSSL is mandatory
  #
-@@ -708,6 +771,8 @@ AC_CHECK_FUNCS([DH_get0_key ECDSA_SIG_get0 RSA_set0_key])
+@@ -708,6 +773,8 @@ AC_CHECK_FUNCS([DH_get0_key ECDSA_SIG_get0 RSA_set0_key])
  
  AC_CHECK_FUNCS([TLS_server_method])
  
@@ -144,7 +146,7 @@ index 154e023212..5cbc379846 100644
  # Check whether FIPS mode is available and whether we should enable it
  #
 diff --git a/doc/dev/unexpected b/doc/dev/unexpected
-index 2c6de4546a..70a61a8710 100644
+index 2c6de4546a4..70a61a87104 100644
 --- a/doc/dev/unexpected
 +++ b/doc/dev/unexpected
 @@ -44,4 +44,4 @@ scheme.
@@ -154,7 +156,7 @@ index 2c6de4546a..70a61a8710 100644
 -FATAL_ERROR().  This will log the problem and then terminate the application.
 +BIND_FATAL_ERROR().  This will log the problem and then terminate the application.
 diff --git a/doc/misc/options b/doc/misc/options
-index eac0be785a..27ae75aa8d 100644
+index eac0be785a9..27ae75aa8dd 100644
 --- a/doc/misc/options
 +++ b/doc/misc/options
 @@ -229,7 +229,7 @@ options {
@@ -176,7 +178,7 @@ index eac0be785a..27ae75aa8d 100644
          managed-keys { <string> (
              static-key | initial-key
 diff --git a/doc/misc/options.active b/doc/misc/options.active
-index b418af3c39..fd89464365 100644
+index b418af3c39e..fd894643655 100644
 --- a/doc/misc/options.active
 +++ b/doc/misc/options.active
 @@ -206,7 +206,7 @@ options {
@@ -198,7 +200,7 @@ index b418af3c39..fd89464365 100644
              static-key | initial-key
              | static-ds | initial-ds
 diff --git a/lib/dns/dst_openssl.h b/lib/dns/dst_openssl.h
-index 34b06d4e02..ab3a7ea763 100644
+index 34b06d4e021..ab3a7ea7634 100644
 --- a/lib/dns/dst_openssl.h
 +++ b/lib/dns/dst_openssl.h
 @@ -34,7 +34,11 @@
@@ -214,7 +216,7 @@ index 34b06d4e02..ab3a7ea763 100644
  	* defined(LIBRESSL_VERSION_NUMBER) */
  
 diff --git a/lib/dns/name.c b/lib/dns/name.c
-index 42ed549a11..78798b4837 100644
+index 42ed549a114..78798b4837e 100644
 --- a/lib/dns/name.c
 +++ b/lib/dns/name.c
 @@ -1248,7 +1248,7 @@ dns_name_fromtext(dns_name_t *name, isc_buffer_t *source,
@@ -263,7 +265,7 @@ index 42ed549a11..78798b4837 100644
  			/* Does not return. */
  		}
 diff --git a/lib/dns/openssl_link.c b/lib/dns/openssl_link.c
-index 5ba79569e6..77bbccf276 100644
+index 5ba79569e63..77bbccf2767 100644
 --- a/lib/dns/openssl_link.c
 +++ b/lib/dns/openssl_link.c
 @@ -163,7 +163,7 @@ dst__openssl_init(isc_mem_t *mctx, const char *engine) {
@@ -276,7 +278,7 @@ index 5ba79569e6..77bbccf276 100644
  			    "cannot be initialized (see the `PRNG not "
  			    "seeded' message in the OpenSSL FAQ)");
 diff --git a/lib/dns/openssldh_link.c b/lib/dns/openssldh_link.c
-index 72b8209366..f0d9b05991 100644
+index 72b82093669..f0d9b05991d 100644
 --- a/lib/dns/openssldh_link.c
 +++ b/lib/dns/openssldh_link.c
 @@ -239,6 +239,7 @@ openssldh_paramcompare(const dst_key_t *key1, const dst_key_t *key2) {
@@ -384,7 +386,7 @@ index 72b8209366..f0d9b05991 100644
  
  	for (i = 0; i < priv.nelements; i++) {
 diff --git a/lib/dns/opensslecdsa_link.c b/lib/dns/opensslecdsa_link.c
-index dd3c1bbf66..544021e049 100644
+index dd3c1bbf665..544021e049b 100644
 --- a/lib/dns/opensslecdsa_link.c
 +++ b/lib/dns/opensslecdsa_link.c
 @@ -34,12 +34,14 @@
@@ -431,7 +433,7 @@ index dd3c1bbf66..544021e049 100644
  static isc_result_t
  load_privkey_from_engine(EC_KEY *eckey, const char *engine, const char *label) {
 diff --git a/lib/dns/opensslrsa_link.c b/lib/dns/opensslrsa_link.c
-index 08be43d3fe..6fdc80ef35 100644
+index 08be43d3fe6..6fdc80ef35b 100644
 --- a/lib/dns/opensslrsa_link.c
 +++ b/lib/dns/opensslrsa_link.c
 @@ -426,6 +426,7 @@ opensslrsa_compare(const dst_key_t *key1, const dst_key_t *key2) {
@@ -540,7 +542,7 @@ index 08be43d3fe..6fdc80ef35 100644
  			label = (char *)priv.elements[i].data;
  			break;
 diff --git a/lib/dns/rbtdb.c b/lib/dns/rbtdb.c
-index b9a46cea40..b2a45d9b32 100644
+index b9a46cea403..b2a45d9b324 100644
 --- a/lib/dns/rbtdb.c
 +++ b/lib/dns/rbtdb.c
 @@ -4532,7 +4532,7 @@ zone_findzonecut(dns_db_t *db, const dns_name_t *name, unsigned int options,
@@ -553,7 +555,7 @@ index b9a46cea40..b2a45d9b32 100644
  	/* NOTREACHED */
  	return (ISC_R_NOTIMPLEMENTED);
 diff --git a/lib/dns/rpz.c b/lib/dns/rpz.c
-index 6c02fe5a8d..9504d63dac 100644
+index 6c02fe5a8df..9504d63dac2 100644
 --- a/lib/dns/rpz.c
 +++ b/lib/dns/rpz.c
 @@ -211,7 +211,7 @@ dns_rpz_type2str(dns_rpz_type_t type) {
@@ -566,7 +568,7 @@ index 6c02fe5a8d..9504d63dac 100644
  }
  
 diff --git a/lib/isc/entropy.c b/lib/isc/entropy.c
-index b31528a895..5738940604 100644
+index b31528a8951..5738940604b 100644
 --- a/lib/isc/entropy.c
 +++ b/lib/isc/entropy.c
 @@ -20,7 +20,7 @@
@@ -579,7 +581,7 @@ index b31528a895..5738940604 100644
  	}
  }
 diff --git a/lib/isc/include/isc/netmgr.h b/lib/isc/include/isc/netmgr.h
-index 7bb21b48e4..7d46f72976 100644
+index 7bb21b48e44..7d46f72976f 100644
 --- a/lib/isc/include/isc/netmgr.h
 +++ b/lib/isc/include/isc/netmgr.h
 @@ -16,7 +16,11 @@
@@ -595,7 +597,7 @@ index 7bb21b48e4..7d46f72976 100644
  /*
   * Replacement for isc_sockettype_t provided by socket.h.
 diff --git a/lib/isc/include/isc/util.h b/lib/isc/include/isc/util.h
-index 8941ec125e..38c3afd788 100644
+index 8941ec125e0..38c3afd7885 100644
 --- a/lib/isc/include/isc/util.h
 +++ b/lib/isc/include/isc/util.h
 @@ -304,7 +304,7 @@ mock_assert(const int result, const char *const expression,
@@ -608,7 +610,7 @@ index 8941ec125e..38c3afd788 100644
  #ifdef UNIT_TESTING
  
 diff --git a/lib/isc/lex.c b/lib/isc/lex.c
-index 3aef691694..86075e1549 100644
+index 3aef691694e..86075e15493 100644
 --- a/lib/isc/lex.c
 +++ b/lib/isc/lex.c
 @@ -854,7 +854,7 @@ isc_lex_gettoken(isc_lex_t *lex, unsigned int options, isc_token_t *tokenp) {
@@ -621,7 +623,7 @@ index 3aef691694..86075e1549 100644
  		}
  	} while (!done);
 diff --git a/lib/isc/netmgr/tls.c b/lib/isc/netmgr/tls.c
-index f685493f38..ba68797984 100644
+index f685493f384..ba68797984b 100644
 --- a/lib/isc/netmgr/tls.c
 +++ b/lib/isc/netmgr/tls.c
 @@ -779,11 +779,14 @@ isc_nm_tls_create_server_ctx(const char *keyfile, const char *certfile,
@@ -641,7 +643,7 @@ index f685493f38..ba68797984 100644
  
  	SSL_CTX *ctx = SSL_CTX_new(method);
 diff --git a/lib/isc/sockaddr.c b/lib/isc/sockaddr.c
-index dbd1c10d79..c3ff4048ea 100644
+index dbd1c10d799..c3ff4048eaa 100644
 --- a/lib/isc/sockaddr.c
 +++ b/lib/isc/sockaddr.c
 @@ -345,7 +345,7 @@ isc_sockaddr_pf(const isc_sockaddr_t *sockaddr) {
@@ -672,7 +674,7 @@ index dbd1c10d79..c3ff4048ea 100644
  	}
  
 diff --git a/lib/isc/unix/socket.c b/lib/isc/unix/socket.c
-index 6f02dd0141..622213e313 100644
+index 6f02dd01415..622213e3135 100644
 --- a/lib/isc/unix/socket.c
 +++ b/lib/isc/unix/socket.c
 @@ -948,7 +948,7 @@ select_poke(isc__socketmgr_t *mgr, int threadid, int fd, int msg) {
@@ -703,7 +705,7 @@ index 6f02dd0141..622213e313 100644
  			}
  
 diff --git a/lib/isc/win32/socket.c b/lib/isc/win32/socket.c
-index 42d345cd82..e6eeab168a 100644
+index 42d345cd829..e6eeab168a6 100644
 --- a/lib/isc/win32/socket.c
 +++ b/lib/isc/win32/socket.c
 @@ -478,7 +478,7 @@ signal_iocompletionport_exit(isc_socketmgr_t *manager) {
