@@ -1760,25 +1760,6 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          default:
              p = PY_SSL_ERROR_INVALID_ERROR_CODE;
              errstr = "Invalid error code";
-@@ -1116,8 +1231,8 @@
-         } else if (sockstate == SOCKET_IS_NONBLOCKING) {
-             break;
-         }
--    } while (err.ssl == SSL_ERROR_WANT_READ ||
--             err.ssl == SSL_ERROR_WANT_WRITE);
-+    } while (ret >= 0 && (err.ssl == SSL_ERROR_WANT_READ ||
-+             err.ssl == SSL_ERROR_WANT_WRITE));
-     Py_XDECREF(sock);
-     if (ret < 1)
-         return PySSL_SetError(self, ret, __FILE__, __LINE__);
-@@ -1159,6 +1274,7 @@
-             goto done;
-         }
-     }
-+
-     if (!buflen && no_name) {
-         Py_INCREF(Py_None);
-         name_obj = Py_None;
 @@ -1222,7 +1338,9 @@
  
          /* check to see if we've gotten to a new RDN */
@@ -1799,17 +1780,6 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          }
          rdn_level = X509_NAME_ENTRY_set(entry);
  
-@@ -1309,8 +1429,9 @@
-     char *vptr;
-     int len;
- 
--    if (certificate == NULL)
-+    if (certificate == NULL) {
-         return peer_alt_names;
-+    }
- 
-     /* get a memory buffer */
-     biobuf = BIO_new(BIO_s_mem());
 @@ -1441,14 +1562,14 @@
                  PyTuple_SET_ITEM(t, 0, v);
  

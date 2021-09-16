@@ -13,7 +13,7 @@ combine_wolfssl.sh
 
 1.  Clones wolfssl/master to directory wolfssl-master
 2.  Adds current outstanding PR's
-4.  Configures and compiles the library if all patches are successful,
+3.  Configures and compiles the library if all patches are successful,
     note that patches can fail and all code will still be applied. Often a fail
     case is just re-applying of code causing a non 0 return.
 
@@ -52,18 +52,20 @@ test_site:
 
     SSL_CTX_set_default_verify_paths()
 
-    We may/may not need to implement this. Will need further research on how
-    apps are calling Python SSL APIs, if they expect this default verify
-    behavior to work.
-
 test_ssl:
 
     - test_unwrap is skipped due to differences in read ahead behavior on
       shutdown
 
-    - various error message differens accounted for in the tests. for example
+    - various error message differences accounted for in the tests. for example
       "ASN no signer error to confirm failure" in wolfSSL versus
       "certificate verify failed" in OpenSSL
 
     - wolfSSL does not support cipher suite rules i.e !NULL
 
+    - At the end of the test suite some dangling threads from tests are reported
+
+test_asyncio:
+
+    - few failures due to difference in error message value returned. for
+      example "ASN no signer error to confirm failure" in wolfSSL
