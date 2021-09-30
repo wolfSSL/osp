@@ -79,7 +79,7 @@ index 31d58ed..46cb88c 100644
  include ../Makefile.libgcrypt.inc
  endif
 diff --git a/src/openssl.c b/src/openssl.c
-index 04d5ec2..3d5aabb 100644
+index 04d5ec2..2a9a952 100644
 --- a/src/openssl.c
 +++ b/src/openssl.c
 @@ -426,6 +426,13 @@ _libssh2_cipher_crypt(_libssh2_cipher_ctx * ctx,
@@ -96,43 +96,84 @@ index 04d5ec2..3d5aabb 100644
  #endif
      if(ret == 1) {
          memcpy(block, buf, blocksize);
+@@ -640,6 +647,14 @@ static EVP_CIPHER * aes_256_ctr_cipher = NULL;
+ 
+ void _libssh2_openssl_crypto_init(void)
+ {
++/*
++ * wolfSSL's version 5 FIPS module requires that the application call
++ * wolfCrypt_SetPrivateKeyReadEnable_fips and wc_SetSeed_Cb before some
++ * functionality will work. wolfSSL_Init calls both of them.
++ */
++#ifdef LIBSSH2_WOLFSSL
++    wolfSSL_Init();
++#endif
+ #if OPENSSL_VERSION_NUMBER >= 0x10100000L && \
+     !defined(LIBRESSL_VERSION_NUMBER)
+ #ifndef OPENSSL_NO_ENGINE
 diff --git a/src/openssl.h b/src/openssl.h
-index 15518e0..fcb6970 100644
+index 15518e0..f0c7e99 100644
 --- a/src/openssl.h
 +++ b/src/openssl.h
-@@ -37,6 +37,19 @@
+@@ -37,6 +37,39 @@
   * OF SUCH DAMAGE.
   */
  
 +#ifdef LIBSSH2_WOLFSSL
 +
-+/* This prevents libssh2 from attempting to call any engine functions. wolfSSL
-+ * doesn't have support for OpenSSL-style engines. */
-+#ifndef OPENSSL_NO_ENGINE
-+#define OPENSSL_NO_ENGINE
-+#endif
-+
 +#include <wolfssl/options.h>
 +#include <openssl/ecdh.h>
++
++#ifdef NO_DSA
++#define OPENSSL_NO_DSA
++#endif
++
++#ifdef NO_MD5
++#define OPENSSL_NO_MD5
++#endif
++
++#ifndef WOLFSSL_RIPEMD
++#define OPENSSL_NO_RIPEMD
++#endif
++
++#ifdef NO_RC4
++#define OPENSSL_NO_RC4
++#endif
++
++#ifdef NO_DES3
++#define OPENSSL_NO_DES
++#endif
++
++/* wolfSSL doesn't support Blowfish or CAST. */
++#define OPENSSL_NO_BF
++#define OPENSSL_NO_CAST
++/* wolfSSL has no engine framework. */
++#define OPENSSL_NO_ENGINE
 +
 +#endif /* LIBSSH2_WOLFSSL */
 +
  #include <openssl/opensslconf.h>
  #include <openssl/sha.h>
  #include <openssl/rsa.h>
-@@ -66,7 +79,8 @@
- # define LIBSSH2_RSA 1
+@@ -55,8 +88,10 @@
+ #include <openssl/pem.h>
+ #include <openssl/rand.h>
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000L && \
+-    !defined(LIBRESSL_VERSION_NUMBER)
++#if (OPENSSL_VERSION_NUMBER >= 0x10100000L && \
++    !defined(LIBRESSL_VERSION_NUMBER)) || defined(LIBSSH2_WOLFSSL)
++/* For wolfSSL, whether the structs are truly opaque or not, it's best to not
++ * rely on their internal data members being exposed publicly. */
+ # define HAVE_OPAQUE_STRUCTS 1
  #endif
  
--#ifdef OPENSSL_NO_DSA
-+#if defined(OPENSSL_NO_DSA) || (defined(LIBSSH2_WOLFSSL) && (defined(NO_DSA) \
-+ || defined(HAVE_FIPS)))
- # define LIBSSH2_DSA 0
- #else
- # define LIBSSH2_DSA 1
-@@ -79,20 +93,22 @@
+@@ -78,14 +113,15 @@
+ # define LIBSSH2_ECDSA 1
  #endif
  
++/* wolfSSL's OpenSSL compatibility layer doesn't have support for all the
++ * necessary ED25519 functions, yet. */
  #if OPENSSL_VERSION_NUMBER >= 0x10101000L && \
 -!defined(LIBRESSL_VERSION_NUMBER)
 +    !defined(LIBRESSL_VERSION_NUMBER) && !defined(LIBSSH2_WOLFSSL)
@@ -141,22 +182,11 @@ index 15518e0..fcb6970 100644
  # define LIBSSH2_ED25519 0
  #endif
  
- 
--#ifdef OPENSSL_NO_MD5
-+#if defined(OPENSSL_NO_MD5) || (defined(LIBSSH2_WOLFSSL) && \
-+    (defined(HAVE_FIPS) || defined(NO_MD5)))
+-
+ #ifdef OPENSSL_NO_MD5
  # define LIBSSH2_MD5 0
  #else
- # define LIBSSH2_MD5 1
- #endif
- 
--#ifdef OPENSSL_NO_RIPEMD
-+#if defined(OPENSSL_NO_RIPEMD) || (defined(LIBSSH2_WOLFSSL) && \
-+    (defined(HAVE_FIPS) || !defined(WOLFSSL_RIPEMD)))
- # define LIBSSH2_HMAC_RIPEMD 0
- #else
- # define LIBSSH2_HMAC_RIPEMD 1
-@@ -101,7 +117,8 @@
+@@ -101,7 +137,8 @@
  #define LIBSSH2_HMAC_SHA256 1
  #define LIBSSH2_HMAC_SHA512 1
  
@@ -166,29 +196,3 @@ index 15518e0..fcb6970 100644
  # define LIBSSH2_AES_CTR 1
  # define LIBSSH2_AES 1
  #else
-@@ -109,19 +126,22 @@
- # define LIBSSH2_AES 0
- #endif
- 
--#ifdef OPENSSL_NO_BF
-+/* wolfSSL doesn't support Blowfish. */
-+#if defined(OPENSSL_NO_BF) || defined(LIBSSH2_WOLFSSL)
- # define LIBSSH2_BLOWFISH 0
- #else
- # define LIBSSH2_BLOWFISH 1
- #endif
- 
--#ifdef OPENSSL_NO_RC4
-+#if defined(OPENSSL_NO_RC4) || (defined(LIBSSH2_WOLFSSL) && \
-+    (defined(HAVE_FIPS) || defined(NO_RC4)))
- # define LIBSSH2_RC4 0
- #else
- # define LIBSSH2_RC4 1
- #endif
- 
--#ifdef OPENSSL_NO_CAST
-+/* wolfSSL doesn't support CAST. */
-+#if defined(OPENSSL_NO_CAST) || defined(LIBSSH2_WOLFSSL)
- # define LIBSSH2_CAST 0
- #else
- # define LIBSSH2_CAST 1

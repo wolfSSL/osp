@@ -1,4 +1,7 @@
+The [master branch of libssh2](https://github.com/libssh2/libssh2) supports wolfSSL natively, but this hasn't made it into a release, yet. If you're using libssh2 1.10.0 or older, you will need to use the approach described below.
+
 # Building libssh2 with wolfSSL
+
 + Configure wolfSSL with `./configure --enable-libssh2`. Add `--enable-debug` if you're going to be debugging. Add `--enable-fips=v2` if using wolfSSL FIPS.
 + `make` and `sudo make install` wolfSSL into /usr/local.
 + Download libssh2-1.9.0 with `curl -O https://www.libssh2.org/download/libssh2-1.9.0.tar.gz`.
