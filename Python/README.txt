@@ -27,6 +27,7 @@ $ sudo make install
 To build Python-3.8.5 with wolfSSL enabled:
 
 $ cd Python-3.8.5
+$ autoreconf -fi
 $ ./configure --with-wolfssl=/usr/local
 $ make
 

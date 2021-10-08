@@ -1,167 +1,3 @@
-diff -Naur a/configure b/configure
---- a/configure	2021-09-16 08:35:22.270328788 -0700
-+++ b/configure	2021-08-26 15:42:06.510758000 -0700
-@@ -842,6 +842,7 @@
- enable_big_digits
- with_computed_gotos
- with_ensurepip
-+with_wolfssl
- with_openssl
- with_ssl_default_suites
- '
-@@ -1555,6 +1556,7 @@
-                           default on supported compilers)
-   --with(out)-ensurepip=[=upgrade]
-                           "install" or "upgrade" using bundled pip
-+  --with-wolfssl=DIR      build with wolfSSL at DIR instead of OpenSSL
-   --with-openssl=DIR      root of the OpenSSL directory
-   --with-ssl-default-suites=[python|openssl|STRING]
-                           Override default cipher suites string, python: use
-@@ -17091,7 +17093,62 @@
- LIBS="$save_LIBS"
- ac_includes_default="$save_includes_default"
- 
--# Check for usable OpenSSL
-+# Check if building with wolfSSL, otherwise default to trying OpenSSL
-+
-+# Check whether --with-wolfssl was given.
-+if test "${with_wolfssl+set}" = set; then :
-+  withval=$with_wolfssl;
-+    OPENSSL_INCLUDES="-I${withval}/include/wolfssl -I${withval}/include/"
-+    OPENSSL_LDFLAGS="-L${withval}/lib"
-+    OPENSSL_LIBS="-lwolfssl"
-+
-+    # AC_SUBST calls required to substitute other uses of OPENSSL_* vars
-+
-+
-+
-+
-+    CPPFLAGS="$CPPFLAGS $OPENSSL_INCLUDES"
-+    LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
-+    LIBS="$LIBS $OPENSSL_LIBS"
-+
-+    USE_WOLFSSL=yes
-+else
-+
-+    USE_WOLFSSL=no
-+
-+fi
-+
-+
-+if test $USE_WOLFSSL = yes
-+then
-+    ac_fn_c_check_header_mongrel "$LINENO" "wolfssl/options.h" "ac_cv_header_wolfssl_options_h" "$ac_includes_default"
-+if test "x$ac_cv_header_wolfssl_options_h" = xyes; then :
-+
-+fi
-+
-+
-+    if test $ac_cv_header_wolfssl_options_h = yes
-+    then
-+
-+$as_echo "#define HAVE_WOLFSSL 1" >>confdefs.h
-+
-+        $as_echo "#define HAVE_X509_VERIFY_PARAM_SET1_HOST 1" >>confdefs.h
-+
-+
-+        # Note we are disabling compression when using wolfSSL
-+
-+$as_echo "#define OPENSSL_NO_COMP 1" >>confdefs.h
-+
-+
-+        # Note we are disabling scrypt until EVP_PBE_scrypt API gets implemented
-+
-+$as_echo "#define OPENSSL_NO_SCRYPT 1" >>confdefs.h
-+
-+    else
-+        as_fn_error $? "Unable to find wolfSSL" "$LINENO" 5
-+    fi
-+else
-+    # Check for usable OpenSSL
- 
-     found=false
- 
-@@ -17296,30 +17353,30 @@
- 
- 
- 
--if test "$have_openssl" = yes; then
--    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for X509_VERIFY_PARAM_set1_host in libssl" >&5
-+    if test "$have_openssl" = yes; then
-+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for X509_VERIFY_PARAM_set1_host in libssl" >&5
- $as_echo_n "checking for X509_VERIFY_PARAM_set1_host in libssl... " >&6; }
- 
--    save_LIBS="$LIBS"
--    save_LDFLAGS="$LDFLAGS"
--    save_CPPFLAGS="$CPPFLAGS"
--    LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
--    LIBS="$OPENSSL_LIBS $LIBS"
--    CPPFLAGS="$OPENSSL_INCLUDES $CPPFLAGS"
-+        save_LIBS="$LIBS"
-+        save_LDFLAGS="$LDFLAGS"
-+        save_CPPFLAGS="$CPPFLAGS"
-+        LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
-+        LIBS="$OPENSSL_LIBS $LIBS"
-+        CPPFLAGS="$OPENSSL_INCLUDES $CPPFLAGS"
- 
--    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
- 
--        #include <openssl/x509_vfy.h>
-+            #include <openssl/x509_vfy.h>
- 
- int
- main ()
- {
- 
--        X509_VERIFY_PARAM *p = X509_VERIFY_PARAM_new();
--        X509_VERIFY_PARAM_set1_host(p, "localhost", 0);
--        X509_VERIFY_PARAM_set1_ip_asc(p, "127.0.0.1");
--        X509_VERIFY_PARAM_set_hostflags(p, 0);
-+            X509_VERIFY_PARAM *p = X509_VERIFY_PARAM_new();
-+            X509_VERIFY_PARAM_set1_host(p, "localhost", 0);
-+            X509_VERIFY_PARAM_set1_ip_asc(p, "127.0.0.1");
-+            X509_VERIFY_PARAM_set_hostflags(p, 0);
- 
-   ;
-   return 0;
-@@ -17328,26 +17385,27 @@
- _ACEOF
- if ac_fn_c_try_link "$LINENO"; then :
- 
--        ac_cv_has_x509_verify_param_set1_host=yes
-+            ac_cv_has_x509_verify_param_set1_host=yes
- 
- else
- 
--        ac_cv_has_x509_verify_param_set1_host=no
-+            ac_cv_has_x509_verify_param_set1_host=no
- 
- fi
- rm -f core conftest.err conftest.$ac_objext \
-     conftest$ac_exeext conftest.$ac_ext
--    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_has_x509_verify_param_set1_host" >&5
-+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_has_x509_verify_param_set1_host" >&5
- $as_echo "$ac_cv_has_x509_verify_param_set1_host" >&6; }
--    if test "$ac_cv_has_x509_verify_param_set1_host" = "yes"; then
-+        if test "$ac_cv_has_x509_verify_param_set1_host" = "yes"; then
- 
- $as_echo "#define HAVE_X509_VERIFY_PARAM_SET1_HOST 1" >>confdefs.h
- 
--    fi
-+        fi
- 
--    CPPFLAGS="$save_CPPFLAGS"
--    LDFLAGS="$save_LDFLAGS"
--    LIBS="$save_LIBS"
-+        CPPFLAGS="$save_CPPFLAGS"
-+        LDFLAGS="$save_LDFLAGS"
-+        LIBS="$save_LIBS"
-+    fi
- fi
- 
- # ssl module default cipher suite string
 diff -Naur a/configure.ac b/configure.ac
 --- a/configure.ac	2021-09-16 08:35:22.270328788 -0700
 +++ b/configure.ac	2021-08-26 15:42:06.524087000 -0700
@@ -504,7 +340,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  SIGNED_CERTFILE2 = data_file("keycert4.pem")
  SIGNED_CERTFILE2_HOSTNAME = 'fakehostname'
  SIGNED_CERTFILE_ECC = data_file("keycertecc.pem")
-@@ -425,10 +450,17 @@
+@@ -425,25 +450,41 @@
              ssl._ssl._test_decode_cert(CERTFILE),
              CERTFILE_INFO
          )
@@ -526,17 +362,27 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
          # Issue #13034: the subjectAltName in some certificates
          # (notably projects.developer.nokia.com:443) wasn't parsed
-@@ -440,10 +472,15 @@
-                           ('DNS', 'projects.forum.nokia.com'))
-                         )
-         # extra OCSP and AIA fields
--        self.assertEqual(p['OCSP'], ('http://ocsp.verisign.com',))
--        self.assertEqual(p['caIssuers'],
+         p = ssl._ssl._test_decode_cert(NOKIACERT)
+         if support.verbose:
+             sys.stdout.write("\n" + pprint.pformat(p) + "\n")
+-        self.assertEqual(p['subjectAltName'],
 +        if ssl.IS_WOLFSSL:
++            self.assertEqual(p['subjectAltName'],
++                         (('DNS', 'projects.forum.nokia.com'),
++                          ('DNS', 'projects.developer.nokia.com'))
++                        )
 +            #@TODO OCSP and caIssuers parsing from wolfSSL
 +            self.assertEqual(p['crlDistributionPoints'],
 +                         ('http://SVRIntl-G3-crl.verisign.com/SVRIntlG3.crl',))
 +        else:
++            self.assertEqual(p['subjectAltName'],
+                          (('DNS', 'projects.developer.nokia.com'),
+                           ('DNS', 'projects.forum.nokia.com'))
+                         )
+-        # extra OCSP and AIA fields
+-        self.assertEqual(p['OCSP'], ('http://ocsp.verisign.com',))
+-        self.assertEqual(p['caIssuers'],
++            # extra OCSP and AIA fields
 +            self.assertEqual(p['OCSP'], ('http://ocsp.verisign.com',))
 +            self.assertEqual(p['caIssuers'],
                           ('http://SVRIntl-G3-aia.verisign.com/SVRIntlG3.cer',))
@@ -552,10 +398,10 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 -        if ssl._OPENSSL_API_VERSION >= (0, 9, 8):
 +        if ssl.IS_WOLFSSL:
 +            # location of email in list is different
-+            san = (('DNS', 'altnull.python.org\x00example.com'),
-+                   ('URI', 'http://null.python.org\x00http://example.org'),
++            san = (('IP Address', '2001:DB8:0:0:0:0:0:1'),
 +                   ('IP Address', '192.0.2.1'),
-+                   ('IP Address', '2001:DB8:0:0:0:0:0:1'),
++                   ('URI', 'http://null.python.org\x00http://example.org'),
++                   ('DNS', 'altnull.python.org\x00example.com'),
 +                   ('email', 'null@python.org\x00user@example.org'))
 +        elif ssl._OPENSSL_API_VERSION >= (0, 9, 8):
              san = (('DNS', 'altnull.python.org\x00example.com'),
@@ -571,11 +417,11 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +            # a slightly different order of how the entries are listed in struct
 +            self.assertEqual(p['subjectAltName'],
 +            (
-+                ('DNS', 'allsans'),
-+                ('DNS', 'www.example.org'),
-+                ('URI', 'https://www.python.org/'),
-+                ('IP Address', '127.0.0.1'),
 +                ('IP Address', '0:0:0:0:0:0:0:1'),
++                ('IP Address', '127.0.0.1'),
++                ('URI', 'https://www.python.org/'),
++                ('DNS', 'www.example.org'),
++                ('DNS', 'allsans'),
 +                ('email', 'user@example.org'),
 +                ('DirName',
 +                    ((('countryName', 'XY'),),
@@ -628,16 +474,16 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +        else:
 +            expected = (129, 'serverAuth', 'TLS Web Server Authentication',
 +                        '1.3.6.1.5.5.7.3.1')
-+        
++
          val = ssl._ASN1Object('1.3.6.1.5.5.7.3.1')
          self.assertEqual(val, expected)
 -        self.assertEqual(val.nid, 129)
-+        
++
 +        if ssl.IS_WOLFSSL:
 +            self.assertEqual(val.nid, 71)
 +        else:
 +            self.assertEqual(val.nid, 129)
-+        
++
          self.assertEqual(val.shortname, 'serverAuth')
          self.assertEqual(val.longname, 'TLS Web Server Authentication')
          self.assertEqual(val.oid, '1.3.6.1.5.5.7.3.1')
@@ -650,7 +496,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +        else:
 +            val = ssl._ASN1Object.fromnid(129)
          self.assertEqual(val, expected)
-+        
++
          self.assertIsInstance(val, ssl._ASN1Object)
          self.assertRaises(ValueError, ssl._ASN1Object.fromnid, -1)
          with self.assertRaisesRegex(ValueError, "unknown NID 100000"):
@@ -666,7 +512,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 -                self.assertIsInstance(obj.longname, str)
 -                self.assertIsInstance(obj.oid, (str, type(None)))
 -
-+        
++
 +        if not ssl.IS_WOLFSSL:
 +            for i in range(1000):
 +                try:
@@ -679,7 +525,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +                    self.assertIsInstance(obj.shortname, str)
 +                    self.assertIsInstance(obj.longname, str)
 +                    self.assertIsInstance(obj.oid, (str, type(None)))
-+        
++
          val = ssl._ASN1Object.fromname('TLS Web Server Authentication')
          self.assertEqual(val, expected)
          self.assertIsInstance(val, ssl._ASN1Object)
@@ -781,7 +627,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +        else:
 +            with self.assertRaisesRegex(ssl.SSLError, "PEM lib"):
 +                ctx.load_cert_chain(EMPTYCERT)
-+        
++
          # Separate key and cert
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
          ctx.load_cert_chain(ONLYCERT, ONLYKEY)
@@ -836,7 +682,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +        else:
 +            with self.assertRaisesRegex(ssl.SSLError, "PEM lib"):
 +                ctx.load_verify_locations(BADCERT)
-+        
++
          ctx.load_verify_locations(CERTFILE, CAPATH)
          ctx.load_verify_locations(CERTFILE, capath=BYTES_CAPATH)
  
@@ -911,7 +757,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +        if ssl.IS_WOLFSSL:
 +            # requires loading CERT and KEY in advance
 +            ctx.load_cert_chain(CERTFILE, keyfile=CERTFILE)
-+        
++
          ctx.sslsocket_class = MySSLSocket
          ctx.sslobject_class = MySSLObject
  
@@ -1065,7 +911,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +                                      chatty=True, connectionchatty=True)
 +                    self.assertIn('called a function you should not call',
 +                                str(e.exception))
-+        
++
          with self.subTest(client=ssl.PROTOCOL_TLS_CLIENT, server=ssl.PROTOCOL_TLS_CLIENT):
              with self.assertRaises(ssl.SSLError) as e:
                  server_params_test(client_context=server_context,
@@ -1115,7 +961,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 -        client_context.set_ciphers('ECDHE:ECDSA:!NULL:!aRSA')
 +        if not ssl.IS_WOLFSSL:
 +            client_context.set_ciphers('ECDHE:ECDSA:!NULL:!aRSA')
-+        
++
          hostname = SIGNED_CERTFILE_ECC_HOSTNAME
  
          server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -1131,7 +977,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +            client_context.set_ciphers('ECDHE:ECDSA:!NULL:!aRSA')
          hostname = SIGNED_CERTFILE_ECC_HOSTNAME
 -
-+        
++
          server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
          # load ECC and RSA key/cert pairs
          server_context.load_cert_chain(SIGNED_CERTFILE_ECC)
@@ -1222,7 +1068,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
              try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_SSLv3, False)
 -        try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_TLS, False,
 -                           client_options=ssl.OP_NO_TLSv1_2)
-+        
++
 +        if not ssl.IS_WOLFSSL:
 +            # this expectes to work
 +            try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_TLS, False,
@@ -1255,7 +1101,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          if ssl.OPENSSL_VERSION_INFO < (1, 0, 0):
              context.set_ciphers("ECCdraft:ECDH")
 +        if ssl.IS_WOLFSSL:
-+            # Default first priority of cipher in the list of wolfSSL is 
++            # Default first priority of cipher in the list of wolfSSL is
 +            # DHE-RSA-AES128-SHA
 +            context.set_ciphers("ECDHE-RSA-AES128-SHA")
          with ThreadedEchoServer(context=context) as server:
@@ -1640,18 +1486,6 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      }
      return err;
  }
-@@ -636,8 +673,10 @@
-         if (lib_obj == NULL && PyErr_Occurred()) {
-             goto fail;
-         }
--        if (errstr == NULL)
-+        if (errstr == NULL) {
-             errstr = ERR_reason_error_string(errcode);
-+
-+        }
-     }
-     if (errstr == NULL)
-         errstr = "unknown error";
 @@ -671,6 +710,13 @@
              );
              break;
@@ -1666,15 +1500,6 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          default:
              verify_str = X509_verify_cert_error_string(verify_code);
              if (verify_str != NULL) {
-@@ -762,7 +808,7 @@
- 
-     if (sslsock->ssl != NULL) {
-         err = sslsock->err;
--
-+        
-         switch (err.ssl) {
-         case SSL_ERROR_ZERO_RETURN:
-             errstr = "TLS/SSL connection has been closed (EOF)";
 @@ -788,8 +834,16 @@
              errstr = "The operation did not complete (connect)";
              break;
@@ -1806,7 +1631,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
 +    X509_EXTENSION* ext;
 +    int loc = 0;
 +    #endif
-+    
++
 +    #ifdef HAVE_WOLFSSL
 +    loc = X509_get_ext_by_NID(certificate, NID_info_access, -1);
 +    if (loc < 0)
@@ -1820,25 +1645,6 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      if (info == NULL)
          return Py_None;
      if (sk_ACCESS_DESCRIPTION_num(info) == 0) {
-@@ -1792,6 +1926,7 @@
-         Py_DECREF(peer_alt_names);
-     }
- 
-+
-     /* Authority Information Access: OCSP URIs */
-     obj = _get_aia_uri(certificate, NID_ad_OCSP);
-     if (obj == NULL) {
-@@ -1931,8 +2066,9 @@
-         return NULL;
-     }
-     peer_cert = SSL_get_peer_certificate(self->ssl);
--    if (peer_cert == NULL)
-+    if (peer_cert == NULL) {
-         Py_RETURN_NONE;
-+    }
- 
-     if (binary_mode) {
-         /* return cert in DER-encoded format */
 @@ -2154,7 +2290,11 @@
  
      SSL_get0_alpn_selected(self->ssl, &out, &outlen);
@@ -1851,29 +1657,6 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          Py_RETURN_NONE;
      return PyUnicode_FromStringAndSize((char *)out, outlen);
  }
-@@ -2589,12 +2729,12 @@
-         PySSL_END_ALLOW_THREADS
-         self->err = err;
- 
--        if (PyErr_CheckSignals())
-+        if (PyErr_CheckSignals()) {
-             goto error;
-+        }
- 
-         if (has_timeout)
-             timeout = deadline - _PyTime_GetMonotonicClock();
--
-         if (err.ssl == SSL_ERROR_WANT_READ) {
-             sockstate = PySSL_select(sock, 0, timeout);
-         } else if (err.ssl == SSL_ERROR_WANT_WRITE) {
-@@ -2659,7 +2799,6 @@
-     PySocketSockObject *sock = GET_SOCKET(self);
-     _PyTime_t timeout, deadline = 0;
-     int has_timeout;
--
-     if (sock != NULL) {
-         /* Guard against closed socket */
-         if ((((PyObject*)sock) == Py_None) || (sock->sock_fd == INVALID_SOCKET)) {
 @@ -3100,11 +3239,13 @@
  
      PySSL_BEGIN_ALLOW_THREADS

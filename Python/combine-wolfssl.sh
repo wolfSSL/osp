@@ -19,22 +19,7 @@ pull_patch() {
 PATCH_NUMBER=4293
 pull_patch
 
-PATCH_NUMBER=4347
-pull_patch
-
-PATCH_NUMBER=4348
-pull_patch
-
-PATCH_NUMBER=4349
-pull_patch
-
 PATCH_NUMBER=4350
-pull_patch
-
-PATCH_NUMBER=4351
-pull_patch
-
-PATCH_NUMBER=4402
 pull_patch
 
 if [ $patch_fail == 0 ]; then
