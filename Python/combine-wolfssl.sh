@@ -15,16 +15,15 @@ pull_patch() {
     if [ $? != 0 ]; then echo fail; patch_fail=1; else echo done; fi
 }
 
-
 PATCH_NUMBER=4293
 pull_patch
 
-PATCH_NUMBER=4350
+PATCH_NUMBER=4497
 pull_patch
 
 if [ $patch_fail == 0 ]; then
     ./autogen.sh
-    ./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-debug CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT"
+    ./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-scrypt --enable-debug CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT"
     make
 fi
 

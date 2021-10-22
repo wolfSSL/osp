@@ -20,13 +20,15 @@ combine_wolfssl.sh
 The script uses the below configuration for wolfSSL:
 
 $ cd wolfssl-master
-$ ./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-debug CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT"
+$ ./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-scrypt --enable-debug CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT"
 $ make check
 $ sudo make install
 
 To build Python-3.8.5 with wolfSSL enabled:
 
+$ tar xvf Python-3.8.5.tar.xz
 $ cd Python-3.8.5
+$ patch -p1 < wolfssl-python-3.8.5.patch
 $ autoreconf -fi
 $ ./configure --with-wolfssl=/usr/local
 $ make
@@ -66,7 +68,3 @@ test_ssl:
 
     - At the end of the test suite some dangling threads from tests are reported
 
-test_asyncio:
-
-    - few failures due to difference in error message value returned. for
-      example "ASN no signer error to confirm failure" in wolfSSL

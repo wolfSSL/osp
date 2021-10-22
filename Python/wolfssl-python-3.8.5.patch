@@ -1,7 +1,7 @@
 diff -Naur a/configure.ac b/configure.ac
---- a/configure.ac	2021-09-16 08:35:22.270328788 -0700
-+++ b/configure.ac	2021-08-26 15:42:06.524087000 -0700
-@@ -5571,43 +5571,84 @@
+--- a/configure.ac	2021-10-21 16:20:42.549134388 -0600
++++ b/configure.ac	2021-10-21 16:29:15.035930953 -0600
+@@ -5571,43 +5571,81 @@
  LIBS="$save_LIBS"
  ac_includes_default="$save_includes_default"
  
@@ -67,9 +67,6 @@ diff -Naur a/configure.ac b/configure.ac
 +
 +        # Note we are disabling compression when using wolfSSL
 +        AC_DEFINE([OPENSSL_NO_COMP], 1, [define to disable compression])
-+
-+        # Note we are disabling scrypt until EVP_PBE_scrypt API gets implemented
-+        AC_DEFINE([OPENSSL_NO_SCRYPT], 1, [define to disable scrypt])
 +    else
 +        AC_MSG_ERROR([Unable to find wolfSSL])
 +    fi
@@ -120,8 +117,8 @@ diff -Naur a/configure.ac b/configure.ac
  
  # ssl module default cipher suite string
 diff -Naur a/Lib/ssl.py b/Lib/ssl.py
---- a/Lib/ssl.py	2021-09-16 08:35:22.486320383 -0700
-+++ b/Lib/ssl.py	2021-09-03 12:45:02.422874525 -0700
+--- a/Lib/ssl.py	2021-10-21 16:20:42.609135630 -0600
++++ b/Lib/ssl.py	2021-10-21 16:20:49.193272090 -0600
 @@ -117,6 +117,7 @@
      HAS_TLSv1_1, HAS_TLSv1_2, HAS_TLSv1_3
  )
@@ -131,8 +128,8 @@ diff -Naur a/Lib/ssl.py b/Lib/ssl.py
  
  _IntEnum._convert_(
 diff -Naur a/Lib/test/capath-2048-plus/5ed36f99.0 b/Lib/test/capath-2048-plus/5ed36f99.0
---- a/Lib/test/capath-2048-plus/5ed36f99.0	1969-12-31 16:00:00.000000000 -0800
-+++ b/Lib/test/capath-2048-plus/5ed36f99.0	2021-08-26 15:41:59.478462000 -0700
+--- a/Lib/test/capath-2048-plus/5ed36f99.0	1969-12-31 17:00:00.000000000 -0700
++++ b/Lib/test/capath-2048-plus/5ed36f99.0	2021-10-22 15:54:02.257679363 -0600
 @@ -0,0 +1,41 @@
 +-----BEGIN CERTIFICATE-----
 +MIIHPTCCBSWgAwIBAgIBADANBgkqhkiG9w0BAQQFADB5MRAwDgYDVQQKEwdSb290
@@ -176,8 +173,8 @@ diff -Naur a/Lib/test/capath-2048-plus/5ed36f99.0 b/Lib/test/capath-2048-plus/5e
 +omTxJBzcoTWcFbLUvFUufQb1nA5V9FrWk9p2rSVzTMVD
 +-----END CERTIFICATE-----
 diff -Naur a/Lib/test/capath-2048-plus/99d0fa06.0 b/Lib/test/capath-2048-plus/99d0fa06.0
---- a/Lib/test/capath-2048-plus/99d0fa06.0	1969-12-31 16:00:00.000000000 -0800
-+++ b/Lib/test/capath-2048-plus/99d0fa06.0	2021-08-26 15:41:59.479194000 -0700
+--- a/Lib/test/capath-2048-plus/99d0fa06.0	1969-12-31 17:00:00.000000000 -0700
++++ b/Lib/test/capath-2048-plus/99d0fa06.0	2021-10-22 15:54:02.257679363 -0600
 @@ -0,0 +1,41 @@
 +-----BEGIN CERTIFICATE-----
 +MIIHPTCCBSWgAwIBAgIBADANBgkqhkiG9w0BAQQFADB5MRAwDgYDVQQKEwdSb290
@@ -221,8 +218,8 @@ diff -Naur a/Lib/test/capath-2048-plus/99d0fa06.0 b/Lib/test/capath-2048-plus/99
 +omTxJBzcoTWcFbLUvFUufQb1nA5V9FrWk9p2rSVzTMVD
 +-----END CERTIFICATE-----
 diff -Naur a/Lib/test/capath-2048-plus/b1930218.0 b/Lib/test/capath-2048-plus/b1930218.0
---- a/Lib/test/capath-2048-plus/b1930218.0	1969-12-31 16:00:00.000000000 -0800
-+++ b/Lib/test/capath-2048-plus/b1930218.0	2021-08-26 15:41:59.479646000 -0700
+--- a/Lib/test/capath-2048-plus/b1930218.0	1969-12-31 17:00:00.000000000 -0700
++++ b/Lib/test/capath-2048-plus/b1930218.0	2021-10-22 15:54:02.257679363 -0600
 @@ -0,0 +1,26 @@
 +-----BEGIN CERTIFICATE-----
 +MIIEbTCCAtWgAwIBAgIJAMstgJlaaVJbMA0GCSqGSIb3DQEBCwUAME0xCzAJBgNV
@@ -251,8 +248,8 @@ diff -Naur a/Lib/test/capath-2048-plus/b1930218.0 b/Lib/test/capath-2048-plus/b1
 +juTH+WpA4bhkRem1WSmlX899WH1keeWkCawedmU9lMRo
 +-----END CERTIFICATE-----
 diff -Naur a/Lib/test/capath-2048-plus/ceff1710.0 b/Lib/test/capath-2048-plus/ceff1710.0
---- a/Lib/test/capath-2048-plus/ceff1710.0	1969-12-31 16:00:00.000000000 -0800
-+++ b/Lib/test/capath-2048-plus/ceff1710.0	2021-08-26 15:41:59.480215000 -0700
+--- a/Lib/test/capath-2048-plus/ceff1710.0	1969-12-31 17:00:00.000000000 -0700
++++ b/Lib/test/capath-2048-plus/ceff1710.0	2021-10-22 15:54:02.257679363 -0600
 @@ -0,0 +1,26 @@
 +-----BEGIN CERTIFICATE-----
 +MIIEbTCCAtWgAwIBAgIJAMstgJlaaVJbMA0GCSqGSIb3DQEBCwUAME0xCzAJBgNV
@@ -281,8 +278,8 @@ diff -Naur a/Lib/test/capath-2048-plus/ceff1710.0 b/Lib/test/capath-2048-plus/ce
 +juTH+WpA4bhkRem1WSmlX899WH1keeWkCawedmU9lMRo
 +-----END CERTIFICATE-----
 diff -Naur a/Lib/test/support/__init__.py b/Lib/test/support/__init__.py
---- a/Lib/test/support/__init__.py	2021-09-16 08:35:22.622315090 -0700
-+++ b/Lib/test/support/__init__.py	2021-08-26 15:42:00.737563000 -0700
+--- a/Lib/test/support/__init__.py	2021-10-21 16:20:42.577134968 -0600
++++ b/Lib/test/support/__init__.py	2021-10-21 16:20:49.217272588 -0600
 @@ -818,7 +818,8 @@
          try:
              f(*args, **kwargs)
@@ -293,9 +290,83 @@ diff -Naur a/Lib/test/support/__init__.py b/Lib/test/support/__init__.py
                  raise unittest.SkipTest("system does not contain "
                                          "necessary certificates")
              raise
+diff -Naur a/Lib/test/test_asyncio/test_events.py b/Lib/test/test_asyncio/test_events.py
+--- a/Lib/test/test_asyncio/test_events.py	2021-10-21 16:20:42.593135299 -0600
++++ b/Lib/test/test_asyncio/test_events.py	2021-10-21 16:20:49.229272837 -0600
+@@ -604,7 +604,10 @@
+                 self._basetest_create_ssl_connection(conn_fut, check_sockname,
+                                                      peername)
+ 
+-        self.assertEqual(cm.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
++        if ssl.IS_WOLFSSL:
++            self.assertEqual(cm.exception.reason, 'ASN_NO_SIGNER_E')
++        else:
++            self.assertEqual(cm.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
+ 
+     @unittest.skipIf(ssl is None, 'No ssl module')
+     def test_create_ssl_connection(self):
+@@ -981,9 +984,14 @@
+                                           ssl=sslcontext_client)
+         with mock.patch.object(self.loop, 'call_exception_handler'):
+             with test_utils.disable_logger():
+-                with self.assertRaisesRegex(ssl.SSLError,
+-                                            '(?i)certificate.verify.failed'):
+-                    self.loop.run_until_complete(f_c)
++                if ssl.IS_WOLFSSL:
++                    with self.assertRaisesRegex(ssl.SSLError,
++                                                'ASN no signer error to confirm failure'):
++                        self.loop.run_until_complete(f_c)
++                else:
++                    with self.assertRaisesRegex(ssl.SSLError,
++                                                '(?i)certificate.verify.failed'):
++                        self.loop.run_until_complete(f_c)
+ 
+             # execute the loop to log the connection error
+             test_utils.run_briefly(self.loop)
+@@ -1011,9 +1019,14 @@
+                                                server_hostname='invalid')
+         with mock.patch.object(self.loop, 'call_exception_handler'):
+             with test_utils.disable_logger():
+-                with self.assertRaisesRegex(ssl.SSLError,
+-                                            '(?i)certificate.verify.failed'):
+-                    self.loop.run_until_complete(f_c)
++                if ssl.IS_WOLFSSL:
++                    with self.assertRaisesRegex(ssl.SSLError,
++                                                'ASN no signer error to confirm failure'):
++                        self.loop.run_until_complete(f_c)
++                else:
++                    with self.assertRaisesRegex(ssl.SSLError,
++                                                '(?i)certificate.verify.failed'):
++                        self.loop.run_until_complete(f_c)
+ 
+             # execute the loop to log the connection error
+             test_utils.run_briefly(self.loop)
+@@ -1041,11 +1054,17 @@
+                                           ssl=sslcontext_client)
+         with mock.patch.object(self.loop, 'call_exception_handler'):
+             with test_utils.disable_logger():
+-                with self.assertRaisesRegex(
+-                        ssl.CertificateError,
+-                        "IP address mismatch, certificate is not valid for "
+-                        "'127.0.0.1'"):
+-                    self.loop.run_until_complete(f_c)
++                if ssl.IS_WOLFSSL:
++                    with self.assertRaisesRegex(
++                            ssl.SSLError,
++                            "peer ip address mismatch"):
++                        self.loop.run_until_complete(f_c)
++                else:
++                    with self.assertRaisesRegex(
++                            ssl.CertificateError,
++                            "IP address mismatch, certificate is not valid for "
++                            "'127.0.0.1'"):
++                        self.loop.run_until_complete(f_c)
+ 
+         # close connection
+         # transport is None because TLS ALERT aborted the handshake
 diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
---- a/Lib/test/test_ssl.py	2021-09-16 08:35:22.578316802 -0700
-+++ b/Lib/test/test_ssl.py	2021-09-16 01:20:16.708824005 -0700
+--- a/Lib/test/test_ssl.py	2021-10-21 16:20:42.581135051 -0600
++++ b/Lib/test/test_ssl.py	2021-10-22 16:09:26.233060505 -0600
 @@ -66,9 +66,17 @@
  CERTFILE_PROTECTED = data_file("keycert.passwd.pem")
  ONLYKEY_PROTECTED = data_file("ssl_key.passwd.pem")
@@ -316,52 +387,15 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  CAFILE_CACERT = data_file("capath", "5ed36f99.0")
  
  CERTFILE_INFO = {
-@@ -112,6 +120,23 @@
-     'version': 3
- }
- 
-+# slightly different order of info @TODO no OCSP and caIssuers yet
-+WOLFSSL_SIGNED_CERTFILE_INFO = {
-+    'subject': ((('countryName', 'XY'),),
-+             (('localityName', 'Castle Anthrax'),),
-+             (('organizationName', 'Python Software Foundation'),),
-+             (('commonName', 'localhost'),)),
-+    'issuer': ((('countryName', 'XY'),),
-+            (('organizationName', 'Python Software Foundation CA'),),
-+            (('commonName', 'our-ca-server'),)),
-+    'version': 3,
-+    'serialNumber': 'CB2D80995A69525C',
-+    'notBefore': 'Aug 29 14:23:16 2018 GMT',
-+    'notAfter': 'Jul  7 14:23:16 2028 GMT',
-+    'subjectAltName': (('DNS', 'localhost'),),
-+    'crlDistributionPoints': ('http://testca.pythontest.net/testca/revocation.crl',),
-+}
-+
- SIGNED_CERTFILE2 = data_file("keycert4.pem")
- SIGNED_CERTFILE2_HOSTNAME = 'fakehostname'
- SIGNED_CERTFILE_ECC = data_file("keycertecc.pem")
-@@ -425,25 +450,41 @@
+@@ -425,6 +433,7 @@
              ssl._ssl._test_decode_cert(CERTFILE),
              CERTFILE_INFO
          )
--        self.assertEqual(
--            ssl._ssl._test_decode_cert(SIGNED_CERTFILE),
--            SIGNED_CERTFILE_INFO
--        )
 +
-+        if ssl.IS_WOLFSSL:
-+            self.assertEqual(
-+                ssl._ssl._test_decode_cert(SIGNED_CERTFILE),
-+                WOLFSSL_SIGNED_CERTFILE_INFO
-+            )
-+        else:
-+            self.assertEqual(
-+                ssl._ssl._test_decode_cert(SIGNED_CERTFILE),
-+                SIGNED_CERTFILE_INFO
-+            )
- 
-         # Issue #13034: the subjectAltName in some certificates
-         # (notably projects.developer.nokia.com:443) wasn't parsed
+         self.assertEqual(
+             ssl._ssl._test_decode_cert(SIGNED_CERTFILE),
+             SIGNED_CERTFILE_INFO
+@@ -435,7 +444,13 @@
          p = ssl._ssl._test_decode_cert(NOKIACERT)
          if support.verbose:
              sys.stdout.write("\n" + pprint.pformat(p) + "\n")
@@ -371,27 +405,12 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +                         (('DNS', 'projects.forum.nokia.com'),
 +                          ('DNS', 'projects.developer.nokia.com'))
 +                        )
-+            #@TODO OCSP and caIssuers parsing from wolfSSL
-+            self.assertEqual(p['crlDistributionPoints'],
-+                         ('http://SVRIntl-G3-crl.verisign.com/SVRIntlG3.crl',))
 +        else:
 +            self.assertEqual(p['subjectAltName'],
                           (('DNS', 'projects.developer.nokia.com'),
                            ('DNS', 'projects.forum.nokia.com'))
                          )
--        # extra OCSP and AIA fields
--        self.assertEqual(p['OCSP'], ('http://ocsp.verisign.com',))
--        self.assertEqual(p['caIssuers'],
-+            # extra OCSP and AIA fields
-+            self.assertEqual(p['OCSP'], ('http://ocsp.verisign.com',))
-+            self.assertEqual(p['caIssuers'],
-                          ('http://SVRIntl-G3-aia.verisign.com/SVRIntlG3.cer',))
--        self.assertEqual(p['crlDistributionPoints'],
-+            self.assertEqual(p['crlDistributionPoints'],
-                          ('http://SVRIntl-G3-crl.verisign.com/SVRIntlG3.crl',))
- 
-     def test_parse_cert_CVE_2019_5010(self):
-@@ -480,7 +517,14 @@
+@@ -480,7 +495,14 @@
                     (('emailAddress', 'python-dev@python.org'),))
          self.assertEqual(p['subject'], subject)
          self.assertEqual(p['issuer'], subject)
@@ -407,7 +426,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
              san = (('DNS', 'altnull.python.org\x00example.com'),
                     ('email', 'null@python.org\x00user@example.org'),
                     ('URI', 'http://null.python.org\x00http://example.org'),
-@@ -498,7 +542,26 @@
+@@ -498,7 +520,26 @@
  
      def test_parse_all_sans(self):
          p = ssl._ssl._test_decode_cert(ALLSANFILE)
@@ -435,7 +454,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
              (
                  ('DNS', 'allsans'),
                  ('othername', '<unsupported>'),
-@@ -515,7 +578,7 @@
+@@ -515,7 +556,7 @@
                  ('IP Address', '0:0:0:0:0:0:0:1'),
                  ('Registered ID', '1.2.3.4.5')
              )
@@ -444,7 +463,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      def test_DER_to_PEM(self):
          with open(CAFILE_CACERT, 'r') as f:
-@@ -556,6 +619,8 @@
+@@ -556,6 +597,8 @@
          if IS_LIBRESSL:
              self.assertTrue(s.startswith("LibreSSL {:d}".format(major)),
                              (s, t, hex(n)))
@@ -453,7 +472,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          else:
              self.assertTrue(s.startswith("OpenSSL {:d}.{:d}.{:d}".format(major, minor, fix)),
                              (s, t, hex(n)))
-@@ -884,6 +949,7 @@
+@@ -884,6 +927,7 @@
              support.gc_collect()
          self.assertIn(r, str(cm.warning.args[0]))
  
@@ -461,20 +480,19 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
      def test_get_default_verify_paths(self):
          paths = ssl.get_default_verify_paths()
          self.assertEqual(len(paths), 6)
-@@ -937,35 +1003,50 @@
+@@ -937,34 +981,49 @@
  
  
      def test_asn1object(self):
 -        expected = (129, 'serverAuth', 'TLS Web Server Authentication',
 -                    '1.3.6.1.5.5.7.3.1')
--
 +        if ssl.IS_WOLFSSL:
 +            expected = (71, 'serverAuth', 'TLS Web Server Authentication',
 +                        '1.3.6.1.5.5.7.3.1')
 +        else:
 +            expected = (129, 'serverAuth', 'TLS Web Server Authentication',
 +                        '1.3.6.1.5.5.7.3.1')
-+
+ 
          val = ssl._ASN1Object('1.3.6.1.5.5.7.3.1')
          self.assertEqual(val, expected)
 -        self.assertEqual(val.nid, 129)
@@ -511,7 +529,6 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 -                self.assertIsInstance(obj.shortname, str)
 -                self.assertIsInstance(obj.longname, str)
 -                self.assertIsInstance(obj.oid, (str, type(None)))
--
 +
 +        if not ssl.IS_WOLFSSL:
 +            for i in range(1000):
@@ -525,11 +542,10 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +                    self.assertIsInstance(obj.shortname, str)
 +                    self.assertIsInstance(obj.longname, str)
 +                    self.assertIsInstance(obj.oid, (str, type(None)))
-+
+ 
          val = ssl._ASN1Object.fromname('TLS Web Server Authentication')
          self.assertEqual(val, expected)
-         self.assertIsInstance(val, ssl._ASN1Object)
-@@ -979,7 +1060,10 @@
+@@ -979,7 +1038,10 @@
          val = ssl._ASN1Object('1.3.6.1.5.5.7.3.1')
          self.assertIsInstance(ssl.Purpose.SERVER_AUTH, ssl._ASN1Object)
          self.assertEqual(ssl.Purpose.SERVER_AUTH, val)
@@ -541,7 +557,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          self.assertEqual(ssl.Purpose.SERVER_AUTH.shortname, 'serverAuth')
          self.assertEqual(ssl.Purpose.SERVER_AUTH.oid,
                                '1.3.6.1.5.5.7.3.1')
-@@ -987,7 +1071,10 @@
+@@ -987,7 +1049,10 @@
          val = ssl._ASN1Object('1.3.6.1.5.5.7.3.2')
          self.assertIsInstance(ssl.Purpose.CLIENT_AUTH, ssl._ASN1Object)
          self.assertEqual(ssl.Purpose.CLIENT_AUTH, val)
@@ -553,7 +569,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          self.assertEqual(ssl.Purpose.CLIENT_AUTH.shortname, 'clientAuth')
          self.assertEqual(ssl.Purpose.CLIENT_AUTH.oid,
                                '1.3.6.1.5.5.7.3.2')
-@@ -1121,6 +1208,7 @@
+@@ -1121,6 +1186,7 @@
              self.assertNotIn("3DES", name)
  
      @unittest.skipIf(ssl.OPENSSL_VERSION_INFO < (1, 0, 2, 0, 0), 'OpenSSL too old')
@@ -561,7 +577,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
      def test_get_ciphers(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          ctx.set_ciphers('AESGCM')
-@@ -1203,7 +1291,7 @@
+@@ -1203,7 +1269,7 @@
          maximum_range = {
              # stock OpenSSL
              ssl.TLSVersion.MAXIMUM_SUPPORTED,
@@ -570,7 +586,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
              ssl.TLSVersion.TLSv1_3
          }
  
-@@ -1257,9 +1345,17 @@
+@@ -1257,9 +1323,17 @@
          self.assertIn(
              ctx.minimum_version, minimum_range
          )
@@ -591,7 +607,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          with self.assertRaises(ValueError):
              ctx.minimum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
          with self.assertRaises(ValueError):
-@@ -1279,10 +1375,11 @@
+@@ -1279,10 +1353,11 @@
          self.assertEqual(ctx.verify_flags, ssl.VERIFY_CRL_CHECK_CHAIN)
          ctx.verify_flags = ssl.VERIFY_DEFAULT
          self.assertEqual(ctx.verify_flags, ssl.VERIFY_DEFAULT)
@@ -607,7 +623,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          with self.assertRaises(TypeError):
              ctx.verify_flags = None
  
-@@ -1295,25 +1392,50 @@
+@@ -1295,25 +1370,50 @@
          with self.assertRaises(OSError) as cm:
              ctx.load_cert_chain(NONEXISTINGCERT)
          self.assertEqual(cm.exception.errno, errno.ENOENT)
@@ -670,7 +686,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          # Password protected key and cert
          ctx.load_cert_chain(CERTFILE_PROTECTED, password=KEY_PASSWORD)
          ctx.load_cert_chain(CERTFILE_PROTECTED, password=KEY_PASSWORD.encode())
-@@ -1380,8 +1502,13 @@
+@@ -1380,8 +1480,13 @@
          with self.assertRaises(OSError) as cm:
              ctx.load_verify_locations(NONEXISTINGCERT)
          self.assertEqual(cm.exception.errno, errno.ENOENT)
@@ -686,7 +702,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          ctx.load_verify_locations(CERTFILE, CAPATH)
          ctx.load_verify_locations(CERTFILE, capath=BYTES_CAPATH)
  
-@@ -1422,28 +1549,38 @@
+@@ -1422,28 +1527,38 @@
          self.assertEqual(ctx.cert_store_stats()["x509_ca"], 2)
  
          # test DER
@@ -742,7 +758,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
  
      def test_load_dh_params(self):
-@@ -1579,6 +1716,7 @@
+@@ -1579,6 +1694,7 @@
  
      @unittest.skipIf(sys.platform == "win32", "not-Windows specific")
      @unittest.skipIf(IS_LIBRESSL, "LibreSSL doesn't support env vars")
@@ -750,7 +766,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
      def test_load_default_certs_env(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          with support.EnvironmentVarGuard() as env:
-@@ -1725,6 +1863,10 @@
+@@ -1725,6 +1841,10 @@
              pass
  
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -761,7 +777,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          ctx.sslsocket_class = MySSLSocket
          ctx.sslobject_class = MySSLObject
  
-@@ -1736,7 +1878,11 @@
+@@ -1736,7 +1856,11 @@
      @unittest.skipUnless(IS_OPENSSL_1_1_1, "Test requires OpenSSL 1.1.1")
      def test_num_tickest(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -774,7 +790,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          ctx.num_tickets = 1
          self.assertEqual(ctx.num_tickets, 1)
          ctx.num_tickets = 0
-@@ -1747,7 +1893,10 @@
+@@ -1747,7 +1871,10 @@
              ctx.num_tickets = None
  
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -786,7 +802,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          with self.assertRaises(ValueError):
              ctx.num_tickets = 1
  
-@@ -1772,7 +1921,10 @@
+@@ -1772,7 +1899,10 @@
          self.assertEqual(cm.exception.library, 'PEM')
          self.assertEqual(cm.exception.reason, 'NO_START_LINE')
          s = str(cm.exception)
@@ -798,7 +814,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      def test_subclass(self):
          # Check that the appropriate SSLError subclass is raised
-@@ -1874,6 +2026,7 @@
+@@ -1874,6 +2004,7 @@
          with self.assertRaisesRegex(TypeError, "public constructor"):
              ssl.SSLObject(bio, bio)
  
@@ -806,7 +822,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
      def test_unwrap(self):
          client_ctx, server_ctx, hostname = testing_context()
          c_in = ssl.MemoryBIO()
-@@ -1947,8 +2100,12 @@
+@@ -1947,8 +2078,12 @@
          s = test_wrap_socket(socket.socket(socket.AF_INET),
                              cert_reqs=ssl.CERT_REQUIRED)
          self.addCleanup(s.close)
@@ -821,7 +837,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      def test_connect_ex(self):
          # Issue #11326: check connect_ex() implementation
-@@ -2011,7 +2168,11 @@
+@@ -2011,7 +2146,11 @@
          ctx.verify_mode = ssl.CERT_REQUIRED
          s = ctx.wrap_socket(socket.socket(socket.AF_INET))
          self.addCleanup(s.close)
@@ -834,13 +850,16 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
                                  s.connect, self.server_addr)
  
      def test_connect_capath(self):
-@@ -2124,13 +2285,19 @@
+@@ -2124,13 +2263,22 @@
          # capath certs are loaded on request
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          ctx.load_verify_locations(capath=CAPATH)
 -        self.assertEqual(ctx.get_ca_certs(), [])
-+        # @TODO wolfSSL will load in the certificates on set
-+        if not ssl.IS_WOLFSSL:
++        # wolfSSL will load in the certificates when load_verify_locations
++        # is called, meaning ctx.get_ca_certs() not empty here.
++        if ssl.IS_WOLFSSL:
++            self.assertNotEqual(ctx.get_ca_certs(), [])
++        else:
 +            self.assertEqual(ctx.get_ca_certs(), [])
          with ctx.wrap_socket(socket.socket(socket.AF_INET),
                               server_hostname='localhost') as s:
@@ -856,7 +875,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      @needs_sni
      def test_context_setget(self):
-@@ -2198,8 +2365,12 @@
+@@ -2198,8 +2346,12 @@
          sslobj = ctx.wrap_bio(incoming, outgoing, False,
                                SIGNED_CERTFILE_HOSTNAME)
          self.assertIs(sslobj._sslobj.owner, sslobj)
@@ -871,30 +890,22 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          self.assertIsNotNone(sslobj.shared_ciphers())
          self.assertRaises(ValueError, sslobj.getpeercert)
          if 'tls-unique' in ssl.CHANNEL_BINDING_TYPES:
-@@ -2217,7 +2388,10 @@
+@@ -2217,7 +2369,10 @@
              # If the server shuts down the TCP connection without sending a
              # secure shutdown message, this is reported as SSL_ERROR_SYSCALL
              pass
 -        self.assertRaises(ssl.SSLError, sslobj.write, b'foo')
 +
-+        # @TODO wolfSSL not rasing an alert here
++        # @TODO wolfSSL not raising an alert here
 +        if not ssl.IS_WOLFSSL:
 +            self.assertRaises(ssl.SSLError, sslobj.write, b'foo')
  
      def test_bio_read_write_data(self):
          sock = socket.socket(socket.AF_INET)
-@@ -2831,23 +3005,30 @@
+@@ -2831,23 +2986,30 @@
                                     server_context=client_context,
                                     chatty=True, connectionchatty=True,
                                     sni_name=hostname)
--            self.assertIn('called a function you should not call',
--                          str(e.exception))
--
--        with self.subTest(client=ssl.PROTOCOL_TLS_SERVER, server=ssl.PROTOCOL_TLS_SERVER):
--            with self.assertRaises(ssl.SSLError) as e:
--                server_params_test(client_context=server_context,
--                                   server_context=server_context,
--                                   chatty=True, connectionchatty=True)
 -            self.assertIn('called a function you should not call',
 -                          str(e.exception))
 +            if ssl.IS_WOLFSSL:
@@ -903,6 +914,13 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +                self.assertIn('called a function you should not call',
 +                              str(e.exception))
  
+-        with self.subTest(client=ssl.PROTOCOL_TLS_SERVER, server=ssl.PROTOCOL_TLS_SERVER):
+-            with self.assertRaises(ssl.SSLError) as e:
+-                server_params_test(client_context=server_context,
+-                                   server_context=server_context,
+-                                   chatty=True, connectionchatty=True)
+-            self.assertIn('called a function you should not call',
+-                          str(e.exception))
 +        if not ssl.IS_WOLFSSL:
 +            with self.subTest(client=ssl.PROTOCOL_TLS_SERVER, server=ssl.PROTOCOL_TLS_SERVER):
 +                with self.assertRaises(ssl.SSLError) as e:
@@ -911,7 +929,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +                                      chatty=True, connectionchatty=True)
 +                    self.assertIn('called a function you should not call',
 +                                str(e.exception))
-+
+ 
          with self.subTest(client=ssl.PROTOCOL_TLS_CLIENT, server=ssl.PROTOCOL_TLS_CLIENT):
              with self.assertRaises(ssl.SSLError) as e:
                  server_params_test(client_context=server_context,
@@ -925,7 +943,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
                            str(e.exception))
  
      def test_getpeercert(self):
-@@ -2888,6 +3069,7 @@
+@@ -2888,6 +3050,7 @@
  
      @unittest.skipUnless(have_verify_flags(),
                          "verify_flags need OpenSSL > 0.9.8")
@@ -933,7 +951,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
      def test_crl_check(self):
          if support.verbose:
              sys.stdout.write("\n")
-@@ -2948,10 +3130,16 @@
+@@ -2948,10 +3111,16 @@
          with server:
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname="invalid") as s:
@@ -954,7 +972,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
          # missing server_hostname arg should cause an exception, too
          server = ThreadedEchoServer(context=server_context, chatty=True)
-@@ -2964,7 +3152,9 @@
+@@ -2964,7 +3133,9 @@
      def test_ecc_cert(self):
          client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          client_context.load_verify_locations(SIGNING_CA)
@@ -965,7 +983,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          hostname = SIGNED_CERTFILE_ECC_HOSTNAME
  
          server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-@@ -2989,13 +3179,19 @@
+@@ -2989,13 +3160,19 @@
          #       algorithms.
          client_context.options |= ssl.OP_NO_TLSv1_3
          # only ECDSA certs
@@ -976,8 +994,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 +        else:
 +            client_context.set_ciphers('ECDHE:ECDSA:!NULL:!aRSA')
          hostname = SIGNED_CERTFILE_ECC_HOSTNAME
--
-+
+ 
          server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
          # load ECC and RSA key/cert pairs
          server_context.load_cert_chain(SIGNED_CERTFILE_ECC)
@@ -988,7 +1005,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
          # correct hostname should verify
          server = ThreadedEchoServer(context=server_context, chatty=True)
-@@ -3116,21 +3312,38 @@
+@@ -3116,21 +3293,40 @@
          with server, \
               client_context.wrap_socket(socket.socket(),
                                          server_hostname=hostname) as s:
@@ -1006,7 +1023,9 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 -                if support.verbose:
 -                    sys.stdout.write("\nsocket.error is %r\n" % e)
 +            if ssl.IS_WOLFSSL:
-+                # wolfSSL do_handshake performs client cert exchaange while doing handshaking
++                # wolfSSL do_handshake performs client cert exchange while
++                # doing handshaking. wolfSSL does support post-handshake
++                # auth.
 +                try:
 +                    s.connect((HOST, server.port))
 +                    s.write(b'data')
@@ -1041,7 +1060,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      def test_rude_shutdown(self):
          """A brutal shutdown of an SSL server should raise an OSError
-@@ -3191,10 +3404,16 @@
+@@ -3191,10 +3387,16 @@
                  except ssl.SSLError as e:
                      msg = 'unable to get local issuer certificate'
                      self.assertIsInstance(e, ssl.SSLCertVerificationError)
@@ -1062,7 +1081,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      @requires_tls_version('SSLv2')
      def test_protocol_sslv2(self):
-@@ -3324,8 +3543,11 @@
+@@ -3324,8 +3526,11 @@
              try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_SSLv2, False)
          if has_tls_version('SSLv3'):
              try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_SSLv3, False)
@@ -1076,15 +1095,15 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
          try_protocol_combo(ssl.PROTOCOL_TLS, ssl.PROTOCOL_TLSv1_2, 'TLSv1.2')
          try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_TLSv1, False)
-@@ -3736,6 +3958,7 @@
+@@ -3736,6 +3941,7 @@
                  sock.do_handshake()
              self.assertEqual(cm.exception.errno, errno.ENOTCONN)
  
-+    @unittest.skipIf(ssl.IS_WOLFSSL, "wolfSSL doesn't support cipher rule.")
++    @unittest.skipIf(ssl.IS_WOLFSSL, "wolfSSL doesn't support cipher rules.")
      def test_no_shared_ciphers(self):
          client_context, server_context, hostname = testing_context()
          # OpenSSL enables all TLS 1.3 ciphers, enforce TLS 1.2 for test
-@@ -3838,7 +4061,10 @@
+@@ -3838,7 +4044,10 @@
                                              server_hostname=hostname) as s:
                  with self.assertRaises(ssl.SSLError) as e:
                      s.connect((HOST, server.port))
@@ -1096,7 +1115,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      @requires_minimum_version
      @requires_tls_version('SSLv3')
-@@ -3868,6 +4094,10 @@
+@@ -3868,6 +4077,10 @@
          # automatically.
          if ssl.OPENSSL_VERSION_INFO < (1, 0, 0):
              context.set_ciphers("ECCdraft:ECDH")
@@ -1107,33 +1126,33 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          with ThreadedEchoServer(context=context) as server:
              with context.wrap_socket(socket.socket()) as s:
                  s.connect((HOST, server.port))
-@@ -3900,7 +4130,11 @@
+@@ -3900,7 +4113,11 @@
                  # check if it is sane
                  self.assertIsNotNone(cb_data)
                  if s.version() == 'TLSv1.3':
 -                    self.assertEqual(len(cb_data), 48)
 +                    if ssl.IS_WOLFSSL:
-+                        # wolfSSL returns 32 length because TLS_AES_128_GCM_SHA256 use
++                        # wolfSSL returns 32 length because TLS_AES_128_GCM_SHA256 is used
 +                        self.assertEqual(len(cb_data), 32)
 +                    else:
 +                        self.assertEqual(len(cb_data), 48)
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
  
-@@ -3925,7 +4159,11 @@
+@@ -3925,7 +4142,11 @@
                  self.assertNotEqual(cb_data, new_cb_data)
                  self.assertIsNotNone(cb_data)
                  if s.version() == 'TLSv1.3':
 -                    self.assertEqual(len(cb_data), 48)
 +                    if ssl.IS_WOLFSSL:
-+                        # wolfSSL returns 32 length because TLS_AES_128_GCM_SHA256 use
++                        # wolfSSL returns 32 length because TLS_AES_128_GCM_SHA256 is used
 +                        self.assertEqual(len(cb_data), 32)
 +                    else:
 +                        self.assertEqual(len(cb_data), 48)
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
                  s.write(b"CB tls-unique\n")
-@@ -3959,13 +4197,18 @@
+@@ -3959,13 +4180,18 @@
          # test scenario needs TLS <= 1.2
          client_context.options |= ssl.OP_NO_TLSv1_3
          server_context.load_dh_params(DHFILE)
@@ -1154,19 +1173,22 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          if "ADH" not in parts and "EDH" not in parts and "DHE" not in parts:
              self.fail("Non-DH cipher: " + cipher[0])
  
-@@ -4166,7 +4409,10 @@
+@@ -4166,7 +4392,13 @@
              stats = server_params_test(client_context, server_context,
                                         chatty=False,
                                         sni_name='supermessage')
 -        self.assertEqual(cm.exception.reason, 'TLSV1_ALERT_ACCESS_DENIED')
 +        if ssl.IS_WOLFSSL:
-+            self.assertEqual(cm.exception.reason, 'fatal error')
++            # Depending on threading and socket shutdown when test is run,
++            # reason may occasionally be None here
++            if cm.exception.reason is not None:
++                self.assertEqual(cm.exception.reason, 'fatal error')
 +        else:
 +            self.assertEqual(cm.exception.reason, 'TLSV1_ALERT_ACCESS_DENIED')
  
      @needs_sni
      def test_sni_callback_raising(self):
-@@ -4182,9 +4428,11 @@
+@@ -4182,9 +4414,11 @@
                  stats = server_params_test(client_context, server_context,
                                             chatty=False,
                                             sni_name='supermessage')
@@ -1181,7 +1203,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
              self.assertEqual(catch.unraisable.exc_type, ZeroDivisionError)
  
      @needs_sni
-@@ -4203,20 +4451,30 @@
+@@ -4203,20 +4437,30 @@
                                             chatty=False,
                                             sni_name='supermessage')
  
@@ -1216,13 +1238,13 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          stats = server_params_test(client_context, server_context,
                                     sni_name=hostname)
          ciphers = stats['server_shared_ciphers'][0]
-@@ -4267,20 +4525,26 @@
+@@ -4267,20 +4511,26 @@
          self.assertTrue(session.id)
          self.assertGreater(session.time, 0)
          self.assertGreater(session.timeout, 0)
 -        self.assertTrue(session.has_ticket)
 +        if not ssl.IS_WOLFSSL:
-+            #wolfSSL is not enabled session ticket as default
++            # wolfSSL does not enable session tickets by default
 +            self.assertTrue(session.has_ticket)
          if ssl.OPENSSL_VERSION_INFO > (1, 0, 1):
              self.assertGreater(session.ticket_lifetime_hint, 0)
@@ -1231,7 +1253,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 -        self.assertEqual(sess_stat['accept'], 1)
 -        self.assertEqual(sess_stat['hits'], 0)
 +        if not ssl.IS_WOLFSSL:
-+            #skip sub-test for sess_accept and sess_hits because those API are STUB
++            # skip sub-test for sess_accept and sess_hits because those functions are stubs
 +            self.assertEqual(sess_stat['accept'], 1)
 +            self.assertEqual(sess_stat['hits'], 0)
  
@@ -1242,39 +1264,71 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
 -        self.assertEqual(sess_stat['accept'], 2)
 -        self.assertEqual(sess_stat['hits'], 1)
 +        if not ssl.IS_WOLFSSL:
-+            #skip sub-test for sess_accept and sess_hits because those API are STUB
++            # skip sub-test for sess_accept and sess_hits because those functions are stubs
 +            self.assertEqual(sess_stat['accept'], 2)
 +            self.assertEqual(sess_stat['hits'], 1)
          self.assertTrue(stats['session_reused'])
          session2 = stats['session']
          self.assertEqual(session2.id, session.id)
-@@ -4297,8 +4561,10 @@
+@@ -4297,8 +4547,10 @@
          self.assertNotEqual(session3.id, session.id)
          self.assertNotEqual(session3, session)
          sess_stat = server_context.session_stats()
 -        self.assertEqual(sess_stat['accept'], 3)
 -        self.assertEqual(sess_stat['hits'], 1)
 +        if not ssl.IS_WOLFSSL:
-+            #skip sub-test for sess_accept and sess_hits because those API are STUB
++            # skip sub-test for sess_accept and sess_hits because those functions are stubs
 +            self.assertEqual(sess_stat['accept'], 3)
 +            self.assertEqual(sess_stat['hits'], 1)
  
          # reuse session again
          stats = server_params_test(client_context, server_context,
-@@ -4310,8 +4576,10 @@
+@@ -4310,8 +4562,10 @@
          self.assertGreaterEqual(session4.time, session.time)
          self.assertGreaterEqual(session4.timeout, session.timeout)
          sess_stat = server_context.session_stats()
 -        self.assertEqual(sess_stat['accept'], 4)
 -        self.assertEqual(sess_stat['hits'], 2)
 +        if not ssl.IS_WOLFSSL:
-+            #skip sub-test for sess_accept and sess_hits because those API are STUB
++            # skip sub-test for sess_accept and sess_hits because those functions are stubs
 +            self.assertEqual(sess_stat['accept'], 4)
 +            self.assertEqual(sess_stat['hits'], 2)
  
      def test_session_handling(self):
          client_context, server_context, hostname = testing_context()
-@@ -4497,10 +4765,17 @@
+@@ -4433,12 +4687,25 @@
+                     # receive CertificateRequest
+                     self.assertEqual(s.recv(1024), b'OK\n')
+                     # send empty Certificate + Finish
+-                    s.write(b'HASCERT')
+-                    # receive alert
+-                    with self.assertRaisesRegex(
+-                            ssl.SSLError,
+-                            'tlsv13 alert certificate required'):
+-                        s.recv(1024)
++                    if ssl.IS_WOLFSSL:
++                        try:
++                            # wolfSSL may close socket when receiving
++                            # CertificateRequest and cert is required
++                            s.write(b'HASCERT')
++                            # receive alert
++                            with self.assertRaisesRegex(
++                                    ssl.SSLError,
++                                    'tlsv13 alert certificate required'):
++                                s.recv(1024)
++                        except ssl.SSLError:
++                            pass
++                    else:
++                        s.write(b'HASCERT')
++                        # receive alert
++                        with self.assertRaisesRegex(
++                                ssl.SSLError,
++                                'tlsv13 alert certificate required'):
++                            s.recv(1024)
+ 
+     def test_pha_optional(self):
+         if support.verbose:
+@@ -4497,10 +4764,17 @@
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1296,39 +1350,39 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      def test_pha_no_pha_server(self):
          # server doesn't have PHA enabled, cert is requested in handshake
-@@ -4616,7 +4891,11 @@
+@@ -4616,7 +4890,11 @@
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
          # header, 5 lines for TLS 1.3
 -        self.assertEqual(self.keylog_lines(), 6)
 +        if ssl.IS_WOLFSSL:
-+            # Does not include EXPORTER
++            # wolfSSL does not include EXPORTER_SECRET value in keylog output
 +            self.assertEqual(self.keylog_lines(), 5)
 +        else:
 +            self.assertEqual(self.keylog_lines(), 6)
  
          client_context.keylog_filename = None
          server_context.keylog_filename = support.TESTFN
-@@ -4625,7 +4904,11 @@
+@@ -4625,7 +4903,11 @@
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
 -        self.assertGreaterEqual(self.keylog_lines(), 11)
 +        if ssl.IS_WOLFSSL:
-+            # Does not include EXPORTER
++            # wolfSSL does not include EXPORTER_SECRET value in keylog output
 +            self.assertEqual(self.keylog_lines(), 9)
 +        else:
 +            self.assertGreaterEqual(self.keylog_lines(), 11)
  
          client_context.keylog_filename = support.TESTFN
          server_context.keylog_filename = support.TESTFN
-@@ -4634,7 +4917,11 @@
+@@ -4634,7 +4916,11 @@
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
 -        self.assertGreaterEqual(self.keylog_lines(), 21)
 +        if ssl.IS_WOLFSSL:
-+            # Does not include EXPORTER
++            # wolfSSL does not include EXPORTER_SECRET value in keylog output
 +            self.assertEqual(self.keylog_lines(), 17)
 +        else:
 +            self.assertGreaterEqual(self.keylog_lines(), 21)
@@ -1336,8 +1390,8 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          client_context.keylog_filename = None
          server_context.keylog_filename = None
 diff -Naur a/Modules/_hashopenssl.c b/Modules/_hashopenssl.c
---- a/Modules/_hashopenssl.c	2021-09-16 08:35:22.346325831 -0700
-+++ b/Modules/_hashopenssl.c	2021-09-10 14:24:36.252210948 -0700
+--- a/Modules/_hashopenssl.c	2021-10-21 16:20:42.529133974 -0600
++++ b/Modules/_hashopenssl.c	2021-10-21 16:20:49.173271676 -0600
 @@ -18,6 +18,10 @@
  #include "hashlib.h"
  #include "pystrhex.h"
@@ -1380,8 +1434,8 @@ diff -Naur a/Modules/_hashopenssl.c b/Modules/_hashopenssl.c
          name ="sha512_224";
          break;
 diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
---- a/Modules/_ssl.c	2021-09-16 08:35:22.342325987 -0700
-+++ b/Modules/_ssl.c	2021-09-16 08:32:37.520740247 -0700
+--- a/Modules/_ssl.c	2021-10-21 16:20:42.529133974 -0600
++++ b/Modules/_ssl.c	2021-10-22 14:22:41.331348849 -0600
 @@ -54,6 +54,10 @@
  #endif
  
@@ -1393,13 +1447,14 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  #include "openssl/rsa.h"
  #include "openssl/crypto.h"
  #include "openssl/x509.h"
-@@ -170,17 +174,42 @@
+@@ -170,17 +174,43 @@
  /* SNI support (client- and server-side) appeared in OpenSSL 1.0.0 and 0.9.8f
   * This includes the SSL_set_SSL_CTX() function.
   */
 -#ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
 +#if defined(SSL_CTRL_SET_TLSEXT_HOSTNAME) || \
 +    (defined(HAVE_WOLFSSL) && defined(HAVE_SNI))
++/* wolfSSL defines HAVE_SNI, but without a value. Undef and redefine here */
 +#undef HAVE_SNI
  # define HAVE_SNI 1
  #else
@@ -1438,7 +1493,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  
  /* We cannot rely on OPENSSL_NO_NEXTPROTONEG because LibreSSL 2.6.1 dropped
   * NPN support but did not set OPENSSL_NO_NEXTPROTONEG for compatibility
-@@ -215,9 +244,10 @@
+@@ -215,9 +245,10 @@
  #define OPENSSL_NO_SSL2
  #endif
  
@@ -1450,7 +1505,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  #define TLS_method SSLv23_method
  #define TLS_client_method SSLv23_client_method
  #define TLS_server_method SSLv23_server_method
-@@ -227,6 +257,7 @@
+@@ -227,6 +258,7 @@
  #define OpenSSL_version_num SSLeay
  #define OpenSSL_version SSLeay_version
  #define OPENSSL_VERSION SSLEAY_VERSION
@@ -1458,7 +1513,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  
  static int X509_NAME_ENTRY_set(const X509_NAME_ENTRY *ne)
  {
-@@ -242,6 +273,7 @@
+@@ -242,6 +274,7 @@
  /* LCOV_EXCL_STOP */
  #endif
  
@@ -1466,7 +1521,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  static pem_password_cb *SSL_CTX_get_default_passwd_cb(SSL_CTX *ctx)
  {
      return ctx->default_passwd_callback;
-@@ -283,6 +315,7 @@
+@@ -283,6 +316,7 @@
  {
      return s->tlsext_tick_lifetime_hint;
  }
@@ -1474,7 +1529,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  
  #endif /* OpenSSL < 1.1.0 or LibreSSL < 2.7.0 */
  
-@@ -503,7 +536,11 @@
+@@ -503,7 +537,11 @@
          _PySSL_FIX_ERRNO;
  #endif
          err.c = errno;
@@ -1486,7 +1541,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      }
      return err;
  }
-@@ -671,6 +710,13 @@
+@@ -671,6 +709,13 @@
              );
              break;
  #endif
@@ -1500,7 +1555,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          default:
              verify_str = X509_verify_cert_error_string(verify_code);
              if (verify_str != NULL) {
-@@ -788,8 +834,16 @@
+@@ -788,8 +833,16 @@
              errstr = "The operation did not complete (connect)";
              break;
          case SSL_ERROR_SYSCALL:
@@ -1517,46 +1572,32 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
                  PySocketSockObject *s = GET_SOCKET(sslsock);
                  if (ret == 0 || (((PyObject *)s) == Py_None)) {
                      p = PY_SSL_ERROR_EOF;
-@@ -834,6 +888,67 @@
+@@ -834,6 +887,49 @@
              }
              break;
          }
 +#ifdef HAVE_WOLFSSL
++        /* type PySSLCertVerificationErrorObject cases */
 +        case ASN_NO_SIGNER_E:
-+        {
-+            p = PY_SSL_ERROR_SSL;
-+            type = PySSLCertVerificationErrorObject;
-+            break;
-+        }
-+        case VERSION_ERROR:
-+        {
-+            p = PY_SSL_ERROR_SSL;
-+            errstr = "record layer version error";
-+            break;
-+        }
-+        case NO_PRIVATE_KEY:
-+        {
-+            p = PY_SSL_ERROR_SSL;
-+            errstr = "need the private key";
-+            break;
-+        }
-+        case SOCKET_ERROR_E:
-+        {
-+            p = PY_SSL_ERROR_SSL;
-+            errstr = "error state on socket";
-+            break;
-+        }
 +        case DOMAIN_NAME_MISMATCH:
 +        {
 +            p = PY_SSL_ERROR_SSL;
++            errstr = (char*)wolfSSL_ERR_reason_error_string(err.ssl);
 +            type = PySSLCertVerificationErrorObject;
-+            errstr = "peer subject name mismatch";
 +            break;
 +        }
++        case VERIFY_FINISHED_ERROR:
++        case NO_PRIVATE_KEY:
++        case SOCKET_ERROR_E:
++        case IPADDR_MISMATCH:
++        case VERSION_ERROR:
++        case SIDE_ERROR:
++        case UNSUPPORTED_PROTO_VERSION:
 +        case MATCH_SUITE_ERROR:
++        case POST_HAND_AUTH_ERROR:
 +        {
 +            p = PY_SSL_ERROR_SSL;
-+            errstr = "can't match cipher suite";
++            errstr = (char*)wolfSSL_ERR_reason_error_string(err.ssl);
 +            break;
 +        }
 +        case FATAL_ERROR:
@@ -1572,20 +1613,16 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
 +            wolfSSL_get_alert_history(sslsock->ssl, &h);
 +            if (h.last_rx.code == certificate_required) {
 +                errstr = "tlsv13 alert certificate required";
++            } else {
++                errstr = "recvd alert fatal error";
 +            }
-+            break;
-+        }
-+        case POST_HAND_AUTH_ERROR:
-+        {
-+            p = PY_SSL_ERROR_SSL;
-+            errstr = "extension not received";
 +            break;
 +        }
 +#endif
          default:
              p = PY_SSL_ERROR_INVALID_ERROR_CODE;
              errstr = "Invalid error code";
-@@ -1222,7 +1338,9 @@
+@@ -1222,7 +1318,9 @@
  
          /* check to see if we've gotten to a new RDN */
          if (rdn_level >= 0) {
@@ -1595,7 +1632,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
                  /* yes, new RDN */
                  /* add old RDN to DN */
                  rdnt = PyList_AsTuple(rdn);
-@@ -1237,7 +1355,9 @@
+@@ -1237,7 +1335,9 @@
                  rdn = PyList_New(0);
                  if (rdn == NULL)
                      goto fail0;
@@ -1605,7 +1642,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          }
          rdn_level = X509_NAME_ENTRY_set(entry);
  
-@@ -1441,14 +1562,14 @@
+@@ -1441,14 +1541,14 @@
                  PyTuple_SET_ITEM(t, 0, v);
  
                  if (name->d.ip->length == 4) {
@@ -1622,7 +1659,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
                      len = sprintf(
                          buf,
                          "%X:%X:%X:%X:%X:%X:%X:%X",
-@@ -1559,8 +1680,21 @@
+@@ -1559,8 +1659,21 @@
      PyObject *lst = NULL, *ostr = NULL;
      int i, result;
      AUTHORITY_INFO_ACCESS *info;
@@ -1645,7 +1682,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      if (info == NULL)
          return Py_None;
      if (sk_ACCESS_DESCRIPTION_num(info) == 0) {
-@@ -2154,7 +2290,11 @@
+@@ -2154,7 +2267,11 @@
  
      SSL_get0_alpn_selected(self->ssl, &out, &outlen);
  
@@ -1657,7 +1694,43 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          Py_RETURN_NONE;
      return PyUnicode_FromStringAndSize((char *)out, outlen);
  }
-@@ -3100,11 +3239,13 @@
+@@ -2828,7 +2945,7 @@
+ #endif
+ }
+ 
+-#ifdef OPENSSL_VERSION_1_1
++#if defined(OPENSSL_VERSION_1_1) && !defined(HAVE_WOLFSSL)
+ 
+ static SSL_SESSION*
+ _ssl_session_dup(SSL_SESSION *session) {
+@@ -2879,7 +2996,7 @@
+     PySSLSession *pysess;
+     SSL_SESSION *session;
+ 
+-#ifdef OPENSSL_VERSION_1_1
++#if defined(OPENSSL_VERSION_1_1) && !defined(HAVE_WOLFSSL)
+     /* duplicate session as workaround for session bug in OpenSSL 1.1.0,
+      * https://github.com/openssl/openssl/issues/1550 */
+     session = SSL_get0_session(self->ssl);  /* borrowed reference */
+@@ -2913,7 +3030,7 @@
+                              void *closure)
+                               {
+     PySSLSession *pysess;
+-#ifdef OPENSSL_VERSION_1_1
++#if defined(OPENSSL_VERSION_1_1) && !defined(HAVE_WOLFSSL)
+     SSL_SESSION *session;
+ #endif
+     int result;
+@@ -2939,7 +3056,7 @@
+                         "Cannot set session after handshake.");
+         return -1;
+     }
+-#ifdef OPENSSL_VERSION_1_1
++#if defined(OPENSSL_VERSION_1_1) && !defined(HAVE_WOLFSSL)
+     /* duplicate session */
+     if ((session = _ssl_session_dup(pysess->session)) == NULL) {
+         return -1;
+@@ -3100,11 +3217,13 @@
  
      PySSL_BEGIN_ALLOW_THREADS
      switch(proto_version) {
@@ -1672,7 +1745,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  #if (defined(TLS1_VERSION) && \
          !defined(OPENSSL_NO_TLS1) && \
          !defined(OPENSSL_NO_TLS1_METHOD))
-@@ -3205,7 +3346,7 @@
+@@ -3205,7 +3324,7 @@
  #ifdef SSL_OP_SINGLE_DH_USE
      options |= SSL_OP_SINGLE_DH_USE;
  #endif
@@ -1681,7 +1754,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      options |= SSL_OP_SINGLE_ECDH_USE;
  #endif
      SSL_CTX_set_options(self->ctx, options);
-@@ -5322,9 +5463,11 @@
+@@ -5322,9 +5441,12 @@
      if (bytes == NULL)
          return NULL;
      if (pseudo) {
@@ -1690,11 +1763,12 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          ok = RAND_bytes((unsigned char*)PyBytes_AS_STRING(bytes), len);
  #else
 +        /* wolfSSL using RAND_pseudo_bytes for fork test where bytes input is
-+         * used as seed in addition to secret data created for result */
++         * used as seed in addition to secret data created for result. Each
++         * thread will likely have different results this way. */
          ok = RAND_pseudo_bytes((unsigned char*)PyBytes_AS_STRING(bytes), len);
  #endif
          if (ok == 0 || ok == 1)
-@@ -6046,7 +6189,7 @@
+@@ -6046,7 +6168,7 @@
      if (!_setup_ssl_threads()) {
          return NULL;
      }
@@ -1703,7 +1777,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      /* OpenSSL 1.1.0 builtin thread support is enabled */
      _ssl_locks_count++;
  #endif
-@@ -6145,8 +6288,10 @@
+@@ -6145,8 +6267,10 @@
                              X509_V_FLAG_CRL_CHECK);
      PyModule_AddIntConstant(m, "VERIFY_CRL_CHECK_CHAIN",
                              X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
@@ -1714,7 +1788,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  #ifdef X509_V_FLAG_TRUSTED_FIRST
      PyModule_AddIntConstant(m, "VERIFY_X509_TRUSTED_FIRST",
                              X509_V_FLAG_TRUSTED_FIRST);
-@@ -6433,5 +6578,11 @@
+@@ -6433,5 +6557,11 @@
      if (r == NULL || PyModule_AddObject(m, "_OPENSSL_API_VERSION", r))
          return NULL;
  
@@ -1727,8 +1801,8 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      return m;
  }
 diff -Naur a/Modules/_ssl_data.h b/Modules/_ssl_data.h
---- a/Modules/_ssl_data.h	2021-09-16 08:35:22.350325675 -0700
-+++ b/Modules/_ssl_data.h	2021-09-13 09:06:02.648155994 -0700
+--- a/Modules/_ssl_data.h	2021-10-21 16:20:42.529133974 -0600
++++ b/Modules/_ssl_data.h	2021-10-21 16:20:49.173271676 -0600
 @@ -80,6 +80,9 @@
  #ifdef ERR_LIB_X509V3
      {"X509V3", ERR_LIB_X509V3},
@@ -1739,20 +1813,37 @@ diff -Naur a/Modules/_ssl_data.h b/Modules/_ssl_data.h
      { NULL }
  };
  
-@@ -6319,5 +6322,10 @@
+@@ -6319,5 +6322,27 @@
    #else
      {"WRONG_TYPE", 11, 122},
    #endif
 +  #ifdef HAVE_WOLFSSL
 +  #define WOLFSSL_ERRORCODE(x)  x<0?(-1*x):x
++     /* wolfCrypt-level error codes. Reason should be negative for
++      * wolfCrypt codes, as wolfSSL_ERR_GET_REASON() returns them as
++      * negative when in wolfCrypt range. */
++    {"BUFFER_E", 0, BUFFER_E},
++    {"ASN_NO_SIGNER_E", 0, ASN_NO_SIGNER_E},
++
++    /* wolfSSL-level error codes */
++    {"VERIFY_FINISHED_ERROR", 0, WOLFSSL_ERRORCODE(VERIFY_FINISHED_ERROR)},
 +    {"error state on socket", 0, WOLFSSL_ERRORCODE(SOCKET_ERROR_E)},
 +    {"fatal error", 0, WOLFSSL_ERRORCODE(FATAL_ERROR)},
++    {"NO_PRIVATE_KEY", 0, WOLFSSL_ERRORCODE(NO_PRIVATE_KEY)},
++    {"DOMAIN_NAME_MISMATCH", 0, WOLFSSL_ERRORCODE(DOMAIN_NAME_MISMATCH)},
++    {"IPADDR_MISMATCH", 0, WOLFSSL_ERRORCODE(IPADDR_MISMATCH)},
++    {"VERSION_ERROR", 0, WOLFSSL_ERRORCODE(VERSION_ERROR)},
++    {"SIDE_ERROR", 0, WOLFSSL_ERRORCODE(SIDE_ERROR)},
++    {"NO_PEER_CERT", 0, WOLFSSL_ERRORCODE(NO_PEER_CERT)},
++    {"SOCKET_PEER_CLOSED_E", 0, WOLFSSL_ERRORCODE(SOCKET_PEER_CLOSED_E)},
++    {"UNSUPPORTED_PROTO_VERSION", 0, WOLFSSL_ERRORCODE(UNSUPPORTED_PROTO_VERSION)},
++    {"POST_HAND_AUTH_ERROR", 0, WOLFSSL_ERRORCODE(POST_HAND_AUTH_ERROR)},
 +  #endif
      { NULL }
  };
 diff -Naur a/pyconfig.h.in b/pyconfig.h.in
---- a/pyconfig.h.in	2021-09-16 08:35:22.270328788 -0700
-+++ b/pyconfig.h.in	2021-08-26 15:42:06.560328000 -0700
+--- a/pyconfig.h.in	2021-10-21 16:20:42.541134223 -0600
++++ b/pyconfig.h.in	2021-10-22 16:02:40.288409547 -0600
 @@ -1325,6 +1325,9 @@
  /* Define to 1 if you have the `wmemcmp' function. */
  #undef HAVE_WMEMCMP
@@ -1763,15 +1854,12 @@ diff -Naur a/pyconfig.h.in b/pyconfig.h.in
  /* Define if tzset() actually switches the local timezone in a meaningful way.
     */
  #undef HAVE_WORKING_TZSET
-@@ -1352,6 +1355,12 @@
+@@ -1352,6 +1355,9 @@
  /* Define if mvwdelch in curses.h is an expression. */
  #undef MVWDELCH_IS_EXPRESSION
  
 +/* define to disable compression */
 +#undef OPENSSL_NO_COMP
-+
-+/* define to disable scrypt */
-+#undef OPENSSL_NO_SCRYPT
 +
  /* Define to the address where bug reports for this package should be sent. */
  #undef PACKAGE_BUGREPORT
