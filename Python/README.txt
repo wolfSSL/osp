@@ -5,23 +5,22 @@ https://www.python.org/ftp/python/3.8.5/Python-3.8.5.tar.xz
 curl -O https://www.python.org/ftp/python/3.8.5/Python-3.8.5.tar.xz
 
 To build wolfSSL for use with Python 3.8.5, see the simple script
-combine_wolfssl.sh used to pull together the correct wolfSSL sources, configure,
-and compile the library. This script will not be used after the final port has
-been complete, but is used for development/testing in the meantime.
+build_wolfssl_master.sh which can be used to build wolfSSL sources, configure,
+and compile the library using the current wolfssl master branch code.
 
-combine_wolfssl.sh
+build_wolfssl.sh
 
 1.  Clones wolfssl/master to directory wolfssl-master
-2.  Adds current outstanding PR's
-3.  Configures and compiles the library if all patches are successful,
-    note that patches can fail and all code will still be applied. Often a fail
-    case is just re-applying of code causing a non 0 return.
+2.  Configures and compiles the library
 
 The script uses the below configuration for wolfSSL:
 
 $ cd wolfssl-master
 $ ./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-scrypt --enable-debug CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT"
 $ make check
+
+After compiling wolfSSL, install:
+
 $ sudo make install
 
 To build Python-3.8.5 with wolfSSL enabled:
@@ -31,6 +30,17 @@ $ cd Python-3.8.5
 $ patch -p1 < wolfssl-python-3.8.5.patch
 $ autoreconf -fi
 $ ./configure --with-wolfssl=/usr/local
+$ make
+
+If you see an error similar to the following when running make:
+
+*** WARNING: renaming "_ssl" since importing it failed: libwolfssl.so.30:
+cannot open shared object file: No such file or directory
+
+You may need to add your wolfSSL installation location to the library
+search path and re-run make:
+
+$ export LD_LIBRARY_PATH=/usr/local/lib
 $ make
 
 To run all Python-3.8.5 tests:
@@ -67,4 +77,11 @@ test_ssl:
     - wolfSSL does not support cipher suite rules i.e !NULL
 
     - At the end of the test suite some dangling threads from tests are reported
+
+test_nntplib:
+
+    - The following two tests fail without wolfSSL, and as such also fail
+      with wolfSSL:
+          test_descriptions
+          test_description
 
