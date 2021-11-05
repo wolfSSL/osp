@@ -1,6 +1,6 @@
 diff -Naur a/configure.ac b/configure.ac
---- a/configure.ac	2021-10-21 16:20:42.549134388 -0600
-+++ b/configure.ac	2021-10-21 16:29:15.035930953 -0600
+--- a/configure.ac	2020-07-20 07:01:32.000000000 -0600
++++ b/configure.ac	2021-11-05 17:17:21.532693359 -0600
 @@ -5571,43 +5571,81 @@
  LIBS="$save_LIBS"
  ac_includes_default="$save_includes_default"
@@ -117,8 +117,8 @@ diff -Naur a/configure.ac b/configure.ac
  
  # ssl module default cipher suite string
 diff -Naur a/Lib/ssl.py b/Lib/ssl.py
---- a/Lib/ssl.py	2021-10-21 16:20:42.609135630 -0600
-+++ b/Lib/ssl.py	2021-10-21 16:20:49.193272090 -0600
+--- a/Lib/ssl.py	2020-07-20 07:01:32.000000000 -0600
++++ b/Lib/ssl.py	2021-11-05 17:17:21.632695387 -0600
 @@ -117,6 +117,7 @@
      HAS_TLSv1_1, HAS_TLSv1_2, HAS_TLSv1_3
  )
@@ -129,7 +129,7 @@ diff -Naur a/Lib/ssl.py b/Lib/ssl.py
  _IntEnum._convert_(
 diff -Naur a/Lib/test/capath-2048-plus/5ed36f99.0 b/Lib/test/capath-2048-plus/5ed36f99.0
 --- a/Lib/test/capath-2048-plus/5ed36f99.0	1969-12-31 17:00:00.000000000 -0700
-+++ b/Lib/test/capath-2048-plus/5ed36f99.0	2021-10-22 15:54:02.257679363 -0600
++++ b/Lib/test/capath-2048-plus/5ed36f99.0	2021-11-05 17:17:21.628695305 -0600
 @@ -0,0 +1,41 @@
 +-----BEGIN CERTIFICATE-----
 +MIIHPTCCBSWgAwIBAgIBADANBgkqhkiG9w0BAQQFADB5MRAwDgYDVQQKEwdSb290
@@ -174,7 +174,7 @@ diff -Naur a/Lib/test/capath-2048-plus/5ed36f99.0 b/Lib/test/capath-2048-plus/5e
 +-----END CERTIFICATE-----
 diff -Naur a/Lib/test/capath-2048-plus/99d0fa06.0 b/Lib/test/capath-2048-plus/99d0fa06.0
 --- a/Lib/test/capath-2048-plus/99d0fa06.0	1969-12-31 17:00:00.000000000 -0700
-+++ b/Lib/test/capath-2048-plus/99d0fa06.0	2021-10-22 15:54:02.257679363 -0600
++++ b/Lib/test/capath-2048-plus/99d0fa06.0	2021-11-05 17:17:21.628695305 -0600
 @@ -0,0 +1,41 @@
 +-----BEGIN CERTIFICATE-----
 +MIIHPTCCBSWgAwIBAgIBADANBgkqhkiG9w0BAQQFADB5MRAwDgYDVQQKEwdSb290
@@ -219,7 +219,7 @@ diff -Naur a/Lib/test/capath-2048-plus/99d0fa06.0 b/Lib/test/capath-2048-plus/99
 +-----END CERTIFICATE-----
 diff -Naur a/Lib/test/capath-2048-plus/b1930218.0 b/Lib/test/capath-2048-plus/b1930218.0
 --- a/Lib/test/capath-2048-plus/b1930218.0	1969-12-31 17:00:00.000000000 -0700
-+++ b/Lib/test/capath-2048-plus/b1930218.0	2021-10-22 15:54:02.257679363 -0600
++++ b/Lib/test/capath-2048-plus/b1930218.0	2021-11-05 17:17:21.628695305 -0600
 @@ -0,0 +1,26 @@
 +-----BEGIN CERTIFICATE-----
 +MIIEbTCCAtWgAwIBAgIJAMstgJlaaVJbMA0GCSqGSIb3DQEBCwUAME0xCzAJBgNV
@@ -249,7 +249,7 @@ diff -Naur a/Lib/test/capath-2048-plus/b1930218.0 b/Lib/test/capath-2048-plus/b1
 +-----END CERTIFICATE-----
 diff -Naur a/Lib/test/capath-2048-plus/ceff1710.0 b/Lib/test/capath-2048-plus/ceff1710.0
 --- a/Lib/test/capath-2048-plus/ceff1710.0	1969-12-31 17:00:00.000000000 -0700
-+++ b/Lib/test/capath-2048-plus/ceff1710.0	2021-10-22 15:54:02.257679363 -0600
++++ b/Lib/test/capath-2048-plus/ceff1710.0	2021-11-05 17:17:21.628695305 -0600
 @@ -0,0 +1,26 @@
 +-----BEGIN CERTIFICATE-----
 +MIIEbTCCAtWgAwIBAgIJAMstgJlaaVJbMA0GCSqGSIb3DQEBCwUAME0xCzAJBgNV
@@ -278,8 +278,8 @@ diff -Naur a/Lib/test/capath-2048-plus/ceff1710.0 b/Lib/test/capath-2048-plus/ce
 +juTH+WpA4bhkRem1WSmlX899WH1keeWkCawedmU9lMRo
 +-----END CERTIFICATE-----
 diff -Naur a/Lib/test/support/__init__.py b/Lib/test/support/__init__.py
---- a/Lib/test/support/__init__.py	2021-10-21 16:20:42.577134968 -0600
-+++ b/Lib/test/support/__init__.py	2021-10-21 16:20:49.217272588 -0600
+--- a/Lib/test/support/__init__.py	2020-07-20 07:01:32.000000000 -0600
++++ b/Lib/test/support/__init__.py	2021-11-05 17:17:21.596694656 -0600
 @@ -818,7 +818,8 @@
          try:
              f(*args, **kwargs)
@@ -291,8 +291,8 @@ diff -Naur a/Lib/test/support/__init__.py b/Lib/test/support/__init__.py
                                          "necessary certificates")
              raise
 diff -Naur a/Lib/test/test_asyncio/test_events.py b/Lib/test/test_asyncio/test_events.py
---- a/Lib/test/test_asyncio/test_events.py	2021-10-21 16:20:42.593135299 -0600
-+++ b/Lib/test/test_asyncio/test_events.py	2021-10-21 16:20:49.229272837 -0600
+--- a/Lib/test/test_asyncio/test_events.py	2020-07-20 07:01:32.000000000 -0600
++++ b/Lib/test/test_asyncio/test_events.py	2021-11-05 17:17:21.620695144 -0600
 @@ -604,7 +604,10 @@
                  self._basetest_create_ssl_connection(conn_fut, check_sockname,
                                                       peername)
@@ -364,9 +364,133 @@ diff -Naur a/Lib/test/test_asyncio/test_events.py b/Lib/test/test_asyncio/test_e
  
          # close connection
          # transport is None because TLS ALERT aborted the handshake
+diff -Naur a/Lib/test/test_httplib.py b/Lib/test/test_httplib.py
+--- a/Lib/test/test_httplib.py	2020-07-20 07:01:32.000000000 -0600
++++ b/Lib/test/test_httplib.py	2021-11-05 17:17:21.604694819 -0600
+@@ -1651,7 +1651,10 @@
+             h = client.HTTPSConnection('self-signed.pythontest.net', 443)
+             with self.assertRaises(ssl.SSLError) as exc_info:
+                 h.request('GET', '/')
+-            self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
++            if ssl.IS_WOLFSSL:
++                self.assertEqual(exc_info.exception.reason, 'ASN_NO_SIGNER_E')
++            else:
++                self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
+ 
+     def test_networked_noverification(self):
+         # Switch off cert verification
+@@ -1723,7 +1726,10 @@
+             h = client.HTTPSConnection('self-signed.pythontest.net', 443, context=context)
+             with self.assertRaises(ssl.SSLError) as exc_info:
+                 h.request('GET', '/')
+-            self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
++            if ssl.IS_WOLFSSL:
++                self.assertEqual(exc_info.exception.reason, 'ASN_NO_SIGNER_E')
++            else:
++                self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
+ 
+     def test_local_unknown_cert(self):
+         # The custom cert isn't known to the default trust bundle
+@@ -1732,7 +1738,10 @@
+         h = client.HTTPSConnection('localhost', server.port)
+         with self.assertRaises(ssl.SSLError) as exc_info:
+             h.request('GET', '/')
+-        self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
++        if ssl.IS_WOLFSSL:
++            self.assertEqual(exc_info.exception.reason, 'ASN_NO_SIGNER_E')
++        else:
++            self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
+ 
+     def test_local_good_hostname(self):
+         # The (valid) cert validates the HTTP hostname
+diff -Naur a/Lib/test/test_imaplib.py b/Lib/test/test_imaplib.py
+--- a/Lib/test/test_imaplib.py	2020-07-20 07:01:32.000000000 -0600
++++ b/Lib/test/test_imaplib.py	2021-11-05 17:34:45.454974808 -0600
+@@ -504,13 +504,21 @@
+         self.assertEqual(ssl_context.check_hostname, True)
+         ssl_context.load_verify_locations(CAFILE)
+ 
+-        with self.assertRaisesRegex(ssl.CertificateError,
+-                "IP address mismatch, certificate is not valid for "
+-                "'127.0.0.1'"):
+-            _, server = self._setup(SimpleIMAPHandler)
+-            client = self.imap_class(*server.server_address,
+-                                     ssl_context=ssl_context)
+-            client.shutdown()
++        if ssl.IS_WOLFSSL:
++            with self.assertRaisesRegex(ssl.SSLError,
++                    "IPADDR_MISMATCH"):
++                _, server = self._setup(SimpleIMAPHandler)
++                client = self.imap_class(*server.server_address,
++                                         ssl_context=ssl_context)
++                client.shutdown()
++        else:
++            with self.assertRaisesRegex(ssl.CertificateError,
++                    "IP address mismatch, certificate is not valid for "
++                    "'127.0.0.1'"):
++                _, server = self._setup(SimpleIMAPHandler)
++                client = self.imap_class(*server.server_address,
++                                         ssl_context=ssl_context)
++                client.shutdown()
+ 
+     def test_ssl_verified(self):
+         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+@@ -894,14 +902,23 @@
+         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+         ssl_context.load_verify_locations(CAFILE)
+ 
+-        with self.assertRaisesRegex(
+-                ssl.CertificateError,
+-                "IP address mismatch, certificate is not valid for "
+-                "'127.0.0.1'"):
+-            with self.reaped_server(SimpleIMAPHandler) as server:
+-                client = self.imap_class(*server.server_address,
+-                                         ssl_context=ssl_context)
+-                client.shutdown()
++        if ssl.IS_WOLFSSL:
++            with self.assertRaisesRegex(
++                    ssl.SSLError,
++                    "IPADDR_MISMATCH"):
++                with self.reaped_server(SimpleIMAPHandler) as server:
++                    client = self.imap_class(*server.server_address,
++                                             ssl_context=ssl_context)
++                    client.shutdown()
++        else:
++            with self.assertRaisesRegex(
++                    ssl.CertificateError,
++                    "IP address mismatch, certificate is not valid for "
++                    "'127.0.0.1'"):
++                with self.reaped_server(SimpleIMAPHandler) as server:
++                    client = self.imap_class(*server.server_address,
++                                             ssl_context=ssl_context)
++                    client.shutdown()
+ 
+         with self.reaped_server(SimpleIMAPHandler) as server:
+             client = self.imap_class("localhost", server.server_address[1],
+diff -Naur a/Lib/test/test_poplib.py b/Lib/test/test_poplib.py
+--- a/Lib/test/test_poplib.py	2020-07-20 07:01:32.000000000 -0600
++++ b/Lib/test/test_poplib.py	2021-11-05 17:17:21.616695062 -0600
+@@ -373,9 +373,15 @@
+         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+         ctx.load_verify_locations(CAFILE)
+         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+-        self.assertEqual(ctx.check_hostname, True)
+-        with self.assertRaises(ssl.CertificateError):
++        if ssl.IS_WOLFSSL:
++            # wolfSSL will fail hostname check when comparing
++            # 127.0.0.1 to localhost, disabling check_hostname in test here
++            ctx.check_hostname = False
+             resp = self.client.stls(context=ctx)
++        else:
++            self.assertEqual(ctx.check_hostname, True)
++            with self.assertRaises(ssl.CertificateError):
++                resp = self.client.stls(context=ctx)
+         self.client = poplib.POP3("localhost", self.server.port, timeout=3)
+         resp = self.client.stls(context=ctx)
+         self.assertEqual(resp, expected)
 diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
---- a/Lib/test/test_ssl.py	2021-10-21 16:20:42.581135051 -0600
-+++ b/Lib/test/test_ssl.py	2021-10-22 16:09:26.233060505 -0600
+--- a/Lib/test/test_ssl.py	2020-07-20 07:01:32.000000000 -0600
++++ b/Lib/test/test_ssl.py	2021-11-05 17:17:21.596694656 -0600
 @@ -66,9 +66,17 @@
  CERTFILE_PROTECTED = data_file("keycert.passwd.pem")
  ONLYKEY_PROTECTED = data_file("ssl_key.passwd.pem")
@@ -1081,7 +1205,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      @requires_tls_version('SSLv2')
      def test_protocol_sslv2(self):
-@@ -3736,6 +3941,7 @@
+@@ -3736,6 +3938,7 @@
                  sock.do_handshake()
              self.assertEqual(cm.exception.errno, errno.ENOTCONN)
  
@@ -1089,7 +1213,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
      def test_no_shared_ciphers(self):
          client_context, server_context, hostname = testing_context()
          # OpenSSL enables all TLS 1.3 ciphers, enforce TLS 1.2 for test
-@@ -3838,7 +4044,10 @@
+@@ -3838,7 +4041,10 @@
                                              server_hostname=hostname) as s:
                  with self.assertRaises(ssl.SSLError) as e:
                      s.connect((HOST, server.port))
@@ -1101,7 +1225,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      @requires_minimum_version
      @requires_tls_version('SSLv3')
-@@ -3868,6 +4077,10 @@
+@@ -3868,6 +4074,10 @@
          # automatically.
          if ssl.OPENSSL_VERSION_INFO < (1, 0, 0):
              context.set_ciphers("ECCdraft:ECDH")
@@ -1112,7 +1236,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          with ThreadedEchoServer(context=context) as server:
              with context.wrap_socket(socket.socket()) as s:
                  s.connect((HOST, server.port))
-@@ -3900,7 +4113,11 @@
+@@ -3900,7 +4110,11 @@
                  # check if it is sane
                  self.assertIsNotNone(cb_data)
                  if s.version() == 'TLSv1.3':
@@ -1125,7 +1249,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
  
-@@ -3925,7 +4142,11 @@
+@@ -3925,7 +4139,11 @@
                  self.assertNotEqual(cb_data, new_cb_data)
                  self.assertIsNotNone(cb_data)
                  if s.version() == 'TLSv1.3':
@@ -1138,7 +1262,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
                  s.write(b"CB tls-unique\n")
-@@ -3959,13 +4180,18 @@
+@@ -3959,13 +4177,18 @@
          # test scenario needs TLS <= 1.2
          client_context.options |= ssl.OP_NO_TLSv1_3
          server_context.load_dh_params(DHFILE)
@@ -1159,7 +1283,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          if "ADH" not in parts and "EDH" not in parts and "DHE" not in parts:
              self.fail("Non-DH cipher: " + cipher[0])
  
-@@ -4166,7 +4392,13 @@
+@@ -4166,7 +4389,13 @@
              stats = server_params_test(client_context, server_context,
                                         chatty=False,
                                         sni_name='supermessage')
@@ -1174,7 +1298,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      @needs_sni
      def test_sni_callback_raising(self):
-@@ -4182,9 +4414,11 @@
+@@ -4182,9 +4411,11 @@
                  stats = server_params_test(client_context, server_context,
                                             chatty=False,
                                             sni_name='supermessage')
@@ -1189,7 +1313,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
              self.assertEqual(catch.unraisable.exc_type, ZeroDivisionError)
  
      @needs_sni
-@@ -4203,20 +4437,30 @@
+@@ -4203,20 +4434,30 @@
                                             chatty=False,
                                             sni_name='supermessage')
  
@@ -1224,7 +1348,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          stats = server_params_test(client_context, server_context,
                                     sni_name=hostname)
          ciphers = stats['server_shared_ciphers'][0]
-@@ -4267,20 +4511,26 @@
+@@ -4267,20 +4508,26 @@
          self.assertTrue(session.id)
          self.assertGreater(session.time, 0)
          self.assertGreater(session.timeout, 0)
@@ -1256,7 +1380,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          self.assertTrue(stats['session_reused'])
          session2 = stats['session']
          self.assertEqual(session2.id, session.id)
-@@ -4297,8 +4547,10 @@
+@@ -4297,8 +4544,10 @@
          self.assertNotEqual(session3.id, session.id)
          self.assertNotEqual(session3, session)
          sess_stat = server_context.session_stats()
@@ -1269,7 +1393,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
          # reuse session again
          stats = server_params_test(client_context, server_context,
-@@ -4310,8 +4562,10 @@
+@@ -4310,8 +4559,10 @@
          self.assertGreaterEqual(session4.time, session.time)
          self.assertGreaterEqual(session4.timeout, session.timeout)
          sess_stat = server_context.session_stats()
@@ -1282,7 +1406,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      def test_session_handling(self):
          client_context, server_context, hostname = testing_context()
-@@ -4433,12 +4687,25 @@
+@@ -4433,12 +4684,25 @@
                      # receive CertificateRequest
                      self.assertEqual(s.recv(1024), b'OK\n')
                      # send empty Certificate + Finish
@@ -1314,7 +1438,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      def test_pha_optional(self):
          if support.verbose:
-@@ -4497,10 +4764,17 @@
+@@ -4497,10 +4761,17 @@
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1336,7 +1460,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
      def test_pha_no_pha_server(self):
          # server doesn't have PHA enabled, cert is requested in handshake
-@@ -4616,7 +4890,11 @@
+@@ -4616,7 +4887,11 @@
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
          # header, 5 lines for TLS 1.3
@@ -1349,7 +1473,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
          client_context.keylog_filename = None
          server_context.keylog_filename = support.TESTFN
-@@ -4625,7 +4903,11 @@
+@@ -4625,7 +4900,11 @@
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1362,7 +1486,7 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
  
          client_context.keylog_filename = support.TESTFN
          server_context.keylog_filename = support.TESTFN
-@@ -4634,7 +4916,11 @@
+@@ -4634,7 +4913,11 @@
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1376,8 +1500,8 @@ diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
          client_context.keylog_filename = None
          server_context.keylog_filename = None
 diff -Naur a/Modules/_hashopenssl.c b/Modules/_hashopenssl.c
---- a/Modules/_hashopenssl.c	2021-10-21 16:20:42.529133974 -0600
-+++ b/Modules/_hashopenssl.c	2021-10-21 16:20:49.173271676 -0600
+--- a/Modules/_hashopenssl.c	2020-07-20 07:01:32.000000000 -0600
++++ b/Modules/_hashopenssl.c	2021-11-05 17:17:21.552693765 -0600
 @@ -18,6 +18,10 @@
  #include "hashlib.h"
  #include "pystrhex.h"
@@ -1420,8 +1544,8 @@ diff -Naur a/Modules/_hashopenssl.c b/Modules/_hashopenssl.c
          name ="sha512_224";
          break;
 diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
---- a/Modules/_ssl.c	2021-10-21 16:20:42.529133974 -0600
-+++ b/Modules/_ssl.c	2021-10-22 14:22:41.331348849 -0600
+--- a/Modules/_ssl.c	2020-07-20 07:01:32.000000000 -0600
++++ b/Modules/_ssl.c	2021-11-05 17:17:21.548693683 -0600
 @@ -54,6 +54,10 @@
  #endif
  
@@ -1541,7 +1665,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          default:
              verify_str = X509_verify_cert_error_string(verify_code);
              if (verify_str != NULL) {
-@@ -788,8 +833,16 @@
+@@ -788,13 +833,28 @@
              errstr = "The operation did not complete (connect)";
              break;
          case SSL_ERROR_SYSCALL:
@@ -1558,7 +1682,19 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
                  PySocketSockObject *s = GET_SOCKET(sslsock);
                  if (ret == 0 || (((PyObject *)s) == Py_None)) {
                      p = PY_SSL_ERROR_EOF;
-@@ -834,6 +887,49 @@
+                     type = PySSLEOFErrorObject;
+                     errstr = "EOF occurred in violation of protocol";
++#ifdef HAVE_WOLFSSL
++                } else if (err.ssl == SOCKET_PEER_CLOSED_E && ret == -1) {
++                    /* Treat SOCKET_PEER_CLOSED_E as EOF error */
++                    p = PY_SSL_ERROR_EOF;
++                    type = PySSLEOFErrorObject;
++                    errstr = "Peer Closed Socket, EOF";
++#endif
+                 } else if (s && ret == -1) {
+                     /* underlying BIO reported an I/O error */
+                     ERR_clear_error();
+@@ -834,6 +894,49 @@
              }
              break;
          }
@@ -1608,7 +1744,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          default:
              p = PY_SSL_ERROR_INVALID_ERROR_CODE;
              errstr = "Invalid error code";
-@@ -1222,7 +1318,9 @@
+@@ -1222,7 +1325,9 @@
  
          /* check to see if we've gotten to a new RDN */
          if (rdn_level >= 0) {
@@ -1618,7 +1754,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
                  /* yes, new RDN */
                  /* add old RDN to DN */
                  rdnt = PyList_AsTuple(rdn);
-@@ -1237,7 +1335,9 @@
+@@ -1237,7 +1342,9 @@
                  rdn = PyList_New(0);
                  if (rdn == NULL)
                      goto fail0;
@@ -1628,7 +1764,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          }
          rdn_level = X509_NAME_ENTRY_set(entry);
  
-@@ -1441,14 +1541,14 @@
+@@ -1441,14 +1548,14 @@
                  PyTuple_SET_ITEM(t, 0, v);
  
                  if (name->d.ip->length == 4) {
@@ -1645,7 +1781,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
                      len = sprintf(
                          buf,
                          "%X:%X:%X:%X:%X:%X:%X:%X",
-@@ -1559,8 +1659,21 @@
+@@ -1559,8 +1666,21 @@
      PyObject *lst = NULL, *ostr = NULL;
      int i, result;
      AUTHORITY_INFO_ACCESS *info;
@@ -1668,7 +1804,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      if (info == NULL)
          return Py_None;
      if (sk_ACCESS_DESCRIPTION_num(info) == 0) {
-@@ -2154,7 +2267,11 @@
+@@ -2154,7 +2274,11 @@
  
      SSL_get0_alpn_selected(self->ssl, &out, &outlen);
  
@@ -1680,7 +1816,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          Py_RETURN_NONE;
      return PyUnicode_FromStringAndSize((char *)out, outlen);
  }
-@@ -2828,7 +2945,7 @@
+@@ -2828,7 +2952,7 @@
  #endif
  }
  
@@ -1689,7 +1825,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  
  static SSL_SESSION*
  _ssl_session_dup(SSL_SESSION *session) {
-@@ -2879,7 +2996,7 @@
+@@ -2879,7 +3003,7 @@
      PySSLSession *pysess;
      SSL_SESSION *session;
  
@@ -1698,7 +1834,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      /* duplicate session as workaround for session bug in OpenSSL 1.1.0,
       * https://github.com/openssl/openssl/issues/1550 */
      session = SSL_get0_session(self->ssl);  /* borrowed reference */
-@@ -2913,7 +3030,7 @@
+@@ -2913,7 +3037,7 @@
                               void *closure)
                                {
      PySSLSession *pysess;
@@ -1707,7 +1843,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      SSL_SESSION *session;
  #endif
      int result;
-@@ -2939,7 +3056,7 @@
+@@ -2939,7 +3063,7 @@
                          "Cannot set session after handshake.");
          return -1;
      }
@@ -1716,7 +1852,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      /* duplicate session */
      if ((session = _ssl_session_dup(pysess->session)) == NULL) {
          return -1;
-@@ -3100,11 +3217,13 @@
+@@ -3100,11 +3224,13 @@
  
      PySSL_BEGIN_ALLOW_THREADS
      switch(proto_version) {
@@ -1731,7 +1867,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  #if (defined(TLS1_VERSION) && \
          !defined(OPENSSL_NO_TLS1) && \
          !defined(OPENSSL_NO_TLS1_METHOD))
-@@ -3205,7 +3324,7 @@
+@@ -3205,7 +3331,7 @@
  #ifdef SSL_OP_SINGLE_DH_USE
      options |= SSL_OP_SINGLE_DH_USE;
  #endif
@@ -1740,7 +1876,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      options |= SSL_OP_SINGLE_ECDH_USE;
  #endif
      SSL_CTX_set_options(self->ctx, options);
-@@ -5322,9 +5441,12 @@
+@@ -5322,9 +5448,12 @@
      if (bytes == NULL)
          return NULL;
      if (pseudo) {
@@ -1754,7 +1890,17 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
          ok = RAND_pseudo_bytes((unsigned char*)PyBytes_AS_STRING(bytes), len);
  #endif
          if (ok == 0 || ok == 1)
-@@ -6046,7 +6168,7 @@
+@@ -6033,6 +6162,9 @@
+         return NULL;
+     PySocketModule = *socket_api;
+ 
++#ifdef HAVE_WOLFSSL
++    wolfSSL_Init();
++#endif
+ #ifndef OPENSSL_VERSION_1_1
+     /* Load all algorithms and initialize cpuid */
+     OPENSSL_add_all_algorithms_noconf();
+@@ -6046,7 +6178,7 @@
      if (!_setup_ssl_threads()) {
          return NULL;
      }
@@ -1763,7 +1909,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      /* OpenSSL 1.1.0 builtin thread support is enabled */
      _ssl_locks_count++;
  #endif
-@@ -6145,8 +6267,10 @@
+@@ -6145,8 +6277,10 @@
                              X509_V_FLAG_CRL_CHECK);
      PyModule_AddIntConstant(m, "VERIFY_CRL_CHECK_CHAIN",
                              X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
@@ -1774,7 +1920,7 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
  #ifdef X509_V_FLAG_TRUSTED_FIRST
      PyModule_AddIntConstant(m, "VERIFY_X509_TRUSTED_FIRST",
                              X509_V_FLAG_TRUSTED_FIRST);
-@@ -6433,5 +6557,11 @@
+@@ -6433,5 +6567,11 @@
      if (r == NULL || PyModule_AddObject(m, "_OPENSSL_API_VERSION", r))
          return NULL;
  
@@ -1787,8 +1933,8 @@ diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
      return m;
  }
 diff -Naur a/Modules/_ssl_data.h b/Modules/_ssl_data.h
---- a/Modules/_ssl_data.h	2021-10-21 16:20:42.529133974 -0600
-+++ b/Modules/_ssl_data.h	2021-10-21 16:20:49.173271676 -0600
+--- a/Modules/_ssl_data.h	2020-07-20 07:01:32.000000000 -0600
++++ b/Modules/_ssl_data.h	2021-11-05 17:17:21.544693602 -0600
 @@ -80,6 +80,9 @@
  #ifdef ERR_LIB_X509V3
      {"X509V3", ERR_LIB_X509V3},
@@ -1828,8 +1974,8 @@ diff -Naur a/Modules/_ssl_data.h b/Modules/_ssl_data.h
      { NULL }
  };
 diff -Naur a/pyconfig.h.in b/pyconfig.h.in
---- a/pyconfig.h.in	2021-10-21 16:20:42.541134223 -0600
-+++ b/pyconfig.h.in	2021-10-22 16:02:40.288409547 -0600
+--- a/pyconfig.h.in	2020-07-20 07:01:32.000000000 -0600
++++ b/pyconfig.h.in	2021-11-05 17:17:21.532693359 -0600
 @@ -1325,6 +1325,9 @@
  /* Define to 1 if you have the `wmemcmp' function. */
  #undef HAVE_WMEMCMP
