@@ -5,7 +5,7 @@ https://www.python.org/ftp/python/3.8.5/Python-3.8.5.tar.xz
 curl -O https://www.python.org/ftp/python/3.8.5/Python-3.8.5.tar.xz
 
 To build wolfSSL for use with Python 3.8.5, see the simple script
-build_wolfssl_master.sh which can be used to build wolfSSL sources, configure,
+build_wolfssl.sh which can be used to build wolfSSL sources, configure,
 and compile the library using the current wolfssl master branch code.
 
 build_wolfssl.sh
