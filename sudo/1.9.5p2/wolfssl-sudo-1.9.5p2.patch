@@ -1,0 +1,281 @@
+diff --git a/configure.ac b/configure.ac
+index 00c634e..46dd40a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1504,8 +1504,39 @@ AC_ARG_ENABLE(werror,
+   esac
+ ])
+ 
++AC_ARG_WITH(wolfssl,
++    AS_HELP_STRING([--with-wolfssl]=DIR,
++		   [Enable wolfssl support @<:@default=no@:>@]),
++[
++	CPPFLAGS="$CPPFLAGS -I${withval}/include/wolfssl -I${withval}/include"
++	LDFLAGS="$LDFLAGS -L${withval}/lib"
++	LIBMD="-lwolfssl"
++	LIBTLS="-lwolfssl"
++	DIGEST=digest_openssl.lo
++
++	AC_DEFINE(HAVE_WOLFSSL)
++	AC_DEFINE(HAVE_OPENSSL)
++	AC_DEFINE(HAVE_X509_STORE_CTX_GET0_CERT)
++	AC_DEFINE(HAVE_ASN1_STRING_GET0_DATA)
++	AC_DEFINE(HAVE_SSL_CTX_GET0_CERTIFICATE)
++	AC_DEFINE(HAVE_TLS_CLIENT_METHOD)
++	AC_DEFINE(HAVE_TLS_SERVER_METHOD)
++	AC_DEFINE(HAVE_SSL_CTX_SET_MIN_PROTO_VERSION)
++	AC_DEFINE(HAVE_SSL_CTX_SET_CIPHERSUITES)
++
++	enable_wolfssl=yes
++],
++[
++	enable_wolfssl=no
++])
++
+ AC_ARG_ENABLE(openssl,
+-[AS_HELP_STRING([--enable-openssl], [Use OpenSSL's TLS and sha2 functions])])
++[AS_HELP_STRING([--enable-openssl], [Use OpenSSL's TLS and sha2 functions])], [
++	if test "${enable_wolfssl-no}" != no; then
++	AC_MSG_WARN([Ignoring --enable-openssl when wolfSSL is enabled.])
++	enable_openssl=no
++    fi
++])
+ 
+ AC_ARG_ENABLE(gcrypt,
+ [AS_HELP_STRING([--enable-gcrypt], [Use GNU crypt's sha2 functions])], [
+@@ -1513,6 +1544,10 @@ AC_ARG_ENABLE(gcrypt,
+ 	AC_MSG_WARN([Ignoring --enable-gcrypt when OpenSSL is enabled.])
+ 	enable_gcrypt=no
+     fi
++    if test "${enable_wolfssl-no}" != no; then
++	AC_MSG_WARN([Ignoring --enable-gcrypt when wolfSSL is enabled.])
++	enable_gcrypt=no
++    fi
+ ])
+ 
+ AC_ARG_ENABLE(hardening,
+@@ -3029,10 +3064,8 @@ AC_CHECK_MEMBERS([struct dirent.d_type, struct dirent.d_namlen], [], [], [
+ AC_INCLUDES_DEFAULT
+ #include <$ac_header_dirent>
+ ])
+-dnl
+-dnl Check for functions only present in OpenSSL 1.1 and above
+-dnl
+-if test "${enable_openssl-no}" != no; then
++
++if test "$enable_wolfssl" != "yes" && test "${enable_openssl-no}" != no; then
+     # Use OpenSSL's sha2 functions
+     AC_DEFINE(HAVE_OPENSSL)
+     DIGEST=digest_openssl.lo
+@@ -4982,6 +5015,7 @@ AH_TEMPLATE(HAVE_KINFO_PROC_44BSD, [Define to 1 if your system has a 4.4BSD-styl
+ AH_TEMPLATE(HAVE_KINFO_PROC_FREEBSD, [Define to 1 if your system has a FreeBSD-style kinfo_proc struct.])
+ AH_TEMPLATE(HAVE_KINFO_PROC2_NETBSD, [Define to 1 if your system has a NetBSD-style kinfo_proc2 struct.])
+ AH_TEMPLATE(HAVE_KINFO_PROC_OPENBSD, [Define to 1 if your system has an OpenBSD-style kinfo_proc struct.])
++AH_TEMPLATE(HAVE_WOLFSSL, [Define to 1 if you are using wolfSSL's TLS and sha2 functions.])
+ AH_TEMPLATE(HAVE_OPENSSL, [Define to 1 if you are using OpenSSL's TLS and sha2 functions.])
+ AH_TEMPLATE(HAVE_GCRYPT, [Define to 1 if you are using gcrypt's sha2 functions.])
+ AH_TEMPLATE(HAVE_SSL_CTX_SET_MIN_PROTO_VERSION, [Define to 1 if you have the `SSL_CTX_set_min_proto_version' function or macro.])
+diff --git a/include/hostcheck.h b/include/hostcheck.h
+index 5c05d36..8328deb 100644
+--- a/include/hostcheck.h
++++ b/include/hostcheck.h
+@@ -18,6 +18,9 @@
+ #define SUDO_HOSTCHECK_H
+ 
+ #if defined(HAVE_OPENSSL)
++#if defined(HAVE_WOLFSSL)
++# include <wolfssl/options.h>
++#endif
+ 
+ # include <openssl/x509v3.h>
+ 
+diff --git a/include/sudo_compat.h b/include/sudo_compat.h
+index 15aeeca..2c3fb71 100644
+--- a/include/sudo_compat.h
++++ b/include/sudo_compat.h
+@@ -383,7 +383,7 @@ int getdomainname(char *, size_t);
+ /*
+  * Compatibility defines for OpenSSL 1.0.2 (not needed for 1.1.x)
+  */
+-#if defined(HAVE_OPENSSL)
++#if defined(HAVE_OPENSSL) && !defined(HAVE_WOLFSSL)
+ # ifndef HAVE_X509_STORE_CTX_GET0_CERT
+ #  define X509_STORE_CTX_get0_cert(x)   ((x)->cert)
+ # endif
+@@ -396,7 +396,7 @@ int getdomainname(char *, size_t);
+ # ifndef HAVE_TLS_SERVER_METHOD
+ #  define TLS_server_method()           SSLv23_server_method()
+ # endif
+-#endif /* HAVE_OPENSSL */
++#endif /* HAVE_OPENSSL && !HAVE_WOLFSSL */
+ 
+ /*
+  * Functions "missing" from libc.
+diff --git a/lib/iolog/hostcheck.c b/lib/iolog/hostcheck.c
+index 0dee14b..50f1c0d 100644
+--- a/lib/iolog/hostcheck.c
++++ b/lib/iolog/hostcheck.c
+@@ -22,6 +22,9 @@
+ #include "config.h"
+ 
+ #if defined(HAVE_OPENSSL)
++#if defined(HAVE_WOLFSSL)
++# include <wolfssl/options.h>
++#endif
+ # include <sys/types.h>
+ # include <sys/socket.h>
+ # include <arpa/inet.h>
+diff --git a/lib/util/digest_openssl.c b/lib/util/digest_openssl.c
+index aed796a..d43aeee 100644
+--- a/lib/util/digest_openssl.c
++++ b/lib/util/digest_openssl.c
+@@ -26,6 +26,10 @@
+ #include <stdlib.h>
+ #include <errno.h>
+ 
++#if defined(HAVE_WOLFSSL)
++#include <wolfssl/options.h>
++#include <wolfssl/wolfcrypt/logging.h>
++#endif
+ #include <openssl/sha.h>
+ 
+ #include "sudo_compat.h"
+diff --git a/logsrvd/logsrvd.c b/logsrvd/logsrvd.c
+index 66b84c2..7015ea8 100644
+--- a/logsrvd/logsrvd.c
++++ b/logsrvd/logsrvd.c
+@@ -50,6 +50,9 @@
+ #endif /* HAVE_GETOPT_LONG */
+ 
+ #if defined(HAVE_OPENSSL)
++#if defined(HAVE_WOLFSSL)
++# include <wolfssl/options.h>
++#endif
+ # include <openssl/ssl.h>
+ # include <openssl/err.h>
+ #endif
+@@ -1162,7 +1165,9 @@ verify_server_cert(SSL_CTX *ctx, const struct logsrvd_tls_config *tls_config)
+     }
+ 
+     if ((ca_store = SSL_CTX_get_cert_store(ctx)) != NULL)
++    #if !defined(HAVE_WOLFSSL)
+         X509_STORE_set_flags(ca_store, X509_V_FLAG_X509_STRICT);
++    #endif
+ 
+     if (!X509_STORE_CTX_init(store_ctx, ca_store, x509, chain_certs)) {
+         sudo_debug_printf(SUDO_DEBUG_ERROR|SUDO_DEBUG_LINENO,
+diff --git a/logsrvd/logsrvd.h b/logsrvd/logsrvd.h
+index 5c8a8b1..2a5b77f 100644
+--- a/logsrvd/logsrvd.h
++++ b/logsrvd/logsrvd.h
+@@ -26,6 +26,9 @@
+ #include "config.h"
+ 
+ #if defined(HAVE_OPENSSL)
++#if defined(HAVE_WOLFSSL)
++# include <wolfssl/options.h>
++#endif
+ # include <openssl/ssl.h>
+ #endif
+ 
+diff --git a/logsrvd/sendlog.c b/logsrvd/sendlog.c
+index 2912d9e..63df776 100644
+--- a/logsrvd/sendlog.c
++++ b/logsrvd/sendlog.c
+@@ -55,6 +55,9 @@
+ #endif /* HAVE_GETOPT_LONG */
+ 
+ #if defined(HAVE_OPENSSL)
++#if defined(HAVE_WOLFSSL)
++# include <wolfssl/options.h>
++#endif
+ # include <openssl/ssl.h>
+ # include <openssl/err.h>
+ #endif
+@@ -1138,10 +1141,14 @@ server_msg_cb(int fd, int what, void *v)
+                      * message and hope that no actual internal error occurs.
+                      */
+                     err = ERR_get_error();
++                #if !defined(HAVE_WOLFSSL)
+                     if (closure->state == RECV_HELLO &&
+                         ERR_GET_REASON(err) == SSL_R_TLSV1_ALERT_INTERNAL_ERROR) {
+                         errstr = "host name does not match certificate";
+-                    } else {
++                    }
++                    else
++                #endif
++                    {
+                         errstr = ERR_reason_error_string(err);
+                     }
+                     sudo_warnx("%s", errstr);
+@@ -1411,7 +1418,12 @@ init_tls_client_context(const char *ca_bundle_file, const char *cert_file, const
+                 ERR_error_string(ERR_get_error(), NULL));
+             goto bad;
+         }
++    #ifdef HAVE_WOLFSSL
++        /* wolfSSL doesn't map X509_FILETYPE_PEM to SSL_FILETYPE_PEM. */
++        if (!SSL_CTX_use_PrivateKey_file(ctx, key_file, SSL_FILETYPE_PEM)) {
++    #else
+         if (!SSL_CTX_use_PrivateKey_file(ctx, key_file, X509_FILETYPE_PEM)) {
++    #endif
+             sudo_debug_printf(SUDO_DEBUG_ERROR|SUDO_DEBUG_LINENO,
+                 "unable to load key to the ssl context: %s",
+                 ERR_error_string(ERR_get_error(), NULL));
+diff --git a/logsrvd/sendlog.h b/logsrvd/sendlog.h
+index 0262cbb..523c375 100644
+--- a/logsrvd/sendlog.h
++++ b/logsrvd/sendlog.h
+@@ -26,6 +26,9 @@
+ #include "config.h"
+ 
+ #if defined(HAVE_OPENSSL)
++#if defined(HAVE_WOLFSSL)
++# include <wolfssl/options.h>
++#endif
+ # include <openssl/ssl.h>
+ #endif
+ 
+diff --git a/plugins/sudoers/log_client.c b/plugins/sudoers/log_client.c
+index 07c7899..16a1b22 100644
+--- a/plugins/sudoers/log_client.c
++++ b/plugins/sudoers/log_client.c
+@@ -49,6 +49,9 @@
+ #endif
+ 
+ #if defined(HAVE_OPENSSL)
++#if defined(HAVE_WOLFSSL)
++# include <wolfssl/options.h>
++#endif
+ # include <openssl/ssl.h>
+ # include <openssl/err.h>
+ # include <openssl/x509v3.h>
+@@ -1711,10 +1714,14 @@ server_msg_cb(int fd, int what, void *v)
+                      * message and hope that no actual internal error occurs.
+                      */
+                     err = ERR_get_error();
++                #if !defined(HAVE_WOLFSSL)
+                     if (closure->state == RECV_HELLO &&
+                         ERR_GET_REASON(err) == SSL_R_TLSV1_ALERT_INTERNAL_ERROR) {
+                         errstr = "host name does not match certificate";
+-                    } else {
++                    }
++                    else
++                #endif
++                    {
+                         errstr = ERR_reason_error_string(err);
+                     }
+                     sudo_warnx("%s", errstr);
+diff --git a/plugins/sudoers/log_client.h b/plugins/sudoers/log_client.h
+index cb8a7a6..bb7dce1 100644
+--- a/plugins/sudoers/log_client.h
++++ b/plugins/sudoers/log_client.h
+@@ -21,6 +21,9 @@
+ 
+ #include <netinet/in.h>			/* for INET6?_ADDRSTRLEN */
+ #if defined(HAVE_OPENSSL)
++#if defined(HAVE_WOLFSSL)
++# include <wolfssl/options.h>
++#endif /* HAVE_WOLFSSL */
+ # include <openssl/ssl.h>
+ #endif /* HAVE_OPENSSL */
+ 
