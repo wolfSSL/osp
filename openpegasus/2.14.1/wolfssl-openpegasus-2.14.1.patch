@@ -1,0 +1,445 @@
+diff --git a/mak/config.mak b/mak/config.mak
+index a304b14..b86e4f1 100644
+--- a/mak/config.mak
++++ b/mak/config.mak
+@@ -742,6 +742,10 @@ endif
+ ifdef PEGASUS_HAS_SSL
+     DEFINES += -DPEGASUS_HAS_SSL
+ 
++    ifdef PEGASUS_HAS_WOLFSSL
++        DEFINES += -DPEGASUS_HAS_WOLFSSL
++    endif
++
+     # Enable SSL Random file by default.
+     ifndef PEGASUS_USE_SSL_RANDOMFILE
+         PEGASUS_USE_SSL_RANDOMFILE = true
+@@ -760,24 +764,38 @@ ifdef PEGASUS_HAS_SSL
+         endif
+     endif
+ 
+-    ifndef OPENSSL_COMMAND
+-        ifdef OPENSSL_BIN
+-            OPENSSL_COMMAND = $(OPENSSL_BIN)/openssl
++    ifdef PEGASUS_HAS_WOLFCLU
++        # Experimental: swap out the OpenSSL command line utility for wolfCLU.
++        ifdef WOLFCLU_BIN
++            OPENSSL_COMMAND = $(WOLFCLU_BIN)/wolfssl
+         else
+-            OPENSSL_COMMAND = openssl
++            OPENSSL_COMMAND = wolfssl
+         endif
+-    endif
+-    ifndef OPENSSL_SET_SERIAL_SUPPORTED
+-        ifneq (, $(findstring 0.9.6, $(shell $(OPENSSL_COMMAND) version)))
+-            OPENSSL_SET_SERIAL_SUPPORTED = false
+-        else
+-            OPENSSL_SET_SERIAL_SUPPORTED = true
++    else
++        ifndef OPENSSL_COMMAND
++            ifdef OPENSSL_BIN
++                OPENSSL_COMMAND = $(OPENSSL_BIN)/openssl
++            else
++                OPENSSL_COMMAND = openssl
++            endif
++        endif
++        ifndef OPENSSL_SET_SERIAL_SUPPORTED
++            ifneq (, $(findstring 0.9.6, $(shell $(OPENSSL_COMMAND) version)))
++                OPENSSL_SET_SERIAL_SUPPORTED = false
++            else
++                OPENSSL_SET_SERIAL_SUPPORTED = true
++            endif
+         endif
+     endif
+ 
+     # Enable CRL verification
+     ifndef PEGASUS_ENABLE_SSL_CRL_VERIFICATION
+-        PEGASUS_ENABLE_SSL_CRL_VERIFICATION = true
++        # wolfSSL currently doesn't support the necessary CRL functions.
++        ifdef PEGASUS_HAS_WOLFSSL
++            PEGASUS_ENABLE_SSL_CRL_VERIFICATION = false
++        else
++            PEGASUS_ENABLE_SSL_CRL_VERIFICATION = true
++        endif
+     endif
+ 
+     # Check for Enable SSL CRL verification
+diff --git a/src/Pegasus/Common/Makefile b/src/Pegasus/Common/Makefile
+index e967b6d..c861d8e 100644
+--- a/src/Pegasus/Common/Makefile
++++ b/src/Pegasus/Common/Makefile
+@@ -226,17 +226,24 @@ endif
+ SOURCES = $(SOURCES1) $(SOURCES2)
+ 
+ ifdef PEGASUS_HAS_SSL
+-    ifeq ($(OS_TYPE),windows)
+-        SYS_LIBS += /libpath:$(OPENSSL_HOME)/lib libeay32.lib ssleay32.lib
++    ifdef PEGASUS_HAS_WOLFSSL
++        ifdef WOLFSSL_HOME
++            EXTRA_LIBRARIES += -L$(WOLFSSL_HOME)/lib
++        endif
++        EXTRA_LIBRARIES += -lwolfssl
+     else
+-        ifeq ($(OS_TYPE), vms)
+-            EXTRA_LIBRARIES += -L$(OPENSSL_LIB) \
+-                -lssl$$libssl_shr32 -lssl$$libcrypto_shr32
++        ifeq ($(OS_TYPE),windows)
++            SYS_LIBS += /libpath:$(OPENSSL_HOME)/lib libeay32.lib ssleay32.lib
+         else
+-            ifdef OPENSSL_HOME
+-                EXTRA_LIBRARIES += -L$(OPENSSL_HOME)/lib
++            ifeq ($(OS_TYPE), vms)
++                EXTRA_LIBRARIES += -L$(OPENSSL_LIB) \
++                    -lssl$$libssl_shr32 -lssl$$libcrypto_shr32
++            else
++                ifdef OPENSSL_HOME
++                    EXTRA_LIBRARIES += -L$(OPENSSL_HOME)/lib
++                endif
++                EXTRA_LIBRARIES += -lssl -lcrypto
+             endif
+-            EXTRA_LIBRARIES += -lssl -lcrypto
+         endif
+     endif
+ endif
+diff --git a/src/Pegasus/Common/Message.cpp b/src/Pegasus/Common/Message.cpp
+index 132330a..a044ae3 100644
+--- a/src/Pegasus/Common/Message.cpp
++++ b/src/Pegasus/Common/Message.cpp
+@@ -421,6 +421,10 @@ CIMOperationType Message::convertMessageTypetoCIMOpType(MessageType type)
+     return enum_type;
+ }
+ 
++/* Without this macro guard, the function below will cause a compiler error
++ * because the "magic" member is only defined when PEGASUS_DEBUG is defined.
++ * See Linkable.h. */
++#ifdef PEGASUS_DEBUG
+ /**
+  * Validate the magic object for this Message. This
+  * compiles only in debug mode and can be use to validate the
+@@ -432,7 +436,7 @@ Boolean Message::valid() const
+ {
+     return magic && (_type < NUMBER_OF_MESSAGES);
+ }
+-
++#endif
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+ //
+diff --git a/src/Pegasus/Common/SSLContext.cpp b/src/Pegasus/Common/SSLContext.cpp
+index 78e531e..a45284a 100644
+--- a/src/Pegasus/Common/SSLContext.cpp
++++ b/src/Pegasus/Common/SSLContext.cpp
+@@ -34,10 +34,18 @@
+ # include <Pegasus/Common/Executor.h>
+ # include <Pegasus/Common/Network.h>
+ # define OPENSSL_NO_KRB5 1
++#ifdef PEGASUS_HAS_WOLFSSL
++# include <wolfssl/options.h>
++# include <wolfssl/openssl/err.h>
++# include <wolfssl/openssl/ssl.h>
++# include <wolfssl/openssl/rand.h>
++# include <wolfssl/openssl/tls1.h>
++#else
+ # include <openssl/err.h>
+ # include <openssl/ssl.h>
+ # include <openssl/rand.h>
+ # include <openssl/tls1.h>
++#endif /* PEGASUS_HAS_WOLFSSL */
+ #else
+ # define SSL_CTX void
+ #endif // end of PEGASUS_HAS_SSL
+@@ -55,7 +63,9 @@
+ # include <ILEWrapper/ILEUtilities.h>
+ #endif
+ 
++#ifndef PEGASUS_HAS_WOLFSSL
+ typedef struct x509_store_ctx_st X509_STORE_CTX;
++#endif
+ 
+ PEGASUS_USING_STD;
+ 
+@@ -99,7 +109,11 @@ CIMDateTime getDateTime(const ASN1_UTCTIME *utcTime)
+     struct tm time;
+     int offset;
+     char plusOrMinus = '+';
++#ifdef PEGASUS_HAS_WOLFSSL
++    unsigned char* utcTimeData = (unsigned char*)utcTime->data;
++#else
+     unsigned char* utcTimeData = utcTime->data;
++#endif
+ 
+     memset(&time, '\0', sizeof(time));
+ 
+@@ -174,12 +188,15 @@ public:
+     static int verificationCallback(
+         int preVerifyOk,
+         X509_STORE_CTX* ctx);
++#ifdef PEGASUS_ENABLE_SSL_CRL_VERIFICATION
+     static int verificationCRLCallback(
+         int ok,
+         X509_STORE_CTX* ctx,
+         X509_STORE* sslCRLStore);
++#endif
+ };
+ 
++#ifdef PEGASUS_ENABLE_SSL_CRL_VERIFICATION
+ //
+ // Callback function that is called by the OpenSSL library. This function
+ // checks whether the certificate is listed in any of the CRL's
+@@ -291,6 +308,7 @@ int SSLCallback::verificationCRLCallback(
+     PEG_METHOD_EXIT();
+     return 0;
+ }
++#endif
+ 
+ //
+ // Callback function that is called by the OpenSSL library. This function
+@@ -305,7 +323,9 @@ int SSLCallback::verificationCallback(int preVerifyOk, X509_STORE_CTX* ctx)
+     char   buf[256];
+     X509   *currentCert;
+     SSL    *ssl;
++#ifdef PEGASUS_ENABLE_SSL_CRL_VERIFICATION
+     int    revoked = -1;
++#endif
+ 
+     PEG_TRACE((TRC_SSL, Tracer::LEVEL4,
+         "--->SSL: Preverify result %d", preVerifyOk));
+diff --git a/src/Pegasus/Common/SSLContext.h b/src/Pegasus/Common/SSLContext.h
+index cc3e6ce..5941f03 100644
+--- a/src/Pegasus/Common/SSLContext.h
++++ b/src/Pegasus/Common/SSLContext.h
+@@ -39,7 +39,13 @@
+ #include <Pegasus/Common/Linkage.h>
+ 
+ #ifdef PEGASUS_HAS_SSL
++#ifdef PEGASUS_HAS_WOLFSSL
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/ssl.h>
++#else
++#include <openssl/ssl.h>
+ typedef struct x509_store_st X509_STORE;
++#endif /* PEGASUS_HAS_WOLFSSL */
+ #else
+ # define X509_STORE int
+ #endif
+diff --git a/src/Pegasus/Common/SSLContextRep.h b/src/Pegasus/Common/SSLContextRep.h
+index 16927a8..1d9f68e 100644
+--- a/src/Pegasus/Common/SSLContextRep.h
++++ b/src/Pegasus/Common/SSLContextRep.h
+@@ -34,10 +34,16 @@
+ 
+ #ifdef PEGASUS_HAS_SSL
+ # define OPENSSL_NO_KRB5 1
++#ifdef PEGASUS_HAS_WOLFSSL
++# include <wolfssl/options.h>
++# include <wolfssl/openssl/err.h>
++# include <wolfssl/openssl/ssl.h>
++# include <wolfssl/openssl/rand.h>
++#else
+ # include <openssl/err.h>
+ # include <openssl/ssl.h>
+ # include <openssl/rand.h>
+-
++#endif /* PEGASUS_HAS_WOLFSSL */
+ //Include the applink.c to stop crashes as per OpenSSL FAQ
+ //http://www.openssl.org/support/faq.html#PROG
+ # ifdef PEGASUS_OS_TYPE_WINDOWS
+diff --git a/src/Pegasus/Common/TLS.cpp b/src/Pegasus/Common/TLS.cpp
+index 5ac1385..16b7919 100644
+--- a/src/Pegasus/Common/TLS.cpp
++++ b/src/Pegasus/Common/TLS.cpp
+@@ -42,9 +42,16 @@
+ 
+ #ifdef PEGASUS_HAS_SSL
+ # define OPENSSL_NO_KRB5 1
++#ifdef PEGASUS_HAS_WOLFSSL
++# include <wolfssl/options.h>
++# include <wolfssl/openssl/err.h>
++# include <wolfssl/openssl/ssl.h>
++# include <wolfssl/openssl/rand.h>
++#else
+ # include <openssl/err.h>
+ # include <openssl/ssl.h>
+ # include <openssl/rand.h>
++#endif
+ #else
+ # define SSL_CTX void
+ typedef void SSL_Context;
+diff --git a/src/Pegasus/ControlProviders/CertificateProvider/CertificateProvider.cpp b/src/Pegasus/ControlProviders/CertificateProvider/CertificateProvider.cpp
+index 9b0db9a..8be2482 100644
+--- a/src/Pegasus/ControlProviders/CertificateProvider/CertificateProvider.cpp
++++ b/src/Pegasus/ControlProviders/CertificateProvider/CertificateProvider.cpp
+@@ -33,9 +33,16 @@
+ #include "CertificateProvider.h"
+ 
+ #define OPENSSL_NO_KRB5 1
++#ifdef PEGASUS_HAS_WOLFSSL
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/err.h>
++#include <wolfssl/openssl/ssl.h>
++#include <wolfssl/openssl/rand.h>
++#else
+ #include <openssl/err.h>
+ #include <openssl/ssl.h>
+ #include <openssl/rand.h>
++#endif /* PEGASUS_HAS_WOLFSSL */
+ 
+ #include <Pegasus/Common/Config.h>
+ #include <Pegasus/Common/PegasusVersion.h>
+@@ -159,7 +166,11 @@ inline CIMDateTime getDateTime(const ASN1_UTCTIME* utcTime)
+     struct tm time;
+     int offset;
+     char plusOrMinus = '+';
++#ifdef PEGASUS_HAS_WOLFSSL
++    unsigned char* utcTimeData = (unsigned char*)utcTime->data;
++#else
+     unsigned char* utcTimeData = utcTime->data;
++#endif
+ 
+     memset(&time, '\0', sizeof(time));
+ 
+@@ -486,6 +497,7 @@ void CertificateProvider::getInstance(
+     PEG_METHOD_EXIT();
+ }
+ 
++#ifdef PEGASUS_ENABLE_SSL_CRL_VERIFICATION
+ /** Builds and returns a PG_SSLCertificateRevocationList from an X509_CRL object
+  */
+ inline CIMInstance _getCRLInstance(X509_CRL* xCrl, String host,
+@@ -560,6 +572,7 @@ inline CIMInstance _getCRLInstance(X509_CRL* xCrl, String host,
+ 
+     return (cimInstance);
+ }
++#endif /* PEGASUS_ENABLE_SSL_CRL_VERIFICATION */
+ 
+ /** Delivers the complete collection of instances to the CIMOM
+  */
+diff --git a/src/Pegasus/ControlProviders/CertificateProvider/Makefile b/src/Pegasus/ControlProviders/CertificateProvider/Makefile
+index 9f2e5ac..d3dd866 100644
+--- a/src/Pegasus/ControlProviders/CertificateProvider/Makefile
++++ b/src/Pegasus/ControlProviders/CertificateProvider/Makefile
+@@ -67,17 +67,24 @@ ifeq ($(PEGASUS_SUPPORTS_DYNLIB),yes)
+ endif
+ 
+ ifdef PEGASUS_HAS_SSL
+-    ifeq ($(OS_TYPE),windows)
+-        SYS_LIBS += /libpath:$(OPENSSL_HOME)/lib libeay32.lib ssleay32.lib
++    ifdef PEGASUS_HAS_WOLFSSL
++        ifdef WOLFSSL_HOME
++            EXTRA_LIBRARIES += -L$(WOLFSSL_HOME)/lib
++        endif
++        EXTRA_LIBRARIES += -lwolfssl
+     else
+-        ifeq ($(OS_TYPE),vms)
+-            EXTRA_LIBRARIES += -L$(OPENSSL_LIB) \
+-                -lssl$$libssl_shr32 -lssl$$libcrypto_shr32
++        ifeq ($(OS_TYPE),windows)
++            SYS_LIBS += /libpath:$(OPENSSL_HOME)/lib libeay32.lib ssleay32.lib
+         else
+-            ifdef OPENSSL_HOME
+-                EXTRA_LIBRARIES += -L$(OPENSSL_HOME)/lib
++            ifeq ($(OS_TYPE),vms)
++                EXTRA_LIBRARIES += -L$(OPENSSL_LIB) \
++                    -lssl$$libssl_shr32 -lssl$$libcrypto_shr32
++            else
++                ifdef OPENSSL_HOME
++                    EXTRA_LIBRARIES += -L$(OPENSSL_HOME)/lib
++                endif
++                EXTRA_LIBRARIES += -lssl -lcrypto
+             endif
+-            EXTRA_LIBRARIES += -lssl -lcrypto
+         endif
+     endif
+ endif
+diff --git a/src/Pegasus/General/Makefile b/src/Pegasus/General/Makefile
+index 31c843d..5f766aa 100644
+--- a/src/Pegasus/General/Makefile
++++ b/src/Pegasus/General/Makefile
+@@ -67,17 +67,24 @@ SOURCES = \
+     SubscriptionKey.cpp
+    
+ ifdef PEGASUS_HAS_SSL
+-    ifeq ($(OS_TYPE),windows)
+-        SYS_LIBS += /libpath:$(OPENSSL_HOME)/lib libeay32.lib ssleay32.lib
++    ifdef PEGASUS_HAS_WOLFSSL
++        ifdef WOLFSSL_HOME
++            EXTRA_LIBRARIES += -L$(WOLFSSL_HOME)/lib
++        endif
++        EXTRA_LIBRARIES += -lwolfssl
+     else
+-        ifeq ($(OS_TYPE), vms)
+-            EXTRA_LIBRARIES += -L$(OPENSSL_LIB) \
+-                -lssl$$libssl_shr32 -lssl$$libcrypto_shr32
++        ifeq ($(OS_TYPE),windows)
++            SYS_LIBS += /libpath:$(OPENSSL_HOME)/lib libeay32.lib ssleay32.lib
+         else
+-            ifdef OPENSSL_HOME
+-                EXTRA_LIBRARIES += -L$(OPENSSL_HOME)/lib
++            ifeq ($(OS_TYPE), vms)
++                EXTRA_LIBRARIES += -L$(OPENSSL_LIB) \
++                    -lssl$$libssl_shr32 -lssl$$libcrypto_shr32
++            else
++                ifdef OPENSSL_HOME
++                    EXTRA_LIBRARIES += -L$(OPENSSL_HOME)/lib
++                endif
++                EXTRA_LIBRARIES += -lssl -lcrypto
+             endif
+-            EXTRA_LIBRARIES += -lssl -lcrypto
+         endif
+     endif
+ endif
+diff --git a/src/Pegasus/General/SSLContextManager.cpp b/src/Pegasus/General/SSLContextManager.cpp
+index 19d28cb..d611bf1 100644
+--- a/src/Pegasus/General/SSLContextManager.cpp
++++ b/src/Pegasus/General/SSLContextManager.cpp
+@@ -36,9 +36,16 @@
+ #ifdef PEGASUS_HAS_SSL
+ # include <Pegasus/Common/Network.h>
+ # define OPENSSL_NO_KRB5 1
++#ifdef PEGASUS_HAS_WOLFSSL
++# include <wolfssl/options.h>
++# include <wolfssl/openssl/err.h>
++# include <wolfssl/openssl/ssl.h>
++# include <wolfssl/openssl/rand.h>
++#else
+ # include <openssl/err.h>
+ # include <openssl/ssl.h>
+ # include <openssl/rand.h>
++#endif /* PEGASUS_HAS_WOLFSSL */
+ #else
+ # define SSL_CTX void
+ #endif // end of PEGASUS_HAS_SSL
+diff --git a/src/Pegasus/Security/Authentication/Cookies.cpp b/src/Pegasus/Security/Authentication/Cookies.cpp
+index 8ceb14b..2303c04 100644
+--- a/src/Pegasus/Security/Authentication/Cookies.cpp
++++ b/src/Pegasus/Security/Authentication/Cookies.cpp
+@@ -40,7 +40,12 @@
+ #include "Cookies.h"
+ 
+ 
++#ifdef PEGASUS_HAS_WOLFSSL
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/rand.h>
++#else
+ #include <openssl/rand.h>
++#endif
+ 
+ PEGASUS_USING_STD;
+ 
+diff --git a/src/Pegasus/Server/tests/TLSv_1_2_Support/TestTLSv1_2_Support.cpp b/src/Pegasus/Server/tests/TLSv_1_2_Support/TestTLSv1_2_Support.cpp
+index 6950200..6c15a20 100644
+--- a/src/Pegasus/Server/tests/TLSv_1_2_Support/TestTLSv1_2_Support.cpp
++++ b/src/Pegasus/Server/tests/TLSv_1_2_Support/TestTLSv1_2_Support.cpp
+@@ -37,8 +37,13 @@
+ 
+ 
+ #ifdef PEGASUS_HAS_SSL
++#ifdef PEGASUS_HAS_WOLFSSL
++#  include <wolfssl/options.h>
++#  include <wolfssl/openssl/tls1.h>
++#else
+ #  include <openssl/tls1.h>
+ #endif
++#endif
+ 
+ PEGASUS_USING_PEGASUS;
+ PEGASUS_USING_STD;

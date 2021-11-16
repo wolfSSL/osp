@@ -30,6 +30,7 @@ Each project port included in this repository is contained in its own subdirecto
 | libest | Cisco EST stack written in C | [Link](https://github.com/cisco/libest) | [Link](https://www.wolfssl.com/wolfssl-cisco-libest-port/) | [README](./libest/README) |
 | libsignal-protocol-c | Signal Protocol C Library | [Link](https://github.com/signalapp/libsignal-protocol-c) | [Link](https://www.wolfssl.com/wolfssl-use-with-signal/) | [README](./libsignal-protocol-c/README.md) |
 | lighttpd | lighttpd web server | [Link](https://www.lighttpd.net/) | [Link](https://www.wolfssl.com/lighttpd-support-wolfssl/) | [README](./lighttpd/README) |
+| OpenPegasus  | OpenPegasus CIM server | [Link](https://collaboration.opengroup.org/pegasus/) | | [README](./openpegasus/2.14.1/README.md) |
 | openldap | OpenLDAP | [Link](https://www.openldap.org/) | | [README](./openldap/2.4.47/README.md) |
 | openresty | OpenResty | [Link](https://openresty.org/en/) | | [README](./openresty/INSTRUCTIONS.md) |
 | openssh-patches | OpenSSH | [Link](https://www.openssh.com/) | [Link](https://www.wolfssl.com/wolfssl-openssh-expanded-openssl-compatibility/) | [README](./openssh-patches/README) |
