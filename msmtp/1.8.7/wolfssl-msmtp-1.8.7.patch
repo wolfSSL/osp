@@ -1,0 +1,376 @@
+diff --git a/configure.ac b/configure.ac
+index 63e47aa..5cfe702 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -98,25 +98,34 @@ tls_lib="none"
+ want_tls="yes"
+ want_gnutls="yes"
+ want_openssl="no"
++want_wolfssl="no"
+ tls_CFLAGS=""
+ tls_LIBS=""
+ with_ssl_was_used=no
+-AC_ARG_WITH([tls], [AS_HELP_STRING([--with-tls=[gnutls|openssl|no]],
+-    [TLS support: GnuTLS (default), OpenSSL (discouraged), or none.])],
++AC_ARG_WITH([tls], [AS_HELP_STRING([--with-tls=[gnutls|openssl|wolfssl|no]],
++    [TLS support: GnuTLS (default), OpenSSL (discouraged), wolfSSL, or none.])],
+     if test "$withval" = "gnutls"; then
+ 	want_tls=yes
+ 	want_gnutls=yes
+ 	want_openssl=no
++    want_wolfssl=no
+     elif test "$withval" = "openssl"; then
+ 	want_tls=yes
+ 	want_gnutls=no
+ 	want_openssl=yes
++    want_wolfssl=no
++    elif test "$withval" = "wolfssl"; then
++    want_tls=yes
++    want_gnutls=no
++    want_openssl=no
++    want_wolfssl=yes
+     elif test "$withval" = "no"; then
+ 	want_tls=no
+ 	want_gnutls=no
+ 	want_openssl=no
++    want_wolfssl=no
+     else
+-	AC_MSG_ERROR([Use --with-tls=gnutls or --with-tls=openssl or --with-tls=no])
++	AC_MSG_ERROR([Use --with-tls=gnutls or --with-tls=openssl or --with-tls=wolfssl or --with-tls=no])
+     fi)
+ if test "$want_gnutls" = "yes"; then
+     PKG_CHECK_MODULES([libgnutls], [gnutls >= 0.0], [HAVE_LIBGNUTLS=1], [HAVE_LIBGNUTLS=0])
+@@ -147,6 +156,20 @@ if test "$want_openssl" = "yes" -a "$have_tls" = "no"; then
+ 	AC_DEFINE([HAVE_LIBSSL], [1], [Define to 1 if libssl is available])
+     fi
+ fi
++if test "$want_wolfssl" = "yes" -a "$have_tls" = "no"; then
++    PKG_CHECK_MODULES([libwolfssl], [wolfssl >= 0.0], [HAVE_LIBWOLFSSL=1], [HAVE_LIBWOLFSSL=0])
++    if test "$HAVE_LIBWOLFSSL" != "1"; then
++        AC_MSG_WARN([library libwolfssl not found:])
++        AC_MSG_WARN([$libwolfssl_PKG_ERRORS])
++        AC_MSG_WARN([libwolfssl is provided by wolfSSL])
++    else
++    have_tls="yes"
++    tls_lib="wolfSSL"
++    tls_CFLAGS="$libwolfssl_CFLAGS"
++    tls_LIBS="$libwolfssl_LIBS"
++    AC_DEFINE([HAVE_LIBWOLFSSL], [1], [Define to 1 if libwolfssl is available])
++    fi
++fi
+ if test "$have_tls" = "yes"; then
+     AC_DEFINE([HAVE_TLS], [1], [Define to 1 to build with TLS/SSL support])
+ elif test "$want_tls" = "yes"; then
+diff --git a/src/md5.h b/src/md5.h
+index cc5c3b3..a512974 100644
+--- a/src/md5.h
++++ b/src/md5.h
+@@ -23,6 +23,11 @@
+  * See md5.c for more information.
+  */
+ 
++#ifdef HAVE_LIBWOLFSSL
++/* Use wolfSSL for MD5. */
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/md5.h>
++#else
+ /* Local change for msmtp: always use these functions regardless of HAVE_OPENSSL,
+  * and use the prefix 'msmtp_' for all symbols to avoid clashes. */
+ #undef HAVE_OPENSSL
+@@ -52,3 +57,4 @@ extern void MD5_Update(MD5_CTX *ctx, const void *data, unsigned long size);
+ extern void MD5_Final(unsigned char *result, MD5_CTX *ctx);
+ 
+ #endif
++#endif /* HAVE_LIBWOLFSSL */
+diff --git a/src/tls.c b/src/tls.c
+index daa7876..3dfe998 100644
+--- a/src/tls.c
++++ b/src/tls.c
+@@ -39,18 +39,28 @@
+ # include <gnutls/x509.h>
+ # include <gnutls/pkcs11.h>
+ #endif /* HAVE_LIBGNUTLS */
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
++#ifdef HAVE_LIBWOLFSSL
++# include <wolfssl/options.h>
++# include <wolfssl/openssl/ssl.h>
++# include <wolfssl/openssl/x509.h>
++# include <wolfssl/openssl/x509v3.h>
++# include <wolfssl/openssl/err.h>
++# include <wolfssl/openssl/rand.h>
++# include <wolfssl/openssl/evp.h>
++#else
+ # include <openssl/ssl.h>
+ # include <openssl/x509.h>
+ # include <openssl/x509v3.h>
+ # include <openssl/err.h>
+ # include <openssl/rand.h>
+ # include <openssl/evp.h>
+-#if OPENSSL_VERSION_NUMBER < 0x10100000L
++#endif /* HAVE_LIBWOLFSSL */
++#if OPENSSL_VERSION_NUMBER < 0x10100000L && !defined(HAVE_LIBWOLFSSL)
+ #define X509_get0_notBefore X509_get_notBefore
+ #define X509_get0_notAfter X509_get_notAfter
+ #endif
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ 
+ #ifdef HAVE_LIBIDN
+ # include <idn2.h>
+@@ -91,7 +101,7 @@ void tls_clear(tls_t *tls)
+  * Used error codes: TLS_ESEED
+  */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+ int seed_prng(char **errstr)
+ {
+     char randfile[512];
+@@ -145,8 +155,7 @@ int seed_prng(char **errstr)
+     }
+     return TLS_EOK;
+ }
+-#endif /* HAVE_LIBSSL */
+-
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ 
+ /*
+  * tls_lib_init()
+@@ -168,12 +177,15 @@ int tls_lib_init(char **errstr)
+     return TLS_EOK;
+ #endif /* HAVE_LIBGNUTLS */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+     int e;
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x10100000L
++#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(HAVE_LIBWOLFSSL)
+     SSL_load_error_strings();
+     SSL_library_init();
++#endif
++#if defined(HAVE_LIBWOLFSSL) && defined(DEBUG_WOLFSSL)
++    wolfSSL_Debugging_ON();
+ #endif
+     if ((e = seed_prng(errstr)) != TLS_EOK)
+     {
+@@ -181,7 +193,7 @@ int tls_lib_init(char **errstr)
+     }
+ 
+     return TLS_EOK;
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ }
+ 
+ 
+@@ -252,7 +264,7 @@ void tls_cert_info_free(tls_cert_info_t *tci)
+  * public domain.
+  */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+ int is_leap(int year)
+ {
+     return (((year) % 4) == 0 && (((year) % 100) != 0 || ((year) % 400) == 0));
+@@ -351,7 +363,7 @@ int asn1time_to_time_t(const char *asn1time, int is_utc, time_t *t)
+ error_exit:
+     return 1;
+ }
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ 
+ 
+ /*
+@@ -475,7 +487,7 @@ int tls_cert_info_get(tls_t *tls, tls_cert_info_t *tci, char **errstr)
+     return TLS_EOK;
+ #endif /* HAVE_LIBGNUTLS */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+     X509 *x509cert;
+     X509_NAME *x509_subject;
+     X509_NAME *x509_issuer;
+@@ -579,7 +591,7 @@ int tls_cert_info_get(tls_t *tls, tls_cert_info_t *tci, char **errstr)
+ 
+     X509_free(x509cert);
+     return TLS_EOK;
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ }
+ 
+ 
+@@ -679,7 +691,7 @@ void tls_print_info(const char *tls_parameter_description,
+  * to'.
+  */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+ int hostname_match(const char *hostname, const char *certname)
+ {
+     const char *cmp1, *cmp2;
+@@ -715,7 +727,7 @@ int hostname_match(const char *hostname, const char *certname)
+ 
+     return 1;
+ }
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ 
+ 
+ /*
+@@ -971,7 +983,7 @@ int tls_check_cert(tls_t *tls, char **errstr)
+     return TLS_EOK;
+ #endif /* HAVE_LIBGNUTLS */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+     X509 *x509cert;
+     long status;
+     const char *error_msg;
+@@ -1172,7 +1184,7 @@ int tls_check_cert(tls_t *tls, char **errstr)
+     }
+ 
+     return TLS_EOK;
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ }
+ 
+ 
+@@ -1369,7 +1381,7 @@ int tls_init(tls_t *tls,
+ 
+ #endif /* HAVE_LIBGNUTLS */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+ 
+     const SSL_METHOD *ssl_method = SSLv23_client_method();
+ 
+@@ -1488,7 +1500,7 @@ int tls_init(tls_t *tls,
+     tls->hostname = xstrdup(hostname);
+     return TLS_EOK;
+ 
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ }
+ 
+ 
+@@ -1507,7 +1519,7 @@ int tls_init(tls_t *tls,
+  * ERR_error_string(3).
+  */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+ char *openssl_io_error(int error_code, int error_code2,
+         const char *error_string)
+ {
+@@ -1559,7 +1571,7 @@ char *openssl_io_error(int error_code, int error_code2,
+     }
+     return xasprintf("%s: %s", error_string, error_reason);
+ }
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ 
+ 
+ /*
+@@ -1620,7 +1632,7 @@ int tls_start(tls_t *tls, int fd,
+     return TLS_EOK;
+ #endif /* HAVE_LIBGNUTLS */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+     int error_code;
+ 
+     if (!SSL_set_fd(tls->ssl, fd))
+@@ -1674,7 +1686,7 @@ int tls_start(tls_t *tls, int fd,
+     }
+     tls->is_active = 1;
+     return TLS_EOK;
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ }
+ 
+ 
+@@ -1725,7 +1737,7 @@ int tls_readbuf_read(tls_t *tls, readbuf_t *readbuf, char *ptr,
+ 
+ #endif /* HAVE_LIBGNUTLS */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+ 
+     int ret;
+     int error_code;
+@@ -1763,7 +1775,7 @@ int tls_readbuf_read(tls_t *tls, readbuf_t *readbuf, char *ptr,
+     *ptr = *((readbuf->ptr)++);
+     return 1;
+ 
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ }
+ 
+ 
+@@ -1855,7 +1867,7 @@ int tls_puts(tls_t *tls, const char *s, size_t len, char **errstr)
+ 
+ #endif /* HAVE_LIBGNUTLS */
+ 
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+ 
+     int error_code;
+ 
+@@ -1885,7 +1897,7 @@ int tls_puts(tls_t *tls, const char *s, size_t len, char **errstr)
+ 
+     return TLS_EOK;
+ 
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ }
+ 
+ 
+@@ -1909,11 +1921,11 @@ void tls_close(tls_t *tls)
+         gnutls_deinit(tls->session);
+         gnutls_certificate_free_credentials(tls->cred);
+ #endif /* HAVE_LIBGNUTLS */
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+         SSL_shutdown(tls->ssl);
+         SSL_free(tls->ssl);
+         SSL_CTX_free(tls->ssl_ctx);
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+     }
+     if (tls->hostname)
+     {
+diff --git a/src/tls.h b/src/tls.h
+index 723428f..5cc761c 100644
+--- a/src/tls.h
++++ b/src/tls.h
+@@ -27,9 +27,14 @@
+ #ifdef HAVE_LIBGNUTLS
+ # include <gnutls/gnutls.h>
+ #endif /* HAVE_LIBGNUTLS */
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
++#ifdef HAVE_LIBWOLFSSL
++# include <wolfssl/options.h>
++# include <wolfssl/openssl/ssl.h>
++#else
+ # include <openssl/ssl.h>
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBWOLFSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ 
+ #include "readbuf.h"
+ 
+@@ -67,10 +72,10 @@ typedef struct
+     gnutls_session_t session;
+     gnutls_certificate_credentials_t cred;
+ #endif /* HAVE_LIBGNUTLS */
+-#ifdef HAVE_LIBSSL
++#if defined(HAVE_LIBSSL) || defined(HAVE_LIBWOLFSSL)
+     SSL_CTX *ssl_ctx;
+     SSL *ssl;
+-#endif /* HAVE_LIBSSL */
++#endif /* HAVE_LIBSSL || HAVE_LIBWOLFSSL */
+ } tls_t;
+ 
+ /*
