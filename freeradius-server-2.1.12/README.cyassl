@@ -6,6 +6,6 @@ Build CyaSSL v2.2.2 with the commands:
 
 Build FreeRADIUS with the commands:
 
-    $ ./configure --with-cyassl --without-openssl
+    $ ./configure --with-cyassl --without-openssl --with-system-libtool --with-system-libltdl
     $ make
     $ sudo make install
