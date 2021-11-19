@@ -50,6 +50,8 @@ static char const RCSID[] =
 #include <net/if_arp.h>
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
+#define _LINUX_IN_H
+#define _LINUX_IN6_H
 #include <linux/if_pppox.h>
 
 #ifndef _ROOT_PATH

@@ -36,10 +36,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include <cyassl/ssl.h>
-#include <cyassl/ctaocrypt/logging.h>
+#include <wolfssl/ssl.h>
+#include <wolfssl/wolfcrypt/logging.h>
 #ifdef MPPE
-#include <cyassl/ctaocrypt/hmac.h>
+#include <wolfssl/wolfcrypt/hmac.h>
 #endif
 
 #include "pppd.h"
@@ -49,10 +49,10 @@
 #include "lcp.h"
 #include "pathnames.h"
 
-int cyassl_recv_callback(char *buf, int sz, void *ctx);
-int cyassl_send_callback(char *buf, int sz, void *ctx);
-void cyassl_logging_callback(const int logLevel, const char *const logMessage);
-int cyassl_verify_callback(int preverify, CYASSL_X509_STORE_CTX *ctx);
+int wolfssl_recv_callback(char *buf, int sz, void *ctx);
+int wolfssl_send_callback(char *buf, int sz, void *ctx);
+void wolfssl_logging_callback(const int logLevel, const char *const logMessage);
+int wolfssl_verify_callback(int preverify, WOLFSSL_X509_STORE_CTX *ctx);
 
 extern char *dh_params;
 extern char *suite_list;
@@ -71,35 +71,35 @@ static void P_hash(const int hmac_type,
 	unsigned char a[SHA_DIGEST_SIZE];
 	unsigned int size;
 
-	HmacSetKey(&hmac_a, hmac_type, secret, secret_len);
-	HmacSetKey(&hmac_out, hmac_type, secret, secret_len);
+	wc_HmacSetKey(&hmac_a, hmac_type, secret, secret_len);
+	wc_HmacSetKey(&hmac_out, hmac_type, secret, secret_len);
 
 	size = (hmac_type == MD5) ? MD5_DIGEST_SIZE : SHA_DIGEST_SIZE;
 
 	/* Calculate A(1) */
-	HmacUpdate(&hmac_a, seed, seed_len);
-	HmacFinal(&hmac_a, a);
+	wc_HmacUpdate(&hmac_a, seed, seed_len);
+	wc_HmacFinal(&hmac_a, a);
 
 	while (1) {
 		/* Calculate next part of output */
-		HmacUpdate(&hmac_out, a, size);
-		HmacUpdate(&hmac_out, seed, seed_len);
+		wc_HmacUpdate(&hmac_out, a, size);
+		wc_HmacUpdate(&hmac_out, seed, seed_len);
 
 		/* Check if last part */
 		if (out_len < size) {
-			HmacFinal(&hmac_out, a);
+			wc_HmacFinal(&hmac_out, a);
 			memcpy(out, a, out_len);
 			break;
 		}
 
 		/* Place digest in output buffer */
-		HmacFinal(&hmac_out, out);
+		wc_HmacFinal(&hmac_out, out);
 		out += size;
 		out_len -= size;
 
 		/* Calculate next A(i) */
-		HmacUpdate(&hmac_a, a, size);
-		HmacFinal(&hmac_a, a);
+		wc_HmacUpdate(&hmac_a, a, size);
+		wc_HmacFinal(&hmac_a, a);
 	}
 
 	memset(a, 0, sizeof(a));
@@ -135,7 +135,7 @@ void eaptls_gen_mppe_keys(struct eaptls_session *ets, const char *prf_label,
 	unsigned char out[4*EAPTLS_MPPE_KEY_LEN], buf[4*EAPTLS_MPPE_KEY_LEN];
 	unsigned char seed[64 + 2*RAN_LEN];
 	unsigned char *p = seed;
-	CYASSL *s = ets->ssl;
+	WOLFSSL *s = ets->ssl;
 	size_t prf_size;
 	unsigned char *masterSecret, *clientRandom, *serverRandom;
 	unsigned int msLen, crLen, srLen;
@@ -145,7 +145,7 @@ void eaptls_gen_mppe_keys(struct eaptls_session *ets, const char *prf_label,
 	memcpy(p, prf_label, prf_size);
 	p += prf_size;
 
-	CyaSSL_get_keys(s,
+	wolfSSL_get_keys(s,
 			&masterSecret, &msLen,
 			&serverRandom, &srLen,
 			&clientRandom, &crLen);
@@ -185,17 +185,17 @@ void eaptls_gen_mppe_keys(struct eaptls_session *ets, const char *prf_label,
 
 #endif
 
-void log_ssl_error(CYASSL *ssl)
+void log_ssl_error(WOLFSSL *ssl)
 {
 	int err = 0;
 
-	if (ssl != NULL) err = CyaSSL_get_error(ssl, 0);
+	if (ssl != NULL) err = wolfSSL_get_error(ssl, 0);
 	
 	if (err != 0)
 	{
 		char err_str[80];
-		CyaSSL_ERR_error_string_n(err, err_str, 80);
-		dbglog("EAP-TLS CyaSSL error:");
+		wolfSSL_ERR_error_string_n(err, err_str, 80);
+		dbglog("EAP-TLS wolfSSL error:");
 		dbglog(err_str);
 	}
 }
@@ -216,11 +216,11 @@ int password_callback(char *buf, int size, int rwflag, void *u)
  * Initialize the SSL stacks and tests if certificates, key and crl
  * for client or server use can be loaded.
  */
-CYASSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
+WOLFSSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
 			char *certfile, char *peer_certfile, char *privkeyfile)
 {
-	CYASSL_CTX		*ctx;
-	CYASSL_METHOD   *method;
+	WOLFSSL_CTX		*ctx;
+	WOLFSSL_METHOD   *method;
 	/* peer_certfile isn't used. The old code would load the certificate
 	   and make sure it could process it, then would let it go to be reloaded
 	   later. */
@@ -246,24 +246,24 @@ CYASSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
 		return NULL;
 	}
 
-	CyaSSL_Init();
+	wolfSSL_Init();
     
 	if (debug != 0)
 	{
-		CyaSSL_SetLoggingCb(cyassl_logging_callback);
-		CyaSSL_Debugging_ON();
+		wolfSSL_SetLoggingCb(wolfssl_logging_callback);
+		wolfSSL_Debugging_ON();
 	}
 	
 	method = init_server ?
-		CyaSSLv23_server_method() : CyaSSLv23_client_method();
-	ctx = CyaSSL_CTX_new(method);
+		wolfSSLv23_server_method() : wolfSSLv23_client_method();
+	ctx = wolfSSL_CTX_new(method);
 
 	if (!ctx) {
 		error("EAP-TLS: Cannot initialize SSL CTX context");
 		return NULL;
 	}
 
-	CyaSSL_CTX_set_default_passwd_cb(ctx, password_callback);
+	wolfSSL_CTX_set_default_passwd_cb(ctx, password_callback);
 
 	{
 		struct stat st = {0};
@@ -284,34 +284,34 @@ CYASSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
 		dbglog( "cacertfilename: %s", pFile ? pFile : "<none>" );
 		dbglog( "cacertpath: %s", pDir ? pDir : "<none>" );
 
-		if (!CyaSSL_CTX_load_verify_locations(ctx, pFile, pDir))
+		if (!wolfSSL_CTX_load_verify_locations(ctx, pFile, pDir))
 		{
 			error("EAP-TLS: Cannot load or verify CA file %s", cacertfile);
 			goto fail;
 		}
 	}
 
-	if (!CyaSSL_CTX_use_certificate_file(ctx, certfile, SSL_FILETYPE_PEM))
+	if (!wolfSSL_CTX_use_certificate_file(ctx, certfile, SSL_FILETYPE_PEM))
 	{
 		error( "EAP-TLS: Cannot use public certificate %s", certfile );
 		goto fail;
 	}
 
-	if (!CyaSSL_CTX_use_PrivateKey_file(ctx, privkeyfile, SSL_FILETYPE_PEM))
+	if (!wolfSSL_CTX_use_PrivateKey_file(ctx, privkeyfile, SSL_FILETYPE_PEM))
 	{ 
 		error("EAP-TLS: Cannot use private key %s", privkeyfile);
 		goto fail;
 	}
 
-	if (CyaSSL_CTX_check_private_key(ctx) != 1) {
+	if (wolfSSL_CTX_check_private_key(ctx) != 1) {
 		error("EAP-TLS: Private key %s fails security check", privkeyfile);
 		goto fail;
 	}
 
-	CyaSSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-	CyaSSL_CTX_set_verify(ctx,
+	wolfSSL_CTX_set_options(ctx, WOLFSSL_OP_NO_SSLv2 | WOLFSSL_OP_NO_SSLv3);
+	wolfSSL_CTX_set_verify(ctx,
 		SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-		&cyassl_verify_callback);
+		&wolfssl_verify_callback);
 	
 	/*
 	 * Only try to load the dh_params file if this is a sever instance,
@@ -320,7 +320,7 @@ CYASSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
 	if (init_server && dh_params && dh_params[0])
 	{
 		dbglog("EAP-TLS: DH params = %s", dh_params);
-		if (CyaSSL_CTX_SetTmpDH_file(ctx, dh_params, SSL_FILETYPE_PEM) < 0)
+		if (wolfSSL_CTX_SetTmpDH_file(ctx, dh_params, SSL_FILETYPE_PEM) < 0)
 		{
 			error("EAP-TLS: Unable to load the DH params file %s", dh_params);
 			goto fail;
@@ -330,7 +330,7 @@ CYASSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
 	if (suite_list && suite_list[0])
 	{
 		dbglog( "EAP-TLS loading cipher suite list: %s", suite_list);
-		if (!CyaSSL_CTX_set_cipher_list(ctx, suite_list))
+		if (!wolfSSL_CTX_set_cipher_list(ctx, suite_list))
 		{
 			error("EAP-TLS: Error setting cipher suites");
 			goto fail;
@@ -340,7 +340,7 @@ CYASSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
 	return ctx;
 
 fail:
-	CyaSSL_CTX_free(ctx);
+	wolfSSL_CTX_free(ctx);
 	return NULL;
 }
 
@@ -407,26 +407,26 @@ int eaptls_init_ssl_server(eap_state * esp)
 	if (!ets->ctx)
 		return 0;
 
-	ets->ssl = CyaSSL_new(ets->ctx);
+	ets->ssl = wolfSSL_new(ets->ctx);
 	if (!ets->ssl)
 		goto fail;
 
 	/* The SSL will check the domain name for us during connection verification. */
 	if (ets->peer[0])
-		CyaSSL_check_domain_name(ets->ssl, ets->peer);
+		wolfSSL_check_domain_name(ets->ssl, ets->peer);
 
-	CyaSSL_SetIORecv(ets->ctx, cyassl_recv_callback);
-	CyaSSL_SetIOReadCtx(ets->ssl, ets);
-	CyaSSL_SetIOSend(ets->ctx, cyassl_send_callback);
-	CyaSSL_SetIOWriteCtx(ets->ssl, ets);
+	wolfSSL_SetIORecv(ets->ctx, wolfssl_recv_callback);
+	wolfSSL_SetIOReadCtx(ets->ssl, ets);
+	wolfSSL_SetIOSend(ets->ctx, wolfssl_send_callback);
+	wolfSSL_SetIOWriteCtx(ets->ssl, ets);
 
 	/*
 	 * Attach the session struct to the connection, so we can later
 	 * retrieve it when doing certificate verification
 	 */
-	CyaSSL_set_ex_data(ets->ssl, 0, ets);
+	wolfSSL_set_ex_data(ets->ssl, 0, ets);
 	
-	CyaSSL_set_accept_state(ets->ssl);
+	wolfSSL_set_accept_state(ets->ssl);
 
 	ets->data = NULL;
 	ets->datalen = 0;
@@ -444,7 +444,7 @@ int eaptls_init_ssl_server(eap_state * esp)
 	return 1;
 
 fail:
-	CyaSSL_CTX_free(ets->ctx);
+	wolfSSL_CTX_free(ets->ctx);
 	return 0;
 }
 
@@ -492,26 +492,26 @@ int eaptls_init_ssl_client(eap_state * esp)
 	if (!ets->ctx)
 		return 0;
 
-	ets->ssl = CyaSSL_new(ets->ctx);
+	ets->ssl = wolfSSL_new(ets->ctx);
 	if (!ets->ssl)
 		goto fail;
 
 	/* The SSL will check the domain name for us during connection verification. */
 	if (ets->peer[0])
-		CyaSSL_check_domain_name(ets->ssl, ets->peer);
+		wolfSSL_check_domain_name(ets->ssl, ets->peer);
 
-	CyaSSL_SetIORecv(ets->ctx, cyassl_recv_callback);
-	CyaSSL_SetIOReadCtx(ets->ssl, ets);
-	CyaSSL_SetIOSend(ets->ctx, cyassl_send_callback);
-	CyaSSL_SetIOWriteCtx(ets->ssl, ets);
+	wolfSSL_SetIORecv(ets->ctx, wolfssl_recv_callback);
+	wolfSSL_SetIOReadCtx(ets->ssl, ets);
+	wolfSSL_SetIOSend(ets->ctx, wolfssl_send_callback);
+	wolfSSL_SetIOWriteCtx(ets->ssl, ets);
 
 	/*
 	 * Attach the session struct to the connection, so we can later
 	 * retrieve it when doing certificate verification
 	 */
-	CyaSSL_set_ex_data(ets->ssl, 0, ets);
+	wolfSSL_set_ex_data(ets->ssl, 0, ets);
 	
-	CyaSSL_set_connect_state(ets->ssl);
+	wolfSSL_set_connect_state(ets->ssl);
 
 	ets->data = NULL;
 	ets->datalen = 0;
@@ -530,7 +530,7 @@ int eaptls_init_ssl_client(eap_state * esp)
 
 fail:
 	dbglog( "eaptls_init_ssl_client: fail" );
-	CyaSSL_CTX_free(ets->ctx);
+	wolfSSL_CTX_free(ets->ctx);
 	return 0;
 
 }
@@ -538,10 +538,10 @@ fail:
 void eaptls_free_session(struct eaptls_session *ets)
 {
 	if (ets->ssl)
-		CyaSSL_free(ets->ssl);
+		wolfSSL_free(ets->ssl);
 
 	if (ets->ctx)
-		CyaSSL_CTX_free(ets->ctx);
+		wolfSSL_CTX_free(ets->ctx);
 
 	free(ets);
 }
@@ -633,7 +633,7 @@ int eaptls_receive(struct eaptls_session *ets, u_char * inp, int len)
 			return 1;
 		}
 		ets->dataused = 0;
-		CyaSSL_negotiate(ets->ssl);
+		wolfSSL_negotiate(ets->ssl);
 
 		free(ets->data);
 		ets->data = NULL;
@@ -663,7 +663,7 @@ int eaptls_send(struct eaptls_session *ets, u_char ** outp)
 	if (!ets->data) {
 
 		if(!ets->alert_sent) {
-			CyaSSL_negotiate(ets->ssl);
+			wolfSSL_negotiate(ets->ssl);
 		}
 		ets->offset = 0;
 		first = 1;
@@ -731,11 +731,11 @@ void eaptls_retransmit(struct eaptls_session *ets, u_char ** outp)
 }
 
 /*
- * Callback from cyassl to actually process the receive
+ * Callback from wolfssl to actually process the receive
  * buffer. Will copy data from the buffer provided by
- * EAP-TLS and write it into the the buffer from cyassl.
+ * EAP-TLS and write it into the the buffer from wolfssl.
  */
-int cyassl_recv_callback(char *buf, int sz, void *ctx)
+int wolfssl_recv_callback(char *buf, int sz, void *ctx)
 {
 	struct eaptls_session *ets = (struct eaptls_session *)ctx;
 	int recvd = 0;
@@ -761,12 +761,12 @@ int cyassl_recv_callback(char *buf, int sz, void *ctx)
 }
 
 /*
- * Callback from cyassl to actually process the send
- * buffer. Will read data provided by CyaSSL and copy
+ * Callback from wolfssl to actually process the send
+ * buffer. Will read data provided by wolfSSL and copy
  * it to the buffer provided by EAP-TLS. If the buffer
  * from EAP-TLS isn't big enough, it will be resized.
  */
-int cyassl_send_callback(char *buf, int sz, void *ctx)
+int wolfssl_send_callback(char *buf, int sz, void *ctx)
 {
 	struct eaptls_session *ets = (struct eaptls_session *)ctx;
 	int sent = 0;
@@ -795,33 +795,33 @@ int cyassl_send_callback(char *buf, int sz, void *ctx)
 }
 
 /*
- * Callback from cyassl to log its debugging messages.
+ * Callback from wolfssl to log its debugging messages.
  * The callback has a different signature than dbglog(),
  * so this calls dbglog().
  */
-void cyassl_logging_callback(const int logLevel, const char *const logMessage)
+void wolfssl_logging_callback(const int logLevel, const char *const logMessage)
 {
 	dbglog("%s", logMessage);
 }
 
 /*
- * Callback from cyassl to compare the received peer certificate to a
+ * Callback from wolfssl to compare the received peer certificate to a
  * local copy stored in the specified file.
  */
-int cyassl_verify_callback(int preverify, CYASSL_X509_STORE_CTX *ctx)
+int wolfssl_verify_callback(int preverify, WOLFSSL_X509_STORE_CTX *ctx)
 {
 	if (preverify)
 	{
-		CYASSL *ssl;
+		WOLFSSL *ssl;
 		struct eaptls_session *ets;
 		
-		ssl = (CYASSL *)CyaSSL_X509_STORE_CTX_get_ex_data(ctx,
-								CyaSSL_get_ex_data_X509_STORE_CTX_idx());
-		ets = (struct eaptls_session *)CyaSSL_get_ex_data(ssl, 0);
+		ssl = (WOLFSSL *)wolfSSL_X509_STORE_CTX_get_ex_data(ctx,
+								wolfSSL_get_ex_data_X509_STORE_CTX_idx());
+		ets = (struct eaptls_session *)wolfSSL_get_ex_data(ssl, 0);
 
 		if (ets->peercertfile[0])
 		{
-			if (CyaSSL_cmp_peer_cert_to_file(ssl, ets->peercertfile) != 0)
+			if (wolfSSL_cmp_peer_cert_to_file(ssl, ets->peercertfile) != 0)
 			{
 				error("Peer certificate doesn't match stored certificate");
 				preverify = 0;

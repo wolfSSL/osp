@@ -38,7 +38,7 @@
 #endif
 
 #ifndef USE_CRYPT
-#include <des.h>
+#include <wolfssl/openssl/des.h>
 #endif
 
 extern bool	DesSetkey __P((u_char *));

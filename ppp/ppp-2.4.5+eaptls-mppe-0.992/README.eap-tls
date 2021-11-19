@@ -23,7 +23,7 @@ EAP-TLS authentication support for PPP
 
 2. Building
 
-    To build pppd with EAP-TLS support, CyaSSL (http://www.yassl.com)
+    To build pppd with EAP-TLS support, wolfSSL (http://www.yassl.com)
     is required. Any version from 2.0.4 should work.
     
     Configure with the Fortress option, make and install as usual:
