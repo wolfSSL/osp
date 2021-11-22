@@ -1,14 +1,22 @@
-PPP v2.4.5 EAP-TLS with CyaSSL v2.0.8
+PPP v2.4.5 EAP-TLS with wolfSSL
 -------------------------------------
 
 This project started with ppp-2.4.5 as the base. It does not have EAP-TLS
-support. That is supplied by a set of patches on top of the sources. CyaSSL
+support. That is supplied by a set of patches on top of the sources. wolfSSL
 is applied as a patch on top of the patches.
 
-The repository has two commits. First is the original ppp sources with the
+To build PPP, first configure wolfSSL as shown below.
+
+```./configure --enable-opensslextra --enable-fortress --enable-dh --enable-des3 CFLAGS=-DWOLFSSL_DES_ECB'```
+
+Then ```make``` and ```sudo make install```.
+
+Then build PPP with ```./configure``` then ```make```.
+
+The repository has three commits. First is the original ppp sources with the
 EAP-TLS v0.992 patch applied. (commit 5e13f6b) Next commit has the
 modifiction where OpenSSL is ripped out and replaced with CyaSSL.
-(commit f5d2954)
+(commit f5d2954) The last commit updates the port to build with wolfSSL.
 
 The original ppp-2.4.5 can be found at the Samba website. The EAP-TLS
 patches can be found at Jan Just Keijser's website.

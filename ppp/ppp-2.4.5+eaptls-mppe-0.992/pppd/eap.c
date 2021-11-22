@@ -628,7 +628,7 @@ int status;
 	case eapTlsSend:
 		ets = (struct eaptls_session *) esp->es_server.ea_session;
 
-		if(CyaSSL_is_init_finished(ets->ssl)) {
+		if(wolfSSL_is_init_finished(ets->ssl)) {
 			esp->es_server.ea_state = eapTlsRecvClient; 
 			break;
 		}
@@ -1757,7 +1757,7 @@ int len;
 			}
 
 			/* Check if TLS handshake is finished */
-			if(CyaSSL_is_init_finished(ets->ssl)){
+			if(wolfSSL_is_init_finished(ets->ssl)){
 #ifdef MPPE
  				eaptls_gen_mppe_keys( ets, "client EAP encryption", 1 );
 #endif

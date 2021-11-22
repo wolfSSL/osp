@@ -34,7 +34,7 @@
 
 #include "eap.h"
 
-#include <cyassl/ssl.h>
+#include <wolfssl/ssl.h>
 
 #define EAP_TLS_FLAGS_LI	128	/* length included flag */
 #define EAP_TLS_FLAGS_MF	64	/* more fragments flag */
@@ -54,8 +54,8 @@ struct eaptls_session
 	int offset;		/* from where to send */
 	int tlslen;		/* total length of tls data */
 	bool frag;		/* packet is fragmented */
-	CYASSL_CTX *ctx;
-	CYASSL *ssl;		/* ssl connection */
+	WOLFSSL_CTX *ctx;
+	WOLFSSL *ssl;		/* ssl connection */
 	char peer[MAXWORDLEN];	/* peer name */
 	char peercertfile[MAXWORDLEN];
 	bool alert_sent;
@@ -75,7 +75,7 @@ typedef struct pw_cb_data
 } PW_CB_DATA;
 
 
-CYASSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
+WOLFSSL_CTX *eaptls_init_ssl(int init_server, char *cacertfile,
 	char *certfile, char *peer_certfile, char *privkeyfile);
 int eaptls_init_ssl_server(eap_state * esp);
 int eaptls_init_ssl_client(eap_state * esp);

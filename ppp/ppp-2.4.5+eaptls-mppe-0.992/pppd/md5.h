@@ -67,11 +67,11 @@ void MD5_Final (unsigned char hash[], MD5_CTX *mdContext);
 
 #else /* USE_EAPTLS */
 
-#include <cyassl/ctaocrypt/md5.h>
+#include <wolfssl/wolfcrypt/md5.h>
 
 typedef Md5 MD5_CTX;
-#define MD5_Init InitMd5
-#define MD5_Update Md5Update
-#define MD5_Final(x,y) Md5Final((y), (x))
+#define MD5_Init wc_InitMd5
+#define MD5_Update wc_Md5Update
+#define MD5_Final(x,y) wc_Md5Final((y), (x))
 
 #endif /* USE_EAPTLS */
