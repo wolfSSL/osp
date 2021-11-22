@@ -28,7 +28,7 @@ Apache httpd is enabled with wolfSSL support using the option `--with-wolfssl[=D
 1. From the base directory, checkout the httpd branch:
 
 ```sh
-curl -O https://mirrors.sonic.net/apache/httpd/httpd-2.4.46.tar.gz
+curl -O https://archive.apache.org/dist/httpd/httpd-2.4.46.tar.gz
 tar xvf httpd-2.4.46.tar.gz
 mv httpd-2.4.46 httpd
 cd httpd
@@ -80,7 +80,7 @@ Listen 80
 Listen 443
 
 <VirtualHost *:443>
-DocumentRoot /var/www/html
+DocumentRoot /usr/local/apache2/htdocs
 ServerName 192.168.0.4
 SSLEngine on
 SSLCertificateFile /home/[username]/wolfssl/certs/server-cert.pem
