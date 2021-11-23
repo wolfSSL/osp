@@ -1,11 +1,11 @@
---- httpd-2.4.46.orig/modules/ssl/ssl_engine_init.c	2021-11-18 12:40:42.903822554 -0500
-+++ httpd-2.4.46.patched/modules/ssl/ssl_engine_init.c	2021-11-18 12:50:27.173308280 -0500
+--- modules/ssl/ssl_engine_init.c	2021-11-18 12:40:42.903822554 -0500
++++ modules/ssl/ssl_engine_init.c	2021-11-18 12:50:27.173308280 -0500
 @@ -1390,6 +1390,9 @@
              }
          }
  
 +/* We have not yet implemented SSL_CTX_check_private_key and
-+ * SSL_CTX_get0_certificate() becuase FALCON is not supported by OpenSSL. */ 
++ * SSL_CTX_get0_certificate() for FALCON. */
 +#if 0
          if (SSL_CTX_check_private_key(mctx->ssl_ctx) < 1) {
              ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s, APLOGNO(02565)
@@ -23,8 +23,8 @@
      }
  #endif
  
-+/* We have not yet implemented SSL_CTX_check_private_key() becuase FALCON is not
-+ * supported by OpenSSL. */ 
++/* We have not yet implemented SSL_CTX_check_private_key() for FALCON.
++ */
 +#if 0
      if (SSL_CTX_check_private_key(sc->server->ssl_ctx) != 1) {
          ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s, APLOGNO(02572)
@@ -33,7 +33,7 @@
          ssl_log_ssl_error(SSLLOG_MARK, APLOG_EMERG, s);
          return ssl_die(s);
      }
-+#endif
++#endif /* 0 */
  
  #if defined(HAVE_OCSP_STAPLING) && defined(SSL_CTRL_SET_CURRENT_CERT)
      /*
