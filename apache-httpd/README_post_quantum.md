@@ -36,14 +36,13 @@ cd httpd
 
 Note: The latest v2.4.x branch can be downloaded using: `svn checkout https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x httpd`
 
-2. Apply the patches svn_apache_patch.diff and apache-wolfssl--with-liboqs.patch in that order in the root directory of the checked out httpd code:
+2. Apply the svn_apache_patch.diff patch file in the root directory of the checked out httpd code:
 
 ```sh
 patch -p0 -i ../svn_apache_patch.diff           
-patch -p0 -i ../apache-wolfssl-post-quantum.patch
 ```
 
-(Note: This assumes the patch files are in the directory above)
+(Note: This assumes the patch file is in the directory above)
 
 3. If APR and APR-Util are already installed, skip to step 4. Otherwise, get the Apache Portable Runtime library (APR):
 
