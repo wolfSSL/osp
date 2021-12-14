@@ -1,0 +1,361 @@
+diff --git a/acinclude.m4 b/acinclude.m4
+index d1b31c6..4e628fc 100644
+--- a/acinclude.m4
++++ b/acinclude.m4
+@@ -478,6 +478,100 @@ AC_DEFUN([APACHE_REQUIRE_CXX],[
+   fi
+ ])
+ 
++dnl Check for wolfSSL
++ENABLED_WOLFSSL=no
++AC_MSG_NOTICE([----------------------------------------])
++AC_MSG_CHECKING([for wolfSSL])
++AC_ARG_WITH([wolfssl],
++  [AC_HELP_STRING([--with-wolfssl@<:@=DIR@:>@],
++    [Include wolfSSL support (default no, yes=/usr/local)]
++  )],
++  [
++    if test "x$withval" != "xno" ; then
++      dnl local variables
++      ap_wolfssl_mod_ldflags=""
++      ap_wolfssl_mod_cflags=""
++      ap_wolfssl_libs=""
++
++      dnl backup flags
++      saved_CPPFLAGS="$CPPFLAGS"
++      saved_LDFLAGS="$LDFLAGS"
++      saved_LIBS="$LIBS"
++
++      dnl determine wolfSSL location and flags
++      if test "x$withval" == "xyes" || test "x$withval" == "x" ; then
++          ap_wolfssl_mod_ldflags="-L/usr/local/lib"
++          ap_wolfssl_mod_cflags="-I/usr/local/include -I/usr/local/include/wolfssl"
++      else
++        if test -d "$withval/lib" ; then
++            ap_wolfssl_mod_ldflags="-L$withval/lib"
++        else
++            ap_wolfssl_mod_ldflags="-L$withval"
++        fi
++        if test -d "$withval/include"; then
++            ap_wolfssl_mod_cflags="-I$withval/include -I$withval/include/wolfssl"
++        else
++            ap_wolfssl_mod_cflags="-I$withval -I$withval/wolfssl"
++        fi
++      fi
++      ap_wolfssl_libs="-lwolfssl"
++      ap_wolfssl_mod_cflags="$ap_wolfssl_mod_cflags -DUSE_WOLFSSL"
++      
++      dnl test for wolfSSL
++      CPPFLAGS="$CPPFLAGS $ap_wolfssl_mod_cflags"
++      LDFLAGS="$LDFLAGS $ap_wolfssl_mod_ldflags"
++      LIBS="$LIBS $ap_wolfssl_libs"
++      AC_LINK_IFELSE([
++          AC_LANG_PROGRAM(
++          [[
++            #include <wolfssl/options.h>
++            #include <wolfssl/ssl.h>
++          ]], 
++          [[ 
++            wolfSSL_Init();
++          ]])
++        ],
++        [ wolfssl_linked=yes ],
++        [ wolfssl_linked=no ]
++      )
++
++      dnl restore flags
++      CPPFLAGS="$saved_CPPFLAGS"
++      LIBS="$saved_LIBS"
++      LDFLAGS="$saved_LDFLAGS"
++
++      if test "x$wolfssl_linked" == "xno" ; then
++        dnl handle library not found error
++        AC_MSG_ERROR([wolfSSL Library not found.
++            If it's already installed, specify its path using --with-wolfssl=/dir/])
++
++      else
++        ENABLED_WOLFSSL=yes
++
++        dnl make sure the SSL module is included
++        ac_cv_openssl=yes
++
++        AC_DEFINE(HAVE_WOLFSSL, 1, [Define if wolfSSL is available])
++
++        dnl add lib to module LDFLAGS and LIBS
++        MOD_LDFLAGS="$MOD_LDFLAGS $ap_wolfssl_libs"
++        LIBS="$LIBS $ap_wolfssl_libs"
++        APR_SETVAR(ab_LIBS, [$MOD_LDFLAGS])
++        APACHE_SUBST(ab_CFLAGS)
++        APACHE_SUBST(ab_LIBS)
++
++        dnl add CFLAGS and LDFLAGS to module and global
++        MOD_CFLAGS="$MOD_CFLAGS $ap_wolfssl_mod_cflags"
++        MOD_LDFLAGS="$MOD_LDFLAGS $ap_wolfssl_mod_ldflags"
++        CPPFLAGS="$CPPFLAGS $ap_wolfssl_mod_cflags"
++        LDFLAGS="$LDFLAGS $ap_wolfssl_mod_ldflags"
++      fi
++    fi
++  ]
++)
++AC_MSG_RESULT([$ENABLED_WOLFSSL])
++
++
+ dnl
+ dnl APACHE_CHECK_OPENSSL
+ dnl
+diff --git a/modules/http2/h2_push.c b/modules/http2/h2_push.c
+index 0a90a5d..7908a6f 100644
+--- a/modules/http2/h2_push.c
++++ b/modules/http2/h2_push.c
+@@ -23,6 +23,7 @@
+ #include <apr_time.h>
+ 
+ #ifdef H2_OPENSSL
++#include <wolfssl/options.h>
+ #include <openssl/evp.h>
+ #endif
+ 
+diff --git a/modules/md/md_crypt.c b/modules/md/md_crypt.c
+index 55826be..570f26d 100644
+--- a/modules/md/md_crypt.c
++++ b/modules/md/md_crypt.c
+@@ -25,6 +25,7 @@
+ #include <httpd.h>
+ #include <http_core.h>
+ 
++#include <wolfssl/options.h>
+ #include <openssl/err.h>
+ #include <openssl/evp.h>
+ #include <openssl/pem.h>
+@@ -67,6 +68,12 @@
+ #endif
+ #endif
+ 
++#if defined(USE_WOLFSSL)
++#ifndef OPENSSL_NO_CT
++#define OPENSSL_NO_CT
++#endif
++#endif
++
+ #ifndef OPENSSL_NO_CT
+ #include <openssl/ct.h>
+ #endif
+diff --git a/modules/md/md_ocsp.c b/modules/md/md_ocsp.c
+index 01e601f..f3a7efe 100644
+--- a/modules/md/md_ocsp.c
++++ b/modules/md/md_ocsp.c
+@@ -26,6 +26,7 @@
+ #include <apr_strings.h>
+ #include <apr_thread_mutex.h>
+ 
++#include <wolfssl/options.h>
+ #include <openssl/err.h>
+ #include <openssl/evp.h>
+ #include <openssl/ocsp.h>
+diff --git a/modules/ssl/mod_ssl.c b/modules/ssl/mod_ssl.c
+index 049578f..0abf34d 100644
+--- a/modules/ssl/mod_ssl.c
++++ b/modules/ssl/mod_ssl.c
+@@ -389,12 +389,23 @@ static apr_status_t ssl_cleanup_pre_config(void *data)
+     return APR_SUCCESS;
+ }
+ 
++static void wolfSSL_debug_cb(const int logLevel,
++        const char *const logMessage)
++{
++    (void)logLevel;
++    ap_log_perror(APLOG_MARK, APLOG_WARNING, 0, NULL, APLOGNO(11111)
++            "%s: %s", MODSSL_LIBRARY_NAME, logMessage);
++}
++
+ static int ssl_hook_pre_config(apr_pool_t *pconf,
+                                apr_pool_t *plog,
+                                apr_pool_t *ptemp)
+ {
+     modssl_running_statically = modssl_is_prelinked();
+ 
++    (void)wolfSSL_SetLoggingCb(wolfSSL_debug_cb);
++    wolfSSL_Debugging_ON();
++
+ #if HAVE_OPENSSL_INIT_SSL || (OPENSSL_VERSION_NUMBER >= 0x10100000L && \
+                               !defined(LIBRESSL_VERSION_NUMBER))
+     /* Openssl v1.1+ handles all initialisation automatically, apart
+diff --git a/modules/ssl/mod_ssl_openssl.h b/modules/ssl/mod_ssl_openssl.h
+index d4f684f..36f1681 100644
+--- a/modules/ssl/mod_ssl_openssl.h
++++ b/modules/ssl/mod_ssl_openssl.h
+@@ -29,7 +29,7 @@
+ #include "mod_ssl.h"
+ 
+ /* OpenSSL headers */
+-
++#include <wolfssl/options.h>
+ #ifndef SSL_PRIVATE_H
+ #include <openssl/opensslv.h>
+ #if (OPENSSL_VERSION_NUMBER >= 0x10001000)
+diff --git a/modules/ssl/ssl_engine_init.c b/modules/ssl/ssl_engine_init.c
+index cb1ea12..11271d9 100644
+--- a/modules/ssl/ssl_engine_init.c
++++ b/modules/ssl/ssl_engine_init.c
+@@ -93,6 +93,7 @@ static int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+ }
+ #endif
+ 
++#ifndef HAVE_FIPS
+ /*
+  * Grab well-defined DH parameters from OpenSSL, see the BN_get_rfc*
+  * functions in <openssl/bn.h> for all available primes.
+@@ -133,16 +134,21 @@ static struct dhparam {
+     { BN_get_rfc2409_prime_1024, NULL, 0 }
+ };
+ 
++#endif /* !HAVE_FIPS */
++
+ static void init_dh_params(void)
+ {
++#ifndef HAVE_FIPS
+     unsigned n;
+ 
+     for (n = 0; n < sizeof(dhparams)/sizeof(dhparams[0]); n++)
+         dhparams[n].dh = make_dh_params(dhparams[n].prime);
++#endif
+ }
+ 
+ static void free_dh_params(void)
+ {
++#ifndef HAVE_FIPS
+     unsigned n;
+ 
+     /* DH_free() is a noop for a NULL parameter, so these are harmless
+@@ -152,6 +158,7 @@ static void free_dh_params(void)
+         DH_free(dhparams[n].dh);
+         dhparams[n].dh = NULL;
+     }
++#endif
+ }
+ 
+ /* Hand out the same DH structure though once generated as we leak
+@@ -163,12 +170,14 @@ static void free_dh_params(void)
+  * to our copy. */
+ DH *modssl_get_dh_params(unsigned keylen)
+ {
++#ifndef HAVE_FIPS
+     unsigned n;
+ 
+     for (n = 0; n < sizeof(dhparams)/sizeof(dhparams[0]); n++)
+         if (keylen >= dhparams[n].min)
+             return dhparams[n].dh;
+         
++#endif
+     return NULL; /* impossible to reach. */
+ }
+ 
+@@ -221,6 +230,21 @@ static apr_status_t modssl_fips_cleanup(void *data)
+ /*
+  *  Per-module initialization
+  */
++
++#ifdef HAVE_FIPS
++static void myFipsCb(int ok, int err, const char* hash)
++{
++    printf("in my Fips callback, ok = %d, err = %d\n", ok, err);
++    printf("message = %s\n", wc_GetErrorString(err));
++    printf("hash = %s\n", hash);
++
++    if (err == IN_CORE_FIPS_E) {
++        printf("In core integrity hash check failure, copy above hash\n");
++        printf("into verifyCore[] in fips_test.c and rebuild\n");
++    }
++}
++#endif /* HAVE_FIPS */
++
+ apr_status_t ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
+                              apr_pool_t *ptemp,
+                              server_rec *base_server)
+@@ -231,6 +255,10 @@ apr_status_t ssl_init_Module(apr_pool_t *p, apr_pool_t *plog,
+     apr_status_t rv;
+     apr_array_header_t *pphrases;
+ 
++#ifdef HAVE_FIPS
++    wolfCrypt_SetCb_fips(myFipsCb);
++#endif
++
+     if (SSLeay() < MODSSL_LIBRARY_VERSION) {
+         ap_log_error(APLOG_MARK, APLOG_WARNING, 0, base_server, APLOGNO(01882)
+                      "Init: this version of mod_ssl was compiled against "
+diff --git a/modules/ssl/ssl_private.h b/modules/ssl/ssl_private.h
+index c194270..6175ace 100644
+--- a/modules/ssl/ssl_private.h
++++ b/modules/ssl/ssl_private.h
+@@ -84,6 +84,7 @@
+ #include "ap_expr.h"
+ 
+ /* OpenSSL headers */
++#include <wolfssl/options.h>
+ #include <openssl/opensslv.h>
+ #if (OPENSSL_VERSION_NUMBER >= 0x10001000)
+ /* must be defined before including ssl.h */
+diff --git a/modules/ssl/ssl_util_ssl.c b/modules/ssl/ssl_util_ssl.c
+index 38079a9..c0259be 100644
+--- a/modules/ssl/ssl_util_ssl.c
++++ b/modules/ssl/ssl_util_ssl.c
+@@ -467,12 +467,14 @@ BOOL modssl_X509_match_name(apr_pool_t *p, X509 *x509, const char *name,
+ DH *ssl_dh_GetParamFromFile(const char *file)
+ {
+     DH *dh = NULL;
++#ifndef HAVE_FIPS
+     BIO *bio;
+ 
+     if ((bio = BIO_new_file(file, "r")) == NULL)
+         return NULL;
+     dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
+     BIO_free(bio);
++#endif
+     return (dh);
+ }
+ 
+diff --git a/modules/ssl/ssl_util_ssl.h b/modules/ssl/ssl_util_ssl.h
+index 443c1b7..7e22e1b 100644
+--- a/modules/ssl/ssl_util_ssl.h
++++ b/modules/ssl/ssl_util_ssl.h
+@@ -39,7 +39,7 @@
+  */
+ 
+ #define MODSSL_LIBRARY_VERSION OPENSSL_VERSION_NUMBER
+-#define MODSSL_LIBRARY_NAME    "OpenSSL"
++#define MODSSL_LIBRARY_NAME    "wolfSSL"
+ #define MODSSL_LIBRARY_TEXT    OPENSSL_VERSION_TEXT
+ #if MODSSL_USE_OPENSSL_PRE_1_1_API
+ #define MODSSL_LIBRARY_DYNTEXT SSLeay_version(SSLEAY_VERSION)
+diff --git a/support/ab.c b/support/ab.c
+index 71cf484..bcedaf1 100644
+--- a/support/ab.c
++++ b/support/ab.c
+@@ -158,12 +158,13 @@
+ 
+ #if defined(HAVE_OPENSSL)
+ 
++#include <wolfssl/options.h>
++#include <openssl/ssl.h>
+ #include <openssl/rsa.h>
+ #include <openssl/crypto.h>
+ #include <openssl/x509.h>
+ #include <openssl/pem.h>
+ #include <openssl/err.h>
+-#include <openssl/ssl.h>
+ #include <openssl/rand.h>
+ #define USE_SSL
+ #define SK_NUM(x) sk_X509_num(x)
+@@ -2554,7 +2555,9 @@ int main(int argc, const char * const argv[])
+                     meth = TLSv1_2_client_method();
+ #endif
+                 } else if (strncasecmp(opt_arg, "TLS1", 4) == 0) {
++#if !defined(NO_OLD_TLS) && defined(WOLFSSL_ALLOW_TLSV10)
+                     meth = TLSv1_client_method();
++#endif
+                 }
+ #else /* #if OPENSSL_VERSION_NUMBER < 0x10100000L */
+                 meth = TLS_client_method();
+-- 
+2.25.1
+
