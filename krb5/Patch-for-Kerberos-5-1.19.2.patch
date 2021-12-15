@@ -1,4 +1,4 @@
-From 237162c77aaa7a78bb913144f72c3d1d602f740e Mon Sep 17 00:00:00 2001
+From 525fd958dc8182a783d894d97f17848a6ac2a27f Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Tue, 28 Sep 2021 10:13:47 +0200
 Subject: [PATCH] Patch for Kerberos 5 1.19.2
@@ -13,6 +13,12 @@ Compile wolfSSL with:
 ./configure --enable-krb
 make
 make install
+```
+
+Kerberos 1.16.1 maybe downloaded and extracted with:
+```
+wget https://web.mit.edu/kerberos/dist/krb5/1.19/krb5-1.19.2.tar.gz
+tar -xvf krb5-1.19.2.tar.gz
 ```
 
 Compile krb5 with:
