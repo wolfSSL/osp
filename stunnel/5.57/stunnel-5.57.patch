@@ -1,8 +1,7 @@
-diff --git a/configure.ac b/configure.ac
-index 9c2b2b6..9daa432 100644
---- a/configure.ac
-+++ b/configure.ac
-@@ -437,26 +437,63 @@ find_ssl_dir() { :
+diff -urN stunnel-5.57.orig/configure.ac stunnel-5.57.new/configure.ac
+--- stunnel-5.57.orig/configure.ac	2019-12-12 06:46:05.000000000 -0500
++++ stunnel-5.57.new/configure.ac	2021-12-30 15:43:08.443755444 -0500
+@@ -437,26 +437,63 @@
      check_ssl_dir "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk/usr"
  }
  
@@ -79,50 +78,789 @@ index 9c2b2b6..9daa432 100644
  
  if test "x$use_fips" = "xauto"; then
      AC_CHECK_FUNCS(FIPS_mode_set, [
-diff --git a/src/Makefile.am b/src/Makefile.am
-index d30842f..68d9d5a 100644
---- a/src/Makefile.am
-+++ b/src/Makefile.am
-@@ -30,12 +30,20 @@ CLEANFILES = stunnel3
- stunnel_CPPFLAGS = -I$(SYSROOT)/usr/kerberos/include
- 
- # Additional preprocesor definitions
-+if WOLFSSL
-+stunnel_CPPFLAGS += -I$(SSLDIR)/include/wolfssl -I$(SSLDIR)/include
+diff -urN stunnel-5.57.orig/m4/acinclude.m4 stunnel-5.57.new/m4/acinclude.m4
+--- stunnel-5.57.orig/m4/acinclude.m4	1969-12-31 19:00:00.000000000 -0500
++++ stunnel-5.57.new/m4/acinclude.m4	2021-12-30 15:44:44.141143772 -0500
+@@ -0,0 +1,775 @@
++# ============================================================================
++#  https://www.gnu.org/software/autoconf-archive/ax_append_compile_flags.html
++# ============================================================================
++#
++# SYNOPSIS
++#
++#   AX_APPEND_COMPILE_FLAGS([FLAG1 FLAG2 ...], [FLAGS-VARIABLE], [EXTRA-FLAGS], [INPUT])
++#
++# DESCRIPTION
++#
++#   For every FLAG1, FLAG2 it is checked whether the compiler works with the
++#   flag.  If it does, the flag is added FLAGS-VARIABLE
++#
++#   If FLAGS-VARIABLE is not specified, the current language's flags (e.g.
++#   CFLAGS) is used.  During the check the flag is always added to the
++#   current language's flags.
++#
++#   If EXTRA-FLAGS is defined, it is added to the current language's default
++#   flags (e.g. CFLAGS) when the check is done.  The check is thus made with
++#   the flags: "CFLAGS EXTRA-FLAGS FLAG".  This can for example be used to
++#   force the compiler to issue an error when a bad flag is given.
++#
++#   INPUT gives an alternative input source to AC_COMPILE_IFELSE.
++#
++#   NOTE: This macro depends on the AX_APPEND_FLAG and
++#   AX_CHECK_COMPILE_FLAG. Please keep this macro in sync with
++#   AX_APPEND_LINK_FLAGS.
++#
++# LICENSE
++#
++#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
++#
++#   Copying and distribution of this file, with or without modification, are
++#   permitted in any medium without royalty provided the copyright notice
++#   and this notice are preserved.  This file is offered as-is, without any
++#   warranty.
++
++#serial 7
++
++AC_DEFUN([AX_APPEND_COMPILE_FLAGS],
++[AX_REQUIRE_DEFINED([AX_CHECK_COMPILE_FLAG])
++AX_REQUIRE_DEFINED([AX_APPEND_FLAG])
++for flag in $1; do
++  AX_CHECK_COMPILE_FLAG([$flag], [AX_APPEND_FLAG([$flag], [$2])], [], [$3], [$4])
++done
++])dnl AX_APPEND_COMPILE_FLAGS
++
++# ===========================================================================
++#      https://www.gnu.org/software/autoconf-archive/ax_append_flag.html
++# ===========================================================================
++#
++# SYNOPSIS
++#
++#   AX_APPEND_FLAG(FLAG, [FLAGS-VARIABLE])
++#
++# DESCRIPTION
++#
++#   FLAG is appended to the FLAGS-VARIABLE shell variable, with a space
++#   added in between.
++#
++#   If FLAGS-VARIABLE is not specified, the current language's flags (e.g.
++#   CFLAGS) is used.  FLAGS-VARIABLE is not changed if it already contains
++#   FLAG.  If FLAGS-VARIABLE is unset in the shell, it is set to exactly
++#   FLAG.
++#
++#   NOTE: Implementation based on AX_CFLAGS_GCC_OPTION.
++#
++# LICENSE
++#
++#   Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
++#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
++#
++#   Copying and distribution of this file, with or without modification, are
++#   permitted in any medium without royalty provided the copyright notice
++#   and this notice are preserved.  This file is offered as-is, without any
++#   warranty.
++
++#serial 8
++
++AC_DEFUN([AX_APPEND_FLAG],
++[dnl
++AC_PREREQ(2.64)dnl for _AC_LANG_PREFIX and AS_VAR_SET_IF
++AS_VAR_PUSHDEF([FLAGS], [m4_default($2,_AC_LANG_PREFIX[FLAGS])])
++AS_VAR_SET_IF(FLAGS,[
++  AS_CASE([" AS_VAR_GET(FLAGS) "],
++    [*" $1 "*], [AC_RUN_LOG([: FLAGS already contains $1])],
++    [
++     AS_VAR_APPEND(FLAGS,[" $1"])
++     AC_RUN_LOG([: FLAGS="$FLAGS"])
++    ])
++  ],
++  [
++  AS_VAR_SET(FLAGS,[$1])
++  AC_RUN_LOG([: FLAGS="$FLAGS"])
++  ])
++AS_VAR_POPDEF([FLAGS])dnl
++])dnl AX_APPEND_FLAG
++
++# ===========================================================================
++#   https://www.gnu.org/software/autoconf-archive/ax_append_link_flags.html
++# ===========================================================================
++#
++# SYNOPSIS
++#
++#   AX_APPEND_LINK_FLAGS([FLAG1 FLAG2 ...], [FLAGS-VARIABLE], [EXTRA-FLAGS], [INPUT])
++#
++# DESCRIPTION
++#
++#   For every FLAG1, FLAG2 it is checked whether the linker works with the
++#   flag.  If it does, the flag is added FLAGS-VARIABLE
++#
++#   If FLAGS-VARIABLE is not specified, the linker's flags (LDFLAGS) is
++#   used. During the check the flag is always added to the linker's flags.
++#
++#   If EXTRA-FLAGS is defined, it is added to the linker's default flags
++#   when the check is done.  The check is thus made with the flags: "LDFLAGS
++#   EXTRA-FLAGS FLAG".  This can for example be used to force the linker to
++#   issue an error when a bad flag is given.
++#
++#   INPUT gives an alternative input source to AC_COMPILE_IFELSE.
++#
++#   NOTE: This macro depends on the AX_APPEND_FLAG and AX_CHECK_LINK_FLAG.
++#   Please keep this macro in sync with AX_APPEND_COMPILE_FLAGS.
++#
++# LICENSE
++#
++#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
++#
++#   Copying and distribution of this file, with or without modification, are
++#   permitted in any medium without royalty provided the copyright notice
++#   and this notice are preserved.  This file is offered as-is, without any
++#   warranty.
++
++#serial 7
++
++AC_DEFUN([AX_APPEND_LINK_FLAGS],
++[AX_REQUIRE_DEFINED([AX_CHECK_LINK_FLAG])
++AX_REQUIRE_DEFINED([AX_APPEND_FLAG])
++for flag in $1; do
++  AX_CHECK_LINK_FLAG([$flag], [AX_APPEND_FLAG([$flag], [m4_default([$2], [LDFLAGS])])], [], [$3], [$4])
++done
++])dnl AX_APPEND_LINK_FLAGS
++
++# ===========================================================================
++#  https://www.gnu.org/software/autoconf-archive/ax_check_compile_flag.html
++# ===========================================================================
++#
++# SYNOPSIS
++#
++#   AX_CHECK_COMPILE_FLAG(FLAG, [ACTION-SUCCESS], [ACTION-FAILURE], [EXTRA-FLAGS], [INPUT])
++#
++# DESCRIPTION
++#
++#   Check whether the given FLAG works with the current language's compiler
++#   or gives an error.  (Warnings, however, are ignored)
++#
++#   ACTION-SUCCESS/ACTION-FAILURE are shell commands to execute on
++#   success/failure.
++#
++#   If EXTRA-FLAGS is defined, it is added to the current language's default
++#   flags (e.g. CFLAGS) when the check is done.  The check is thus made with
++#   the flags: "CFLAGS EXTRA-FLAGS FLAG".  This can for example be used to
++#   force the compiler to issue an error when a bad flag is given.
++#
++#   INPUT gives an alternative input source to AC_COMPILE_IFELSE.
++#
++#   NOTE: Implementation based on AX_CFLAGS_GCC_OPTION. Please keep this
++#   macro in sync with AX_CHECK_{PREPROC,LINK}_FLAG.
++#
++# LICENSE
++#
++#   Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
++#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
++#
++#   Copying and distribution of this file, with or without modification, are
++#   permitted in any medium without royalty provided the copyright notice
++#   and this notice are preserved.  This file is offered as-is, without any
++#   warranty.
++
++#serial 6
++
++AC_DEFUN([AX_CHECK_COMPILE_FLAG],
++[AC_PREREQ(2.64)dnl for _AC_LANG_PREFIX and AS_VAR_IF
++AS_VAR_PUSHDEF([CACHEVAR],[ax_cv_check_[]_AC_LANG_ABBREV[]flags_$4_$1])dnl
++AC_CACHE_CHECK([whether _AC_LANG compiler accepts $1], CACHEVAR, [
++  ax_check_save_flags=$[]_AC_LANG_PREFIX[]FLAGS
++  _AC_LANG_PREFIX[]FLAGS="$[]_AC_LANG_PREFIX[]FLAGS $4 $1"
++  AC_COMPILE_IFELSE([m4_default([$5],[AC_LANG_PROGRAM()])],
++    [AS_VAR_SET(CACHEVAR,[yes])],
++    [AS_VAR_SET(CACHEVAR,[no])])
++  _AC_LANG_PREFIX[]FLAGS=$ax_check_save_flags])
++AS_VAR_IF(CACHEVAR,yes,
++  [m4_default([$2], :)],
++  [m4_default([$3], :)])
++AS_VAR_POPDEF([CACHEVAR])dnl
++])dnl AX_CHECK_COMPILE_FLAGS
++
++# ===========================================================================
++#    https://www.gnu.org/software/autoconf-archive/ax_check_link_flag.html
++# ===========================================================================
++#
++# SYNOPSIS
++#
++#   AX_CHECK_LINK_FLAG(FLAG, [ACTION-SUCCESS], [ACTION-FAILURE], [EXTRA-FLAGS], [INPUT])
++#
++# DESCRIPTION
++#
++#   Check whether the given FLAG works with the linker or gives an error.
++#   (Warnings, however, are ignored)
++#
++#   ACTION-SUCCESS/ACTION-FAILURE are shell commands to execute on
++#   success/failure.
++#
++#   If EXTRA-FLAGS is defined, it is added to the linker's default flags
++#   when the check is done.  The check is thus made with the flags: "LDFLAGS
++#   EXTRA-FLAGS FLAG".  This can for example be used to force the linker to
++#   issue an error when a bad flag is given.
++#
++#   INPUT gives an alternative input source to AC_LINK_IFELSE.
++#
++#   NOTE: Implementation based on AX_CFLAGS_GCC_OPTION. Please keep this
++#   macro in sync with AX_CHECK_{PREPROC,COMPILE}_FLAG.
++#
++# LICENSE
++#
++#   Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
++#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
++#
++#   Copying and distribution of this file, with or without modification, are
++#   permitted in any medium without royalty provided the copyright notice
++#   and this notice are preserved.  This file is offered as-is, without any
++#   warranty.
++
++#serial 6
++
++AC_DEFUN([AX_CHECK_LINK_FLAG],
++[AC_PREREQ(2.64)dnl for _AC_LANG_PREFIX and AS_VAR_IF
++AS_VAR_PUSHDEF([CACHEVAR],[ax_cv_check_ldflags_$4_$1])dnl
++AC_CACHE_CHECK([whether the linker accepts $1], CACHEVAR, [
++  ax_check_save_flags=$LDFLAGS
++  LDFLAGS="$LDFLAGS $4 $1"
++  AC_LINK_IFELSE([m4_default([$5],[AC_LANG_PROGRAM()])],
++    [AS_VAR_SET(CACHEVAR,[yes])],
++    [AS_VAR_SET(CACHEVAR,[no])])
++  LDFLAGS=$ax_check_save_flags])
++AS_VAR_IF(CACHEVAR,yes,
++  [m4_default([$2], :)],
++  [m4_default([$3], :)])
++AS_VAR_POPDEF([CACHEVAR])dnl
++])dnl AX_CHECK_LINK_FLAGS
++
++# ===========================================================================
++#        https://www.gnu.org/software/autoconf-archive/ax_pthread.html
++# ===========================================================================
++#
++# SYNOPSIS
++#
++#   AX_PTHREAD([ACTION-IF-FOUND[, ACTION-IF-NOT-FOUND]])
++#
++# DESCRIPTION
++#
++#   This macro figures out how to build C programs using POSIX threads. It
++#   sets the PTHREAD_LIBS output variable to the threads library and linker
++#   flags, and the PTHREAD_CFLAGS output variable to any special C compiler
++#   flags that are needed. (The user can also force certain compiler
++#   flags/libs to be tested by setting these environment variables.)
++#
++#   Also sets PTHREAD_CC to any special C compiler that is needed for
++#   multi-threaded programs (defaults to the value of CC otherwise). (This
++#   is necessary on AIX to use the special cc_r compiler alias.)
++#
++#   NOTE: You are assumed to not only compile your program with these flags,
++#   but also to link with them as well. For example, you might link with
++#   $PTHREAD_CC $CFLAGS $PTHREAD_CFLAGS $LDFLAGS ... $PTHREAD_LIBS $LIBS
++#
++#   If you are only building threaded programs, you may wish to use these
++#   variables in your default LIBS, CFLAGS, and CC:
++#
++#     LIBS="$PTHREAD_LIBS $LIBS"
++#     CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
++#     CC="$PTHREAD_CC"
++#
++#   In addition, if the PTHREAD_CREATE_JOINABLE thread-attribute constant
++#   has a nonstandard name, this macro defines PTHREAD_CREATE_JOINABLE to
++#   that name (e.g. PTHREAD_CREATE_UNDETACHED on AIX).
++#
++#   Also HAVE_PTHREAD_PRIO_INHERIT is defined if pthread is found and the
++#   PTHREAD_PRIO_INHERIT symbol is defined when compiling with
++#   PTHREAD_CFLAGS.
++#
++#   ACTION-IF-FOUND is a list of shell commands to run if a threads library
++#   is found, and ACTION-IF-NOT-FOUND is a list of commands to run it if it
++#   is not found. If ACTION-IF-FOUND is not specified, the default action
++#   will define HAVE_PTHREAD.
++#
++#   Please let the authors know if this macro fails on any platform, or if
++#   you have any other suggestions or comments. This macro was based on work
++#   by SGJ on autoconf scripts for FFTW (http://www.fftw.org/) (with help
++#   from M. Frigo), as well as ac_pthread and hb_pthread macros posted by
++#   Alejandro Forero Cuervo to the autoconf macro repository. We are also
++#   grateful for the helpful feedback of numerous users.
++#
++#   Updated for Autoconf 2.68 by Daniel Richard G.
++#
++# LICENSE
++#
++#   Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
++#   Copyright (c) 2011 Daniel Richard G. <skunk@iSKUNK.ORG>
++#
++#   This program is free software: you can redistribute it and/or modify it
++#   under the terms of the GNU General Public License as published by the
++#   Free Software Foundation, either version 3 of the License, or (at your
++#   option) any later version.
++#
++#   This program is distributed in the hope that it will be useful, but
++#   WITHOUT ANY WARRANTY; without even the implied warranty of
++#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
++#   Public License for more details.
++#
++#   You should have received a copy of the GNU General Public License along
++#   with this program. If not, see <https://www.gnu.org/licenses/>.
++#
++#   As a special exception, the respective Autoconf Macro's copyright owner
++#   gives unlimited permission to copy, distribute and modify the configure
++#   scripts that are the output of Autoconf when processing the Macro. You
++#   need not follow the terms of the GNU General Public License when using
++#   or distributing such scripts, even though portions of the text of the
++#   Macro appear in them. The GNU General Public License (GPL) does govern
++#   all other use of the material that constitutes the Autoconf Macro.
++#
++#   This special exception to the GPL applies to versions of the Autoconf
++#   Macro released by the Autoconf Archive. When you make and distribute a
++#   modified version of the Autoconf Macro, you may extend this special
++#   exception to the GPL to apply to your modified version as well.
++
++#serial 24
++
++AU_ALIAS([ACX_PTHREAD], [AX_PTHREAD])
++AC_DEFUN([AX_PTHREAD], [
++AC_REQUIRE([AC_CANONICAL_HOST])
++AC_REQUIRE([AC_PROG_CC])
++AC_REQUIRE([AC_PROG_SED])
++AC_LANG_PUSH([C])
++ax_pthread_ok=no
++
++# We used to check for pthread.h first, but this fails if pthread.h
++# requires special compiler flags (e.g. on Tru64 or Sequent).
++# It gets checked for in the link test anyway.
++
++# First of all, check if the user has set any of the PTHREAD_LIBS,
++# etcetera environment variables, and if threads linking works using
++# them:
++if test "x$PTHREAD_CFLAGS$PTHREAD_LIBS" != "x"; then
++        ax_pthread_save_CC="$CC"
++        ax_pthread_save_CFLAGS="$CFLAGS"
++        ax_pthread_save_LIBS="$LIBS"
++        AS_IF([test "x$PTHREAD_CC" != "x"], [CC="$PTHREAD_CC"])
++        CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
++        LIBS="$PTHREAD_LIBS $LIBS"
++        AC_MSG_CHECKING([for pthread_join using $CC $PTHREAD_CFLAGS $PTHREAD_LIBS])
++        AC_LINK_IFELSE([AC_LANG_CALL([], [pthread_join])], [ax_pthread_ok=yes])
++        AC_MSG_RESULT([$ax_pthread_ok])
++        if test "x$ax_pthread_ok" = "xno"; then
++                PTHREAD_LIBS=""
++                PTHREAD_CFLAGS=""
++        fi
++        CC="$ax_pthread_save_CC"
++        CFLAGS="$ax_pthread_save_CFLAGS"
++        LIBS="$ax_pthread_save_LIBS"
++fi
++
++# We must check for the threads library under a number of different
++# names; the ordering is very important because some systems
++# (e.g. DEC) have both -lpthread and -lpthreads, where one of the
++# libraries is broken (non-POSIX).
++
++# Create a list of thread flags to try.  Items starting with a "-" are
++# C compiler flags, and other items are library names, except for "none"
++# which indicates that we try without any flags at all, and "pthread-config"
++# which is a program returning the flags for the Pth emulation library.
++
++ax_pthread_flags="pthreads none -Kthread -pthread -pthreads -mthreads pthread --thread-safe -mt pthread-config"
++
++# The ordering *is* (sometimes) important.  Some notes on the
++# individual items follow:
++
++# pthreads: AIX (must check this before -lpthread)
++# none: in case threads are in libc; should be tried before -Kthread and
++#       other compiler flags to prevent continual compiler warnings
++# -Kthread: Sequent (threads in libc, but -Kthread needed for pthread.h)
++# -pthread: Linux/gcc (kernel threads), BSD/gcc (userland threads), Tru64
++#           (Note: HP C rejects this with "bad form for `-t' option")
++# -pthreads: Solaris/gcc (Note: HP C also rejects)
++# -mt: Sun Workshop C (may only link SunOS threads [-lthread], but it
++#      doesn't hurt to check since this sometimes defines pthreads and
++#      -D_REENTRANT too), HP C (must be checked before -lpthread, which
++#      is present but should not be used directly; and before -mthreads,
++#      because the compiler interprets this as "-mt" + "-hreads")
++# -mthreads: Mingw32/gcc, Lynx/gcc
++# pthread: Linux, etcetera
++# --thread-safe: KAI C++
++# pthread-config: use pthread-config program (for GNU Pth library)
++
++case $host_os in
++
++        freebsd*)
++
++        # -kthread: FreeBSD kernel threads (preferred to -pthread since SMP-able)
++        # lthread: LinuxThreads port on FreeBSD (also preferred to -pthread)
++
++        ax_pthread_flags="-kthread lthread $ax_pthread_flags"
++        ;;
++
++        hpux*)
++
++        # From the cc(1) man page: "[-mt] Sets various -D flags to enable
++        # multi-threading and also sets -lpthread."
++
++        ax_pthread_flags="-mt -pthread pthread $ax_pthread_flags"
++        ;;
++
++        openedition*)
++
++        # IBM z/OS requires a feature-test macro to be defined in order to
++        # enable POSIX threads at all, so give the user a hint if this is
++        # not set. (We don't define these ourselves, as they can affect
++        # other portions of the system API in unpredictable ways.)
++
++        AC_EGREP_CPP([AX_PTHREAD_ZOS_MISSING],
++            [
++#            if !defined(_OPEN_THREADS) && !defined(_UNIX03_THREADS)
++             AX_PTHREAD_ZOS_MISSING
++#            endif
++            ],
++            [AC_MSG_WARN([IBM z/OS requires -D_OPEN_THREADS or -D_UNIX03_THREADS to enable pthreads support.])])
++        ;;
++
++        solaris*)
++
++        # On Solaris (at least, for some versions), libc contains stubbed
++        # (non-functional) versions of the pthreads routines, so link-based
++        # tests will erroneously succeed. (N.B.: The stubs are missing
++        # pthread_cleanup_push, or rather a function called by this macro,
++        # so we could check for that, but who knows whether they'll stub
++        # that too in a future libc.)  So we'll check first for the
++        # standard Solaris way of linking pthreads (-mt -lpthread).
++
++        ax_pthread_flags="-mt,pthread pthread $ax_pthread_flags"
++        ;;
++esac
++
++# GCC generally uses -pthread, or -pthreads on some platforms (e.g. SPARC)
++
++AS_IF([test "x$GCC" = "xyes"],
++      [ax_pthread_flags="-pthread -pthreads $ax_pthread_flags"])
++
++# The presence of a feature test macro requesting re-entrant function
++# definitions is, on some systems, a strong hint that pthreads support is
++# correctly enabled
++
++case $host_os in
++        darwin* | hpux* | linux* | osf* | solaris*)
++        ax_pthread_check_macro="_REENTRANT"
++        ;;
++
++        aix*)
++        ax_pthread_check_macro="_THREAD_SAFE"
++        ;;
++
++        *)
++        ax_pthread_check_macro="--"
++        ;;
++esac
++AS_IF([test "x$ax_pthread_check_macro" = "x--"],
++      [ax_pthread_check_cond=0],
++      [ax_pthread_check_cond="!defined($ax_pthread_check_macro)"])
++
++# Are we compiling with Clang?
++
++AC_CACHE_CHECK([whether $CC is Clang],
++    [ax_cv_PTHREAD_CLANG],
++    [ax_cv_PTHREAD_CLANG=no
++     # Note that Autoconf sets GCC=yes for Clang as well as GCC
++     if test "x$GCC" = "xyes"; then
++        AC_EGREP_CPP([AX_PTHREAD_CC_IS_CLANG],
++            [/* Note: Clang 2.7 lacks __clang_[a-z]+__ */
++#            if defined(__clang__) && defined(__llvm__)
++             AX_PTHREAD_CC_IS_CLANG
++#            endif
++            ],
++            [ax_cv_PTHREAD_CLANG=yes])
++     fi
++    ])
++ax_pthread_clang="$ax_cv_PTHREAD_CLANG"
++
++ax_pthread_clang_warning=no
++
++# Clang needs special handling, because older versions handle the -pthread
++# option in a rather... idiosyncratic way
++
++if test "x$ax_pthread_clang" = "xyes"; then
++
++        # Clang takes -pthread; it has never supported any other flag
++
++        # (Note 1: This will need to be revisited if a system that Clang
++        # supports has POSIX threads in a separate library.  This tends not
++        # to be the way of modern systems, but it's conceivable.)
++
++        # (Note 2: On some systems, notably Darwin, -pthread is not needed
++        # to get POSIX threads support; the API is always present and
++        # active.  We could reasonably leave PTHREAD_CFLAGS empty.  But
++        # -pthread does define _REENTRANT, and while the Darwin headers
++        # ignore this macro, third-party headers might not.)
++
++        PTHREAD_CFLAGS="-pthread"
++        PTHREAD_LIBS=
++
++        ax_pthread_ok=yes
++
++        # However, older versions of Clang make a point of warning the user
++        # that, in an invocation where only linking and no compilation is
++        # taking place, the -pthread option has no effect ("argument unused
++        # during compilation").  They expect -pthread to be passed in only
++        # when source code is being compiled.
++        #
++        # Problem is, this is at odds with the way Automake and most other
++        # C build frameworks function, which is that the same flags used in
++        # compilation (CFLAGS) are also used in linking.  Many systems
++        # supported by AX_PTHREAD require exactly this for POSIX threads
++        # support, and in fact it is often not straightforward to specify a
++        # flag that is used only in the compilation phase and not in
++        # linking.  Such a scenario is extremely rare in practice.
++        #
++        # Even though use of the -pthread flag in linking would only print
++        # a warning, this can be a nuisance for well-run software projects
++        # that build with -Werror.  So if the active version of Clang has
++        # this misfeature, we search for an option to squash it.
++
++        AC_CACHE_CHECK([whether Clang needs flag to prevent "argument unused" warning when linking with -pthread],
++            [ax_cv_PTHREAD_CLANG_NO_WARN_FLAG],
++            [ax_cv_PTHREAD_CLANG_NO_WARN_FLAG=unknown
++             # Create an alternate version of $ac_link that compiles and
++             # links in two steps (.c -> .o, .o -> exe) instead of one
++             # (.c -> exe), because the warning occurs only in the second
++             # step
++             ax_pthread_save_ac_link="$ac_link"
++             ax_pthread_sed='s/conftest\.\$ac_ext/conftest.$ac_objext/g'
++             ax_pthread_link_step=`$as_echo "$ac_link" | sed "$ax_pthread_sed"`
++             ax_pthread_2step_ac_link="($ac_compile) && (echo ==== >&5) && ($ax_pthread_link_step)"
++             ax_pthread_save_CFLAGS="$CFLAGS"
++             for ax_pthread_try in '' -Qunused-arguments -Wno-unused-command-line-argument unknown; do
++                AS_IF([test "x$ax_pthread_try" = "xunknown"], [break])
++                CFLAGS="-Werror -Wunknown-warning-option $ax_pthread_try -pthread $ax_pthread_save_CFLAGS"
++                ac_link="$ax_pthread_save_ac_link"
++                AC_LINK_IFELSE([AC_LANG_SOURCE([[int main(void){return 0;}]])],
++                    [ac_link="$ax_pthread_2step_ac_link"
++                     AC_LINK_IFELSE([AC_LANG_SOURCE([[int main(void){return 0;}]])],
++                         [break])
++                    ])
++             done
++             ac_link="$ax_pthread_save_ac_link"
++             CFLAGS="$ax_pthread_save_CFLAGS"
++             AS_IF([test "x$ax_pthread_try" = "x"], [ax_pthread_try=no])
++             ax_cv_PTHREAD_CLANG_NO_WARN_FLAG="$ax_pthread_try"
++            ])
++
++        case "$ax_cv_PTHREAD_CLANG_NO_WARN_FLAG" in
++                no | unknown) ;;
++                *) PTHREAD_CFLAGS="$ax_cv_PTHREAD_CLANG_NO_WARN_FLAG $PTHREAD_CFLAGS" ;;
++        esac
++
++fi # $ax_pthread_clang = yes
++
++if test "x$ax_pthread_ok" = "xno"; then
++for ax_pthread_try_flag in $ax_pthread_flags; do
++
++        case $ax_pthread_try_flag in
++                none)
++                AC_MSG_CHECKING([whether pthreads work without any flags])
++                ;;
++
++                -mt,pthread)
++                AC_MSG_CHECKING([whether pthreads work with -mt -lpthread])
++                PTHREAD_CFLAGS="-mt"
++                PTHREAD_LIBS="-lpthread"
++                ;;
++
++                -*)
++                AC_MSG_CHECKING([whether pthreads work with $ax_pthread_try_flag])
++                PTHREAD_CFLAGS="$ax_pthread_try_flag"
++                ;;
++
++                pthread-config)
++                AC_CHECK_PROG([ax_pthread_config], [pthread-config], [yes], [no])
++                AS_IF([test "x$ax_pthread_config" = "xno"], [continue])
++                PTHREAD_CFLAGS="`pthread-config --cflags`"
++                PTHREAD_LIBS="`pthread-config --ldflags` `pthread-config --libs`"
++                ;;
++
++                *)
++                AC_MSG_CHECKING([for the pthreads library -l$ax_pthread_try_flag])
++                PTHREAD_LIBS="-l$ax_pthread_try_flag"
++                ;;
++        esac
++
++        ax_pthread_save_CFLAGS="$CFLAGS"
++        ax_pthread_save_LIBS="$LIBS"
++        CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
++        LIBS="$PTHREAD_LIBS $LIBS"
++
++        # Check for various functions.  We must include pthread.h,
++        # since some functions may be macros.  (On the Sequent, we
++        # need a special flag -Kthread to make this header compile.)
++        # We check for pthread_join because it is in -lpthread on IRIX
++        # while pthread_create is in libc.  We check for pthread_attr_init
++        # due to DEC craziness with -lpthreads.  We check for
++        # pthread_cleanup_push because it is one of the few pthread
++        # functions on Solaris that doesn't have a non-functional libc stub.
++        # We try pthread_create on general principles.
++
++        AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <pthread.h>
++#                       if $ax_pthread_check_cond
++#                        error "$ax_pthread_check_macro must be defined"
++#                       endif
++                        static void routine(void *a) { a = 0; }
++                        static void *start_routine(void *a) { return a; }],
++                       [pthread_t th; pthread_attr_t attr;
++                        pthread_create(&th, 0, start_routine, 0);
++                        pthread_join(th, 0);
++                        pthread_attr_init(&attr);
++                        pthread_cleanup_push(routine, 0);
++                        pthread_cleanup_pop(0) /* ; */])],
++            [ax_pthread_ok=yes],
++            [])
++
++        CFLAGS="$ax_pthread_save_CFLAGS"
++        LIBS="$ax_pthread_save_LIBS"
++
++        AC_MSG_RESULT([$ax_pthread_ok])
++        AS_IF([test "x$ax_pthread_ok" = "xyes"], [break])
++
++        PTHREAD_LIBS=""
++        PTHREAD_CFLAGS=""
++done
++fi
++
++# Various other checks:
++if test "x$ax_pthread_ok" = "xyes"; then
++        ax_pthread_save_CFLAGS="$CFLAGS"
++        ax_pthread_save_LIBS="$LIBS"
++        CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
++        LIBS="$PTHREAD_LIBS $LIBS"
++
++        # Detect AIX lossage: JOINABLE attribute is called UNDETACHED.
++        AC_CACHE_CHECK([for joinable pthread attribute],
++            [ax_cv_PTHREAD_JOINABLE_ATTR],
++            [ax_cv_PTHREAD_JOINABLE_ATTR=unknown
++             for ax_pthread_attr in PTHREAD_CREATE_JOINABLE PTHREAD_CREATE_UNDETACHED; do
++                 AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <pthread.h>],
++                                                 [int attr = $ax_pthread_attr; return attr /* ; */])],
++                                [ax_cv_PTHREAD_JOINABLE_ATTR=$ax_pthread_attr; break],
++                                [])
++             done
++            ])
++        AS_IF([test "x$ax_cv_PTHREAD_JOINABLE_ATTR" != "xunknown" && \
++               test "x$ax_cv_PTHREAD_JOINABLE_ATTR" != "xPTHREAD_CREATE_JOINABLE" && \
++               test "x$ax_pthread_joinable_attr_defined" != "xyes"],
++              [AC_DEFINE_UNQUOTED([PTHREAD_CREATE_JOINABLE],
++                                  [$ax_cv_PTHREAD_JOINABLE_ATTR],
++                                  [Define to necessary symbol if this constant
++                                   uses a non-standard name on your system.])
++               ax_pthread_joinable_attr_defined=yes
++              ])
++
++        AC_CACHE_CHECK([whether more special flags are required for pthreads],
++            [ax_cv_PTHREAD_SPECIAL_FLAGS],
++            [ax_cv_PTHREAD_SPECIAL_FLAGS=no
++             case $host_os in
++             solaris*)
++             ax_cv_PTHREAD_SPECIAL_FLAGS="-D_POSIX_PTHREAD_SEMANTICS"
++             ;;
++             esac
++            ])
++        AS_IF([test "x$ax_cv_PTHREAD_SPECIAL_FLAGS" != "xno" && \
++               test "x$ax_pthread_special_flags_added" != "xyes"],
++              [PTHREAD_CFLAGS="$ax_cv_PTHREAD_SPECIAL_FLAGS $PTHREAD_CFLAGS"
++               ax_pthread_special_flags_added=yes])
++
++        AC_CACHE_CHECK([for PTHREAD_PRIO_INHERIT],
++            [ax_cv_PTHREAD_PRIO_INHERIT],
++            [AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <pthread.h>]],
++                                             [[int i = PTHREAD_PRIO_INHERIT;]])],
++                            [ax_cv_PTHREAD_PRIO_INHERIT=yes],
++                            [ax_cv_PTHREAD_PRIO_INHERIT=no])
++            ])
++        AS_IF([test "x$ax_cv_PTHREAD_PRIO_INHERIT" = "xyes" && \
++               test "x$ax_pthread_prio_inherit_defined" != "xyes"],
++              [AC_DEFINE([HAVE_PTHREAD_PRIO_INHERIT], [1], [Have PTHREAD_PRIO_INHERIT.])
++               ax_pthread_prio_inherit_defined=yes
++              ])
++
++        CFLAGS="$ax_pthread_save_CFLAGS"
++        LIBS="$ax_pthread_save_LIBS"
++
++        # More AIX lossage: compile with *_r variant
++        if test "x$GCC" != "xyes"; then
++            case $host_os in
++                aix*)
++                AS_CASE(["x/$CC"],
++                    [x*/c89|x*/c89_128|x*/c99|x*/c99_128|x*/cc|x*/cc128|x*/xlc|x*/xlc_v6|x*/xlc128|x*/xlc128_v6],
++                    [#handle absolute path differently from PATH based program lookup
++                     AS_CASE(["x$CC"],
++                         [x/*],
++                         [AS_IF([AS_EXECUTABLE_P([${CC}_r])],[PTHREAD_CC="${CC}_r"])],
++                         [AC_CHECK_PROGS([PTHREAD_CC],[${CC}_r],[$CC])])])
++                ;;
++            esac
++        fi
++fi
++
++test -n "$PTHREAD_CC" || PTHREAD_CC="$CC"
++
++AC_SUBST([PTHREAD_LIBS])
++AC_SUBST([PTHREAD_CFLAGS])
++AC_SUBST([PTHREAD_CC])
++
++# Finally, execute ACTION-IF-FOUND/ACTION-IF-NOT-FOUND:
++if test "x$ax_pthread_ok" = "xyes"; then
++        ifelse([$1],,[AC_DEFINE([HAVE_PTHREAD],[1],[Define if you have POSIX threads libraries and header files.])],[$1])
++        :
 +else
- stunnel_CPPFLAGS += -I$(SSLDIR)/include
-+endif
- stunnel_CPPFLAGS += -DLIBDIR='"$(pkglibdir)"'
- stunnel_CPPFLAGS += -DCONFDIR='"$(sysconfdir)/stunnel"'
- 
- # TLS library
-+if WOLFSSL
-+stunnel_LDFLAGS = -L$(SSLDIR)/lib64 -L$(SSLDIR)/lib -lwolfssl
-+else
- stunnel_LDFLAGS = -L$(SSLDIR)/lib64 -L$(SSLDIR)/lib -lssl -lcrypto
-+endif
- 
- # stunnel3 script
- edit = sed \
-@@ -53,8 +61,13 @@ libstunnel_la_LDFLAGS = -avoid-version
- # Win32 executables                                                           #
- ###############################################################################
- 
-+if WOLFSSL
-+mingw:
-+	$(MAKE) -f $(srcdir)/mingw_wolfssl.mk srcdir=$(srcdir) win32_arch=win32 win32_targetcpu=i686 win32_mingw=mingw
-+else
- mingw:
- 	$(MAKE) -f $(srcdir)/mingw.mk srcdir=$(srcdir) win32_arch=win32 win32_targetcpu=i686 win32_mingw=mingw
-+endif
- 
- mingw64:
- 	$(MAKE) -f $(srcdir)/mingw.mk srcdir=$(srcdir) win32_arch=win64 win32_targetcpu=x86_64 win32_mingw=mingw64
-diff --git a/src/client.c b/src/client.c
-index 7825e04..6bbe722 100644
---- a/src/client.c
-+++ b/src/client.c
-@@ -626,7 +626,9 @@ NOEXPORT void ssl_start(CLI *c) {
++        ax_pthread_ok=no
++        $2
++fi
++AC_LANG_POP
++])dnl AX_PTHREAD
++
++# ===========================================================================
++#    https://www.gnu.org/software/autoconf-archive/ax_require_defined.html
++# ===========================================================================
++#
++# SYNOPSIS
++#
++#   AX_REQUIRE_DEFINED(MACRO)
++#
++# DESCRIPTION
++#
++#   AX_REQUIRE_DEFINED is a simple helper for making sure other macros have
++#   been defined and thus are available for use.  This avoids random issues
++#   where a macro isn't expanded.  Instead the configure script emits a
++#   non-fatal:
++#
++#     ./configure: line 1673: AX_CFLAGS_WARN_ALL: command not found
++#
++#   It's like AC_REQUIRE except it doesn't expand the required macro.
++#
++#   Here's an example:
++#
++#     AX_REQUIRE_DEFINED([AX_CHECK_LINK_FLAG])
++#
++# LICENSE
++#
++#   Copyright (c) 2014 Mike Frysinger <vapier@gentoo.org>
++#
++#   Copying and distribution of this file, with or without modification, are
++#   permitted in any medium without royalty provided the copyright notice
++#   and this notice are preserved. This file is offered as-is, without any
++#   warranty.
++
++#serial 2
++
++AC_DEFUN([AX_REQUIRE_DEFINED], [dnl
++  m4_ifndef([$1], [m4_fatal([macro ]$1[ is not defined; is a m4 file missing?])])
++])dnl AX_REQUIRE_DEFINED
++
+diff -urN stunnel-5.57.orig/src/client.c stunnel-5.57.new/src/client.c
+--- stunnel-5.57.orig/src/client.c	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/client.c	2021-12-30 15:43:08.443755444 -0500
+@@ -626,7 +626,9 @@
              if(!c->opt->option.client)
                  SSL_CTX_add_session(c->opt->ctx, sess);
          }
@@ -132,7 +870,7 @@ index 7825e04..6bbe722 100644
      }
  }
  
-@@ -1517,7 +1519,9 @@ NOEXPORT SOCKET connect_remote(CLI *c) {
+@@ -1517,7 +1519,9 @@
                  SSL_SESSION *sess=SSL_get1_session(c->ssl);
                  if(sess) {
                      idx_cache_save(sess, &c->connect_addr.addr[c->idx]);
@@ -142,7 +880,7 @@ index 7825e04..6bbe722 100644
                  }
              }
              print_bound_address(c);
-@@ -1577,7 +1581,9 @@ NOEXPORT unsigned idx_cache_retrieve(CLI *c) {
+@@ -1577,7 +1581,9 @@
                  len=addr_len(ptr);
                  memcpy(&addr, ptr, (size_t)len);
                  CRYPTO_THREAD_unlock(stunnel_locks[LOCK_ADDR]);
@@ -152,7 +890,7 @@ index 7825e04..6bbe722 100644
                  /* address was copied, ptr itself is no longer valid */
                  for(i=0; i<c->connect_addr.num; ++i) {
                      if(addr_len(&c->connect_addr.addr[i])==len &&
-@@ -1594,7 +1600,9 @@ NOEXPORT unsigned idx_cache_retrieve(CLI *c) {
+@@ -1594,7 +1600,9 @@
                  str_free(addr_txt);
              } else {
                  CRYPTO_THREAD_unlock(stunnel_locks[LOCK_ADDR]);
@@ -162,7 +900,7 @@ index 7825e04..6bbe722 100644
                  s_log(LOG_NOTICE, "persistence: No cached address found");
              }
          }
-@@ -1748,7 +1756,9 @@ NOEXPORT int redirect(CLI *c) {
+@@ -1748,7 +1756,9 @@
      if(!sess)
          return 1; /* no TLS session -> always redirect */
      ex_data=SSL_SESSION_get_ex_data(sess, index_session_authenticated);
@@ -172,10 +910,9 @@ index 7825e04..6bbe722 100644
      return ex_data == NULL;
  }
  
-diff --git a/src/common.h b/src/common.h
-index 929cfa7..cd30b22 100644
---- a/src/common.h
-+++ b/src/common.h
+diff -urN stunnel-5.57.orig/src/common.h stunnel-5.57.new/src/common.h
+--- stunnel-5.57.orig/src/common.h	2020-06-24 16:02:36.000000000 -0400
++++ stunnel-5.57.new/src/common.h	2021-12-30 15:43:08.443755444 -0500
 @@ -47,15 +47,22 @@
  #define LIBWRAP_CLIENTS 5
  
@@ -202,7 +939,7 @@ index 929cfa7..cd30b22 100644
  
  /**************************************** debugging */
  
-@@ -409,6 +416,20 @@ extern char *sys_errlist[];
+@@ -409,6 +416,20 @@
  #define S_ISREG(m) (((m)&S_IFMT)==S_IFREG)
  #endif
  
@@ -223,7 +960,7 @@ index 929cfa7..cd30b22 100644
  /**************************************** OpenSSL headers */
  
  #define OPENSSL_THREAD_DEFINES
-@@ -455,13 +476,62 @@ extern char *sys_errlist[];
+@@ -455,13 +476,62 @@
  #endif /* !defined(OPENSSL_NO_SSL2) */
  #else /* OpenSSL older than 1.1.0 */
  #define X509_STORE_CTX_get0_chain(x) X509_STORE_CTX_get_chain(x)
@@ -286,11 +1023,10 @@ index 929cfa7..cd30b22 100644
  #if defined(USE_WIN32) && defined(OPENSSL_FIPS)
  #define USE_FIPS
  #endif
-diff --git a/src/cron.c b/src/cron.c
-index e75642d..b72ca67 100644
---- a/src/cron.c
-+++ b/src/cron.c
-@@ -53,7 +53,7 @@ NOEXPORT unsigned __stdcall cron_thread(void *arg);
+diff -urN stunnel-5.57.orig/src/cron.c stunnel-5.57.new/src/cron.c
+--- stunnel-5.57.orig/src/cron.c	2020-06-24 16:02:36.000000000 -0400
++++ stunnel-5.57.new/src/cron.c	2021-12-30 15:43:08.443755444 -0500
+@@ -53,7 +53,7 @@
  #ifdef USE_OS_THREADS
  NOEXPORT void cron_worker(void);
  #ifndef OPENSSL_NO_DH
@@ -299,7 +1035,7 @@ index e75642d..b72ca67 100644
  NOEXPORT void cron_dh_param(BN_GENCB *);
  NOEXPORT BN_GENCB *cron_bn_gencb(void);
  NOEXPORT int bn_callback(int, int, BN_GENCB *);
-@@ -142,19 +142,19 @@ int cron_init() {
+@@ -142,19 +142,19 @@
  NOEXPORT void cron_worker(void) {
      time_t now, then;
      int delay;
@@ -322,7 +1058,7 @@ index e75642d..b72ca67 100644
          cron_dh_param(bn_gencb);
  #else /* OpenSSL older than 0.9.8 */
          cron_dh_param();
-@@ -183,7 +183,7 @@ NOEXPORT void cron_worker(void) {
+@@ -183,7 +183,7 @@
  
  #ifndef OPENSSL_NO_DH
  
@@ -331,7 +1067,7 @@ index e75642d..b72ca67 100644
  NOEXPORT void cron_dh_param(BN_GENCB *bn_gencb) {
  #else /* OpenSSL older than 0.9.8 */
  NOEXPORT void cron_dh_param(void) {
-@@ -195,7 +195,7 @@ NOEXPORT void cron_dh_param(void) {
+@@ -195,7 +195,7 @@
          return;
  
      s_log(LOG_NOTICE, "Updating DH parameters");
@@ -340,7 +1076,7 @@ index e75642d..b72ca67 100644
      /* generate 2048-bit DH parameters */
      dh=DH_new();
      if(!dh) {
-@@ -230,7 +230,7 @@ NOEXPORT void cron_dh_param(void) {
+@@ -230,7 +230,7 @@
      s_log(LOG_NOTICE, "DH parameters updated");
  }
  
@@ -349,11 +1085,10 @@ index e75642d..b72ca67 100644
  
  NOEXPORT BN_GENCB *cron_bn_gencb(void) {
  #if OPENSSL_VERSION_NUMBER>=0x10100000L
-diff --git a/src/ctx.c b/src/ctx.c
-index 63b1719..dafa587 100644
---- a/src/ctx.c
-+++ b/src/ctx.c
-@@ -60,7 +60,9 @@ NOEXPORT int matches_wildcard(const char *, const char *);
+diff -urN stunnel-5.57.orig/src/ctx.c stunnel-5.57.new/src/ctx.c
+--- stunnel-5.57.orig/src/ctx.c	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/ctx.c	2021-12-30 15:43:08.443755444 -0500
+@@ -60,7 +60,9 @@
  /* DH/ECDH */
  #ifndef OPENSSL_NO_DH
  NOEXPORT int dh_init(SERVICE_OPTIONS *);
@@ -363,7 +1098,7 @@ index 63b1719..dafa587 100644
  #endif /* OPENSSL_NO_DH */
  #ifndef OPENSSL_NO_ECDH
  NOEXPORT int ecdh_init(SERVICE_OPTIONS *);
-@@ -193,7 +195,7 @@ int context_init(SERVICE_OPTIONS *section) { /* init TLS context */
+@@ -193,7 +195,7 @@
  
      /* ciphers */
      if(section->cipher_list) {
@@ -372,7 +1107,7 @@ index 63b1719..dafa587 100644
          if(!SSL_CTX_set_cipher_list(section->ctx, section->cipher_list)) {
              sslerror("SSL_CTX_set_cipher_list");
              return 1; /* FAILED */
-@@ -382,13 +384,22 @@ NOEXPORT int matches_wildcard(const char *servername, const char *pattern) {
+@@ -382,13 +384,22 @@
  
  #ifndef OPENSSL_NO_DH
  
@@ -396,7 +1131,7 @@ index 63b1719..dafa587 100644
      DH *dh=NULL;
      int i, n;
      char description[128];
-@@ -432,6 +443,8 @@ NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
+@@ -432,6 +443,8 @@
          DH_free(dh);
          return 0; /* OK */
      }
@@ -405,7 +1140,7 @@ index 63b1719..dafa587 100644
      CRYPTO_THREAD_read_lock(stunnel_locks[LOCK_DH]);
      SSL_CTX_set_tmp_dh(section->ctx, dh_params);
      CRYPTO_THREAD_unlock(stunnel_locks[LOCK_DH]);
-@@ -441,6 +454,7 @@ NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
+@@ -441,6 +454,7 @@
      return 0; /* OK */
  }
  
@@ -413,7 +1148,7 @@ index 63b1719..dafa587 100644
  NOEXPORT DH *dh_read(char *cert) {
      DH *dh;
      BIO *bio;
-@@ -465,6 +479,7 @@ NOEXPORT DH *dh_read(char *cert) {
+@@ -465,6 +479,7 @@
      s_log(LOG_DEBUG, "Using DH parameters from %s", cert);
      return dh;
  }
@@ -421,7 +1156,7 @@ index 63b1719..dafa587 100644
  
  #endif /* OPENSSL_NO_DH */
  
-@@ -472,7 +487,7 @@ NOEXPORT DH *dh_read(char *cert) {
+@@ -472,7 +487,7 @@
  
  #ifndef OPENSSL_NO_ECDH
  
@@ -430,7 +1165,7 @@ index 63b1719..dafa587 100644
  /* simplified version that only supports a single curve */
  NOEXPORT int SSL_CTX_set1_groups_list(SSL_CTX *ctx, char *list) {
      int nid;
-@@ -496,9 +511,15 @@ NOEXPORT int SSL_CTX_set1_groups_list(SSL_CTX *ctx, char *list) {
+@@ -496,9 +511,15 @@
      EC_KEY_free(ecdh);
      return 1; /* OK */
  }
@@ -447,7 +1182,7 @@ index 63b1719..dafa587 100644
      s_log(LOG_DEBUG, "ECDH initialization");
      if(!SSL_CTX_set1_groups_list(section->ctx, section->curves)) {
  #if OPENSSL_VERSION_NUMBER >= 0x10101000L
-@@ -508,6 +529,7 @@ NOEXPORT int ecdh_init(SERVICE_OPTIONS *section) {
+@@ -508,6 +529,7 @@
      }
      s_log(LOG_DEBUG, "ECDH initialized with curves %s", section->curves);
      return 0; /* OK */
@@ -455,7 +1190,7 @@ index 63b1719..dafa587 100644
  }
  
  #endif /* OPENSSL_NO_ECDH */
-@@ -742,6 +764,11 @@ NOEXPORT int pkcs12_extension(const char *filename) {
+@@ -742,6 +764,11 @@
  }
  
  NOEXPORT int load_pkcs12_file(SERVICE_OPTIONS *section) {
@@ -467,7 +1202,7 @@ index 63b1719..dafa587 100644
      size_t len;
      int i, success;
      BIO *bio=NULL;
-@@ -813,6 +840,7 @@ NOEXPORT int load_pkcs12_file(SERVICE_OPTIONS *section) {
+@@ -813,6 +840,7 @@
      s_log(LOG_INFO, "Certificate and private key loaded from file: %s",
          section->cert);
      return 0; /* OK */
@@ -475,7 +1210,7 @@ index 63b1719..dafa587 100644
  }
  
  NOEXPORT int load_cert_file(SERVICE_OPTIONS *section) {
-@@ -952,6 +980,10 @@ NOEXPORT void set_prompt(const char *name) {
+@@ -952,6 +980,10 @@
  }
  
  NOEXPORT int ui_retry() {
@@ -486,7 +1221,7 @@ index 63b1719..dafa587 100644
      unsigned long err=ERR_peek_error();
  
      switch(ERR_GET_LIB(err)) {
-@@ -997,6 +1029,7 @@ NOEXPORT int ui_retry() {
+@@ -997,6 +1029,7 @@
      default:
          return 0;
      }
@@ -494,7 +1229,7 @@ index 63b1719..dafa587 100644
  }
  
  /**************************************** session tickets */
-@@ -1041,7 +1074,9 @@ NOEXPORT int generate_session_ticket_cb(SSL *ssl, void *arg) {
+@@ -1041,7 +1074,9 @@
  
      retval=SSL_SESSION_set1_ticket_appdata(sess,
          &ticket_data, sizeof(TICKET_DATA));
@@ -504,7 +1239,7 @@ index 63b1719..dafa587 100644
      return retval;
  }
  
-@@ -1211,6 +1246,46 @@ void print_session_id(SSL_SESSION *sess) {
+@@ -1211,6 +1246,46 @@
  }
  
  NOEXPORT void new_chain(CLI *c) {
@@ -551,7 +1286,7 @@ index 63b1719..dafa587 100644
      BIO *bio;
      int i, len;
      X509 *peer_cert;
-@@ -1254,6 +1329,7 @@ NOEXPORT void new_chain(CLI *c) {
+@@ -1254,6 +1329,7 @@
      c->opt->chain=chain; /* this race condition is safe to ignore */
      ui_new_chain(c->opt->section_number);
      s_log(LOG_DEBUG, "Peer certificate was cached (%d bytes)", len);
@@ -559,7 +1294,7 @@ index 63b1719..dafa587 100644
  }
  
  /* cache client sessions */
-@@ -1281,8 +1357,12 @@ NOEXPORT void session_cache_save(CLI *c, SSL_SESSION *sess) {
+@@ -1281,8 +1357,12 @@
      }
      CRYPTO_THREAD_unlock(stunnel_locks[LOCK_SESSION]);
  
@@ -572,7 +1307,7 @@ index 63b1719..dafa587 100644
  }
  
  NOEXPORT SSL_SESSION *sess_get_cb(SSL *ssl,
-@@ -1504,6 +1584,7 @@ NOEXPORT void info_callback(const SSL *ssl, int where, int ret) {
+@@ -1504,6 +1584,7 @@
          s_log(LOG_DEBUG, "state = %x", state);
  #endif
  
@@ -580,7 +1315,7 @@ index 63b1719..dafa587 100644
          /* log the client certificate request (if received) */
  #ifndef SSL3_ST_CR_CERT_REQ_A
          if(state==TLS_ST_CR_CERT_REQ)
-@@ -1518,6 +1599,7 @@ NOEXPORT void info_callback(const SSL *ssl, int where, int ret) {
+@@ -1518,6 +1599,7 @@
  #endif
              if(!SSL_get_client_CA_list((SSL *)ssl))
                  s_log(LOG_INFO, "Client certificate not requested");
@@ -588,11 +1323,10 @@ index 63b1719..dafa587 100644
  
          /* prevent renegotiation DoS attack */
          if((where&SSL_CB_HANDSHAKE_DONE)
-diff --git a/src/log.c b/src/log.c
-index c7f786a..2e9a106 100644
---- a/src/log.c
-+++ b/src/log.c
-@@ -246,6 +246,13 @@ void log_flush(LOG_MODE new_mode) {
+diff -urN stunnel-5.57.orig/src/log.c stunnel-5.57.new/src/log.c
+--- stunnel-5.57.orig/src/log.c	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/log.c	2021-12-30 15:43:08.443755444 -0500
+@@ -246,6 +246,13 @@
      CRYPTO_THREAD_unlock(stunnel_locks[LOCK_LOG_MODE]);
  }
  
@@ -606,11 +1340,47 @@ index c7f786a..2e9a106 100644
  NOEXPORT void log_raw(SERVICE_OPTIONS *opt,
          int level, char *stamp, char *id, char *text) {
      char *line;
-diff --git a/src/mingw_wolfssl.mk b/src/mingw_wolfssl.mk
-new file mode 100644
-index 0000000..7637107
---- /dev/null
-+++ b/src/mingw_wolfssl.mk
+diff -urN stunnel-5.57.orig/src/Makefile.am stunnel-5.57.new/src/Makefile.am
+--- stunnel-5.57.orig/src/Makefile.am	2020-06-24 16:02:36.000000000 -0400
++++ stunnel-5.57.new/src/Makefile.am	2021-12-30 15:43:08.443755444 -0500
+@@ -30,12 +30,20 @@
+ stunnel_CPPFLAGS = -I$(SYSROOT)/usr/kerberos/include
+ 
+ # Additional preprocesor definitions
++if WOLFSSL
++stunnel_CPPFLAGS += -I$(SSLDIR)/include/wolfssl -I$(SSLDIR)/include
++else
+ stunnel_CPPFLAGS += -I$(SSLDIR)/include
++endif
+ stunnel_CPPFLAGS += -DLIBDIR='"$(pkglibdir)"'
+ stunnel_CPPFLAGS += -DCONFDIR='"$(sysconfdir)/stunnel"'
+ 
+ # TLS library
++if WOLFSSL
++stunnel_LDFLAGS = -L$(SSLDIR)/lib64 -L$(SSLDIR)/lib -lwolfssl
++else
+ stunnel_LDFLAGS = -L$(SSLDIR)/lib64 -L$(SSLDIR)/lib -lssl -lcrypto
++endif
+ 
+ # stunnel3 script
+ edit = sed \
+@@ -53,8 +61,13 @@
+ # Win32 executables                                                           #
+ ###############################################################################
+ 
++if WOLFSSL
++mingw:
++	$(MAKE) -f $(srcdir)/mingw_wolfssl.mk srcdir=$(srcdir) win32_arch=win32 win32_targetcpu=i686 win32_mingw=mingw
++else
+ mingw:
+ 	$(MAKE) -f $(srcdir)/mingw.mk srcdir=$(srcdir) win32_arch=win32 win32_targetcpu=i686 win32_mingw=mingw
++endif
+ 
+ mingw64:
+ 	$(MAKE) -f $(srcdir)/mingw.mk srcdir=$(srcdir) win32_arch=win64 win32_targetcpu=x86_64 win32_mingw=mingw64
+diff -urN stunnel-5.57.orig/src/mingw_wolfssl.mk stunnel-5.57.new/src/mingw_wolfssl.mk
+--- stunnel-5.57.orig/src/mingw_wolfssl.mk	1969-12-31 19:00:00.000000000 -0500
++++ stunnel-5.57.new/src/mingw_wolfssl.mk	2021-12-30 15:43:08.443755444 -0500
 @@ -0,0 +1,70 @@
 +## mingw/mingw64 Makefile
 +# by Michal Trojnara 1998-2020
@@ -682,11 +1452,10 @@ index 0000000..7637107
 +	$(win32_windres) --include-dir $(srcdir) $< $@
 +
 +$(objdir)/resources.o: $(srcdir)/version.h
-diff --git a/src/options.c b/src/options.c
-index 25c8f7b..87a9f26 100644
---- a/src/options.c
-+++ b/src/options.c
-@@ -276,12 +276,23 @@ static SERVICE_OPTIONS new_service_options;
+diff -urN stunnel-5.57.orig/src/options.c stunnel-5.57.new/src/options.c
+--- stunnel-5.57.orig/src/options.c	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/options.c	2021-12-30 15:43:08.443755444 -0500
+@@ -276,12 +276,23 @@
  static char *option_not_found=
      "Specified option name is not valid here";
  
@@ -711,7 +1480,7 @@ index 25c8f7b..87a9f26 100644
  #endif /* TLS 1.3 */
  
  /**************************************** parse commandline parameters */
-@@ -1461,7 +1472,7 @@ NOEXPORT char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr,
+@@ -1461,7 +1472,7 @@
          break;
      }
  
@@ -720,7 +1489,7 @@ index 25c8f7b..87a9f26 100644
  
      /* checkEmail */
      switch(cmd) {
-@@ -1622,7 +1633,11 @@ NOEXPORT char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr,
+@@ -1622,7 +1633,11 @@
          }
          break;
      case CMD_PRINT_DEFAULTS:
@@ -732,7 +1501,7 @@ index 25c8f7b..87a9f26 100644
          break;
      case CMD_PRINT_HELP:
          s_log(LOG_NOTICE, "%-22s = permitted ciphersuites for TLS 1.3", "ciphersuites");
-@@ -3685,7 +3700,9 @@ NOEXPORT char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr,
+@@ -3685,7 +3700,9 @@
      case CMD_FREE:
          str_free(section->chain);
          if(section->session)
@@ -742,11 +1511,10 @@ index 25c8f7b..87a9f26 100644
          if(section->ctx)
              SSL_CTX_free(section->ctx);
          str_free(section->servname);
-diff --git a/src/prototypes.h b/src/prototypes.h
-index 50428f3..a7b5230 100644
---- a/src/prototypes.h
-+++ b/src/prototypes.h
-@@ -227,7 +227,7 @@ typedef struct service_options_struct {
+diff -urN stunnel-5.57.orig/src/prototypes.h stunnel-5.57.new/src/prototypes.h
+--- stunnel-5.57.orig/src/prototypes.h	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/prototypes.h	2021-12-30 15:43:08.443755444 -0500
+@@ -227,7 +227,7 @@
      char *ocsp_url;
      unsigned long ocsp_flags;
  #endif /* !defined(OPENSSL_NO_OCSP) */
@@ -755,7 +1523,7 @@ index 50428f3..a7b5230 100644
      NAME_LIST *check_host, *check_email, *check_ip;   /* cert subject checks */
      NAME_LIST *config;                               /* OpenSSL CONF options */
  #endif /* OPENSSL_VERSION_NUMBER>=0x10002000L */
-@@ -518,6 +518,11 @@ void s_log(int, const char *, ...)
+@@ -518,6 +518,11 @@
  #else
      ;
  #endif
@@ -767,7 +1535,7 @@ index 50428f3..a7b5230 100644
  char *log_id(CLI *);
  void fatal_debug(char *, const char *, int) NORETURN;
  #define fatal(a) fatal_debug((a), __FILE__, __LINE__)
-@@ -707,7 +712,9 @@ int getnameinfo(const struct sockaddr *, socklen_t,
+@@ -707,7 +712,9 @@
  extern CLI *thread_head;
  #endif
  
@@ -778,7 +1546,7 @@ index 50428f3..a7b5230 100644
  
  #ifdef USE_OS_THREADS
  
-@@ -757,12 +764,14 @@ typedef enum {
+@@ -757,12 +764,14 @@
  extern CRYPTO_RWLOCK *stunnel_locks[STUNNEL_LOCKS];
  
  #if OPENSSL_VERSION_NUMBER<0x10100004L
@@ -793,11 +1561,10 @@ index 50428f3..a7b5230 100644
  int CRYPTO_atomic_add(int *, int, int *, CRYPTO_RWLOCK *);
  #endif
  
-diff --git a/src/ssl.c b/src/ssl.c
-index b2b63c8..7203249 100644
---- a/src/ssl.c
-+++ b/src/ssl.c
-@@ -69,8 +69,8 @@ int ssl_init(void) { /* init TLS before parsing configuration file */
+diff -urN stunnel-5.57.orig/src/ssl.c stunnel-5.57.new/src/ssl.c
+--- stunnel-5.57.orig/src/ssl.c	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/ssl.c	2021-12-30 15:43:08.443755444 -0500
+@@ -69,8 +69,8 @@
          OPENSSL_INIT_LOAD_CRYPTO_STRINGS | OPENSSL_INIT_LOAD_CONFIG, NULL);
  #else
      OPENSSL_config(NULL);
@@ -807,7 +1574,7 @@ index b2b63c8..7203249 100644
  #endif
      index_ssl_cli=SSL_get_ex_new_index(0,
          "CLI pointer", NULL, NULL, NULL);
-@@ -96,6 +96,7 @@ int ssl_init(void) { /* init TLS before parsing configuration file */
+@@ -96,6 +96,7 @@
          return 1;
      }
  #endif /* OPENSSL_NO_DH */
@@ -815,7 +1582,7 @@ index b2b63c8..7203249 100644
      return 0;
  }
  
-@@ -279,6 +280,7 @@ NOEXPORT int compression_init(GLOBAL_OPTIONS *global) {
+@@ -279,6 +280,7 @@
  NOEXPORT int prng_init(GLOBAL_OPTIONS *global) {
      int totbytes=0;
      char filename[256];
@@ -823,7 +1590,7 @@ index b2b63c8..7203249 100644
      const RAND_METHOD *meth=RAND_get_rand_method();
  
      /* skip PRNG initialization when no seeding methods are available */
-@@ -286,6 +288,7 @@ NOEXPORT int prng_init(GLOBAL_OPTIONS *global) {
+@@ -286,6 +288,7 @@
          s_log(LOG_DEBUG, "No PRNG seeding methods");
          return 0; /* success */
      }
@@ -831,11 +1598,10 @@ index b2b63c8..7203249 100644
  
      if(RAND_status()) {
          s_log(LOG_DEBUG, "No PRNG seeding was required");
-diff --git a/src/sthreads.c b/src/sthreads.c
-index d4c8214..81e193d 100644
---- a/src/sthreads.c
-+++ b/src/sthreads.c
-@@ -122,6 +122,8 @@ void thread_id_init(void) {
+diff -urN stunnel-5.57.orig/src/sthreads.c stunnel-5.57.new/src/sthreads.c
+--- stunnel-5.57.orig/src/sthreads.c	2020-06-24 16:02:36.000000000 -0400
++++ stunnel-5.57.new/src/sthreads.c	2021-12-30 15:43:08.443755444 -0500
+@@ -122,6 +122,8 @@
  /* we only need to initialize locking with OpenSSL older than 1.1.0 */
  #if OPENSSL_VERSION_NUMBER<0x10100004L
  
@@ -844,7 +1610,7 @@ index d4c8214..81e193d 100644
  #ifdef USE_PTHREAD
  
  NOEXPORT void s_lock_init_debug(struct CRYPTO_dynlock_value *lock,
-@@ -206,6 +208,8 @@ NOEXPORT void s_lock_destroy_debug(struct CRYPTO_dynlock_value *lock,
+@@ -206,6 +208,8 @@
  
  #endif /* USE_WIN32 */
  
@@ -853,7 +1619,7 @@ index d4c8214..81e193d 100644
  NOEXPORT int s_atomic_add(int *val, int amount, CRYPTO_RWLOCK *lock) {
      int ret;
  
-@@ -231,6 +235,8 @@ CRYPTO_RWLOCK *stunnel_locks[STUNNEL_LOCKS];
+@@ -231,6 +235,8 @@
  
  #if OPENSSL_VERSION_NUMBER<0x10100004L
  
@@ -862,7 +1628,7 @@ index d4c8214..81e193d 100644
  #ifdef USE_OS_THREADS
  
  static struct CRYPTO_dynlock_value *lock_cs;
-@@ -330,6 +336,8 @@ void CRYPTO_THREAD_lock_free(CRYPTO_RWLOCK *lock) {
+@@ -330,6 +336,8 @@
  
  #endif /* USE_OS_THREADS */
  
@@ -871,7 +1637,7 @@ index d4c8214..81e193d 100644
  int CRYPTO_atomic_add(int *val, int amount, int *ret, CRYPTO_RWLOCK *lock) {
      *ret=s_atomic_add(val, amount, lock);
      return 1;
-@@ -339,7 +347,7 @@ int CRYPTO_atomic_add(int *val, int amount, int *ret, CRYPTO_RWLOCK *lock) {
+@@ -339,7 +347,7 @@
  
  void locking_init(void) {
      size_t i;
@@ -880,10 +1646,9 @@ index d4c8214..81e193d 100644
      size_t num;
  
      /* initialize the OpenSSL static locking */
-diff --git a/src/stunnel.c b/src/stunnel.c
-index 4f45930..20a1ed1 100644
---- a/src/stunnel.c
-+++ b/src/stunnel.c
+diff -urN stunnel-5.57.orig/src/stunnel.c stunnel-5.57.new/src/stunnel.c
+--- stunnel-5.57.orig/src/stunnel.c	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/stunnel.c	2021-12-30 15:43:08.443755444 -0500
 @@ -48,7 +48,9 @@
  #pragma GCC diagnostic ignored "-Wpedantic"
  #endif /* __GNUC__ */
@@ -894,7 +1659,7 @@ index 4f45930..20a1ed1 100644
  
  #ifdef __GNUC__
  #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-@@ -120,10 +122,16 @@ void main_init() { /* one-time initialization */
+@@ -120,10 +122,16 @@
  #endif
      /* basic initialization contains essential functions required for logging
       * subsystem to function properly, thus all errors here are fatal */
@@ -911,11 +1676,10 @@ index 4f45930..20a1ed1 100644
      options_defaults(); /* initialize defaults */
      options_apply(); /* apply the defaults */
  #ifndef USE_FORK
-diff --git a/src/ui_unix.c b/src/ui_unix.c
-index 5092124..c391d60 100644
---- a/src/ui_unix.c
-+++ b/src/ui_unix.c
-@@ -71,6 +71,10 @@ NOEXPORT int main_unix(int argc, char* argv[]) {
+diff -urN stunnel-5.57.orig/src/ui_unix.c stunnel-5.57.new/src/ui_unix.c
+--- stunnel-5.57.orig/src/ui_unix.c	2020-06-24 16:02:36.000000000 -0400
++++ stunnel-5.57.new/src/ui_unix.c	2021-12-30 15:43:08.447755502 -0500
+@@ -71,6 +71,10 @@
          fatal("Could not open /dev/null");
  #endif
      main_init();
@@ -926,11 +1690,10 @@ index 5092124..c391d60 100644
      configure_status=main_configure(argc>1 ? argv[1] : NULL,
          argc>2 ? argv[2] : NULL);
      switch(configure_status) {
-diff --git a/src/ui_win_cli.c b/src/ui_win_cli.c
-index 7678137..9512295 100644
---- a/src/ui_win_cli.c
-+++ b/src/ui_win_cli.c
-@@ -70,6 +70,10 @@ int main(int argc, char *argv[]) {
+diff -urN stunnel-5.57.orig/src/ui_win_cli.c stunnel-5.57.new/src/ui_win_cli.c
+--- stunnel-5.57.orig/src/ui_win_cli.c	2020-06-24 16:02:36.000000000 -0400
++++ stunnel-5.57.new/src/ui_win_cli.c	2021-12-30 15:43:08.447755502 -0500
+@@ -70,6 +70,10 @@
          return 1;
      resolver_init();
      main_init();
@@ -941,11 +1704,10 @@ index 7678137..9512295 100644
      if(!main_configure(argc>1 ? argv[1] : NULL, argc>2 ? argv[2] : NULL))
          daemon_loop();
      main_cleanup();
-diff --git a/src/ui_win_gui.c b/src/ui_win_gui.c
-index a93e1aa..f8503df 100644
---- a/src/ui_win_gui.c
-+++ b/src/ui_win_gui.c
-@@ -72,7 +72,10 @@ NOEXPORT LRESULT CALLBACK window_proc(HWND, UINT, WPARAM, LPARAM);
+diff -urN stunnel-5.57.orig/src/ui_win_gui.c stunnel-5.57.new/src/ui_win_gui.c
+--- stunnel-5.57.orig/src/ui_win_gui.c	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/ui_win_gui.c	2021-12-30 15:43:08.447755502 -0500
+@@ -72,7 +72,10 @@
  NOEXPORT void save_peer_certificate(WPARAM wParam);
  NOEXPORT LRESULT CALLBACK about_proc(HWND, UINT, WPARAM, LPARAM);
  NOEXPORT LRESULT CALLBACK pass_proc(HWND, UINT, WPARAM, LPARAM);
@@ -956,7 +1718,7 @@ index a93e1aa..f8503df 100644
  
  NOEXPORT void save_log(void);
  NOEXPORT void win_log(LPCTSTR);
-@@ -766,7 +769,7 @@ int ui_passwd_cb(char *buf, int size, int rwflag, void *userdata) {
+@@ -766,7 +769,7 @@
      return len;
  }
  
@@ -965,10 +1727,9 @@ index a93e1aa..f8503df 100644
  UI_METHOD *UI_stunnel() {
      static UI_METHOD *ui_method=NULL;
  
-diff --git a/src/verify.c b/src/verify.c
-index ee49d8b..7d96cd5 100644
---- a/src/verify.c
-+++ b/src/verify.c
+diff -urN stunnel-5.57.orig/src/verify.c stunnel-5.57.new/src/verify.c
+--- stunnel-5.57.orig/src/verify.c	2020-10-11 13:22:32.000000000 -0400
++++ stunnel-5.57.new/src/verify.c	2021-12-30 15:43:08.447755502 -0500
 @@ -43,30 +43,34 @@
  /* verify initialization */
  NOEXPORT void set_client_CA_list(SERVICE_OPTIONS *section);
@@ -1009,7 +1770,7 @@ index ee49d8b..7d96cd5 100644
  
  /**************************************** verify initialization */
  
-@@ -86,8 +90,58 @@ int verify_init(SERVICE_OPTIONS *section) {
+@@ -86,8 +90,58 @@
  
      /* CRL initialization */
      if(section->crl_file || section->crl_dir)
@@ -1020,7 +1781,7 @@ index ee49d8b..7d96cd5 100644
 +        if(wolfSSL_CTX_EnableCRL(section->ctx, WOLFSSL_CRL_CHECKALL)
 +                                                        != SSL_SUCCESS) {
 +            sslerror("SSL_CTX_EnableCRL");
-             return 1; /* FAILED */
++            return 1; /* FAILED */
 +        } else if (wolfSSL_CTX_LoadCRL(section->ctx, section->crl_dir,
 +                  SSL_FILETYPE_PEM, 0) != SSL_SUCCESS)
 +        {
@@ -1061,7 +1822,7 @@ index ee49d8b..7d96cd5 100644
 +        if(wolfSSL_CTX_EnableOCSP(section->ctx, 0) != SSL_SUCCESS) {
 +            s_log(LOG_ERR, "Error enabling OCSP");
 +            sslerror("wolfSSL_CTX_EnableOCSP");
-+            return 1; /* FAILED */
+             return 1; /* FAILED */
 +        }
 +        s_log(LOG_INFO, "Enabled OCSP with aia extension.");
 +    }
@@ -1069,7 +1830,7 @@ index ee49d8b..7d96cd5 100644
  
      /* verify callback setup */
      if(section->option.request_cert) {
-@@ -111,6 +165,7 @@ NOEXPORT void set_client_CA_list(SERVICE_OPTIONS *section) {
+@@ -111,6 +165,7 @@
      print_client_CA_list(ca_dn);
  }
  
@@ -1077,7 +1838,7 @@ index ee49d8b..7d96cd5 100644
  NOEXPORT int crl_init(SERVICE_OPTIONS *section) {
      X509_STORE *store;
  
-@@ -164,6 +219,7 @@ NOEXPORT int add_dir_lookup(X509_STORE *store, char *name) {
+@@ -164,6 +219,7 @@
      s_log(LOG_DEBUG, "Added %s revocation lookup directory", name);
      return 0; /* OK */
  }
@@ -1085,7 +1846,7 @@ index ee49d8b..7d96cd5 100644
  
  /* issue warnings on insecure/missing authentication */
  NOEXPORT void auth_warnings(SERVICE_OPTIONS *section) {
-@@ -201,7 +257,7 @@ NOEXPORT void auth_warnings(SERVICE_OPTIONS *section) {
+@@ -201,7 +257,7 @@
  /**************************************** verify callback */
  
  NOEXPORT int verify_callback(int preverify_ok, X509_STORE_CTX *callback_ctx) {
@@ -1094,7 +1855,7 @@ index ee49d8b..7d96cd5 100644
      SSL *ssl;
      CLI *c;
  
-@@ -223,7 +279,9 @@ NOEXPORT int verify_callback(int preverify_ok, X509_STORE_CTX *callback_ctx) {
+@@ -223,7 +279,9 @@
          if(sess) {
              int ok=SSL_SESSION_set_ex_data(sess,
                  index_session_authenticated, NULL);
@@ -1104,7 +1865,7 @@ index ee49d8b..7d96cd5 100644
              if(!ok) {
                  sslerror("SSL_SESSION_set_ex_data");
                  return 0; /* reject */
-@@ -251,14 +309,14 @@ NOEXPORT int verify_checks(CLI *c,
+@@ -251,14 +309,14 @@
          str_free(subject);
          return 0; /* reject */
      }
@@ -1121,7 +1882,7 @@ index ee49d8b..7d96cd5 100644
  
      s_log(depth ? LOG_INFO : LOG_NOTICE,
          "Certificate accepted at depth=%d: %s", depth, subject);
-@@ -290,10 +348,10 @@ NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
+@@ -290,10 +348,10 @@
      }
  
      if(depth==0) { /* additional peer certificate checks */
@@ -1134,7 +1895,7 @@ index ee49d8b..7d96cd5 100644
          if(c->opt->option.verify_peer && !cert_check_local(callback_ctx))
              return 0; /* reject */
      }
-@@ -301,7 +359,7 @@ NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
+@@ -301,7 +359,7 @@
      return 1; /* accept */
  }
  
@@ -1143,7 +1904,7 @@ index ee49d8b..7d96cd5 100644
  NOEXPORT int cert_check_subject(CLI *c, X509_STORE_CTX *callback_ctx) {
      X509 *cert=X509_STORE_CTX_get_current_cert(callback_ctx);
      NAME_LIST *ptr;
-@@ -337,7 +395,7 @@ NOEXPORT int cert_check_subject(CLI *c, X509_STORE_CTX *callback_ctx) {
+@@ -337,7 +395,7 @@
      s_log(LOG_WARNING, "CERT: Subject checks failed");
      return 0; /* reject */
  }
@@ -1152,7 +1913,7 @@ index ee49d8b..7d96cd5 100644
  
  #if OPENSSL_VERSION_NUMBER>=0x10000000L
  /* modern implementation for OpenSSL version >= 1.0.0 */
-@@ -351,7 +409,7 @@ NOEXPORT int cert_check_local(X509_STORE_CTX *callback_ctx) {
+@@ -351,7 +409,7 @@
      cert=X509_STORE_CTX_get_current_cert(callback_ctx);
      subject=X509_get_subject_name(cert);
  
@@ -1161,7 +1922,7 @@ index ee49d8b..7d96cd5 100644
  #define X509_STORE_CTX_get1_certs X509_STORE_get1_certs
  #endif
      /* modern API allows retrieving multiple matching certificates */
-@@ -403,6 +461,44 @@ NOEXPORT int cert_check_local(X509_STORE_CTX *callback_ctx) {
+@@ -403,6 +461,44 @@
  #endif /* OPENSSL_VERSION_NUMBER>=0x10000000L */
  
  NOEXPORT int compare_pubkeys(X509 *c1, X509 *c2) {
@@ -1206,7 +1967,7 @@ index ee49d8b..7d96cd5 100644
      ASN1_BIT_STRING *k1=X509_get0_pubkey_bitstr(c1);
      ASN1_BIT_STRING *k2=X509_get0_pubkey_bitstr(c2);
      if(!k1 || !k2 || k1->length!=k2->length || k1->length<0 ||
-@@ -410,11 +506,12 @@ NOEXPORT int compare_pubkeys(X509 *c1, X509 *c2) {
+@@ -410,11 +506,12 @@
          return 0; /* reject */
      s_log(LOG_INFO, "CERT: Locally installed certificate matched");
      return 1; /* accept */
@@ -1220,7 +1981,7 @@ index ee49d8b..7d96cd5 100644
  
  #ifdef DEFINE_STACK_OF
  /* defined in openssl/safestack.h:
-@@ -735,7 +832,7 @@ NOEXPORT void log_time(const int level, const char *txt, ASN1_TIME *t) {
+@@ -735,7 +832,7 @@
      str_free(cp);
  }
  
@@ -1229,7 +1990,7 @@ index ee49d8b..7d96cd5 100644
  
  void print_client_CA_list(const STACK_OF(X509_NAME) *ca_dn) {
      char *ca_name;
-@@ -759,6 +856,15 @@ void print_client_CA_list(const STACK_OF(X509_NAME) *ca_dn) {
+@@ -759,6 +856,15 @@
  
  char *X509_NAME2text(X509_NAME *name) {
      char *text;
@@ -1245,7 +2006,7 @@ index ee49d8b..7d96cd5 100644
      BIO *bio;
      int n;
  
-@@ -777,6 +883,7 @@ char *X509_NAME2text(X509_NAME *name) {
+@@ -777,6 +883,7 @@
      }
      text[n]='\0';
      BIO_free(bio);
