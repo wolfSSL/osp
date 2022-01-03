@@ -1,6 +1,6 @@
-diff -urN stunnel-5.57.orig/configure.ac stunnel-5.57.new/configure.ac
---- stunnel-5.57.orig/configure.ac	2019-12-12 06:46:05.000000000 -0500
-+++ stunnel-5.57.new/configure.ac	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/configure.ac stunnel-5.57.have_pqc/configure.ac
+--- stunnel-5.57.orig/configure.ac	2022-01-03 14:51:45.961927100 -0500
++++ stunnel-5.57.have_pqc/configure.ac	2022-01-03 14:53:15.923376821 -0500
 @@ -437,26 +437,63 @@
      check_ssl_dir "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk/usr"
  }
@@ -78,9 +78,9 @@ diff -urN stunnel-5.57.orig/configure.ac stunnel-5.57.new/configure.ac
  
  if test "x$use_fips" = "xauto"; then
      AC_CHECK_FUNCS(FIPS_mode_set, [
-diff -urN stunnel-5.57.orig/m4/acinclude.m4 stunnel-5.57.new/m4/acinclude.m4
+diff -urN stunnel-5.57.orig/m4/acinclude.m4 stunnel-5.57.have_pqc/m4/acinclude.m4
 --- stunnel-5.57.orig/m4/acinclude.m4	1969-12-31 19:00:00.000000000 -0500
-+++ stunnel-5.57.new/m4/acinclude.m4	2021-12-30 15:44:44.141143772 -0500
++++ stunnel-5.57.have_pqc/m4/acinclude.m4	2022-01-03 14:53:15.923376821 -0500
 @@ -0,0 +1,775 @@
 +# ============================================================================
 +#  https://www.gnu.org/software/autoconf-archive/ax_append_compile_flags.html
@@ -857,10 +857,153 @@ diff -urN stunnel-5.57.orig/m4/acinclude.m4 stunnel-5.57.new/m4/acinclude.m4
 +  m4_ifndef([$1], [m4_fatal([macro ]$1[ is not defined; is a m4 file missing?])])
 +])dnl AX_REQUIRE_DEFINED
 +
-diff -urN stunnel-5.57.orig/src/client.c stunnel-5.57.new/src/client.c
---- stunnel-5.57.orig/src/client.c	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/client.c	2021-12-30 15:43:08.443755444 -0500
-@@ -626,7 +626,9 @@
+diff -urN stunnel-5.57.orig/src/client.c stunnel-5.57.have_pqc/src/client.c
+--- stunnel-5.57.orig/src/client.c	2022-01-03 14:51:45.977927358 -0500
++++ stunnel-5.57.have_pqc/src/client.c	2022-01-03 14:54:00.872098080 -0500
+@@ -498,6 +498,121 @@
+         (long)c->remote_fd.fd);
+ }
+ 
++#if defined(WITH_WOLFSSL) && defined(HAVE_PQC)
++static word16 get_pq_codepoint(void) {
++    char *group_name = getenv("WOLFSSL_PQ_GROUP");
++    if (group_name == NULL) {
++        return 0;
++    }
++
++    if (XSTRNCMP(group_name, "KYBER_LEVEL1", XSTRLEN("KYBER_LEVEL1")) == 0) {
++        return WOLFSSL_KYBER_LEVEL1;
++    }
++    else if (XSTRNCMP(group_name, "KYBER_LEVEL3",
++                      XSTRLEN("KYBER_LEVEL3")) == 0) {
++        return WOLFSSL_KYBER_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "KYBER_LEVEL5",
++                      XSTRLEN("KYBER_LEVEL5")) == 0) {
++        return WOLFSSL_KYBER_LEVEL5;
++    }
++    else if (XSTRNCMP(group_name, "NTRU_HPS_LEVEL1",
++                      XSTRLEN("NTRU_HPS_LEVEL1")) == 0) {
++        return WOLFSSL_NTRU_HPS_LEVEL1;
++    }
++    else if (XSTRNCMP(group_name, "NTRU_HPS_LEVEL3",
++                      XSTRLEN("NTRU_HPS_LEVEL3")) == 0) {
++        return WOLFSSL_NTRU_HPS_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "NTRU_HPS_LEVEL5",
++                      XSTRLEN("NTRU_HPS_LEVEL5")) == 0) {
++        return WOLFSSL_NTRU_HPS_LEVEL5;
++    }
++    else if (XSTRNCMP(group_name, "NTRU_HRSS_LEVEL3",
++                      XSTRLEN("NTRU_HRSS_LEVEL3")) == 0) {
++        return WOLFSSL_NTRU_HRSS_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "SABER_LEVEL1",
++                      XSTRLEN("SABER_LEVEL1")) == 0) {
++        return WOLFSSL_SABER_LEVEL1;
++    }
++    else if (XSTRNCMP(group_name, "SABER_LEVEL3",
++                      XSTRLEN("SABER_LEVEL3")) == 0) {
++        return WOLFSSL_SABER_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "SABER_LEVEL5",
++                      XSTRLEN("SABER_LEVEL5")) == 0) {
++        return WOLFSSL_SABER_LEVEL5;
++    }
++    else if (XSTRNCMP(group_name, "KYBER_90S_LEVEL1",
++                      XSTRLEN("KYBER_90S_LEVEL1")) == 0) {
++        return WOLFSSL_KYBER_90S_LEVEL1;
++    }
++    else if (XSTRNCMP(group_name, "KYBER_90S_LEVEL3",
++                      XSTRLEN("KYBER_90S_LEVEL3")) == 0) {
++        return WOLFSSL_KYBER_90S_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "KYBER_90S_LEVEL5",
++                      XSTRLEN("KYBER_90S_LEVEL5")) == 0) {
++        return WOLFSSL_KYBER_90S_LEVEL5;
++    }
++    else if (XSTRNCMP(group_name, "P256_NTRU_HPS_LEVEL1",
++                      XSTRLEN("P256_NTRU_HPS_LEVEL1")) == 0) {
++        return WOLFSSL_P256_NTRU_HPS_LEVEL1;
++    }
++    else if (XSTRNCMP(group_name, "P384_NTRU_HPS_LEVEL3",
++                      XSTRLEN("P384_NTRU_HPS_LEVEL3")) == 0) {
++        return WOLFSSL_P384_NTRU_HPS_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "P521_NTRU_HPS_LEVEL5",
++                      XSTRLEN("P521_NTRU_HPS_LEVEL5")) == 0) {
++        return WOLFSSL_P521_NTRU_HPS_LEVEL5;
++    }
++    else if (XSTRNCMP(group_name, "P384_NTRU_HRSS_LEVEL3",
++                      XSTRLEN("P384_NTRU_HRSS_LEVEL3")) == 0) {
++        return WOLFSSL_P384_NTRU_HRSS_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "P256_SABER_LEVEL1",
++                      XSTRLEN("P256_SABER_LEVEL1")) == 0) {
++        return WOLFSSL_P256_SABER_LEVEL1;
++    }
++    else if (XSTRNCMP(group_name, "P384_SABER_LEVEL3",
++                      XSTRLEN("P384_SABER_LEVEL3")) == 0) {
++        return WOLFSSL_P384_SABER_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "P521_SABER_LEVEL5",
++                      XSTRLEN("P521_SABER_LEVEL5")) == 0) {
++        return WOLFSSL_P521_SABER_LEVEL5;
++    }
++    else if (XSTRNCMP(group_name, "P256_KYBER_LEVEL1",
++                      XSTRLEN("P256_KYBER_LEVEL1")) == 0) {
++        return WOLFSSL_P256_KYBER_LEVEL1;
++    }
++    else if (XSTRNCMP(group_name, "P384_KYBER_LEVEL3",
++                      XSTRLEN("P384_KYBER_LEVEL3")) == 0) {
++        return WOLFSSL_P384_KYBER_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "P521_KYBER_LEVEL5",
++                      XSTRLEN("P521_KYBER_LEVEL5")) == 0) {
++        return WOLFSSL_P521_KYBER_LEVEL5;
++    }
++    else if (XSTRNCMP(group_name, "P256_KYBER_90S_LEVEL1",
++                      XSTRLEN("P256_KYBER_90S_LEVEL1")) == 0) {
++        return WOLFSSL_P256_KYBER_90S_LEVEL1;
++    }
++    else if (XSTRNCMP(group_name, "P384_KYBER_90S_LEVEL3",
++                      XSTRLEN("P384_KYBER_90S_LEVEL3")) == 0) {
++        return WOLFSSL_P384_KYBER_90S_LEVEL3;
++    }
++    else if (XSTRNCMP(group_name, "P521_KYBER_90S_LEVEL5",
++                      XSTRLEN("P521_KYBER_90S_LEVEL5")) == 0) {
++        return WOLFSSL_P521_KYBER_90S_LEVEL5;
++    }
++
++    return 0xFFFF;
++}
++#endif 
++
+ NOEXPORT void ssl_start(CLI *c) {
+     int i, err;
+     SSL_SESSION *sess;
+@@ -516,6 +631,20 @@
+         throw_exception(c, 1);
+     }
+     if(c->opt->option.client) {
++#if defined(WITH_WOLFSSL) && defined(HAVE_PQC)
++        word16 pq_codepoint = get_pq_codepoint();
++        /* This logic does nothing if env var was not defined. */
++        if (pq_codepoint == 0xFFFF) {
++            /* Env var defined to a bad value. */
++            sslerror("Bad PQ Env Var");
++            throw_exception(c, 1);
++        } else if (pq_codepoint) {
++            if (wolfSSL_UseKeyShare(c->ssl, pq_codepoint) != WOLFSSL_SUCCESS) {
++                sslerror("wolfSSL_UseKeyShare");
++                throw_exception(c, 1);
++            }
++        }
++#endif
+ #ifndef OPENSSL_NO_TLSEXT
+         /* c->opt->sni should always be initialized at this point,
+          * either explicitly with "sni"
+@@ -626,7 +755,9 @@
              if(!c->opt->option.client)
                  SSL_CTX_add_session(c->opt->ctx, sess);
          }
@@ -870,7 +1013,7 @@ diff -urN stunnel-5.57.orig/src/client.c stunnel-5.57.new/src/client.c
      }
  }
  
-@@ -1517,7 +1519,9 @@
+@@ -1517,7 +1648,9 @@
                  SSL_SESSION *sess=SSL_get1_session(c->ssl);
                  if(sess) {
                      idx_cache_save(sess, &c->connect_addr.addr[c->idx]);
@@ -880,7 +1023,7 @@ diff -urN stunnel-5.57.orig/src/client.c stunnel-5.57.new/src/client.c
                  }
              }
              print_bound_address(c);
-@@ -1577,7 +1581,9 @@
+@@ -1577,7 +1710,9 @@
                  len=addr_len(ptr);
                  memcpy(&addr, ptr, (size_t)len);
                  CRYPTO_THREAD_unlock(stunnel_locks[LOCK_ADDR]);
@@ -890,7 +1033,7 @@ diff -urN stunnel-5.57.orig/src/client.c stunnel-5.57.new/src/client.c
                  /* address was copied, ptr itself is no longer valid */
                  for(i=0; i<c->connect_addr.num; ++i) {
                      if(addr_len(&c->connect_addr.addr[i])==len &&
-@@ -1594,7 +1600,9 @@
+@@ -1594,7 +1729,9 @@
                  str_free(addr_txt);
              } else {
                  CRYPTO_THREAD_unlock(stunnel_locks[LOCK_ADDR]);
@@ -900,7 +1043,7 @@ diff -urN stunnel-5.57.orig/src/client.c stunnel-5.57.new/src/client.c
                  s_log(LOG_NOTICE, "persistence: No cached address found");
              }
          }
-@@ -1748,7 +1756,9 @@
+@@ -1748,7 +1885,9 @@
      if(!sess)
          return 1; /* no TLS session -> always redirect */
      ex_data=SSL_SESSION_get_ex_data(sess, index_session_authenticated);
@@ -910,9 +1053,9 @@ diff -urN stunnel-5.57.orig/src/client.c stunnel-5.57.new/src/client.c
      return ex_data == NULL;
  }
  
-diff -urN stunnel-5.57.orig/src/common.h stunnel-5.57.new/src/common.h
---- stunnel-5.57.orig/src/common.h	2020-06-24 16:02:36.000000000 -0400
-+++ stunnel-5.57.new/src/common.h	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/common.h stunnel-5.57.have_pqc/src/common.h
+--- stunnel-5.57.orig/src/common.h	2022-01-03 14:51:45.973927294 -0500
++++ stunnel-5.57.have_pqc/src/common.h	2022-01-03 14:53:15.923376821 -0500
 @@ -47,15 +47,22 @@
  #define LIBWRAP_CLIENTS 5
  
@@ -1023,9 +1166,9 @@ diff -urN stunnel-5.57.orig/src/common.h stunnel-5.57.new/src/common.h
  #if defined(USE_WIN32) && defined(OPENSSL_FIPS)
  #define USE_FIPS
  #endif
-diff -urN stunnel-5.57.orig/src/cron.c stunnel-5.57.new/src/cron.c
---- stunnel-5.57.orig/src/cron.c	2020-06-24 16:02:36.000000000 -0400
-+++ stunnel-5.57.new/src/cron.c	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/cron.c stunnel-5.57.have_pqc/src/cron.c
+--- stunnel-5.57.orig/src/cron.c	2022-01-03 14:51:45.973927294 -0500
++++ stunnel-5.57.have_pqc/src/cron.c	2022-01-03 14:53:15.923376821 -0500
 @@ -53,7 +53,7 @@
  #ifdef USE_OS_THREADS
  NOEXPORT void cron_worker(void);
@@ -1085,9 +1228,9 @@ diff -urN stunnel-5.57.orig/src/cron.c stunnel-5.57.new/src/cron.c
  
  NOEXPORT BN_GENCB *cron_bn_gencb(void) {
  #if OPENSSL_VERSION_NUMBER>=0x10100000L
-diff -urN stunnel-5.57.orig/src/ctx.c stunnel-5.57.new/src/ctx.c
---- stunnel-5.57.orig/src/ctx.c	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/ctx.c	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/ctx.c stunnel-5.57.have_pqc/src/ctx.c
+--- stunnel-5.57.orig/src/ctx.c	2022-01-03 14:51:45.969927229 -0500
++++ stunnel-5.57.have_pqc/src/ctx.c	2022-01-03 14:53:15.927376885 -0500
 @@ -60,7 +60,9 @@
  /* DH/ECDH */
  #ifndef OPENSSL_NO_DH
@@ -1323,9 +1466,9 @@ diff -urN stunnel-5.57.orig/src/ctx.c stunnel-5.57.new/src/ctx.c
  
          /* prevent renegotiation DoS attack */
          if((where&SSL_CB_HANDSHAKE_DONE)
-diff -urN stunnel-5.57.orig/src/log.c stunnel-5.57.new/src/log.c
---- stunnel-5.57.orig/src/log.c	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/log.c	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/log.c stunnel-5.57.have_pqc/src/log.c
+--- stunnel-5.57.orig/src/log.c	2022-01-03 14:51:45.969927229 -0500
++++ stunnel-5.57.have_pqc/src/log.c	2022-01-03 14:53:15.927376885 -0500
 @@ -246,6 +246,13 @@
      CRYPTO_THREAD_unlock(stunnel_locks[LOCK_LOG_MODE]);
  }
@@ -1340,9 +1483,9 @@ diff -urN stunnel-5.57.orig/src/log.c stunnel-5.57.new/src/log.c
  NOEXPORT void log_raw(SERVICE_OPTIONS *opt,
          int level, char *stamp, char *id, char *text) {
      char *line;
-diff -urN stunnel-5.57.orig/src/Makefile.am stunnel-5.57.new/src/Makefile.am
---- stunnel-5.57.orig/src/Makefile.am	2020-06-24 16:02:36.000000000 -0400
-+++ stunnel-5.57.new/src/Makefile.am	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/Makefile.am stunnel-5.57.have_pqc/src/Makefile.am
+--- stunnel-5.57.orig/src/Makefile.am	2022-01-03 14:51:45.965927165 -0500
++++ stunnel-5.57.have_pqc/src/Makefile.am	2022-01-03 14:53:15.927376885 -0500
 @@ -30,12 +30,20 @@
  stunnel_CPPFLAGS = -I$(SYSROOT)/usr/kerberos/include
  
@@ -1378,9 +1521,9 @@ diff -urN stunnel-5.57.orig/src/Makefile.am stunnel-5.57.new/src/Makefile.am
  
  mingw64:
  	$(MAKE) -f $(srcdir)/mingw.mk srcdir=$(srcdir) win32_arch=win64 win32_targetcpu=x86_64 win32_mingw=mingw64
-diff -urN stunnel-5.57.orig/src/mingw_wolfssl.mk stunnel-5.57.new/src/mingw_wolfssl.mk
+diff -urN stunnel-5.57.orig/src/mingw_wolfssl.mk stunnel-5.57.have_pqc/src/mingw_wolfssl.mk
 --- stunnel-5.57.orig/src/mingw_wolfssl.mk	1969-12-31 19:00:00.000000000 -0500
-+++ stunnel-5.57.new/src/mingw_wolfssl.mk	2021-12-30 15:43:08.443755444 -0500
++++ stunnel-5.57.have_pqc/src/mingw_wolfssl.mk	2022-01-03 14:53:15.927376885 -0500
 @@ -0,0 +1,70 @@
 +## mingw/mingw64 Makefile
 +# by Michal Trojnara 1998-2020
@@ -1452,9 +1595,9 @@ diff -urN stunnel-5.57.orig/src/mingw_wolfssl.mk stunnel-5.57.new/src/mingw_wolf
 +	$(win32_windres) --include-dir $(srcdir) $< $@
 +
 +$(objdir)/resources.o: $(srcdir)/version.h
-diff -urN stunnel-5.57.orig/src/options.c stunnel-5.57.new/src/options.c
---- stunnel-5.57.orig/src/options.c	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/options.c	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/options.c stunnel-5.57.have_pqc/src/options.c
+--- stunnel-5.57.orig/src/options.c	2022-01-03 14:51:45.969927229 -0500
++++ stunnel-5.57.have_pqc/src/options.c	2022-01-03 14:53:15.927376885 -0500
 @@ -276,12 +276,23 @@
  static char *option_not_found=
      "Specified option name is not valid here";
@@ -1511,9 +1654,9 @@ diff -urN stunnel-5.57.orig/src/options.c stunnel-5.57.new/src/options.c
          if(section->ctx)
              SSL_CTX_free(section->ctx);
          str_free(section->servname);
-diff -urN stunnel-5.57.orig/src/prototypes.h stunnel-5.57.new/src/prototypes.h
---- stunnel-5.57.orig/src/prototypes.h	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/prototypes.h	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/prototypes.h stunnel-5.57.have_pqc/src/prototypes.h
+--- stunnel-5.57.orig/src/prototypes.h	2022-01-03 14:51:45.973927294 -0500
++++ stunnel-5.57.have_pqc/src/prototypes.h	2022-01-03 14:53:15.927376885 -0500
 @@ -227,7 +227,7 @@
      char *ocsp_url;
      unsigned long ocsp_flags;
@@ -1561,9 +1704,9 @@ diff -urN stunnel-5.57.orig/src/prototypes.h stunnel-5.57.new/src/prototypes.h
  int CRYPTO_atomic_add(int *, int, int *, CRYPTO_RWLOCK *);
  #endif
  
-diff -urN stunnel-5.57.orig/src/ssl.c stunnel-5.57.new/src/ssl.c
---- stunnel-5.57.orig/src/ssl.c	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/ssl.c	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/ssl.c stunnel-5.57.have_pqc/src/ssl.c
+--- stunnel-5.57.orig/src/ssl.c	2022-01-03 14:51:45.977927358 -0500
++++ stunnel-5.57.have_pqc/src/ssl.c	2022-01-03 14:53:15.927376885 -0500
 @@ -69,8 +69,8 @@
          OPENSSL_INIT_LOAD_CRYPTO_STRINGS | OPENSSL_INIT_LOAD_CONFIG, NULL);
  #else
@@ -1598,9 +1741,9 @@ diff -urN stunnel-5.57.orig/src/ssl.c stunnel-5.57.new/src/ssl.c
  
      if(RAND_status()) {
          s_log(LOG_DEBUG, "No PRNG seeding was required");
-diff -urN stunnel-5.57.orig/src/sthreads.c stunnel-5.57.new/src/sthreads.c
---- stunnel-5.57.orig/src/sthreads.c	2020-06-24 16:02:36.000000000 -0400
-+++ stunnel-5.57.new/src/sthreads.c	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/sthreads.c stunnel-5.57.have_pqc/src/sthreads.c
+--- stunnel-5.57.orig/src/sthreads.c	2022-01-03 14:51:45.973927294 -0500
++++ stunnel-5.57.have_pqc/src/sthreads.c	2022-01-03 14:53:15.927376885 -0500
 @@ -122,6 +122,8 @@
  /* we only need to initialize locking with OpenSSL older than 1.1.0 */
  #if OPENSSL_VERSION_NUMBER<0x10100004L
@@ -1646,9 +1789,9 @@ diff -urN stunnel-5.57.orig/src/sthreads.c stunnel-5.57.new/src/sthreads.c
      size_t num;
  
      /* initialize the OpenSSL static locking */
-diff -urN stunnel-5.57.orig/src/stunnel.c stunnel-5.57.new/src/stunnel.c
---- stunnel-5.57.orig/src/stunnel.c	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/stunnel.c	2021-12-30 15:43:08.443755444 -0500
+diff -urN stunnel-5.57.orig/src/stunnel.c stunnel-5.57.have_pqc/src/stunnel.c
+--- stunnel-5.57.orig/src/stunnel.c	2022-01-03 14:51:45.973927294 -0500
++++ stunnel-5.57.have_pqc/src/stunnel.c	2022-01-03 14:53:15.927376885 -0500
 @@ -48,7 +48,9 @@
  #pragma GCC diagnostic ignored "-Wpedantic"
  #endif /* __GNUC__ */
@@ -1676,9 +1819,9 @@ diff -urN stunnel-5.57.orig/src/stunnel.c stunnel-5.57.new/src/stunnel.c
      options_defaults(); /* initialize defaults */
      options_apply(); /* apply the defaults */
  #ifndef USE_FORK
-diff -urN stunnel-5.57.orig/src/ui_unix.c stunnel-5.57.new/src/ui_unix.c
---- stunnel-5.57.orig/src/ui_unix.c	2020-06-24 16:02:36.000000000 -0400
-+++ stunnel-5.57.new/src/ui_unix.c	2021-12-30 15:43:08.447755502 -0500
+diff -urN stunnel-5.57.orig/src/ui_unix.c stunnel-5.57.have_pqc/src/ui_unix.c
+--- stunnel-5.57.orig/src/ui_unix.c	2022-01-03 14:51:45.965927165 -0500
++++ stunnel-5.57.have_pqc/src/ui_unix.c	2022-01-03 14:53:15.927376885 -0500
 @@ -71,6 +71,10 @@
          fatal("Could not open /dev/null");
  #endif
@@ -1690,9 +1833,9 @@ diff -urN stunnel-5.57.orig/src/ui_unix.c stunnel-5.57.new/src/ui_unix.c
      configure_status=main_configure(argc>1 ? argv[1] : NULL,
          argc>2 ? argv[2] : NULL);
      switch(configure_status) {
-diff -urN stunnel-5.57.orig/src/ui_win_cli.c stunnel-5.57.new/src/ui_win_cli.c
---- stunnel-5.57.orig/src/ui_win_cli.c	2020-06-24 16:02:36.000000000 -0400
-+++ stunnel-5.57.new/src/ui_win_cli.c	2021-12-30 15:43:08.447755502 -0500
+diff -urN stunnel-5.57.orig/src/ui_win_cli.c stunnel-5.57.have_pqc/src/ui_win_cli.c
+--- stunnel-5.57.orig/src/ui_win_cli.c	2022-01-03 14:51:45.973927294 -0500
++++ stunnel-5.57.have_pqc/src/ui_win_cli.c	2022-01-03 14:53:15.927376885 -0500
 @@ -70,6 +70,10 @@
          return 1;
      resolver_init();
@@ -1704,9 +1847,9 @@ diff -urN stunnel-5.57.orig/src/ui_win_cli.c stunnel-5.57.new/src/ui_win_cli.c
      if(!main_configure(argc>1 ? argv[1] : NULL, argc>2 ? argv[2] : NULL))
          daemon_loop();
      main_cleanup();
-diff -urN stunnel-5.57.orig/src/ui_win_gui.c stunnel-5.57.new/src/ui_win_gui.c
---- stunnel-5.57.orig/src/ui_win_gui.c	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/ui_win_gui.c	2021-12-30 15:43:08.447755502 -0500
+diff -urN stunnel-5.57.orig/src/ui_win_gui.c stunnel-5.57.have_pqc/src/ui_win_gui.c
+--- stunnel-5.57.orig/src/ui_win_gui.c	2022-01-03 14:51:45.969927229 -0500
++++ stunnel-5.57.have_pqc/src/ui_win_gui.c	2022-01-03 14:53:15.927376885 -0500
 @@ -72,7 +72,10 @@
  NOEXPORT void save_peer_certificate(WPARAM wParam);
  NOEXPORT LRESULT CALLBACK about_proc(HWND, UINT, WPARAM, LPARAM);
@@ -1727,9 +1870,9 @@ diff -urN stunnel-5.57.orig/src/ui_win_gui.c stunnel-5.57.new/src/ui_win_gui.c
  UI_METHOD *UI_stunnel() {
      static UI_METHOD *ui_method=NULL;
  
-diff -urN stunnel-5.57.orig/src/verify.c stunnel-5.57.new/src/verify.c
---- stunnel-5.57.orig/src/verify.c	2020-10-11 13:22:32.000000000 -0400
-+++ stunnel-5.57.new/src/verify.c	2021-12-30 15:43:08.447755502 -0500
+diff -urN stunnel-5.57.orig/src/verify.c stunnel-5.57.have_pqc/src/verify.c
+--- stunnel-5.57.orig/src/verify.c	2022-01-03 14:51:45.973927294 -0500
++++ stunnel-5.57.have_pqc/src/verify.c	2022-01-03 14:53:15.927376885 -0500
 @@ -43,30 +43,34 @@
  /* verify initialization */
  NOEXPORT void set_client_CA_list(SERVICE_OPTIONS *section);
