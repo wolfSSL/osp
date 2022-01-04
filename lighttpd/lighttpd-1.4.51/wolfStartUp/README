@@ -122,3 +122,14 @@ To use lighttpd logging the following function is called with a lighttpd
 server *srv argument:
     log_error_write(srv, __FILE__, __LINE__, "ss", "", "desired message");
 
+5.0 Certificates and Keys
+
+It might be the case that the certificates are expired. You can regenerate the
+PEM files by going into wolfSSL's `certs` directory and executing the following
+commands: 
+
+```
+cp ca-cert.pem /path/to/wolfStartUp/ca-cert.pem
+cp client-cert.pem /path/to/wolfStartUp/client-cert.pem
+cat server-key.pem server-cert.pem > /path/to/wolfStartUp/server.pem
+```
