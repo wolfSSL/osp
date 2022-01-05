@@ -481,6 +481,7 @@ network_openssl_load_pemfile (server *srv, plugin_config *s, size_t ndx)
 
     s->ssl_pemfile_x509 = x509_load_pem_file(srv, s->ssl_pemfile->ptr);
     if (NULL == s->ssl_pemfile_x509) return -1;
+#if !defined(USE_WOLFSSL) || !defined(HAVE_PQC)
     s->ssl_pemfile_pkey = evp_pkey_load_pem_file(srv, s->ssl_pemfile->ptr);
     if (NULL == s->ssl_pemfile_pkey) return -1;
 
@@ -491,6 +492,7 @@ network_openssl_load_pemfile (server *srv, plugin_config *s, size_t ndx)
                         s->ssl_pemfile);
         return -1;
     }
+#endif
 
     return 0;
 }
@@ -1094,12 +1096,22 @@ network_init_ssl (server *srv, void *p_d)
             return -1;
         }
 
+#if defined(USE_WOLFSSL) && defined(HAVE_PQC)
+        if (1 != SSL_CTX_use_PrivateKey_file(s->ssl_ctx, s->ssl_pemfile->ptr,
+                                             SSL_FILETYPE_PEM)) {
+            log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
+                            ERR_error_string(ERR_get_error(), NULL),
+                            s->ssl_pemfile);
+            return -1;
+        }
+#else
         if (1 != SSL_CTX_use_PrivateKey(s->ssl_ctx, s->ssl_pemfile_pkey)) {
             log_error_write(srv, __FILE__, __LINE__, "ssb", "SSL:",
                             ERR_error_string(ERR_get_error(), NULL),
                             s->ssl_pemfile);
             return -1;
         }
+#endif
 
         if (SSL_CTX_check_private_key(s->ssl_ctx) != 1) {
             log_error_write(srv, __FILE__, __LINE__, "sssb", "SSL:",

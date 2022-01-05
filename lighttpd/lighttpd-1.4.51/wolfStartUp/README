@@ -133,3 +133,46 @@ cp ca-cert.pem /path/to/wolfStartUp/ca-cert.pem
 cp client-cert.pem /path/to/wolfStartUp/client-cert.pem
 cat server-key.pem server-cert.pem > /path/to/wolfStartUp/server.pem
 ```
+
+6.0 Experimenting with Post-Quantum Algorithms
+
+6.1 Build liboqs, OpenQuantumSafe's OpenSSL Fork and lighttpd
+
+See wolfSSL's INSTALL file for instructions on how to build and install liboqs
+and OpenQuantumSafe's OpenSSL fork. Also perform the steps for generating the
+FALCON certificate chain. For building wolfSSL, it is the same instructions as
+in section 2.1 above, but add `--with-liboqs` to the configure command for
+wolfSSL. Follow the instructions in section 2.2 for building lighttpd.
+
+6.2 Trying it Out
+
+Run through all the steps in section 3 as a sanity check to make sure things
+are working as expected.
+
+The only things that need to be changed now are the certifcates and private
+key and some client command-line arguments. For the certificates and private
+key, simply go into OpenQuantumSafe's OpenSSL fork directory and execute the
+following command (modifying the paths):
+
+```
+cat falcon_level5_entity_key.pem \
+    falcon_level5_entity_cert.pem \
+    falcon_level5_root_cert.pem \
+    > /path/to/wolfStartUp/server.pem
+````
+
+Now run the web server as specified above. After that, execute the example
+client like this:
+
+./examples/client/client -p 443 -g -d \
+                         -v 4 \
+                         --pqc P521_KYBER_LEVEL5 \
+                         -l TLS_AES_256_GCM_SHA384 \
+                         -A /path/to/oqs/openssl/falcon_level5_root_cert.pem
+
+`-v 4` specifies TLS 1.3. `--pqc P521_KYBER_LEVEL5` specifies ECDHE over curve
+P521 hybridized with KYBER NIST Level 5. `-l TLS_AES_256_GCM_SHA384` specifies
+the use of AES-256 which is considered to have the post-quantum strenth of
+AES-128. `falcon_level5_entity_key.pem` specifies that the signature scheme to
+be used is FALCON Level 5. All of these combined together make for a TLS 1.3
+connection protected by post-quantum algorithms.
