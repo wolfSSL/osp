@@ -1,0 +1,9 @@
+[submodule "wolfEngine/radsecproxy/radsecproxy"]
+	path = wolfEngine/radsecproxy/radsecproxy
+	url = https://github.com/radsecproxy/radsecproxy.git
+[submodule "wolfEngine/libssh2/libssh2"]
+	path = wolfEngine/libssh2/libssh2
+	url = https://github.com/libssh2/libssh2.git
+[submodule "wolfEngine/libssh/libssh"]
+	path = wolfEngine/libssh/libssh
+	url = https://git.libssh.org/projects/libssh.git

@@ -51,6 +51,7 @@ Each project port included in this repository is contained in its own subdirecto
 | urllib3 | urllib3 HTTP client for Python | [Link](https://github.com/urllib3/urllib3) | | [README](./urllib3/README.rst) |
 | websocket-client | WebSocket client for python | [Link](https://github.com/websocket-client/websocket-client) | | [README](./websocket-client/README.rst) |
 | websocketpp | WebSocket++ | [Link](https://www.zaphoyd.com/projects/websocketpp/) | [Link](https://www.wolfssl.com/building-websocket-wolfssl-support/) | [README](websocketpp/readme.md) |
+| wolfengine | OpenSSL Engine using wolfCrypt | [Link](https://github.com/wolfSSL/wolfEngine) | | [README](./wolfengine/README.md) |
 
 # Licensing
 
