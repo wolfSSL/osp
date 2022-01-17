@@ -1,0 +1,242 @@
+commit 18d87d0136b578afcedbd3ec13c874b690b687b7
+Author: John Safranek <john@wolfssl.com>
+Date:   Tue Dec 28 18:46:24 2021 -0800
+
+    OpenSSL EVP
+    This change allows radsecproxy to use cryptography from OpenSSL using an engine.
+    1. Remove dependency on nettle.
+    2. Add file wrapping EVP functions with the names of the functions used from nettle.
+    3. Add some calls to SSL_library_init().
+
+diff --git a/Makefile.am b/Makefile.am
+index ac85aa6..2c6359a 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -16,6 +16,7 @@ librsp_a_SOURCES = \
+ 	debug.c debug.h \
+ 	dtls.c dtls.h \
+ 	fticks.c fticks.h fticks_hashmac.c fticks_hashmac.h \
++	hashmac.c hashmac.h \
+ 	gconfig.c gconfig.h \
+ 	hash.c hash.h \
+ 	hostport.c hostport.h \
+@@ -44,7 +45,7 @@ AM_CFLAGS = \
+ radsecproxy_LDFLAGS = @SSL_LDFLAGS@ @TARGET_LDFLAGS@
+ radsecproxy_LDADD = librsp.a @SSL_LIBS@
+ radsecproxy_conf_LDFLAGS = @TARGET_LDFLAGS@
+-radsecproxy_hash_LDADD = fticks_hashmac.o hash.o list.o
++radsecproxy_hash_LDADD = hashmac.o fticks_hashmac.o hash.o list.o @SSL_LIBS@
+ 
+ dist_man_MANS = radsecproxy.8 radsecproxy-hash.8 radsecproxy.conf.5
+ 
+diff --git a/configure.ac b/configure.ac
+index 7d321f1..106073d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -61,9 +61,6 @@ AC_ARG_ENABLE(dtls,
+     fi
+   ])
+ 
+-AC_CHECK_LIB([nettle], [nettle_sha256_init],,
+-    [AC_MSG_ERROR([required library nettle not found])])
+-
+ dnl Check if we're on Solaris and set CFLAGS accordingly
+ AC_CANONICAL_TARGET
+ case "${target_os}" in
+diff --git a/fticks_hashmac.c b/fticks_hashmac.c
+index 5616291..cc0b273 100644
+--- a/fticks_hashmac.c
++++ b/fticks_hashmac.c
+@@ -6,8 +6,7 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <ctype.h>
+-#include <nettle/sha.h>
+-#include <nettle/hmac.h>
++#include "hashmac.h"
+ #include "fticks_hashmac.h"
+ 
+ /** \a HASH is an input buffer of length SHA256_DIGEST_SIZE bytes.
+diff --git a/hashmac.c b/hashmac.c
+new file mode 100644
+index 0000000..c437d35
+--- /dev/null
++++ b/hashmac.c
+@@ -0,0 +1,85 @@
++#include "hashmac.h"
++
++void sha256_init(struct sha256_ctx *ctx)
++{
++    ctx->ctx = EVP_MD_CTX_new();
++    EVP_DigestInit(ctx->ctx, EVP_sha256());
++    ctx->init = 1;
++}
++
++void sha256_update(struct sha256_ctx *ctx, size_t length, const uint8_t *data)
++{
++    if (ctx->init == 0)
++        sha256_init(ctx);
++    EVP_DigestUpdate(ctx->ctx, data, length);
++}
++
++void sha256_digest(struct sha256_ctx *ctx, size_t length, uint8_t *digest)
++{
++    unsigned int digest_length = (unsigned int)length;
++
++    EVP_DigestFinal(ctx->ctx, digest, &digest_length);
++    EVP_MD_CTX_free(ctx->ctx);
++    ctx->init = 0;
++}
++
++void md5_init(struct md5_ctx *ctx)
++{
++    ctx->ctx = EVP_MD_CTX_new();
++    EVP_DigestInit(ctx->ctx, EVP_md5());
++    ctx->init = 1;
++}
++
++void md5_update(struct md5_ctx *ctx, size_t length, const uint8_t *data)
++{
++    if (ctx->init == 0)
++        md5_init(ctx);
++    EVP_DigestUpdate(ctx->ctx, data, length);
++}
++
++void md5_digest(struct md5_ctx *ctx, size_t length, uint8_t *digest)
++{
++    unsigned int digest_length = (unsigned int)length;
++
++    EVP_DigestFinal(ctx->ctx, digest, &digest_length);
++    EVP_MD_CTX_free(ctx->ctx);
++    ctx->init = 0;
++}
++
++void hmac_sha256_set_key(struct hmac_sha256_ctx *ctx, size_t key_length, const uint8_t *key)
++{
++    ctx->pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_HMAC, NULL, key, key_length);
++    ctx->ctx = EVP_MD_CTX_new();
++    EVP_DigestSignInit(ctx->ctx, NULL, EVP_sha256(), NULL, ctx->pkey);
++}
++
++void hmac_sha256_update(struct hmac_sha256_ctx *ctx, size_t length, const uint8_t *data)
++{
++    EVP_DigestSignUpdate(ctx->ctx, data, length);
++}
++
++void hmac_sha256_digest(struct hmac_sha256_ctx *ctx, size_t length, uint8_t *digest)
++{
++    EVP_DigestSignFinal(ctx->ctx, digest, &length);
++    EVP_MD_CTX_free(ctx->ctx);
++    EVP_PKEY_free(ctx->pkey);
++}
++
++void hmac_md5_set_key(struct hmac_md5_ctx *ctx, size_t key_length, const uint8_t *key)
++{
++    ctx->pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_HMAC, NULL, key, key_length);
++    ctx->ctx = EVP_MD_CTX_new();
++    EVP_DigestSignInit(ctx->ctx, NULL, EVP_sha256(), NULL, ctx->pkey);
++}
++
++void hmac_md5_update(struct hmac_md5_ctx *ctx, size_t length, const uint8_t *data)
++{
++    EVP_DigestSignUpdate(ctx->ctx, data, length);
++}
++
++void hmac_md5_digest(struct hmac_md5_ctx *ctx, size_t length, uint8_t *digest)
++{
++    EVP_DigestSignFinal(ctx->ctx, digest, &length);
++    EVP_MD_CTX_free(ctx->ctx);
++    EVP_PKEY_free(ctx->pkey);
++}
+diff --git a/hashmac.h b/hashmac.h
+new file mode 100644
+index 0000000..ae65964
+--- /dev/null
++++ b/hashmac.h
+@@ -0,0 +1,38 @@
++#include <openssl/evp.h>
++#include <openssl/sha.h>
++#include <openssl/md5.h>
++
++#define SHA256_DIGEST_SIZE SHA256_DIGEST_LENGTH
++#define MD5_DIGEST_SIZE MD5_DIGEST_LENGTH
++
++struct sha256_ctx {
++    EVP_MD_CTX *ctx;
++    int init;
++};
++void sha256_init(struct sha256_ctx *ctx);
++void sha256_update(struct sha256_ctx *ctx, size_t length, const uint8_t *data);
++void sha256_digest(struct sha256_ctx *ctx, size_t length, uint8_t *digest);
++
++struct md5_ctx {
++    EVP_MD_CTX *ctx;
++    int init;
++};
++void md5_init(struct md5_ctx *ctx);
++void md5_update(struct md5_ctx *ctx, size_t length, const uint8_t *data);
++void md5_digest(struct md5_ctx *ctx, size_t length, uint8_t *digest);
++
++struct hmac_sha256_ctx {
++    EVP_PKEY *pkey;
++    EVP_MD_CTX *ctx;
++};
++void hmac_sha256_set_key(struct hmac_sha256_ctx *ctx, size_t key_length, const uint8_t *key);
++void hmac_sha256_update(struct hmac_sha256_ctx *ctx, size_t length, const uint8_t *data);
++void hmac_sha256_digest(struct hmac_sha256_ctx *ctx, size_t length, uint8_t *digest);
++
++struct hmac_md5_ctx {
++    EVP_PKEY *pkey;
++    EVP_MD_CTX *ctx;
++};
++void hmac_md5_set_key(struct hmac_md5_ctx *ctx, size_t key_length, const uint8_t *key);
++void hmac_md5_update(struct hmac_md5_ctx *ctx, size_t length, const uint8_t *data);
++void hmac_md5_digest(struct hmac_md5_ctx *ctx, size_t length, uint8_t *digest);
+diff --git a/radmsg.c b/radmsg.c
+index afd7c60..d2465f8 100644
+--- a/radmsg.c
++++ b/radmsg.c
+@@ -13,8 +13,8 @@
+ #include "radmsg.h"
+ #include "debug.h"
+ #include <pthread.h>
+-#include <nettle/hmac.h>
+ #include <openssl/rand.h>
++#include "hashmac.h"
+ #include "raddict.h"
+ #include "util.h"
+ 
+diff --git a/radsecproxy-hash.c b/radsecproxy-hash.c
+index df629f7..df8e08a 100644
+--- a/radsecproxy-hash.c
++++ b/radsecproxy-hash.c
+@@ -5,6 +5,7 @@
+ #include <stdlib.h>
+ #include <unistd.h>
+ #include <string.h>
++#include <openssl/ssl.h>
+ 
+ #include "radsecproxy.h"
+ #include "fticks_hashmac.h"
+@@ -46,6 +47,8 @@ main(int argc, char *argv[])
+   char mac[80+1];
+   uint8_t *key = NULL;
+ 
++  SSL_library_init();
++
+   while ((opt = getopt(argc, argv, "hk:")) != -1) {
+     switch (opt) {
+ #if defined(READ_CONFIG)
+diff --git a/radsecproxy.c b/radsecproxy.c
+index 75f5ef3..45d4319 100644
+--- a/radsecproxy.c
++++ b/radsecproxy.c
+@@ -60,7 +60,7 @@
+ #include <openssl/ssl.h>
+ #include <openssl/rand.h>
+ #include <openssl/err.h>
+-#include <nettle/md5.h>
++#include "hashmac.h"
+ #include "debug.h"
+ #include "hash.h"
+ #include "util.h"
