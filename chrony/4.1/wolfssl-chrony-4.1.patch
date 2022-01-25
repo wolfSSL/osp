@@ -1,0 +1,2063 @@
+diff --git a/cmac_wolfssl.c b/cmac_wolfssl.c
+new file mode 100644
+index 0000000..1c92730
+--- /dev/null
++++ b/cmac_wolfssl.c
+@@ -0,0 +1,130 @@
++/*
++  chronyd/chronyc - Programs for keeping computer clocks accurate.
++
++ **********************************************************************
++ * Copyright (C) Miroslav Lichvar  2019
++ * 
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of version 2 of the GNU General Public License as
++ * published by the Free Software Foundation.
++ * 
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ * 
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ * 
++ **********************************************************************
++
++  =======================================================================
++
++  Support for AES128 and AES256 CMAC in Nettle.
++
++  */
++
++#include "config.h"
++
++#include "logging.h"
++#include <wolfssl/options.h>
++#include <wolfssl/wolfcrypt/cmac.h>
++
++#include "cmac.h"
++#include "memory.h"
++
++struct CMC_Instance_Record {
++  unsigned char key[AES_256_KEY_SIZE];
++  int keySz;
++};
++
++int
++CMC_GetKeyLength(CMC_Algorithm algorithm)
++{
++  int ret = 0;
++
++  switch (algorithm) {
++    case CMC_AES128:
++      ret = AES_128_KEY_SIZE;
++      break;
++    case CMC_AES256:
++      ret = AES_256_KEY_SIZE;
++      break;
++    default:
++      break;
++  }
++
++  return ret;
++}
++
++/* ================================================== */
++
++CMC_Instance
++CMC_CreateInstance(CMC_Algorithm algorithm, const unsigned char *key,
++                   int length)
++{
++  CMC_Instance inst;
++
++  DEBUG_LOG("algorithm = %d, key = %p, length = %d",
++    algorithm, key, length);
++
++  if (length <= 0 || length != CMC_GetKeyLength(algorithm)) {
++    LOG(LOGS_ERR, "Bad parameter.");
++    return NULL;
++  }
++
++  inst = MallocNew(struct CMC_Instance_Record);
++  if (!inst) { 
++    LOG(LOGS_ERR, "MallocNew failed.");
++    return NULL;
++  }
++
++  memcpy(inst->key, key, length);
++  inst->keySz = length;
++
++  return inst;
++}
++
++int
++CMC_Hash(CMC_Instance inst, const void *in, int in_len, unsigned char *out,
++         int out_len)
++{
++  /* 
++   * We need to use a temporary buffer for the CMAC output because wolfCrypt
++   * enforces a minimum tag size of 4 bytes. We need to ignore that constraint
++   * for the purposes of this function (i.e. we want to permit tags < 4 bytes). 
++   */
++  unsigned char tmp[WC_CMAC_TAG_MAX_SZ];
++  unsigned int tmpSz = WC_CMAC_TAG_MAX_SZ;
++
++  DEBUG_LOG("inst = %p, in = %p, in_len = %d, out = %p, out_len = %d", inst, in,
++    in_len, out, out_len);
++
++  if (inst == NULL || in == NULL || in_len < 0 || out == NULL || out_len < 0) {
++    LOG(LOGS_ERR, "Bad parameter.");
++    return 0;
++  }
++
++  if (out_len > WC_CMAC_TAG_MAX_SZ) {
++    out_len = WC_CMAC_TAG_MAX_SZ;
++  }
++
++  if (wc_AesCmacGenerate(tmp, &tmpSz, in, in_len, inst->key, inst->keySz) != 0) {
++    LOG(LOGS_ERR, "wc_AesCmacGenerate failed.");
++    return 0;
++  }
++  else {
++    memcpy(out, tmp, out_len);
++  }
++
++  return out_len;
++}
++
++/* ================================================== */
++
++void
++CMC_DestroyInstance(CMC_Instance inst)
++{
++  Free(inst);
++}
+diff --git a/configure b/configure
+index 5b8948f..bf3a766 100755
+--- a/configure
++++ b/configure
+@@ -226,6 +226,7 @@ feat_sechash=1
+ try_nettle=1
+ try_nss=1
+ try_tomcrypt=1
++try_wolfssl=0
+ feat_nts=1
+ try_gnutls=1
+ feat_rtc=1
+@@ -383,6 +384,9 @@ do
+     --without-tomcrypt )
+       try_tomcrypt=0
+     ;;
++    --enable-wolfssl )
++      try_wolfssl=1
++    ;;
+     --disable-nts )
+       feat_nts=0
+     ;;
+@@ -407,6 +411,13 @@ do
+     esac
+ done
+ 
++if [ $try_wolfssl = "1" ]; then
++  try_nettle=0
++  try_nss=0
++  try_tomcrypt=0
++  try_gnutls=0
++fi
++
+ rm -f config.h config.log
+ 
+ SYSTEM=${OPERATINGSYSTEM}-${MACHINE}
+@@ -934,6 +945,41 @@ if [ $feat_sechash = "1" ] && [ "x$HASH_LINK" = "x" ] && [ $try_tomcrypt = "1" ]
+   fi
+ fi
+ 
++if [ $feat_sechash = "1" ] && [ "x$HASH_LINK" = "x" ] && [ $try_wolfssl = "1" ]; then
++  if test_code 'wolfssl' 'wolfssl/wolfcrypt/hash.h' '' '-lwolfssl' \
++    'wc_HashGetDigestSize(WC_HASH_TYPE_SHA256);'
++  then
++    HASH_OBJ="hash_wolfssl.o"
++    HASH_LINK="-lwolfssl"
++    add_def FEAT_SECHASH
++    add_def HAVE_WOLFSSL
++
++    if test_code 'CMAC in wolfSSL' 'wolfssl/wolfcrypt/cmac.h' "" "-lwolfssl" \
++      'wc_InitCmac(NULL, NULL, 0, 0, NULL);'
++    then
++      add_def HAVE_CMAC
++      EXTRA_OBJECTS="$EXTRA_OBJECTS cmac_wolfssl.o"
++      EXTRA_CLI_OBJECTS="$EXTRA_CLI_OBJECTS cmac_wolfssl.o"
++
++      if test_code 'SIV in wolfSSL' 'wolfssl/wolfcrypt/siv.h' "" "-lwolfssl" \
++        'wc_AesSivEncrypt(NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL);'
++      then
++        EXTRA_OBJECTS="$EXTRA_OBJECTS siv_wolfssl.o"
++        add_def HAVE_SIV
++        add_def HAVE_WOLFSSL_SIV_CMAC
++      fi
++
++      if grep '#define HAVE_SIV' config.h > /dev/null; then
++        EXTRA_OBJECTS="$EXTRA_OBJECTS nts_ke_client.o nts_ke_server.o nts_ke_session_wolfssl.o"
++        EXTRA_OBJECTS="$EXTRA_OBJECTS nts_ntp_auth.o nts_ntp_client.o nts_ntp_server.o"
++        LIBS="$LIBS $test_link"
++        MYCPPFLAGS="$MYCPPFLAGS $test_cflags"
++        add_def FEAT_NTS
++      fi
++    fi
++  fi
++fi
++
+ EXTRA_OBJECTS="$EXTRA_OBJECTS $HASH_OBJ"
+ EXTRA_CLI_OBJECTS="$EXTRA_CLI_OBJECTS $HASH_OBJ"
+ LIBS="$LIBS $HASH_LINK"
+@@ -972,7 +1018,7 @@ if [ $feat_ntp = "1" ] && [ $feat_nts = "1" ] && [ $try_gnutls = "1" ]; then
+     fi
+ 
+     if grep '#define HAVE_SIV' config.h > /dev/null; then
+-      EXTRA_OBJECTS="$EXTRA_OBJECTS nts_ke_client.o nts_ke_server.o nts_ke_session.o"
++      EXTRA_OBJECTS="$EXTRA_OBJECTS nts_ke_client.o nts_ke_server.o nts_ke_session_gnutls.o"
+       EXTRA_OBJECTS="$EXTRA_OBJECTS nts_ntp_auth.o nts_ntp_client.o nts_ntp_server.o"
+       LIBS="$LIBS $test_link"
+       MYCPPFLAGS="$MYCPPFLAGS $test_cflags"
+diff --git a/hash_wolfssl.c b/hash_wolfssl.c
+new file mode 100644
+index 0000000..538d4c2
+--- /dev/null
++++ b/hash_wolfssl.c
+@@ -0,0 +1,123 @@
++/*
++  chronyd/chronyc - Programs for keeping computer clocks accurate.
++
++ **********************************************************************
++ * Copyright (C) Miroslav Lichvar  2018
++ * 
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of version 2 of the GNU General Public License as
++ * published by the Free Software Foundation.
++ * 
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MEretHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ * 
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ * 
++ **********************************************************************
++
++  =======================================================================
++
++  Routines implementing crypto hashing using the nettle library.
++
++  */
++
++#include "config.h"
++
++#include "logging.h"
++#include "hash.h"
++#include <wolfssl/options.h>
++#include <wolfssl/wolfcrypt/hash.h>
++
++int
++HSH_GetHashId(HSH_Algorithm algorithm)
++{
++  switch (algorithm) {
++    case HSH_MD5:
++      return WC_HASH_TYPE_MD5;
++    case HSH_SHA1:
++      return WC_HASH_TYPE_SHA;
++    case HSH_SHA256:
++      return WC_HASH_TYPE_SHA256;
++    case HSH_SHA384:
++      return WC_HASH_TYPE_SHA384;
++    case HSH_SHA512:
++      return WC_HASH_TYPE_SHA512;
++    case HSH_SHA3_224:
++      return WC_HASH_TYPE_SHA3_224;
++    case HSH_SHA3_256:
++      return WC_HASH_TYPE_SHA3_256;
++    case HSH_SHA3_384:
++      return WC_HASH_TYPE_SHA3_384;
++    case HSH_SHA3_512:
++      return WC_HASH_TYPE_SHA3_512;
++    default:
++      return -1;
++  }
++}
++
++int
++HSH_Hash(int id, const void *in1, int in1_len, const void *in2, int in2_len,
++         unsigned char *out, int out_len)
++{
++  int hashSize;
++  wc_HashAlg hash;
++  int ret = out_len;
++  unsigned char tmp[WC_MAX_DIGEST_SIZE];
++
++  if (in1_len < 0 || in2_len < 0 || out_len <= 0)
++    return 0;
++
++  hashSize = wc_HashGetDigestSize(id);
++  if (hashSize <= 0) {
++    LOG(LOGS_ERR, "wc_HashGetDigestSize for ID %d failed.", id);
++    ret = 0;
++  }
++
++  if (ret != 0) {
++    if (wc_HashInit(&hash, id) != 0) {
++      LOG(LOGS_ERR, "wc_HashInit for ID %d failed.", id);
++      ret = 0;
++    }
++  }
++
++  if (ret != 0) {
++    if (wc_HashUpdate(&hash, id, in1, in1_len) != 0) {
++      LOG(LOGS_ERR, "wc_HashUpdate 1 for ID %d failed.", id);
++      ret = 0;
++    }
++  }
++
++  if (ret != 0 && in2) {
++    if (wc_HashUpdate(&hash, id, in2, in2_len) != 0) {
++      LOG(LOGS_ERR, "wc_HashUpdate 2 for ID %d failed.", id);
++      ret = 0;
++    }
++  }
++
++  if (ret != 0) {
++    if (wc_HashFinal(&hash, id, tmp) != 0) {
++      LOG(LOGS_ERR, "wc_HashFinal for ID %d failed.", id);
++      ret = 0;
++    }
++    else {
++      if (out_len > hashSize) {
++        out_len = hashSize;
++        ret = out_len;
++      }
++      memcpy(out, tmp, out_len);
++    }
++  }
++
++  wc_HashFree(&hash, id);
++
++  return ret;
++}
++
++void
++HSH_Finalise(void)
++{
++}
+diff --git a/nts_ke_session.c b/nts_ke_session_gnutls.c
+similarity index 99%
+rename from nts_ke_session.c
+rename to nts_ke_session_gnutls.c
+index 96b08c1..760959e 100644
+--- a/nts_ke_session.c
++++ b/nts_ke_session_gnutls.c
+@@ -21,11 +21,13 @@
+ 
+   =======================================================================
+ 
+-  NTS-KE session used by server and client
++  NTS-KE session used by server and client, using GnuTLS for TLS.
+   */
+ 
+ #include "config.h"
+ 
++#ifndef HAVE_WOLFSSL
++
+ #include "sysincl.h"
+ 
+ #include "nts_ke_session.h"
+@@ -918,3 +920,5 @@ NKSN_GetRetryFactor(NKSN_Instance inst)
+ {
+   return inst->retry_factor;
+ }
++
++#endif /* !HAVE_WOLFSSL */
+diff --git a/nts_ke_session_wolfssl.c b/nts_ke_session_wolfssl.c
+new file mode 100644
+index 0000000..8716955
+--- /dev/null
++++ b/nts_ke_session_wolfssl.c
+@@ -0,0 +1,1208 @@
++/*
++  chronyd/chronyc - Programs for keeping computer clocks accurate.
++
++ **********************************************************************
++ * Copyright (C) Miroslav Lichvar  2020-2021
++ * 
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of version 2 of the GNU General Public License as
++ * published by the Free Software Foundation.
++ * 
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ * 
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ * 
++ **********************************************************************
++
++  =======================================================================
++
++  NTS-KE session used by server and client, using wolfSSL for TLS.
++  */
++
++#include "config.h"
++
++#include "sysincl.h"
++
++#include "nts_ke_session.h"
++
++#include "conf.h"
++#include "local.h"
++#include "logging.h"
++#include "memory.h"
++#include "siv.h"
++#include "socket.h"
++#include "sched.h"
++#include "util.h"
++
++#include <wolfssl/options.h>
++#include <wolfssl/ssl.h>
++#include <wolfssl/wolfcrypt/error-crypt.h>
++#include <wolfssl/wolfcrypt/asn.h>
++#include <wolfssl/wolfcrypt/time.h>
++
++#define INVALID_SOCK_FD (-8)
++
++struct RecordHeader {
++  uint16_t type;
++  uint16_t body_length;
++};
++
++struct Message {
++  int length;
++  int sent;
++  int parsed;
++  int complete;
++  unsigned char data[NKE_MAX_MESSAGE_LENGTH];
++};
++
++typedef enum {
++  KE_WAIT_CONNECT,
++  KE_HANDSHAKE,
++  KE_SEND,
++  KE_RECEIVE,
++  KE_SHUTDOWN,
++  KE_STOPPED,
++} KeState;
++
++struct NKSN_Instance_Record {
++  int server;
++  char *server_name;
++  NKSN_MessageHandler handler;
++  void *handler_arg;
++
++  KeState state;
++  int sock_fd;
++  char *label;
++  WOLFSSL_CTX* tls_ctx;
++  WOLFSSL* tls_session;
++  SCH_TimeoutID timeout_id;
++  int retry_factor;
++
++  struct Message message;
++  int new_message;
++};
++
++typedef struct WolfsslCreds {
++  char** certs;
++  char** keys;
++  int n_certs_keys;
++  char** trusted_certs;
++  int n_trusted_certs;
++} WolfsslCreds;
++
++static const size_t MAX_FILE_NAME_SZ = 255;
++
++/* ================================================== */
++
++static int credentials_counter = 0;
++
++static int clock_updates = 0;
++
++/* ================================================== */
++
++static void
++reset_message(struct Message *message)
++{
++  message->length = 0;
++  message->sent = 0;
++  message->parsed = 0;
++  message->complete = 0;
++}
++
++/* ================================================== */
++
++static int
++add_record(struct Message *message, int critical, int type, const void *body, int body_length)
++{
++  struct RecordHeader header;
++
++  assert(message->length <= sizeof (message->data));
++
++  if (body_length < 0 || body_length > 0xffff || type < 0 || type > 0x7fff ||
++      message->length + sizeof (header) + body_length > sizeof (message->data))
++    return 0;
++
++  header.type = htons(!!critical * NKE_RECORD_CRITICAL_BIT | type);
++  header.body_length = htons(body_length);
++
++  memcpy(&message->data[message->length], &header, sizeof (header));
++  message->length += sizeof (header);
++
++  if (body_length > 0) {
++    memcpy(&message->data[message->length], body, body_length);
++    message->length += body_length;
++  }
++
++  return 1;
++}
++
++/* ================================================== */
++
++static void
++reset_message_parsing(struct Message *message)
++{
++  message->parsed = 0;
++}
++
++/* ================================================== */
++
++static int
++get_record(struct Message *message, int *critical, int *type, int *body_length,
++           void *body, int buffer_length)
++{
++  struct RecordHeader header;
++  int blen, rlen;
++
++  if (message->length < message->parsed + sizeof (header) ||
++      buffer_length < 0)
++    return 0;
++
++  memcpy(&header, &message->data[message->parsed], sizeof (header));
++
++  blen = ntohs(header.body_length);
++  rlen = sizeof (header) + blen;
++  assert(blen >= 0 && rlen > 0);
++
++  if (message->length < message->parsed + rlen)
++    return 0;
++
++  if (critical)
++    *critical = !!(ntohs(header.type) & NKE_RECORD_CRITICAL_BIT);
++  if (type)
++    *type = ntohs(header.type) & ~NKE_RECORD_CRITICAL_BIT;
++  if (body)
++    memcpy(body, &message->data[message->parsed + sizeof (header)], MIN(buffer_length, blen));
++  if (body_length)
++    *body_length = blen;
++
++  message->parsed += rlen;
++
++  return 1;
++}
++
++/* ================================================== */
++
++static int
++check_message_format(struct Message *message, int eof)
++{
++  int critical = 0, type = -1, length = -1, ends = 0;
++
++  reset_message_parsing(message);
++  message->complete = 0;
++
++  while (get_record(message, &critical, &type, &length, NULL, 0)) {
++    if (type == NKE_RECORD_END_OF_MESSAGE) {
++      if (!critical || length != 0 || ends > 0)
++        return 0;
++      ends++;
++    }
++  }
++
++  /* If the message cannot be fully parsed, but more data may be coming,
++     consider the format to be ok */
++  if (message->length == 0 || message->parsed < message->length)
++    return !eof;
++
++  if (type != NKE_RECORD_END_OF_MESSAGE)
++    return !eof;
++
++  message->complete = 1;
++
++  return 1;
++}
++
++/* ================================================== */
++
++static int server_sni_cb(WOLFSSL* ssl, int* alertReason, void* exArg)
++{
++  WolfsslCreds* creds = (WolfsslCreds*)exArg;
++  char* req_server;
++  unsigned short req_server_len;
++  int i = 0;
++  DerBuffer* der = NULL;
++  DecodedCert decoded_cert;
++  int ret = 0;
++
++  req_server_len = wolfSSL_SNI_GetRequest(ssl, WOLFSSL_SNI_HOST_NAME,
++                                          (void**)&req_server);
++  if (req_server_len == 0) {
++    /* Not an error if no SNI sent by client. */
++    return 0;
++  }
++  for (; i < creds->n_certs_keys && ret == 0; ++i) {
++    ret = wc_PemCertToDer_ex(creds->certs[i], &der);
++    if (ret != 0) {
++      LOG(LOGS_ERR, "wc_PemCertToDer_ex failed.");
++      ret = fatal_return;
++    }
++    if (ret == 0) {
++      wc_InitDecodedCert(&decoded_cert, der->buffer, der->length, NULL);
++      ret = wc_ParseCert(&decoded_cert, CERT_TYPE, NO_VERIFY, NULL);
++      if (ret != 0) {
++        LOG(LOGS_ERR, "wc_ParseCert failed.");
++        ret = fatal_return;
++      }
++    }
++    if (ret == 0) {
++      DEBUG_LOG("Checking candidate cert with subject name %s against hostname "
++                "%s in client SNI extension.", decoded_cert.subjectCN,
++                req_server);
++      if (memcmp(req_server, decoded_cert.subjectCN, req_server_len) == 0) {
++        if (wolfSSL_use_certificate_chain_file(ssl, creds->certs[i])
++              != WOLFSSL_SUCCESS) {
++          LOG(LOGS_ERR, "Failed to use certificate %s.", creds->certs[i]);
++          ret = fatal_return;
++        }
++        if (wolfSSL_use_PrivateKey_file(ssl, creds->keys[i],
++              WOLFSSL_FILETYPE_PEM) != WOLFSSL_SUCCESS) {
++          LOG(LOGS_ERR, "Failed to use private key %s.", creds->keys[i]);
++          ret = fatal_return;
++        }
++        DEBUG_LOG("Cert %s matched.", creds->certs[i]);
++      }
++      else {
++        DEBUG_LOG("Cert %s did NOT match.", creds->certs[i]);
++      }
++    }
++    wc_FreeDecodedCert(&decoded_cert);
++    wc_FreeDer(&der);
++  }
++
++  return ret;
++}
++
++/* ================================================== */
++
++static WOLFSSL_CTX*
++create_tls_ctx(NKSN_Instance inst, NKSN_Credentials creds)
++{
++  WOLFSSL_CTX* ctx;
++
++  if (inst->server) {
++    ctx = wolfSSL_CTX_new(wolfTLSv1_3_server_method_ex(NULL));
++    wolfSSL_CTX_set_servername_callback(ctx, server_sni_cb);
++    wolfSSL_CTX_set_servername_arg(ctx, creds);
++  }
++  else {
++    ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method_ex(NULL));
++  }
++
++  return ctx;
++}
++
++/* ================================================== */
++
++static int override_date_err_cb(int preverify, WOLFSSL_X509_STORE_CTX* store)
++{
++     if (store->error == ASN_BEFORE_DATE_E || store->error == ASN_AFTER_DATE_E) { 
++         return 1;
++     }
++
++     return 0;
++}
++
++/* ================================================== */
++
++static WOLFSSL*
++create_tls_session(WOLFSSL_CTX* ctx, int server_mode, int sock_fd,
++                   const char *server_name, const WolfsslCreds* creds)
++{
++  char alpn_name[] = NKE_ALPN_NAME;
++  WOLFSSL* session = NULL;
++  int r = WOLFSSL_SUCCESS;
++  int i;
++  struct stat stat_buf;
++  unsigned int verify_flags;
++
++  /* GnuTLS implementation allows date errors at load time. We achieve the same
++   * behavior here with WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY. */
++  verify_flags = WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY;
++
++  if (!server_mode && clock_updates < CNF_GetNoCertTimeCheck()) {
++    wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, override_date_err_cb);
++    DEBUG_LOG("Disabled time checks");
++  }
++
++  for (i = 0; i < creds->n_trusted_certs; ++i) {
++    if (stat(creds->trusted_certs[i], &stat_buf) == 0 &&
++        S_ISDIR(stat_buf.st_mode)) {
++      r = wolfSSL_CTX_load_verify_locations_ex(ctx, NULL,
++                                               creds->trusted_certs[i],
++                                               verify_flags);
++      if (r != WOLFSSL_SUCCESS) {
++        LOG(LOGS_ERR, "Failed to use trusted certificate dir %s.",
++            creds->trusted_certs[i]);
++        break;
++      }
++    }
++    else {
++      r = wolfSSL_CTX_load_verify_locations_ex(ctx, creds->trusted_certs[i],
++                                               NULL, verify_flags);
++      if (r != WOLFSSL_SUCCESS) {
++        LOG(LOGS_ERR, "Failed to use trusted certificate %s. (%d)",
++            creds->trusted_certs[i], r);
++        break;
++      }
++    }
++  }
++
++  if (r == WOLFSSL_SUCCESS) {
++    /* Default to using the first cert/key pair. If there are multiple pairs,
++     * the SNI callback, server_sni_cb, will pick the one to use based on the
++     * hostname in the SNI extension of the ClientHello. */
++    if (creds->n_certs_keys != 0) {
++      r = wolfSSL_CTX_use_certificate_chain_file(ctx, creds->certs[0]);
++      if (r != WOLFSSL_SUCCESS) {
++        LOG(LOGS_ERR, "Failed to use certificate %s.", creds->certs[i]);
++      }
++      else {
++        r = wolfSSL_CTX_use_PrivateKey_file(ctx, creds->keys[0],
++                                            WOLFSSL_FILETYPE_PEM);
++        if (r != WOLFSSL_SUCCESS) {
++          LOG(LOGS_ERR, "Failed to use private key %s.", creds->keys[0]);
++        }
++      }
++    }
++  }
++
++  if (r == WOLFSSL_SUCCESS) {
++    session = wolfSSL_new(ctx);
++    if (session == NULL) {
++      LOG(LOGS_ERR, "Could not create TLS session.");
++      return NULL;
++    }
++  }
++
++  if (!server_mode) {
++    assert(server_name);
++
++    if (!UTI_IsStringIP(server_name)) {
++      r = wolfSSL_UseSNI(session, WOLFSSL_SNI_HOST_NAME, server_name,
++                         strlen(server_name));
++      if (r != WOLFSSL_SUCCESS) {
++        LOG(LOGS_ERR, "Failed to enable SNI with hostname %s.", server_name);
++      }
++    }
++  }
++
++  if (r == WOLFSSL_SUCCESS) {
++    /* Continue on mismatch because we check the ALPN manually in check_alpn.
++     * This mirrors the behavior with the GnuTLS implementation. */
++    r = wolfSSL_UseALPN(session, alpn_name, sizeof(alpn_name)-1,
++                        WOLFSSL_ALPN_CONTINUE_ON_MISMATCH);
++    if (r != WOLFSSL_SUCCESS) {
++      LOG(LOGS_ERR, "Failed to enable ALPN.");
++    }
++  }
++
++  if (r == WOLFSSL_SUCCESS) {
++    r = wolfSSL_set_fd(session, sock_fd);
++    if (r != WOLFSSL_SUCCESS) {
++      LOG(LOGS_ERR, "Failed to associate socket with TLS session.");
++    }
++  }
++
++  if (r != WOLFSSL_SUCCESS && session != NULL) {
++    wolfSSL_free(session);
++    session = NULL;
++  }
++
++  return session;
++}
++
++/* ================================================== */
++
++static void
++stop_session(NKSN_Instance inst)
++{
++  if (inst->state == KE_STOPPED)
++    return;
++
++  inst->state = KE_STOPPED;
++
++  SCH_RemoveFileHandler(inst->sock_fd);
++  SCK_CloseSocket(inst->sock_fd);
++  inst->sock_fd = INVALID_SOCK_FD;
++
++  Free(inst->label);
++  inst->label = NULL;
++
++  wolfSSL_free(inst->tls_session);
++  inst->tls_session = NULL;
++
++  wolfSSL_CTX_free(inst->tls_ctx);
++  inst->tls_ctx = NULL;
++
++  SCH_RemoveTimeout(inst->timeout_id);
++  inst->timeout_id = 0;
++}
++
++/* ================================================== */
++
++static void
++session_timeout(void *arg)
++{
++  NKSN_Instance inst = arg;
++
++  LOG(inst->server ? LOGS_DEBUG : LOGS_ERR, "NTS-KE session with %s timed out", inst->label);
++
++  inst->timeout_id = 0;
++  stop_session(inst);
++}
++
++/* ================================================== */
++
++static int
++check_alpn(NKSN_Instance inst)
++{
++  char* protocol_name = NULL;
++  unsigned short protocol_name_sz;
++  int r;
++  int err = 0;
++
++  if (inst->server) {
++    r = wolfSSL_ALPN_GetPeerProtocol(inst->tls_session, &protocol_name,
++                                     &protocol_name_sz);
++  }
++  else {
++    r = wolfSSL_ALPN_GetProtocol(inst->tls_session, &protocol_name,
++                                 &protocol_name_sz);
++  }
++  if (r != WOLFSSL_SUCCESS) {
++    LOG(LOGS_ERR, "Failed to get ALPN protocol name.");
++    err = 1;
++  }
++
++  if (protocol_name_sz != sizeof(NKE_ALPN_NAME)-1 ||
++      memcmp(protocol_name, NKE_ALPN_NAME, protocol_name_sz) != 0) {
++    LOG(LOGS_ERR, "ALPN protocol name %s doesn't match expected %s.",
++      protocol_name, NKE_ALPN_NAME);
++    err = 1;
++  }
++
++  /* wolfSSL_ALPN_GetPeerProtocol dynamically allocates protocol_name. */
++  if (inst->server && protocol_name != NULL) {
++      free(protocol_name);
++  }
++
++  if (err) {
++    return 0;
++  }
++
++  return 1;
++}
++
++/* ================================================== */
++
++static void
++set_input_output(NKSN_Instance inst, int output)
++{
++  SCH_SetFileHandlerEvent(inst->sock_fd, SCH_FILE_INPUT, !output);
++  SCH_SetFileHandlerEvent(inst->sock_fd, SCH_FILE_OUTPUT, output);
++}
++
++/* ================================================== */
++
++static void
++change_state(NKSN_Instance inst, KeState state)
++{
++  int output;
++
++  switch (state) {
++    case KE_HANDSHAKE:
++      output = !inst->server;
++      break;
++    case KE_WAIT_CONNECT:
++    case KE_SEND:
++    case KE_SHUTDOWN:
++      output = 1;
++      break;
++    case KE_RECEIVE:
++      output = 0;
++      break;
++    default:
++      assert(0);
++  }
++
++  set_input_output(inst, output);
++
++  inst->state = state;
++}
++
++/* ================================================== */
++
++static int
++handle_event(NKSN_Instance inst, int event)
++{
++  struct Message *message = &inst->message;
++  int r;
++  int err;
++
++  DEBUG_LOG("Session event %d fd=%d state=%d", event, inst->sock_fd, (int)inst->state);
++
++  switch (inst->state) {
++    case KE_WAIT_CONNECT:
++      /* Check if connect() succeeded */
++      if (event != SCH_FILE_OUTPUT)
++        return 0;
++
++      /* Get the socket error */
++      if (!SCK_GetIntOption(inst->sock_fd, SOL_SOCKET, SO_ERROR, &r))
++        r = EINVAL;
++
++      if (r != 0) {
++        LOG(LOGS_ERR, "Could not connect to %s : %s", inst->label, strerror(r));
++        stop_session(inst);
++        return 0;
++      }
++
++      DEBUG_LOG("Connected to %s", inst->label);
++
++      change_state(inst, KE_HANDSHAKE);
++      return 0;
++
++    case KE_HANDSHAKE:
++      if (inst->server) {
++        r = wolfSSL_accept(inst->tls_session);
++      }
++      else {
++        r = wolfSSL_connect(inst->tls_session);
++      }
++
++      if (r != WOLFSSL_SUCCESS) {
++        err = wolfSSL_get_error(inst->tls_session, 0);
++        if (err != WOLFSSL_ERROR_WANT_READ && err != WOLFSSL_ERROR_WANT_WRITE) {
++          LOG(inst->server ? LOGS_DEBUG : LOGS_ERR, "TLS handshake with %s "
++              "failed : %s", inst->label, wc_GetErrorString(err));
++          stop_session(inst);
++          return 0;
++        }
++
++        /* Disable output when the handshake is trying to receive data */
++        if (err == WOLFSSL_ERROR_WANT_READ) {
++          set_input_output(inst, 0);
++        }
++        
++        /* Increase the retry interval. */
++        inst->retry_factor = NKE_RETRY_FACTOR2_TLS;
++        return 0;
++      }
++
++      inst->retry_factor = NKE_RETRY_FACTOR2_TLS;
++
++      if (DEBUG) {
++        DEBUG_LOG("Handshake with %s completed", inst->label);
++      }
++
++      if (!check_alpn(inst)) {
++        LOG(inst->server ? LOGS_DEBUG : LOGS_ERR, "NTS-KE not supported by %s",
++            inst->label);
++        stop_session(inst);
++        return 0;
++      }
++
++      /* Client will send a request to the server */
++      change_state(inst, inst->server ? KE_RECEIVE : KE_SEND);
++      return 0;
++
++    case KE_SEND:
++      assert(inst->new_message && message->complete);
++      assert(message->length <= sizeof (message->data) && message->length >
++             message->sent);
++
++      r = wolfSSL_write(inst->tls_session, &message->data[message->sent],
++                        message->length - message->sent);
++      if (r <= 0) {
++        err = wolfSSL_get_error(inst->tls_session, 0);
++        if (err != WOLFSSL_ERROR_WANT_WRITE && err != WOLFSSL_ERROR_WANT_READ) {
++          LOG(inst->server ? LOGS_DEBUG : LOGS_ERR,
++              "Could not send NTS-KE message to %s : %s", inst->label,
++              wolfSSL_ERR_error_string(err, NULL));
++          stop_session(inst);
++        }
++        return 0;
++      }
++
++      DEBUG_LOG("Sent %d bytes to %s", r, inst->label);
++
++      message->sent += r;
++      if (message->sent < message->length)
++        return 0;
++
++      /* Client will receive a response */
++      change_state(inst, inst->server ? KE_SHUTDOWN : KE_RECEIVE);
++      reset_message(&inst->message);
++      inst->new_message = 0;
++      return 0;
++
++    case KE_RECEIVE:
++      do {
++        if (message->length >= sizeof (message->data)) {
++          DEBUG_LOG("Message is too long");
++          stop_session(inst);
++          return 0;
++        }
++
++        r = wolfSSL_read(inst->tls_session, &message->data[message->length],
++                         sizeof (message->data) - message->length);
++        if (r <= 0) {
++          err = wolfSSL_get_error(inst->tls_session, 0);
++          if (err != WOLFSSL_ERROR_WANT_WRITE && err != WOLFSSL_ERROR_WANT_READ) {
++            LOG(inst->server ? LOGS_DEBUG : LOGS_ERR,
++                "Could not receive NTS-KE message from %s : %s", inst->label,
++                wolfSSL_ERR_error_string(err, NULL));
++            stop_session(inst);
++          }
++          return 0;
++        }
++
++        DEBUG_LOG("Received %d bytes from %s", r, inst->label);
++
++        message->length += r;
++
++      } while (wolfSSL_pending(inst->tls_session) > 0);
++
++      if (!check_message_format(message, r == 0)) {
++        LOG(inst->server ? LOGS_DEBUG : LOGS_ERR,
++            "Received invalid NTS-KE message from %s", inst->label);
++        stop_session(inst);
++        return 0;
++      }
++
++      /* Wait for more data if the message is not complete yet */
++      if (!message->complete)
++        return 0;
++
++      /* Server will send a response to the client */
++      change_state(inst, inst->server ? KE_SEND : KE_SHUTDOWN);
++
++      /* Return success to process the received message */
++      return 1;
++
++    case KE_SHUTDOWN:
++      r = wolfSSL_shutdown(inst->tls_session);
++      if (r != WOLFSSL_SUCCESS) {
++        if (r == WOLFSSL_SHUTDOWN_NOT_DONE) {
++          set_input_output(inst, 0);
++        }
++        else {
++          err = wolfSSL_get_error(inst->tls_session, 0);
++          DEBUG_LOG("Shutdown with %s failed : %s", inst->label,
++                    wolfSSL_ERR_error_string(err, NULL));
++          stop_session(inst);
++        }
++        return 0;
++      }
++
++      SCK_ShutdownConnection(inst->sock_fd);
++      stop_session(inst);
++
++      DEBUG_LOG("Shutdown completed");
++      return 0;
++
++    default:
++      assert(0);
++      return 0;
++  }
++}
++
++/* ================================================== */
++
++static void
++read_write_socket(int fd, int event, void *arg)
++{
++  NKSN_Instance inst = arg;
++
++  if (!handle_event(inst, event))
++    return;
++
++  /* A valid message was received.  Call the handler to process the message,
++     and prepare a response if it is a server. */
++
++  reset_message_parsing(&inst->message);
++
++  if (!(inst->handler)(inst->handler_arg)) {
++    stop_session(inst);
++    return;
++  }
++}
++
++/* ================================================== */
++
++static time_t
++get_time(time_t *t)
++{
++  struct timespec now;
++
++  LCL_ReadCookedTime(&now, NULL);
++  if (t)
++    *t = now.tv_sec;
++
++  return now.tv_sec;
++}
++
++/* ================================================== */
++
++static void
++handle_step(struct timespec *raw, struct timespec *cooked, double dfreq,
++            double doffset, LCL_ChangeType change_type, void *anything)
++{
++  if (change_type != LCL_ChangeUnknownStep && clock_updates < INT_MAX)
++    clock_updates++;
++}
++
++/* ================================================== */
++
++static int wolfssl_init = 0;
++
++static void
++init_wolfssl(void)
++{
++  int r;
++
++  if (wolfssl_init == 1)
++    return;
++
++  r = wolfSSL_Init();
++  if (r != WOLFSSL_SUCCESS)
++    LOG_FATAL("wolfSSL_Init() failed.");
++
++  /* Use our clock instead of the system clock in certificate verification */
++  wc_SetTimeCb(get_time);
++
++  wolfssl_init = 1;
++  DEBUG_LOG("wolfSSL initialized.");
++
++  LCL_AddParameterChangeHandler(handle_step, NULL);
++}
++
++/* ================================================== */
++
++static void
++deinit_wolfssl(void)
++{
++  if (!wolfssl_init || credentials_counter > 0)
++    return;
++
++  LCL_RemoveParameterChangeHandler(handle_step, NULL);
++
++  wolfSSL_Cleanup();
++  wolfssl_init = 0;
++  DEBUG_LOG("Deinitialised");
++}
++
++/* ================================================== */
++
++static void
++free_credentials(WolfsslCreds* creds) {
++  int i;
++
++  if (creds != NULL) {
++    if (creds->trusted_certs != NULL) {
++      for (i = 0; i < creds->n_trusted_certs; ++i) {
++        if (creds->trusted_certs[i] != NULL) {
++          free(creds->trusted_certs[i]);
++        }
++      }
++      free(creds->trusted_certs);
++    }
++    if (creds->keys != NULL) {
++      for (i = 0; i < creds->n_certs_keys; ++i) {
++        if (creds->keys[i] != NULL) {
++          free(creds->keys[i]);
++        }
++      }
++      free(creds->keys);
++    }
++    if (creds->certs != NULL) {
++      for (i = 0; i < creds->n_certs_keys; ++i) {
++        if (creds->certs[i] != NULL) {
++          free(creds->certs[i]);
++        }
++      }
++      free(creds->certs);
++    }
++    free(creds);
++  }
++}
++
++static WolfsslCreds*
++allocate_credentials(int n_certs_keys, int n_trusted_certs) {
++  WolfsslCreds* creds;
++  int err = 0;
++  int i;
++
++  creds = (WolfsslCreds*)malloc(sizeof(WolfsslCreds));
++  if (creds == NULL) {
++    err = 1;
++  }
++  else {
++    memset(creds, 0, sizeof(WolfsslCreds));
++  }
++  if (!err && n_certs_keys > 0) {
++    creds->certs = (char**)malloc(n_certs_keys * sizeof(char*));
++    if (creds->certs ==  NULL) {
++      err = 1;
++    }
++    else {
++      memset(creds->certs, 0, n_certs_keys * sizeof(char*));
++      for (i = 0; i < n_certs_keys; ++i) {
++        creds->certs[i] = (char*)malloc(MAX_FILE_NAME_SZ);
++        if (creds->certs[i] == NULL) {
++          err = 1;
++          break;
++        }
++      }
++    }
++    if (!err) {
++      creds->keys = (char**)malloc(n_certs_keys * sizeof(char*));
++      if (creds->keys ==  NULL) {
++        err = 1;
++      }
++      else {
++        memset(creds->keys, 0, n_certs_keys * sizeof(char*));
++        for (i = 0; i < n_certs_keys; ++i) {
++          creds->keys[i] = (char*)malloc(MAX_FILE_NAME_SZ);
++          if (creds->keys[i] == NULL) {
++            err = 1;
++            break;
++          }
++        }
++      }
++    }
++  }
++  if (!err && n_trusted_certs > 0) {
++    creds->trusted_certs = (char**)malloc(n_trusted_certs * sizeof(char*));
++    if (creds->trusted_certs == NULL) {
++      err = 1;
++    }
++    else {
++      memset(creds->trusted_certs, 0, n_trusted_certs * sizeof(char*));
++      for (i = 0; i < n_trusted_certs; ++i) {
++        creds->trusted_certs[i] = (char*)malloc(MAX_FILE_NAME_SZ);
++        if (creds->trusted_certs[i] == NULL) {
++          err = 1;
++          break;
++        }
++      }
++    }
++  }
++
++  if (err) {
++    free_credentials(creds);
++    creds = NULL;
++  }
++
++  return creds;
++}
++
++static NKSN_Credentials
++create_credentials(const char **certs, const char **keys, int n_certs_keys,
++                   const char **trusted_certs, uint32_t *trusted_certs_ids,
++                   int n_trusted_certs, uint32_t trusted_cert_set)
++{
++  WolfsslCreds* creds;
++  int err = 0;
++  int i;
++  int j = 0;
++  struct stat stat_buf;
++
++  init_wolfssl();
++
++  creds = allocate_credentials(n_certs_keys, n_trusted_certs);
++  if (creds == NULL) {
++    err = 1;
++  }
++
++  if (!err && certs && keys) {
++    if (trusted_certs || trusted_certs_ids) {
++      assert(0);
++    }
++
++    if (!err) {
++      creds->n_certs_keys = n_certs_keys;
++      for (i = 0; i < n_certs_keys; i++) {
++        if (stat(certs[i], &stat_buf) != 0) {
++          LOG(LOGS_ERR, "Cert %s doesn't exist.", certs[i]);
++          err = 1;
++          break;
++        }
++        if (stat(keys[i], &stat_buf) != 0) {
++          LOG(LOGS_ERR, "Key %s doesn't exist.", keys[i]);
++          err = 1;
++          break;
++        }
++
++        strncpy(creds->certs[i], certs[i], MAX_FILE_NAME_SZ);
++        strncpy(creds->keys[i], keys[i], MAX_FILE_NAME_SZ);
++      }
++    }
++  }
++  else {
++    if (certs || keys || n_certs_keys > 0) {
++      assert(0);
++    }
++
++    if (!err && trusted_certs && trusted_certs_ids) {
++      for (i = 0; i < n_trusted_certs; i++) {
++        if (trusted_certs_ids[i] != trusted_cert_set) {
++          continue;
++        }
++        if (stat(trusted_certs[i], &stat_buf) != 0) {
++          LOG(LOGS_ERR, "Cert %s doesn't exist.", trusted_certs[i]);
++          err = 1;
++          break;
++        }
++
++        ++creds->n_trusted_certs;
++        strncpy(creds->trusted_certs[j++], trusted_certs[i], MAX_FILE_NAME_SZ);
++      }
++    } 
++  }
++
++  if (err) {
++    LOG(LOGS_ERR, "Could not set credentials");
++    free_credentials(creds);
++    creds = NULL;
++    deinit_wolfssl();
++  }
++  else {
++    ++credentials_counter;
++  }
++
++  return (NKSN_Credentials)creds;
++}
++
++/* ================================================== */
++
++NKSN_Credentials
++NKSN_CreateServerCertCredentials(const char **certs, const char **keys, int n_certs_keys)
++{
++  return create_credentials(certs, keys, n_certs_keys, NULL, NULL, 0, 0);
++}
++
++/* ================================================== */
++
++NKSN_Credentials
++NKSN_CreateClientCertCredentials(const char **certs, uint32_t *ids,
++                                 int n_certs_ids, uint32_t trusted_cert_set)
++{
++  return create_credentials(NULL, NULL, 0, certs, ids, n_certs_ids,
++                            trusted_cert_set);
++}
++
++/* ================================================== */
++
++void
++NKSN_DestroyCertCredentials(NKSN_Credentials credentials)
++{
++  free_credentials((WolfsslCreds*)credentials);
++  credentials_counter--;
++  deinit_wolfssl();
++}
++
++/* ================================================== */
++
++NKSN_Instance
++NKSN_CreateInstance(int server_mode, const char *server_name,
++                    NKSN_MessageHandler handler, void *handler_arg)
++{
++  NKSN_Instance inst;
++
++  inst = MallocNew(struct NKSN_Instance_Record);
++
++  inst->server = server_mode;
++  inst->server_name = server_name ? Strdup(server_name) : NULL;
++  inst->handler = handler;
++  inst->handler_arg = handler_arg;
++  /* Replace a NULL argument with the session itself */
++  if (!inst->handler_arg)
++    inst->handler_arg = inst;
++
++  inst->state = KE_STOPPED;
++  inst->sock_fd = INVALID_SOCK_FD;
++  inst->label = NULL;
++  inst->tls_session = NULL;
++  inst->timeout_id = 0;
++  inst->retry_factor = NKE_RETRY_FACTOR2_CONNECT;
++
++  return inst;
++}
++
++/* ================================================== */
++
++void
++NKSN_DestroyInstance(NKSN_Instance inst)
++{
++  stop_session(inst);
++
++  Free(inst->server_name);
++  Free(inst);
++}
++
++/* ================================================== */
++
++int
++NKSN_StartSession(NKSN_Instance inst, int sock_fd, const char *label,
++                  NKSN_Credentials creds, double timeout)
++{
++  assert(inst->state == KE_STOPPED);
++
++  inst->tls_ctx = create_tls_ctx(inst, creds);
++  if (inst->tls_ctx == NULL) {
++    LOG(LOGS_ERR, "Failed to create TLS context.");
++    return 0;
++  }
++  inst->tls_session = create_tls_session(inst->tls_ctx, inst->server, sock_fd,
++                                         inst->server_name,
++                                         (WolfsslCreds*)creds);
++  if (inst->tls_session == NULL) {
++    LOG(LOGS_ERR, "Failed to create TLS session.");
++    wolfSSL_CTX_free(inst->tls_ctx);
++    inst->tls_ctx = NULL;
++    return 0;
++  }
++  else {
++    /* Needed to export keying material. */
++    wolfSSL_KeepArrays(inst->tls_session);
++  }
++
++  inst->sock_fd = sock_fd;
++  SCH_AddFileHandler(sock_fd, SCH_FILE_INPUT, read_write_socket, inst);
++
++  inst->label = Strdup(label);
++  inst->timeout_id = SCH_AddTimeoutByDelay(timeout, session_timeout, inst);
++  inst->retry_factor = NKE_RETRY_FACTOR2_CONNECT;
++
++  reset_message(&inst->message);
++  inst->new_message = 0;
++
++  change_state(inst, inst->server ? KE_HANDSHAKE : KE_WAIT_CONNECT);
++
++  return 1;
++}
++
++/* ================================================== */
++
++void
++NKSN_BeginMessage(NKSN_Instance inst)
++{
++  reset_message(&inst->message);
++  inst->new_message = 1;
++}
++
++/* ================================================== */
++
++int
++NKSN_AddRecord(NKSN_Instance inst, int critical, int type, const void *body,
++               int body_length)
++{
++  assert(inst->new_message && !inst->message.complete);
++  assert(type != NKE_RECORD_END_OF_MESSAGE);
++
++  return add_record(&inst->message, critical, type, body, body_length);
++}
++
++/* ================================================== */
++
++int
++NKSN_EndMessage(NKSN_Instance inst)
++{
++  assert(!inst->message.complete);
++
++  /* Terminate the message */
++  if (!add_record(&inst->message, 1, NKE_RECORD_END_OF_MESSAGE, NULL, 0))
++    return 0;
++
++  inst->message.complete = 1;
++
++  return 1;
++}
++
++/* ================================================== */
++
++int
++NKSN_GetRecord(NKSN_Instance inst, int *critical, int *type, int *body_length,
++               void *body, int buffer_length)
++{
++  int type2;
++
++  assert(inst->message.complete);
++
++  if (body_length)
++    *body_length = 0;
++
++  if (!get_record(&inst->message, critical, &type2, body_length, body,
++                  buffer_length))
++    return 0;
++
++  /* Hide the end-of-message record */
++  if (type2 == NKE_RECORD_END_OF_MESSAGE)
++    return 0;
++
++  if (type)
++    *type = type2;
++
++  return 1;
++}
++
++/* ================================================== */
++
++int
++NKSN_GetKeys(NKSN_Instance inst, SIV_Algorithm siv, NKE_Key *c2s, NKE_Key *s2c)
++{
++  int length = SIV_GetKeyLength(siv);
++
++  if (length <= 0 || length > sizeof (c2s->key) || length > sizeof (s2c->key)) {
++    LOG(LOGS_ERR, "Bad parameter.");
++    return 0;
++  }
++
++  if (wolfSSL_export_keying_material(inst->tls_session,
++        (unsigned char*)c2s->key, length, NKE_EXPORTER_LABEL,
++        sizeof(NKE_EXPORTER_LABEL)-1,
++        (const unsigned char*)NKE_EXPORTER_CONTEXT_C2S,
++        sizeof(NKE_EXPORTER_CONTEXT_C2S)-1, 1) != WOLFSSL_SUCCESS ||
++      wolfSSL_export_keying_material(inst->tls_session,
++        (unsigned char*)s2c->key, length, NKE_EXPORTER_LABEL,
++        sizeof(NKE_EXPORTER_LABEL)-1,
++        (const unsigned char*)NKE_EXPORTER_CONTEXT_S2C,
++        sizeof(NKE_EXPORTER_CONTEXT_S2C)-1, 1) != WOLFSSL_SUCCESS) {
++    LOG(LOGS_ERR, "Failed to export keying material.");
++    return 0;
++  }
++
++  c2s->length = length;
++  s2c->length = length;
++
++  return 1;
++}
++
++/* ================================================== */
++
++int
++NKSN_IsStopped(NKSN_Instance inst)
++{
++  return inst->state == KE_STOPPED;
++}
++
++/* ================================================== */
++
++void
++NKSN_StopSession(NKSN_Instance inst)
++{
++  stop_session(inst);
++}
++
++/* ================================================== */
++
++int
++NKSN_GetRetryFactor(NKSN_Instance inst)
++{
++  return inst->retry_factor;
++}
+diff --git a/siv_wolfssl.c b/siv_wolfssl.c
+new file mode 100644
+index 0000000..1a5a540
+--- /dev/null
++++ b/siv_wolfssl.c
+@@ -0,0 +1,162 @@
++/*
++  chronyd/chronyc - Programs for keeping computer clocks accurate.
++
++ **********************************************************************
++ * Copyright (C) Miroslav Lichvar  2019
++ * 
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of version 2 of the GNU General Public License as
++ * published by the Free Software Foundation.
++ * 
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ * 
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ * 
++ **********************************************************************
++
++  =======================================================================
++
++  SIV ciphers using wolfSSL
++  */
++
++#include "config.h"
++
++#include "sysincl.h"
++
++#include <wolfssl/options.h>
++#include <wolfssl/wolfcrypt/aes.h>
++#include <wolfssl/wolfcrypt/aes_siv.h>
++
++#include "memory.h"
++#include "siv.h"
++
++struct SIV_Instance_Record {
++  unsigned char key[AES_128_KEY_SIZE*2];
++  int keySz;
++};
++
++/* ================================================== */
++
++SIV_Instance
++SIV_CreateInstance(SIV_Algorithm algorithm)
++{
++  SIV_Instance instance;
++
++  if (algorithm != AEAD_AES_SIV_CMAC_256)
++    return NULL;
++
++  instance = MallocNew(struct SIV_Instance_Record);
++  instance->keySz = 0;
++
++  return instance;
++}
++
++/* ================================================== */
++
++void
++SIV_DestroyInstance(SIV_Instance instance)
++{
++  Free(instance);
++}
++
++/* ================================================== */
++
++int
++SIV_GetKeyLength(SIV_Algorithm algorithm)
++{
++  assert(32 <= SIV_MAX_KEY_LENGTH);
++
++  if (algorithm == AEAD_AES_SIV_CMAC_256)
++    return 32;
++  return 0;
++}
++
++/* ================================================== */
++
++int
++SIV_SetKey(SIV_Instance instance, const unsigned char *key, int length)
++{
++  if (length != 32)
++    return 0;
++
++  memcpy(instance->key, key, length);
++  instance->keySz = length;
++
++  return 1;
++}
++
++/* ================================================== */
++
++int
++SIV_GetTagLength(SIV_Instance instance)
++{
++  assert(AES_BLOCK_SIZE <= SIV_MAX_TAG_LENGTH);
++
++  return AES_BLOCK_SIZE;
++}
++
++/* ================================================== */
++
++int
++SIV_Encrypt(SIV_Instance instance,
++            const unsigned char *nonce, int nonce_length,
++            const void *assoc, int assoc_length,
++            const void *plaintext, int plaintext_length,
++            unsigned char *ciphertext, int ciphertext_length)
++{
++  unsigned char iv[AES_BLOCK_SIZE];
++
++  if (instance->keySz == 0)
++    return 0;
++
++  if (nonce_length <= 0 || assoc_length < 0 ||
++      plaintext_length < 0 || plaintext_length > ciphertext_length ||
++      plaintext_length + AES_BLOCK_SIZE != ciphertext_length)
++    return 0;
++
++  assert(assoc && plaintext);
++
++  if (wc_AesSivEncrypt(instance->key, instance->keySz, assoc, assoc_length,
++                       nonce, nonce_length, plaintext, plaintext_length, iv,
++                       ciphertext + AES_BLOCK_SIZE) != 0) {
++    return 0;
++  }
++
++  memcpy(ciphertext, iv, AES_BLOCK_SIZE);
++
++  return 1;
++}
++
++/* ================================================== */
++
++int
++SIV_Decrypt(SIV_Instance instance,
++            const unsigned char *nonce, int nonce_length,
++            const void *assoc, int assoc_length,
++            const unsigned char *ciphertext, int ciphertext_length,
++            void *plaintext, int plaintext_length)
++{
++  if (instance->keySz == 0)
++    return 0;
++
++  if (nonce_length <= 0 || assoc_length < 0 ||
++      plaintext_length < 0 || plaintext_length > ciphertext_length ||
++      plaintext_length + AES_BLOCK_SIZE != ciphertext_length)
++    return 0;
++
++  assert(assoc && plaintext);
++
++  if (wc_AesSivDecrypt(instance->key, instance->keySz, assoc, assoc_length,
++                       nonce, nonce_length, ciphertext + AES_BLOCK_SIZE,
++                       ciphertext_length - AES_BLOCK_SIZE,
++                       (unsigned char*)ciphertext, plaintext) != 0) {
++    return 0;
++  }
++
++  return 1;
++}
+diff --git a/test/simulation/139-nts b/test/simulation/139-nts
+index 6a2112d..4118ae2 100755
+--- a/test/simulation/139-nts
++++ b/test/simulation/139-nts
+@@ -37,11 +37,13 @@ ntsrotate 66
+ ntsdumpdir tmp
+ "
+ client_server_options="minpoll 6 maxpoll 6 nts"
++# When using wolfSSL, cannot pass /dev/null as a certificate without generating
++# an error.
+ client_conf="
+ nosystemcert
+-ntstrustedcerts /dev/null
++#ntstrustedcerts /dev/null
+ ntstrustedcerts tmp/server1.crt
+-ntstrustedcerts /dev/null
++#ntstrustedcerts /dev/null
+ logdir tmp
+ log rawmeasurements"
+ 
+@@ -52,7 +54,7 @@ check_sync || test_fail
+ 
+ check_file_messages "20.*123\.1.* 111 111 1111" 75 80 measurements.log || test_fail
+ check_file_messages "20.*123\.1.* 111 001 0000" 37 39 measurements.log || test_fail
+-check_file_messages "	2	1	.*	4460	" 260 300 log.packets || test_fail
++check_file_messages "	2	1	.*	4460	" 220 300 log.packets || test_fail
+ check_file_messages "." 6 6 ntskeys || test_fail
+ rm -f tmp/measurements.log
+ 
+@@ -67,7 +69,7 @@ check_sync || test_fail
+ 
+ check_file_messages "20.*123\.1.* 111 111 1111" 99 103 measurements.log || test_fail
+ check_file_messages "20.*123\.1.* 111 001 0000" 0 0 measurements.log || test_fail
+-check_file_messages "	2	1	.*	4460	" 350 390 log.packets || test_fail
++check_file_messages "	2	1	.*	4460	" 300 390 log.packets || test_fail
+ check_file_messages "." 6 6 ntskeys || test_fail
+ check_file_messages "." 12 13 192.168.123.1.nts || test_fail
+ rm -f tmp/measurements.log
+@@ -116,7 +118,7 @@ check_sync && test_fail
+ 
+ check_file_messages "	2	1	.*	123	" 0 0 log.packets || test_fail
+ check_file_messages "	2	1	.*	4460	" 10 20 log.packets || test_fail
+-check_log_messages "expired certificate" 4 4 || test_fail
++check_log_messages "current date after" 4 4 || test_fail
+ 
+ client_conf+="
+ nocerttimecheck 1"
+diff --git a/test/unit/nts_ke_session_gnutls.c b/test/unit/nts_ke_session_gnutls.c
+new file mode 100644
+index 0000000..00f2aa6
+--- /dev/null
++++ b/test/unit/nts_ke_session_gnutls.c
+@@ -0,0 +1,224 @@
++/*
++ **********************************************************************
++ * Copyright (C) Miroslav Lichvar  2020
++ * 
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of version 2 of the GNU General Public License as
++ * published by the Free Software Foundation.
++ * 
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ * 
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ * 
++ **********************************************************************
++ */
++
++#include <config.h>
++#include "test.h"
++
++#if defined(FEAT_NTS) && !defined(HAVE_WOLFSSL)
++
++#include <nts_ke_session_gnutls.c>
++
++#include <local.h>
++#include <socket.h>
++#include <sched.h>
++
++static NKSN_Instance client, server;
++static unsigned char record[NKE_MAX_MESSAGE_LENGTH];
++static int record_length, critical, type_start, records;
++static int request_received;
++static int response_received;
++
++static void
++send_message(NKSN_Instance inst)
++{
++  int i;
++
++  record_length = random() % (NKE_MAX_MESSAGE_LENGTH - 4 + 1);
++  for (i = 0; i < record_length; i++)
++    record[i] = random() % 256;
++  critical = random() % 2;
++  type_start = random() % 30000 + 1;
++  assert(sizeof (struct RecordHeader) == 4);
++  records = random() % ((NKE_MAX_MESSAGE_LENGTH - 4) / (4 + record_length) + 1);
++
++  DEBUG_LOG("critical=%d type_start=%d records=%d*%d",
++            critical, type_start, records, record_length);
++
++  NKSN_BeginMessage(inst);
++
++  TEST_CHECK(check_message_format(&inst->message, 0));
++  TEST_CHECK(!check_message_format(&inst->message, 1));
++
++  TEST_CHECK(!NKSN_AddRecord(inst, 0, 1, record, NKE_MAX_MESSAGE_LENGTH - 4 + 1));
++
++  TEST_CHECK(check_message_format(&inst->message, 0));
++  TEST_CHECK(!check_message_format(&inst->message, 1));
++
++  for (i = 0; i < records; i++) {
++    TEST_CHECK(NKSN_AddRecord(inst, critical, type_start + i, record, record_length));
++    TEST_CHECK(!NKSN_AddRecord(inst, 0, 1, &record,
++                               NKE_MAX_MESSAGE_LENGTH - inst->message.length - 4 + 1));
++
++    TEST_CHECK(check_message_format(&inst->message, 0));
++    TEST_CHECK(!check_message_format(&inst->message, 1));
++  }
++
++  TEST_CHECK(NKSN_EndMessage(inst));
++
++  TEST_CHECK(check_message_format(&inst->message, 0));
++  TEST_CHECK(check_message_format(&inst->message, 1));
++}
++
++static void
++verify_message(NKSN_Instance inst)
++{
++  unsigned char buffer[NKE_MAX_MESSAGE_LENGTH];
++  int i, c, t, length, buffer_length, msg_length, prev_parsed;
++  NKE_Key c2s, s2c;
++
++  for (i = 0; i < records; i++) {
++    memset(buffer, 0, sizeof (buffer));
++    buffer_length = random() % (record_length + 1);
++    assert(buffer_length <= sizeof (buffer));
++
++    prev_parsed = inst->message.parsed;
++    msg_length = inst->message.length;
++
++    TEST_CHECK(NKSN_GetRecord(inst, &c, &t, &length, buffer, buffer_length));
++    TEST_CHECK(c == critical);
++    TEST_CHECK(t == type_start + i);
++    TEST_CHECK(length == record_length);
++    TEST_CHECK(memcmp(record, buffer, buffer_length) == 0);
++    if (buffer_length < record_length)
++      TEST_CHECK(buffer[buffer_length] == 0);
++
++    inst->message.length = inst->message.parsed - 1;
++    inst->message.parsed = prev_parsed;
++    TEST_CHECK(!get_record(&inst->message, NULL, NULL, NULL, buffer, buffer_length));
++    TEST_CHECK(inst->message.parsed == prev_parsed);
++    inst->message.length = msg_length;
++    if (msg_length < 0x8000) {
++      inst->message.data[prev_parsed + 2] ^= 0x80;
++      TEST_CHECK(!get_record(&inst->message, NULL, NULL, NULL, buffer, buffer_length));
++      TEST_CHECK(inst->message.parsed == prev_parsed);
++      inst->message.data[prev_parsed + 2] ^= 0x80;
++    }
++    TEST_CHECK(get_record(&inst->message, NULL, NULL, NULL, buffer, buffer_length));
++    TEST_CHECK(inst->message.parsed > prev_parsed);
++  }
++
++  TEST_CHECK(!NKSN_GetRecord(inst, &critical, &t, &length, buffer, sizeof (buffer)));
++
++  TEST_CHECK(NKSN_GetKeys(inst, AEAD_AES_SIV_CMAC_256, &c2s, &s2c));
++  TEST_CHECK(c2s.length == SIV_GetKeyLength(AEAD_AES_SIV_CMAC_256));
++  TEST_CHECK(s2c.length == SIV_GetKeyLength(AEAD_AES_SIV_CMAC_256));
++}
++
++static int
++handle_request(void *arg)
++{
++  NKSN_Instance server = arg;
++
++  verify_message(server);
++
++  request_received = 1;
++
++  send_message(server);
++
++  return 1;
++}
++
++static int
++handle_response(void *arg)
++{
++  NKSN_Instance client = arg;
++
++  response_received = 1;
++
++  verify_message(client);
++
++  return 1;
++}
++
++static void
++check_finished(void *arg)
++{
++  DEBUG_LOG("checking for stopped sessions");
++  if (!NKSN_IsStopped(server) || !NKSN_IsStopped(client)) {
++    SCH_AddTimeoutByDelay(0.001, check_finished, NULL);
++    return;
++  }
++
++  SCH_QuitProgram();
++}
++
++void
++test_unit(void)
++{
++  NKSN_Credentials client_cred, server_cred;
++  const char *cert, *key;
++  int sock_fds[2], i;
++  uint32_t cert_id;
++
++  LCL_Initialise();
++  TST_RegisterDummyDrivers();
++
++  cert = "nts_ke.crt";
++  key = "nts_ke.key";
++  cert_id = 0;
++
++  for (i = 0; i < 50; i++) {
++    SCH_Initialise();
++
++    server = NKSN_CreateInstance(1, NULL, handle_request, NULL);
++    client = NKSN_CreateInstance(0, "test", handle_response, NULL);
++
++    server_cred = NKSN_CreateServerCertCredentials(&cert, &key, 1);
++    client_cred = NKSN_CreateClientCertCredentials(&cert, &cert_id, 1, 0);
++
++    TEST_CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, sock_fds) == 0);
++    TEST_CHECK(fcntl(sock_fds[0], F_SETFL, O_NONBLOCK) == 0);
++    TEST_CHECK(fcntl(sock_fds[1], F_SETFL, O_NONBLOCK) == 0);
++
++    TEST_CHECK(NKSN_StartSession(server, sock_fds[0], "client", server_cred, 4.0));
++    TEST_CHECK(NKSN_StartSession(client, sock_fds[1], "server", client_cred, 4.0));
++
++    send_message(client);
++
++    request_received = response_received = 0;
++
++    check_finished(NULL);
++
++    SCH_MainLoop();
++
++    TEST_CHECK(NKSN_IsStopped(server));
++    TEST_CHECK(NKSN_IsStopped(client));
++
++    TEST_CHECK(request_received);
++    TEST_CHECK(response_received);
++
++    NKSN_DestroyInstance(server);
++    NKSN_DestroyInstance(client);
++
++    NKSN_DestroyCertCredentials(server_cred);
++    NKSN_DestroyCertCredentials(client_cred);
++
++    SCH_Finalise();
++  }
++
++  LCL_Finalise();
++}
++#else
++void
++test_unit(void)
++{
++  TEST_REQUIRE(0);
++}
++#endif /* FEAT_NTS && !HAVE_WOLFSSL */
+diff --git a/test/unit/nts_ke_session.c b/test/unit/nts_ke_session_wolfssl.c
+similarity index 98%
+rename from test/unit/nts_ke_session.c
+rename to test/unit/nts_ke_session_wolfssl.c
+index d0e72c7..766ece7 100644
+--- a/test/unit/nts_ke_session.c
++++ b/test/unit/nts_ke_session_wolfssl.c
+@@ -17,13 +17,15 @@
+  * 
+  **********************************************************************
+  */
++#include <wolfssl/options.h>
++#include <wolfssl/ssl.h>
+ 
+ #include <config.h>
+ #include "test.h"
+ 
+ #ifdef FEAT_NTS
+ 
+-#include <nts_ke_session.c>
++#include <nts_ke_session_wolfssl.c>
+ 
+ #include <local.h>
+ #include <socket.h>
