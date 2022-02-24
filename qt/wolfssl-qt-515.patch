@@ -166,10 +166,169 @@ index ad4d711cba..d1e54014e4 100644
 +    return(false)
 +}
 diff --git a/src/network/ssl/qsslcertificate_openssl.cpp b/src/network/ssl/qsslcertificate_openssl.cpp
-index ca9d61ccb1..9b0ee9983b 100644
+index ca9d61ccb1..8b6b99c1ed 100644
 --- a/src/network/ssl/qsslcertificate_openssl.cpp
 +++ b/src/network/ssl/qsslcertificate_openssl.cpp
-@@ -661,7 +661,7 @@ static QMultiMap<QByteArray, QString> _q_mapFromX509Name(X509_NAME *name)
+@@ -46,6 +46,7 @@
+ 
+ #include <QtCore/qendian.h>
+ #include <QtCore/qmutex.h>
++#include <QtCore/qscopeguard.h>
+ 
+ QT_BEGIN_NAMESPACE
+ 
+@@ -318,6 +319,34 @@ QSslKey QSslCertificate::publicKey() const
+     return key;
+ }
+ 
++#if QT_CONFIG(wolfssl)
++static void wolfssl_extinternal_free(X509V3_EXT_METHOD  *meth, void *internal)
++{
++
++    if (!meth || !internal) return;
++
++    switch(meth->ext_nid) {
++        case (NID_basic_constraints):
++            BASIC_CONSTRAINTS_free((BASIC_CONSTRAINTS*)internal);
++            break;
++        case (NID_subject_key_identifier):
++            ASN1_STRING_free((ASN1_STRING*)internal);
++            break;
++        case (NID_authority_key_identifier):
++            AUTHORITY_KEYID_free((AUTHORITY_KEYID*)internal);
++            break;
++        case (NID_key_usage):
++            ASN1_STRING_free((ASN1_STRING*)internal);
++            break;
++        case (NID_info_access):
++            AUTHORITY_INFO_ACCESS_pop_free((AUTHORITY_INFO_ACCESS*)internal, NULL);
++            break;
++        default:
++           qCWarning(lcSsl, "No method to free an unknown extension, a potential memory leak");
++    }
++
++}
++#endif
+ /*
+  * Convert unknown extensions to a QVariant.
+  */
+@@ -337,11 +366,31 @@ static QVariant x509UnknownExtensionToValue(X509_EXTENSION *ext)
+ 
+     //const unsigned char *data = ext->value->data;
+     void *ext_internal = q_X509V3_EXT_d2i(ext);
++    if (!ext_internal)
++        return {};
++
++    const auto extCleaner = qScopeGuard([meth, ext_internal]{
++        Q_ASSERT(ext_internal && meth);
++    #if !QT_CONFIG(wolfssl)
++        if (meth->it)
++            q_ASN1_item_free(static_cast<ASN1_VALUE *>(ext_internal), ASN1_ITEM_ptr(meth->it));
++        else if (meth->ext_free)
++            meth->ext_free(ext_internal);
++        else
++            qCWarning(lcSsl, "No method to free an unknown extension, a potential memory leak?");
++    #else
++        wolfssl_extinternal_free(meth, ext_internal);
++    #endif
++    });
+ 
+     // If this extension can be converted
+-    if (meth->i2v && ext_internal) {
++    if (meth->i2v) {
+         STACK_OF(CONF_VALUE) *val = meth->i2v(meth, ext_internal, nullptr);
+-
++        const auto stackCleaner = qScopeGuard([val]{
++            if (val)
++                q_OPENSSL_sk_pop_free((OPENSSL_STACK *)val, (void(*)(void*))q_X509V3_conf_free);
++        });
++
+         QVariantMap map;
+         QVariantList list;
+         bool isMap = false;
+@@ -362,11 +411,13 @@ static QVariant x509UnknownExtensionToValue(X509_EXTENSION *ext)
+             return map;
+         else
+             return list;
+-    } else if (meth->i2s && ext_internal) {
++    } else if (meth->i2s) {
+         //qCDebug(lcSsl) << meth->i2s(meth, ext_internal);
+-        QVariant result(QString::fromUtf8(meth->i2s(meth, ext_internal)));
++        const char *hexString = meth->i2s(meth, ext_internal);
++        QVariant result(hexString ? QString::fromUtf8(hexString) : QString{});
++        q_OPENSSL_free((void *)hexString);
+         return result;
+-    } else if (meth->i2r && ext_internal) {
++    } else if (meth->i2r) {
+         QByteArray result;
+ 
+         BIO *bio = q_BIO_new(q_BIO_s_mem());
+@@ -396,6 +447,34 @@ static QVariant x509ExtensionToValue(X509_EXTENSION *ext)
+     ASN1_OBJECT *obj = q_X509_EXTENSION_get_object(ext);
+     int nid = q_OBJ_obj2nid(obj);
+ 
++    // We cast away the const-ness here because some versions of openssl
++    // don't use const for the parameters in the functions pointers stored
++    // in the object.
++    X509V3_EXT_METHOD *meth = const_cast<X509V3_EXT_METHOD *>(q_X509V3_EXT_get(ext));
++
++    void *ext_internal = nullptr;
++    const auto extCleaner = qScopeGuard([meth, ext_internal]{
++        if (!meth || !ext_internal)
++            return;
++
++    #if !QT_CONFIG(wolfssl)
++        if (meth->it)
++            q_ASN1_item_free(static_cast<ASN1_VALUE *>(ext_internal), ASN1_ITEM_ptr(meth->it));
++        else if (meth->ext_free)
++            meth->ext_free(ext_internal);
++        else
++            qCWarning(lcSsl, "No method to free an unknown extension, a potential memory leak?");
++    #else
++        wolfssl_extinternal_free(meth, ext_internal);
++    #endif
++    });
++
++    const char * hexString = nullptr;
++    const auto hexStringCleaner = qScopeGuard([&hexString](){
++        if (hexString)
++            q_OPENSSL_free((void*)hexString);
++    });
++
+     switch (nid) {
+     case NID_basic_constraints:
+         {
+@@ -434,21 +513,19 @@ static QVariant x509ExtensionToValue(X509_EXTENSION *ext)
+                     qCWarning(lcSsl) << "Strange location type" << name->type;
+                 }
+             }
+-
+-            q_OPENSSL_sk_pop_free((OPENSSL_STACK*)info, reinterpret_cast<void(*)(void *)>(q_OPENSSL_sk_free));
++
++            q_AUTHORITY_INFO_ACCESS_free(info);
+             return result;
+         }
+         break;
+     case NID_subject_key_identifier:
+         {
+-            void *ext_internal = q_X509V3_EXT_d2i(ext);
+-
+-            // we cast away the const-ness here because some versions of openssl
+-            // don't use const for the parameters in the functions pointers stored
+-            // in the object.
+-            X509V3_EXT_METHOD *meth = const_cast<X509V3_EXT_METHOD *>(q_X509V3_EXT_get(ext));
+-
+-            return QVariant(QString::fromUtf8(meth->i2s(meth, ext_internal)));
++            ext_internal = q_X509V3_EXT_d2i(ext);
++            if (!ext_internal)
++                return {};
++
++            hexString = meth->i2s(meth, ext_internal);
++            return QVariant(QString::fromUtf8(hexString));
+         }
+         break;
+     case NID_authority_key_identifier:
+@@ -661,7 +738,7 @@ static QMultiMap<QByteArray, QString> _q_mapFromX509Name(X509_NAME *name)
          unsigned char *data = nullptr;
          int size = q_ASN1_STRING_to_UTF8(&data, q_X509_NAME_ENTRY_get_data(e));
          info.insert(name, QString::fromUtf8((char*)data, size));
@@ -311,10 +470,21 @@ index 67f267aec1..a33e649a01 100644
  #include <openssl/bio.h>
  #include <openssl/bn.h>
 diff --git a/src/network/ssl/qsslsocket_openssl_symbols.cpp b/src/network/ssl/qsslsocket_openssl_symbols.cpp
-index ed80fc14bd..a20859cab1 100644
+index ed80fc14bd..6ced838b8a 100644
 --- a/src/network/ssl/qsslsocket_openssl_symbols.cpp
 +++ b/src/network/ssl/qsslsocket_openssl_symbols.cpp
-@@ -187,7 +187,6 @@ DEFINEFUNC(STACK_OF(X509) *, X509_STORE_CTX_get0_chain, X509_STORE_CTX *a, a, re
+@@ -178,6 +178,10 @@ DEFINEFUNC(const SSL_METHOD *, TLS_server_method, DUMMYARG, DUMMYARG, return nul
+ DEFINEFUNC(void, X509_up_ref, X509 *a, a, return, DUMMYARG)
+ DEFINEFUNC(ASN1_TIME *, X509_getm_notBefore, X509 *a, a, return nullptr, return)
+ DEFINEFUNC(ASN1_TIME *, X509_getm_notAfter, X509 *a, a, return nullptr, return)
++#if !QT_CONFIG(wolfssl)
++DEFINEFUNC2(void, ASN1_item_free, ASN1_VALUE *val, val, const ASN1_ITEM *it, it, return, return)
++#endif
++DEFINEFUNC(void, X509V3_conf_free, CONF_VALUE *val, val, return, return)
+ DEFINEFUNC(long, X509_get_version, X509 *a, a, return -1, return)
+ DEFINEFUNC(EVP_PKEY *, X509_get_pubkey, X509 *a, a, return nullptr, return)
+ DEFINEFUNC2(void, X509_STORE_set_verify_cb, X509_STORE *a, a, X509_STORE_CTX_verify_cb verify_cb, verify_cb, return, DUMMYARG)
+@@ -187,7 +191,6 @@ DEFINEFUNC(STACK_OF(X509) *, X509_STORE_CTX_get0_chain, X509_STORE_CTX *a, a, re
  DEFINEFUNC3(void, CRYPTO_free, void *str, str, const char *file, file, int line, line, return, DUMMYARG)
  DEFINEFUNC(long, OpenSSL_version_num, void, DUMMYARG, return 0, return)
  DEFINEFUNC(const char *, OpenSSL_version, int a, a, return nullptr, return)
@@ -322,8 +492,35 @@ index ed80fc14bd..a20859cab1 100644
  DEFINEFUNC4(void, DH_get0_pqg, const DH *dh, dh, const BIGNUM **p, p, const BIGNUM **q, q, const BIGNUM **g, g, return, DUMMYARG)
  DEFINEFUNC(int, DH_bits, DH *dh, dh, return 0, return)
  
+@@ -234,6 +237,7 @@ DEFINEFUNC6(int, OCSP_basic_sign, OCSP_BASICRESP *br, br, X509 *signer, signer,
+             const EVP_MD *dg, dg, STACK_OF(X509) *cs, cs, unsigned long flags, flags, return 0, return)
+ #endif // ocsp
+ 
++DEFINEFUNC(void, AUTHORITY_INFO_ACCESS_free, AUTHORITY_INFO_ACCESS *p, p, return, return)
+ DEFINEFUNC2(void, BIO_set_data, BIO *a, a, void *ptr, ptr, return, DUMMYARG)
+ DEFINEFUNC(void *, BIO_get_data, BIO *a, a, return nullptr, return)
+ DEFINEFUNC2(void, BIO_set_init, BIO *a, a, int init, init, return, DUMMYARG)
+@@ -844,6 +848,7 @@ bool q_resolveOpenSslSymbols()
+     RESOLVEFUNC(OPENSSL_init_crypto)
+     RESOLVEFUNC(ASN1_STRING_get0_data)
+     RESOLVEFUNC(EVP_CIPHER_CTX_reset)
++    RESOLVEFUNC(AUTHORITY_INFO_ACCESS_free)
+     RESOLVEFUNC(EVP_PKEY_up_ref)
+     RESOLVEFUNC(EVP_PKEY_CTX_new)
+     RESOLVEFUNC(EVP_PKEY_param_check)
+@@ -880,6 +885,10 @@ bool q_resolveOpenSslSymbols()
+     RESOLVEFUNC(X509_STORE_CTX_get0_chain)
+     RESOLVEFUNC(X509_getm_notBefore)
+     RESOLVEFUNC(X509_getm_notAfter)
++    #if !QT_CONFIG(wolfssl)
++    RESOLVEFUNC(ASN1_item_free)
++    #endif
++    RESOLVEFUNC(X509V3_conf_free)
+     RESOLVEFUNC(X509_get_version)
+     RESOLVEFUNC(X509_get_pubkey)
+     RESOLVEFUNC(X509_STORE_set_verify_cb)
 diff --git a/src/network/ssl/qsslsocket_openssl_symbols_p.h b/src/network/ssl/qsslsocket_openssl_symbols_p.h
-index c46afcf53e..69cca9d7be 100644
+index c46afcf53e..63d59f083c 100644
 --- a/src/network/ssl/qsslsocket_openssl_symbols_p.h
 +++ b/src/network/ssl/qsslsocket_openssl_symbols_p.h
 @@ -69,6 +69,11 @@
@@ -338,7 +535,31 @@ index c46afcf53e..69cca9d7be 100644
  #include "qsslsocket_openssl_p.h"
  #include <QtCore/qglobal.h>
  
-@@ -284,7 +289,7 @@ void q_CRYPTO_free(void *str, const char *file, int line);
+@@ -230,6 +235,7 @@ const unsigned char * q_ASN1_STRING_get0_data(const ASN1_STRING *x);
+ Q_AUTOTEST_EXPORT BIO *q_BIO_new(const BIO_METHOD *a);
+ Q_AUTOTEST_EXPORT const BIO_METHOD *q_BIO_s_mem();
+ 
++void q_AUTHORITY_INFO_ACCESS_free(AUTHORITY_INFO_ACCESS *a);
+ int q_DSA_bits(DSA *a);
+ int q_EVP_CIPHER_CTX_reset(EVP_CIPHER_CTX *c);
+ Q_AUTOTEST_EXPORT int q_EVP_PKEY_up_ref(EVP_PKEY *a);
+@@ -255,6 +261,10 @@ const SSL_METHOD *q_TLS_client_method();
+ const SSL_METHOD *q_TLS_server_method();
+ ASN1_TIME *q_X509_getm_notBefore(X509 *a);
+ ASN1_TIME *q_X509_getm_notAfter(X509 *a);
++#if !QT_CONFIG(wolfssl)
++void q_ASN1_item_free(ASN1_VALUE *val, const ASN1_ITEM *it);
++#endif
++void q_X509V3_conf_free(CONF_VALUE *val);
+ 
+ Q_AUTOTEST_EXPORT void q_X509_up_ref(X509 *a);
+ long q_X509_get_version(X509 *a);
+@@ -279,12 +289,11 @@ int q_DH_bits(DH *dh);
+                                                                     | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL)
+ 
+ int q_OPENSSL_init_crypto(uint64_t opts, const OPENSSL_INIT_SETTINGS *settings);
+-void q_CRYPTO_free(void *str, const char *file, int line);
+ 
  long q_OpenSSL_version_num();
  const char *q_OpenSSL_version(int type);
  
@@ -347,6 +568,16 @@ index c46afcf53e..69cca9d7be 100644
  unsigned long q_SSL_set_options(SSL *s, unsigned long op);
  
  #ifdef TLS1_3_VERSION
+@@ -747,7 +756,8 @@ int q_OCSP_id_cmp(OCSP_CERTID *a, OCSP_CERTID *b);
+ 
+ void *q_CRYPTO_malloc(size_t num, const char *file, int line);
+ #define q_OPENSSL_malloc(num) q_CRYPTO_malloc(num, "", 0)
+-
++void q_CRYPTO_free(void *str, const char *file, int line);
++# define q_OPENSSL_free(addr) q_CRYPTO_free(addr, "", 0)
+ int q_SSL_CTX_get_security_level(const SSL_CTX *ctx);
+ void q_SSL_CTX_set_security_level(SSL_CTX *ctx, int level);
+ 
 diff --git a/src/network/ssl/ssl.pri b/src/network/ssl/ssl.pri
 index 230c45c26f..132b0e356d 100644
 --- a/src/network/ssl/ssl.pri
