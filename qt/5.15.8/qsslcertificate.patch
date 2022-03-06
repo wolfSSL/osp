@@ -1,0 +1,43 @@
+328a329,356
+> #if QT_CONFIG(wolfssl)
+> static void wolfssl_extinternal_free(X509V3_EXT_METHOD  *meth, void *internal)
+> {
+> 
+>     if (!meth || !internal) return;
+> 
+>     switch(meth->ext_nid) {
+>         case (NID_basic_constraints):
+>             BASIC_CONSTRAINTS_free((BASIC_CONSTRAINTS*)internal);
+>             break;
+>         case (NID_subject_key_identifier):
+>             ASN1_STRING_free((ASN1_STRING*)internal);
+>             break;
+>         case (NID_authority_key_identifier):
+>             AUTHORITY_KEYID_free((AUTHORITY_KEYID*)internal);
+>             break;
+>         case (NID_key_usage):
+>             ASN1_STRING_free((ASN1_STRING*)internal);
+>             break;
+>         case (NID_info_access):
+>             AUTHORITY_INFO_ACCESS_pop_free((AUTHORITY_INFO_ACCESS*)internal, NULL);
+>             break;
+>         default:
+>            qCWarning(lcSsl, "No method to free an unknown extension, a potential memory leak");
+>     }
+> 
+> }
+> #endif
+354c382
+< 
+---
+>     #if !QT_CONFIG(wolfssl)
+360a389,391
+>     #else
+>         wolfssl_extinternal_free(meth, ext_internal);
+>     #endif
+435a467
+>     #if !QT_CONFIG(wolfssl)
+441a474,476
+>     #else
+>         wolfssl_extinternal_free(meth, ext_internal);
+>     #endif
