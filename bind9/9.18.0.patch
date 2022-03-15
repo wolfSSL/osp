@@ -1,0 +1,696 @@
+From 11d9dc9384d984a97eddf6ae485181243b25be6a Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 11 Mar 2022 19:11:38 +0100
+Subject: [PATCH] Patch for wolfSSL
+
+This patch was implemented and tested on commit 8db45afa1affcb823e68afdeddedf93e136f5d3e of the master bind9 branch.
+
+- `--with-wolfssl` configure option added. Uses `PKG_CHECK_MODULES` and `PKG_CHECK_VAR` to find the install location of the wolfSSL module.
+- `FATAL_ERROR` changed to `BIND_FATAL_ERROR` to avoid collision with wolfSSL `FATAL_ERROR`.
+- `BN_GENCB_*` not supported so uses are macro'd out.
+- `DH` structure doesn't use flags.
+- ECC `NID_*` are not defines so don't try to check for them with preprocessor.
+- Compatibility layer does not support using an engine.
+- `ssl_ctx_st` equivalent is `WOLFSSL_CTX`.
+- `isc__initialize` and `isc__shutdown` moved to header file and called in `isc_test_begin` to enable testing with a static (`--disable-shared`) build.
+- `EC_KEY_get0_public_key` (almost) always returns an object even if it is not populated. This is checked with `wolfSSL_EC_POINT_is_at_infinity` to make sure the public key is set.
+- `shutdown` -> `_shutdown` due to masking with system `shutdown` API
+
+Compile wolfSSL with:
+```
+./autogen.sh
+./configure --enable-bind
+make
+make install
+```
+
+Compile bind with
+```
+patch -p1 < <path/to/this/patch>
+autoreconf -ivf
+./configure --with-wolfssl
+make
+```
+
+Tests require IPv6 support on the loopback interface. An easy way to add support for this on Linux is to modify `/etc/network/interfaces` to:
+```
+auto lo
+iface lo inet loopback
+iface lo inet6 loopback
+```
+
+And to run `sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=0`
+
+bind9 should pass all tests run with:
+```
+make check
+```
+If any tests fail, please first try compiling with OpenSSL to check if your system is correctly configured to run tests.
+
+The system tests could not be successfully run (even when compiling with OpenSSL). To skip these when running `make check`, delete the associated Makefile `rm bin/tests/system/Makefile`.
+---
+ configure.ac                | 72 +++++++++++++++++++++++++++++++++++++
+ doc/dev/unexpected          |  2 +-
+ lib/bind9/check.c           |  3 ++
+ lib/dns/dst_openssl.h       |  4 +++
+ lib/dns/name.c              | 10 +++---
+ lib/dns/openssl_shim.h      |  1 +
+ lib/dns/openssldh_link.c    | 22 ++++++++++++
+ lib/dns/opensslecdsa_link.c |  9 ++++-
+ lib/dns/opensslrsa_link.c   | 21 ++++++++++-
+ lib/dns/rbtdb.c             |  2 +-
+ lib/dns/rpz.c               |  2 +-
+ lib/isc/entropy.c           |  2 +-
+ lib/isc/include/isc/tls.h   |  6 ++++
+ lib/isc/include/isc/util.h  |  7 +++-
+ lib/isc/lex.c               |  2 +-
+ lib/isc/lib.c               |  5 ---
+ lib/isc/sockaddr.c          |  6 ++--
+ lib/isc/tests/isctest.c     |  2 ++
+ lib/isc/tests/timer_test.c  |  4 +--
+ lib/isc/tls.c               |  2 +-
+ 20 files changed, 160 insertions(+), 24 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index c4ada3050b4..421ca5ba355 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -612,6 +612,76 @@ AS_IF([test "$enable_pthread_rwlock" = "yes"],
+ 
+ CRYPTO=OpenSSL
+ 
++AC_ARG_WITH([wolfssl], 
++	      [AS_HELP_STRING([--with-wolfssl],
++	      		[Use wolfSSL TLS [default=no]])],
++	      [], [])
++
++if test "$with_wolfssl" = "yes"; then
++
++	#
++	# wolfSSL is mandatory
++	#
++	PKG_CHECK_MODULES(
++		[WOLFSSL],
++		[wolfssl],
++		[],
++		[AC_MSG_ERROR([Could not find wolfSSL.])]
++	)
++	PKG_CHECK_VAR(
++		[WOLFSSL_INCLUDEDIR],
++		[wolfssl],
++		[includedir],
++		[],
++		[AC_MSG_ERROR([Could not find wolfSSL includedir variable.])]
++	)
++	WOLFSSL_CFLAGS="${WOLFSSL_CFLAGS} -I${WOLFSSL_INCLUDEDIR}/wolfssl"
++
++	OPENSSL_CFLAGS="$WOLFSSL_CFLAGS"
++	OPENSSL_LIBS="$WOLFSSL_LIBS"
++	CFLAGS="$CFLAGS $WOLFSSL_CFLAGS"
++	LIBS="$LIBS $WOLFSSL_LIBS"
++	
++	AC_DEFINE([HAVE_WOLFSSL], [1], [Use the wolfSSL TLS library])
++	AC_DEFINE([EXTERNAL_OPTS_OPENVPN], [1], [Instruct wolfSSL to self include the options header])
++	
++	#
++	# Building wolfSSL with --enable-bind takes care of making 
++	# everything necessary available.
++	#
++	
++	AC_DEFINE([HAVE_ECDSA_SIGN], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_ECDSA_VERIFY], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_AES_128_ECB], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_AES_192_ECB], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_AES_256_ECB], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_CIPHER_CTX_FREE], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_CIPHER_CTX_NEW], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_MD_CTX_RESET], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_MD_CTX_FREE], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_MD_CTX_NEW], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA1], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA224], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA256], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA384], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_SHA512], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_RSA_SET0_KEY], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_TLS_SERVER_METHOD], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_TLS_CLIENT_METHOD], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_HMAC_CTX_NEW], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_HMAC_CTX_FREE], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_HMAC_CTX_RESET], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_HMAC_CTX_GET_MD], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_DH_GET0_KEY], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_ECDSA_SIG_GET0], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_ECDSA_SIG_SET0], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_OPENSSL_INIT_CRYPTO], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_OPENSSL_INIT_SSL], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_OPENSSL_CLEANUP], [1], [wolfSSL includes])
++	AC_DEFINE([HAVE_EVP_PKEY_GET0_EC_KEY], [1], [wolfSSL includes])
++
++else
++
+ #
+ # OpenSSL/LibreSSL is mandatory
+ #
+@@ -712,6 +782,8 @@ AC_CHECK_FUNCS([DH_get0_key ECDSA_SIG_get0 RSA_set0_key EVP_PKEY_get0_EC_KEY])
+ 
+ AC_CHECK_FUNCS([TLS_server_method TLS_client_method])
+ 
++fi
++
+ #
+ # Check whether FIPS mode is available and whether we should enable it
+ #
+diff --git a/doc/dev/unexpected b/doc/dev/unexpected
+index ffa4b2a9b93..0c1edaaf8e5 100644
+--- a/doc/dev/unexpected
++++ b/doc/dev/unexpected
+@@ -53,4 +53,4 @@ scheme.
+ 
+ In the (rare) situation where a library routine encounters a fatal error and
+ has no way of reporting the error to the application, the library may call
+-FATAL_ERROR().  This will log the problem and then terminate the application.
++BIND_FATAL_ERROR().  This will log the problem and then terminate the application.
+diff --git a/lib/bind9/check.c b/lib/bind9/check.c
+index a88aac6ad3d..b3611a800b3 100644
+--- a/lib/bind9/check.c
++++ b/lib/bind9/check.c
+@@ -18,6 +18,9 @@
+ #include <stdbool.h>
+ #include <stdlib.h>
+ 
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/opensslv.h>
+ 
+ #ifdef HAVE_DNSTAP
+diff --git a/lib/dns/dst_openssl.h b/lib/dns/dst_openssl.h
+index 911c285cb7b..c489801aa95 100644
+--- a/lib/dns/dst_openssl.h
++++ b/lib/dns/dst_openssl.h
+@@ -35,7 +35,11 @@
+  */
+ #define BN_GENCB_free(x)    ((void)0)
+ #define BN_GENCB_new()	    (&_cb)
++#ifndef HAVE_WOLFSSL
+ #define BN_GENCB_get_arg(x) ((x)->arg)
++#else
++#define BN_GENCB_get_arg(x) (NULL)
++#endif
+ #endif /* if OPENSSL_VERSION_NUMBER < 0x10100000L || \
+ 	* defined(LIBRESSL_VERSION_NUMBER) */
+ 
+diff --git a/lib/dns/name.c b/lib/dns/name.c
+index e357228d355..b26956b7dc2 100644
+--- a/lib/dns/name.c
++++ b/lib/dns/name.c
+@@ -1250,7 +1250,7 @@ dns_name_fromtext(dns_name_t *name, isc_buffer_t *source,
+ 			}
+ 			break;
+ 		default:
+-			FATAL_ERROR(__FILE__, __LINE__, "Unexpected state %d",
++			BIND_FATAL_ERROR(__FILE__, __LINE__, "Unexpected state %d",
+ 				    state);
+ 			/* Does not return. */
+ 		}
+@@ -1473,7 +1473,7 @@ dns_name_totext2(const dns_name_t *name, unsigned int options,
+ 				count--;
+ 			}
+ 		} else {
+-			FATAL_ERROR(__FILE__, __LINE__,
++			BIND_FATAL_ERROR(__FILE__, __LINE__,
+ 				    "Unexpected label type %02x", count);
+ 			/* NOTREACHED */
+ 		}
+@@ -1597,7 +1597,7 @@ dns_name_tofilenametext(const dns_name_t *name, bool omit_final_dot,
+ 				count--;
+ 			}
+ 		} else {
+-			FATAL_ERROR(__FILE__, __LINE__,
++			BIND_FATAL_ERROR(__FILE__, __LINE__,
+ 				    "Unexpected label type %02x", count);
+ 			/* NOTREACHED */
+ 		}
+@@ -1680,7 +1680,7 @@ dns_name_downcase(const dns_name_t *source, dns_name_t *name,
+ 				count--;
+ 			}
+ 		} else {
+-			FATAL_ERROR(__FILE__, __LINE__,
++			BIND_FATAL_ERROR(__FILE__, __LINE__,
+ 				    "Unexpected label type %02x", count);
+ 			/* Does not return. */
+ 		}
+@@ -1891,7 +1891,7 @@ dns_name_fromwire(dns_name_t *name, isc_buffer_t *source,
+ 			state = fw_start;
+ 			break;
+ 		default:
+-			FATAL_ERROR(__FILE__, __LINE__, "Unknown state %d",
++			BIND_FATAL_ERROR(__FILE__, __LINE__, "Unknown state %d",
+ 				    state);
+ 			/* Does not return. */
+ 		}
+diff --git a/lib/dns/openssl_shim.h b/lib/dns/openssl_shim.h
+index 439d9f999ae..466822cdb20 100644
+--- a/lib/dns/openssl_shim.h
++++ b/lib/dns/openssl_shim.h
+@@ -13,6 +13,7 @@
+ 
+ #pragma once
+ 
++#include <openssl/ssl.h>
+ #include <openssl/bn.h>
+ #include <openssl/dh.h>
+ #include <openssl/ecdsa.h>
+diff --git a/lib/dns/openssldh_link.c b/lib/dns/openssldh_link.c
+index 2c9986089a7..45bae0b066e 100644
+--- a/lib/dns/openssldh_link.c
++++ b/lib/dns/openssldh_link.c
+@@ -317,6 +317,7 @@ openssldh_paramcompare(const dst_key_t *key1, const dst_key_t *key2) {
+ }
+ 
+ #if OPENSSL_VERSION_NUMBER < 0x30000000L
++#ifndef HAVE_WOLFSSL
+ static int
+ progress_cb(int p, int n, BN_GENCB *cb) {
+ 	union {
+@@ -332,6 +333,7 @@ progress_cb(int p, int n, BN_GENCB *cb) {
+ 	}
+ 	return (1);
+ }
++#endif
+ #else
+ static int
+ progress_cb(EVP_PKEY_CTX *ctx) {
+@@ -359,11 +361,13 @@ openssldh_generate(dst_key_t *key, int generator, void (*callback)(int)) {
+ 	BIGNUM *p = NULL, *g = NULL;
+ #if OPENSSL_VERSION_NUMBER < 0x30000000L
+ 	DH *dh = NULL;
++#ifndef HAVE_WOLFSSL
+ 	BN_GENCB *cb = NULL;
+ #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+ 	BN_GENCB _cb;
+ #endif /* if OPENSSL_VERSION_NUMBER < 0x10100000L || \
+ 	* defined(LIBRESSL_VERSION_NUMBER) */
++#endif
+ #else
+ 	OSSL_PARAM_BLD *bld = NULL;
+ 	OSSL_PARAM *params = NULL;
+@@ -372,6 +376,8 @@ openssldh_generate(dst_key_t *key, int generator, void (*callback)(int)) {
+ 	EVP_PKEY *param_pkey = NULL;
+ 	EVP_PKEY *pkey = NULL;
+ #endif /* OPENSSL_VERSION_NUMBER < 0x30000000L */
++	(void)callback;
++	(void)u;
+ 
+ #if OPENSSL_VERSION_NUMBER < 0x30000000L
+ 	dh = DH_new();
+@@ -445,6 +451,7 @@ openssldh_generate(dst_key_t *key, int generator, void (*callback)(int)) {
+ 
+ 	if (generator != 0) {
+ #if OPENSSL_VERSION_NUMBER < 0x30000000L
++#ifndef HAVE_WOLFSSL
+ 		cb = BN_GENCB_new();
+ #if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
+ 		if (cb == NULL) {
+@@ -452,15 +459,22 @@ openssldh_generate(dst_key_t *key, int generator, void (*callback)(int)) {
+ 		}
+ #endif /* if OPENSSL_VERSION_NUMBER >= 0x10100000L && \
+ 	* !defined(LIBRESSL_VERSION_NUMBER) */
++#endif
++#ifndef HAVE_WOLFSSL
+ 		if (callback == NULL) {
+ 			BN_GENCB_set_old(cb, NULL, NULL);
+ 		} else {
+ 			u.fptr = callback;
+ 			BN_GENCB_set(cb, progress_cb, u.dptr);
+ 		}
++#endif
+ 
+ 		if (!DH_generate_parameters_ex(dh, key->key_size, generator,
++#ifndef HAVE_WOLFSSL
+ 					       cb)) {
++#else
++					       NULL)) {
++#endif
+ 			DST_RET(dst__openssl_toresult2("DH_generate_parameters_"
+ 						       "ex",
+ 						       DST_R_OPENSSLFAILURE));
+@@ -495,7 +509,9 @@ openssldh_generate(dst_key_t *key, int generator, void (*callback)(int)) {
+ 		DST_RET(dst__openssl_toresult2("DH_generate_key",
+ 					       DST_R_OPENSSLFAILURE));
+ 	}
++#ifndef HAVE_WOLFSSL
+ 	DH_clear_flags(dh, DH_FLAG_CACHE_MONT_P);
++#endif
+ 	key->keydata.dh = dh;
+ 	dh = NULL;
+ #else
+@@ -567,9 +583,11 @@ err:
+ 	if (dh != NULL) {
+ 		DH_free(dh);
+ 	}
++#ifndef HAVE_WOLFSSL
+ 	if (cb != NULL) {
+ 		BN_GENCB_free(cb);
+ 	}
++#endif
+ #else
+ 	if (param_pkey != NULL) {
+ 		EVP_PKEY_free(param_pkey);
+@@ -788,7 +806,9 @@ openssldh_fromdns(dst_key_t *key, isc_buffer_t *data) {
+ 	if (dh == NULL) {
+ 		DST_RET(dst__openssl_toresult(ISC_R_NOMEMORY));
+ 	}
++#ifndef HAVE_WOLFSSL
+ 	DH_clear_flags(dh, DH_FLAG_CACHE_MONT_P);
++#endif
+ #else
+ 	bld = OSSL_PARAM_BLD_new();
+ 	if (bld == NULL) {
+@@ -1119,7 +1139,9 @@ openssldh_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 	if (dh == NULL) {
+ 		DST_RET(ISC_R_NOMEMORY);
+ 	}
++#ifndef HAVE_WOLFSSL
+ 	DH_clear_flags(dh, DH_FLAG_CACHE_MONT_P);
++#endif
+ #else
+ 	bld = OSSL_PARAM_BLD_new();
+ 	if (bld == NULL) {
+diff --git a/lib/dns/opensslecdsa_link.c b/lib/dns/opensslecdsa_link.c
+index f1cb63eb0ef..bfc787e9b1c 100644
+--- a/lib/dns/opensslecdsa_link.c
++++ b/lib/dns/opensslecdsa_link.c
+@@ -44,12 +44,14 @@
+ #include "dst_parse.h"
+ #include "openssl_shim.h"
+ 
++#ifndef HAVE_WOLFSSL
+ #ifndef NID_X9_62_prime256v1
+ #error "P-256 group is not known (NID_X9_62_prime256v1)"
+ #endif /* ifndef NID_X9_62_prime256v1 */
+ #ifndef NID_secp384r1
+ #error "P-384 group is not known (NID_secp384r1)"
+ #endif /* ifndef NID_secp384r1 */
++#endif
+ 
+ #define DST_RET(a)        \
+ 	{                 \
+@@ -907,7 +909,12 @@ ecdsa_check(EC_KEY *eckey, EC_KEY *pubeckey) {
+ 	const EC_POINT *pubkey;
+ 
+ 	pubkey = EC_KEY_get0_public_key(eckey);
+-	if (pubkey != NULL) {
++	if (pubkey != NULL
++#ifdef HAVE_WOLFSSL
++	        && !wolfSSL_EC_POINT_is_at_infinity(
++	                wolfSSL_EC_KEY_get0_group(pubeckey), pubkey)
++#endif
++	        ) {
+ 		return (ISC_R_SUCCESS);
+ 	} else if (pubeckey != NULL) {
+ 		pubkey = EC_KEY_get0_public_key(pubeckey);
+diff --git a/lib/dns/opensslrsa_link.c b/lib/dns/opensslrsa_link.c
+index ccac492944a..aa7177a3806 100644
+--- a/lib/dns/opensslrsa_link.c
++++ b/lib/dns/opensslrsa_link.c
+@@ -340,6 +340,7 @@ err:
+ }
+ 
+ #if OPENSSL_VERSION_NUMBER < 0x30000000L
++#ifndef HAVE_WOLFSSL
+ static int
+ progress_cb(int p, int n, BN_GENCB *cb) {
+ 	union {
+@@ -355,6 +356,7 @@ progress_cb(int p, int n, BN_GENCB *cb) {
+ 	}
+ 	return (1);
+ }
++#endif
+ #else
+ static int
+ progress_cb(EVP_PKEY_CTX *ctx) {
+@@ -383,18 +385,27 @@ opensslrsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
+ #if OPENSSL_VERSION_NUMBER < 0x30000000L
+ 	RSA *rsa = RSA_new();
+ 	EVP_PKEY *pkey = EVP_PKEY_new();
++#ifndef HAVE_WOLFSSL
+ #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+ 	BN_GENCB _cb;
+ #endif /* if OPENSSL_VERSION_NUMBER < 0x10100000L || \
+ 	* defined(LIBRESSL_VERSION_NUMBER) */
+ 	BN_GENCB *cb = BN_GENCB_new();
++#endif
+ #else
+ 	EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+ 	EVP_PKEY *pkey = NULL;
+ #endif /* OPENSSL_VERSION_NUMBER < 0x30000000L */
+ 
++	(void)callback;
++	(void)u;
++
+ #if OPENSSL_VERSION_NUMBER < 0x30000000L
++#ifndef HAVE_WOLFSSL
+ 	if (e == NULL || rsa == NULL || pkey == NULL || cb == NULL) {
++#else
++	if (e == NULL || rsa == NULL || pkey == NULL) {
++#endif
+ 		DST_RET(dst__openssl_toresult(DST_R_OPENSSLFAILURE));
+ 	}
+ #else
+@@ -446,6 +457,7 @@ opensslrsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
+ 		DST_RET(dst__openssl_toresult(DST_R_OPENSSLFAILURE));
+ 	}
+ 
++#ifndef HAVE_WOLFSSL
+ 	if (callback == NULL) {
+ 		BN_GENCB_set_old(cb, NULL, NULL);
+ 	} else {
+@@ -453,7 +465,10 @@ opensslrsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
+ 		BN_GENCB_set(cb, progress_cb, u.dptr);
+ 	}
+ 
+-	if (RSA_generate_key_ex(rsa, key->key_size, e, cb) != 1) {
++	if (RSA_generate_key_ex(rsa, key->key_size, e, cb)) {
++#else
++	if (RSA_generate_key_ex(rsa, key->key_size, e, NULL)) {
++#endif
+ 		DST_RET(dst__openssl_toresult2("RSA_generate_key_ex",
+ 					       DST_R_OPENSSLFAILURE));
+ 	}
+@@ -494,9 +509,11 @@ err:
+ 	if (rsa != NULL) {
+ 		RSA_free(rsa);
+ 	}
++#ifndef HAVE_WOLFSSL
+ 	if (cb != NULL) {
+ 		BN_GENCB_free(cb);
+ 	}
++#endif
+ #else
+ 	if (ctx != NULL) {
+ 		EVP_PKEY_CTX_free(ctx);
+@@ -1138,9 +1155,11 @@ opensslrsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 
+ 	for (i = 0; i < priv.nelements; i++) {
+ 		switch (priv.elements[i].tag) {
++#ifndef HAVE_WOLFSSL
+ 		case TAG_RSA_ENGINE:
+ 			engine = (char *)priv.elements[i].data;
+ 			break;
++#endif
+ 		case TAG_RSA_LABEL:
+ 			label = (char *)priv.elements[i].data;
+ 			break;
+diff --git a/lib/dns/rbtdb.c b/lib/dns/rbtdb.c
+index ae34ef28e25..2b73b29d89f 100644
+--- a/lib/dns/rbtdb.c
++++ b/lib/dns/rbtdb.c
+@@ -4443,7 +4443,7 @@ zone_findzonecut(dns_db_t *db, const dns_name_t *name, unsigned int options,
+ 	UNUSED(rdataset);
+ 	UNUSED(sigrdataset);
+ 
+-	FATAL_ERROR(__FILE__, __LINE__, "zone_findzonecut() called!");
++	BIND_FATAL_ERROR(__FILE__, __LINE__, "zone_findzonecut() called!");
+ 
+ 	/* NOTREACHED */
+ 	return (ISC_R_NOTIMPLEMENTED);
+diff --git a/lib/dns/rpz.c b/lib/dns/rpz.c
+index f0cfbc6b275..3d82230dbb7 100644
+--- a/lib/dns/rpz.c
++++ b/lib/dns/rpz.c
+@@ -213,7 +213,7 @@ dns_rpz_type2str(dns_rpz_type_t type) {
+ 	case DNS_RPZ_TYPE_BAD:
+ 		break;
+ 	}
+-	FATAL_ERROR(__FILE__, __LINE__, "impossible rpz type %d", type);
++	BIND_FATAL_ERROR(__FILE__, __LINE__, "impossible rpz type %d", type);
+ 	return ("impossible");
+ }
+ 
+diff --git a/lib/isc/entropy.c b/lib/isc/entropy.c
+index ce79ba21c3b..e7a97ccab58 100644
+--- a/lib/isc/entropy.c
++++ b/lib/isc/entropy.c
+@@ -22,7 +22,7 @@
+ void
+ isc_entropy_get(void *buf, size_t buflen) {
+ 	if (RAND_bytes(buf, buflen) < 1) {
+-		FATAL_ERROR(__FILE__, __LINE__, "RAND_bytes(): %s",
++		BIND_FATAL_ERROR(__FILE__, __LINE__, "RAND_bytes(): %s",
+ 			    ERR_error_string(ERR_get_error(), NULL));
+ 	}
+ }
+diff --git a/lib/isc/include/isc/tls.h b/lib/isc/include/isc/tls.h
+index fd57042f304..0006d543d81 100644
+--- a/lib/isc/include/isc/tls.h
++++ b/lib/isc/include/isc/tls.h
+@@ -18,8 +18,14 @@
+ #include <isc/result.h>
+ #include <isc/types.h>
+ 
++#ifndef HAVE_WOLFSSL
+ typedef struct ssl_ctx_st isc_tlsctx_t;
+ typedef struct ssl_st	  isc_tls_t;
++#else
++#include <wolfssl/ssl.h>
++typedef WOLFSSL_CTX       isc_tlsctx_t;
++typedef WOLFSSL           isc_tls_t;
++#endif
+ 
+ void
+ isc_tlsctx_free(isc_tlsctx_t **ctpx);
+diff --git a/lib/isc/include/isc/util.h b/lib/isc/include/isc/util.h
+index 71bc3b22144..0f75177058d 100644
+--- a/lib/isc/include/isc/util.h
++++ b/lib/isc/include/isc/util.h
+@@ -294,7 +294,7 @@ mock_assert(const int result, const char *const expression,
+ /*% Unexpected Error */
+ #define UNEXPECTED_ERROR isc_error_unexpected
+ /*% Fatal Error */
+-#define FATAL_ERROR isc_error_fatal
++#define BIND_FATAL_ERROR isc_error_fatal
+ 
+ #ifdef UNIT_TESTING
+ 
+@@ -330,3 +330,8 @@ mock_assert(const int result, const char *const expression,
+  * Misc
+  */
+ #include <isc/deprecated.h>
++
++void
++isc__initialize(void) ISC_CONSTRUCTOR;
++void
++isc__shutdown(void) ISC_DESTRUCTOR;
+diff --git a/lib/isc/lex.c b/lib/isc/lex.c
+index 69480410708..3350a73c031 100644
+--- a/lib/isc/lex.c
++++ b/lib/isc/lex.c
+@@ -896,7 +896,7 @@ isc_lex_gettoken(isc_lex_t *lex, unsigned int options, isc_token_t *tokenp) {
+ 			remaining--;
+ 			break;
+ 		default:
+-			FATAL_ERROR(__FILE__, __LINE__, "Unexpected state %d",
++			BIND_FATAL_ERROR(__FILE__, __LINE__, "Unexpected state %d",
+ 				    state);
+ 		}
+ 	} while (!done);
+diff --git a/lib/isc/lib.c b/lib/isc/lib.c
+index 7f6b12c4aa0..1dfed3e3119 100644
+--- a/lib/isc/lib.c
++++ b/lib/isc/lib.c
+@@ -33,11 +33,6 @@
+  *** Functions
+  ***/
+ 
+-void
+-isc__initialize(void) ISC_CONSTRUCTOR;
+-void
+-isc__shutdown(void) ISC_DESTRUCTOR;
+-
+ void
+ isc__initialize(void) {
+ 	isc__os_initialize();
+diff --git a/lib/isc/sockaddr.c b/lib/isc/sockaddr.c
+index e2f363ef1bc..4c4be863d5a 100644
+--- a/lib/isc/sockaddr.c
++++ b/lib/isc/sockaddr.c
+@@ -342,7 +342,7 @@ isc_sockaddr_pf(const isc_sockaddr_t *sockaddr) {
+ 	case AF_INET6:
+ 		return (PF_INET6);
+ 	default:
+-		FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
++		BIND_FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
+ 			    (int)sockaddr->type.sa.sa_family);
+ 	}
+ #endif /* if (AF_INET == PF_INET && AF_INET6 == PF_INET6) */
+@@ -382,7 +382,7 @@ isc_sockaddr_setport(isc_sockaddr_t *sockaddr, in_port_t port) {
+ 		sockaddr->type.sin6.sin6_port = htons(port);
+ 		break;
+ 	default:
+-		FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
++		BIND_FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
+ 			    (int)sockaddr->type.sa.sa_family);
+ 	}
+ }
+@@ -399,7 +399,7 @@ isc_sockaddr_getport(const isc_sockaddr_t *sockaddr) {
+ 		port = ntohs(sockaddr->type.sin6.sin6_port);
+ 		break;
+ 	default:
+-		FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
++		BIND_FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
+ 			    (int)sockaddr->type.sa.sa_family);
+ 	}
+ 
+diff --git a/lib/isc/tests/isctest.c b/lib/isc/tests/isctest.c
+index 3f26583a6fd..9b5262e910e 100644
+--- a/lib/isc/tests/isctest.c
++++ b/lib/isc/tests/isctest.c
+@@ -99,6 +99,8 @@ isc_test_begin(FILE *logfile, bool start_managers, unsigned int workers) {
+ 	INSIST(!test_running);
+ 	test_running = true;
+ 
++	isc__initialize();
++
+ 	isc_mem_debugging |= ISC_MEM_DEBUGRECORD;
+ 
+ 	INSIST(test_mctx == NULL);
+diff --git a/lib/isc/tests/timer_test.c b/lib/isc/tests/timer_test.c
+index 8ff64c6da3b..9f0a5f470d9 100644
+--- a/lib/isc/tests/timer_test.c
++++ b/lib/isc/tests/timer_test.c
+@@ -81,7 +81,7 @@ _teardown(void **state) {
+ }
+ 
+ static void
+-shutdown(isc_task_t *task, isc_event_t *event) {
++_shutdown(isc_task_t *task, isc_event_t *event) {
+ 	isc_result_t result;
+ 
+ 	UNUSED(task);
+@@ -122,7 +122,7 @@ setup_test(isc_timertype_t timertype, isc_time_t *expires,
+ 	result = isc_task_create(taskmgr, 0, &task);
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+ 
+-	result = isc_task_onshutdown(task, shutdown, NULL);
++	result = isc_task_onshutdown(task, _shutdown, NULL);
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+ 
+ 	isc_mutex_lock(&lasttime_mx);
+diff --git a/lib/isc/tls.c b/lib/isc/tls.c
+index 35b8a1277e5..b495052b1e5 100644
+--- a/lib/isc/tls.c
++++ b/lib/isc/tls.c
+@@ -117,7 +117,7 @@ tls_initialize(void) {
+ 
+ 	/* Protect ourselves against unseeded PRNG */
+ 	if (RAND_status() != 1) {
+-		FATAL_ERROR(__FILE__, __LINE__,
++		BIND_FATAL_ERROR(__FILE__, __LINE__,
+ 			    "OpenSSL pseudorandom number generator "
+ 			    "cannot be initialized (see the `PRNG not "
+ 			    "seeded' message in the OpenSSL FAQ)");
+-- 
+2.25.1
+
