@@ -1,4 +1,4 @@
-From 525fd958dc8182a783d894d97f17848a6ac2a27f Mon Sep 17 00:00:00 2001
+From ef57d510a38f0a85231db68e75e13fa1aa83d20b Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Tue, 28 Sep 2021 10:13:47 +0200
 Subject: [PATCH] Patch for Kerberos 5 1.19.2
@@ -15,7 +15,7 @@ make
 make install
 ```
 
-Kerberos 1.16.1 maybe downloaded and extracted with:
+Kerberos 1.19.2 may be downloaded and extracted with:
 ```
 wget https://web.mit.edu/kerberos/dist/krb5/1.19/krb5-1.19.2.tar.gz
 tar -xvf krb5-1.19.2.tar.gz
@@ -50,14 +50,14 @@ make check
  src/lib/crypto/crypto_tests/t_short.c         |    2 +
  src/lib/crypto/crypto_tests/t_str2key.c       |    2 +
  src/lib/crypto/openssl/Makefile.in            |    4 +
- .../crypto/openssl/enc_provider/camellia.c    |   14 +
+ .../crypto/openssl/enc_provider/camellia.c    |   16 +
  src/lib/krb5/os/sendto_kdc.c                  |    8 +-
  src/m4/pkg.m4                                 |  344 ++++++
  src/plugins/preauth/pkinit/Makefile.in        |    4 +
  src/plugins/tls/k5tls/openssl.c               |    8 +-
  src/tests/dejagnu/config/default.exp          |   16 -
  src/tests/gssapi/t_prf.c                      |    2 +
- 20 files changed, 471 insertions(+), 1061 deletions(-)
+ 20 files changed, 473 insertions(+), 1061 deletions(-)
  create mode 100644 src/m4/pkg.m4
 
 diff --git a/src/aclocal.m4 b/src/aclocal.m4
@@ -1401,10 +1401,23 @@ index aa434b1685..246e0ed5b9 100644
  
  STLIBOBJS=\
 diff --git a/src/lib/crypto/openssl/enc_provider/camellia.c b/src/lib/crypto/openssl/enc_provider/camellia.c
-index 2da6913292..5468b83e9a 100644
+index 2da6913292..104b0efbb2 100644
 --- a/src/lib/crypto/openssl/enc_provider/camellia.c
 +++ b/src/lib/crypto/openssl/enc_provider/camellia.c
-@@ -74,11 +74,13 @@ xorblock(unsigned char *out, const unsigned char *in)
+@@ -46,6 +46,7 @@ cts_decr(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
+ #define NUM_BITS 8
+ #define IV_CTS_BUF_SIZE 16 /* 16 - hardcoded in CRYPTO_cts128_en/decrypt */
+ 
++#ifndef HAVE_LIBWOLFSSL
+ static void
+ xorblock(unsigned char *out, const unsigned char *in)
+ {
+@@ -70,15 +71,18 @@ xorblock(unsigned char *out, const unsigned char *in)
+         store_32_n(load_32_n(outptr) ^ load_32_n(inptr), outptr);
+     }
+ }
++#endif
+ 
  static const EVP_CIPHER *
  map_mode(unsigned int len)
  {
@@ -1418,7 +1431,7 @@ index 2da6913292..5468b83e9a 100644
          return NULL;
  }
  
-@@ -154,6 +156,7 @@ static krb5_error_code
+@@ -154,6 +158,7 @@ static krb5_error_code
  cts_encr(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
           size_t num_data, size_t dlen)
  {
@@ -1426,7 +1439,7 @@ index 2da6913292..5468b83e9a 100644
      int                    ret = 0;
      size_t                 size = 0;
      unsigned char         *oblock = NULL, *dbuf = NULL;
-@@ -200,12 +203,16 @@ cts_encr(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
+@@ -200,12 +205,16 @@ cts_encr(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
      OPENSSL_free(dbuf);
  
      return ret;
@@ -1443,7 +1456,7 @@ index 2da6913292..5468b83e9a 100644
      int                    ret = 0;
      size_t                 size = 0;
      unsigned char         *oblock = NULL;
-@@ -253,6 +260,9 @@ cts_decr(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
+@@ -253,6 +262,9 @@ cts_decr(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
      OPENSSL_free(dbuf);
  
      return ret;
@@ -1453,7 +1466,7 @@ index 2da6913292..5468b83e9a 100644
  }
  
  static krb5_error_code
-@@ -300,6 +310,7 @@ krb5int_camellia_cbc_mac(krb5_key key, const krb5_crypto_iov *data,
+@@ -300,6 +312,7 @@ krb5int_camellia_cbc_mac(krb5_key key, const krb5_crypto_iov *data,
                           size_t num_data, const krb5_data *iv,
                           krb5_data *output)
  {
@@ -1461,7 +1474,7 @@ index 2da6913292..5468b83e9a 100644
      CAMELLIA_KEY enck;
      unsigned char blockY[CAMELLIA_BLOCK_SIZE], blockB[CAMELLIA_BLOCK_SIZE];
      struct iov_cursor cursor;
-@@ -325,6 +336,9 @@ krb5int_camellia_cbc_mac(krb5_key key, const krb5_crypto_iov *data,
+@@ -325,6 +338,9 @@ krb5int_camellia_cbc_mac(krb5_key key, const krb5_crypto_iov *data,
      memcpy(output->data, blockY, CAMELLIA_BLOCK_SIZE);
  
      return 0;

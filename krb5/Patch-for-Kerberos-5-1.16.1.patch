@@ -1,4 +1,4 @@
-From ffd73b30e9c917c30ef6243e6d38be5ea63fcec9 Mon Sep 17 00:00:00 2001
+From a5b1fe5c8c01aa32dd10749e84faa71aaee56e4d Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Tue, 14 Sep 2021 13:37:02 +0200
 Subject: [PATCH] Patch for Kerberos 5 1.16.1
@@ -15,7 +15,7 @@ make
 make install
 ```
 
-Kerberos 1.16.1 maybe downloaded and extracted with:
+Kerberos 1.16.1 may be downloaded and extracted with:
 ```
 wget https://web.mit.edu/kerberos/dist/krb5/1.16/krb5-1.16.1.tar.gz
 tar -xvf krb5-1.16.1.tar.gz
