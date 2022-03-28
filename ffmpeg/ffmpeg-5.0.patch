@@ -1,0 +1,250 @@
+From 5f1b42a639dd9425706f5db36f3fd187c6252cd4 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Mon, 28 Mar 2022 12:26:39 +0200
+Subject: [PATCH] Add support for wolfSSL to FFmpeg 5.0
+
+# Building
+
+Compile wolfSSL with:
+```
+./autogen.sh
+./configure --enable-ffmpeg
+make
+make install
+```
+
+Compile FFmpeg with:
+```
+patch -p1 < /path/to/this/patch
+./configure --enable-wolfssl
+make
+make install
+```
+
+# Testing
+
+All FFmpeg tests run with `make check` should pass. Additional testing was done by downloading a video and converting it using the built `ffmpeg` binary.
+
+## Testing with `libx264`
+
+This requires that the `libx264` library and development files have been installed on the system. On systems using `apt` this can be done using `apt install libx264-155 libx264-dev`.
+
+Compile FFmpeg with:
+```
+./configure --enable-wolfssl --enable-libx264 --enable-gpl
+make
+```
+
+Download and convert a video using the following example:
+```
+./ffmpeg -i "https://v.redd.it/oh1i066en0q81/HLSPlaylist.m3u8" -vcodec h264 "OUTPUT.mp4"
+```
+This will output a file `OUTPUT.mp4` that can be played with a video player. The file was downloaded using `wolfssl` to accomplish the https connection.
+
+## Testing without `libx264`
+
+This test can also be run without `libx264` but output video will be very low quality. Compile FFmpeg like in the [Building](#Building) section.
+
+Download and convert a video using the following example:
+```
+./ffmpeg -i "https://v.redd.it/oh1i066en0q81/HLSPlaylist.m3u8" "OUTPUT.mp4"
+```
+This will output a file `OUTPUT.mp4` that can be played with a video player. The file was downloaded using `wolfssl` to accomplish the https connection.
+---
+ configure                 | 14 +++++++++-----
+ libavformat/Makefile      |  1 +
+ libavformat/hlsenc.c      |  6 ++++++
+ libavformat/network.c     |  4 ++--
+ libavformat/rtmpdh.c      |  2 +-
+ libavformat/rtmpdh.h      |  6 ++++++
+ libavformat/tls_openssl.c | 11 +++++++++++
+ 7 files changed, 36 insertions(+), 8 deletions(-)
+
+diff --git a/configure b/configure
+index 7a62f0c248..ee716d7664 100755
+--- a/configure
++++ b/configure
+@@ -316,6 +316,7 @@ External library support:
+   --enable-opengl          enable OpenGL rendering [no]
+   --enable-openssl         enable openssl, needed for https support
+                            if gnutls, libtls or mbedtls is not used [no]
++  --enable-wolfssl         enable wolfSSL [no]
+   --enable-pocketsphinx    enable PocketSphinx, needed for asr filter [no]
+   --disable-sndio          disable sndio support [autodetect]
+   --disable-schannel       disable SChannel SSP, needed for TLS support on
+@@ -1880,6 +1881,7 @@ EXTERNAL_LIBRARY_LIST="
+     openssl
+     pocketsphinx
+     vapoursynth
++    wolfssl
+ "
+ 
+ HWACCEL_AUTODETECT_LIBRARY_LIST="
+@@ -3539,7 +3541,7 @@ xv_outdev_deps="xlib_xv xlib_x11 xlib_xext"
+ async_protocol_deps="threads"
+ bluray_protocol_deps="libbluray"
+ ffrtmpcrypt_protocol_conflict="librtmp_protocol"
+-ffrtmpcrypt_protocol_deps_any="gcrypt gmp openssl mbedtls"
++ffrtmpcrypt_protocol_deps_any="gcrypt gmp openssl mbedtls wolfssl"
+ ffrtmpcrypt_protocol_select="tcp_protocol"
+ ffrtmphttp_protocol_conflict="librtmp_protocol"
+ ffrtmphttp_protocol_select="http_protocol"
+@@ -3570,13 +3572,13 @@ rtmpte_protocol_suggest="zlib"
+ rtmpts_protocol_select="ffrtmphttp_protocol https_protocol"
+ rtmpts_protocol_suggest="zlib"
+ rtp_protocol_select="udp_protocol"
+-schannel_conflict="openssl gnutls libtls mbedtls"
++schannel_conflict="openssl gnutls libtls mbedtls wolfssl"
+ sctp_protocol_deps="struct_sctp_event_subscribe struct_msghdr_msg_flags"
+ sctp_protocol_select="network"
+-securetransport_conflict="openssl gnutls libtls mbedtls"
++securetransport_conflict="openssl gnutls libtls mbedtls wolfssl"
+ srtp_protocol_select="rtp_protocol srtp"
+ tcp_protocol_select="network"
+-tls_protocol_deps_any="gnutls openssl schannel securetransport libtls mbedtls"
++tls_protocol_deps_any="gnutls openssl schannel securetransport libtls mbedtls wolfssl"
+ tls_protocol_select="tcp_protocol"
+ udp_protocol_select="network"
+ udplite_protocol_select="network"
+@@ -3597,7 +3599,7 @@ libsmbclient_protocol_deps="libsmbclient gplv3"
+ libsrt_protocol_deps="libsrt"
+ libsrt_protocol_select="network"
+ libssh_protocol_deps="libssh"
+-libtls_conflict="openssl gnutls mbedtls"
++libtls_conflict="openssl gnutls mbedtls wolfssl"
+ libzmq_protocol_deps="libzmq"
+ libzmq_protocol_select="network"
+ 
+@@ -6715,6 +6717,8 @@ enabled openssl           && { { check_pkg_config openssl "openssl >= 3.0.0" ope
+                                check_lib openssl openssl/ssl.h SSL_library_init -lssl32 -leay32 ||
+                                check_lib openssl openssl/ssl.h SSL_library_init -lssl -lcrypto -lws2_32 -lgdi32 ||
+                                die "ERROR: openssl not found"; }
++enabled wolfssl           && { check_pkg_config wolfssl "wolfssl >= 5.2.0" "wolfssl/options.h wolfssl/ssl.h" wolfSSL_library_init || 
++                               die "ERROR: wolfSSL not found";}
+ enabled pocketsphinx      && require_pkg_config pocketsphinx pocketsphinx pocketsphinx/pocketsphinx.h ps_init
+ enabled rkmpp             && { require_pkg_config rkmpp rockchip_mpp  rockchip/rk_mpi.h mpp_create &&
+                                require_pkg_config rockchip_mpp "rockchip_mpp >= 1.3.7" rockchip/rk_mpi.h mpp_create &&
+diff --git a/libavformat/Makefile b/libavformat/Makefile
+index 84e73e3c63..0efc27fed5 100644
+--- a/libavformat/Makefile
++++ b/libavformat/Makefile
+@@ -660,6 +660,7 @@ TLS-OBJS-$(CONFIG_GNUTLS)                += tls_gnutls.o
+ TLS-OBJS-$(CONFIG_LIBTLS)                += tls_libtls.o
+ TLS-OBJS-$(CONFIG_MBEDTLS)               += tls_mbedtls.o
+ TLS-OBJS-$(CONFIG_OPENSSL)               += tls_openssl.o
++TLS-OBJS-$(CONFIG_WOLFSSL)               += tls_openssl.o
+ TLS-OBJS-$(CONFIG_SECURETRANSPORT)       += tls_securetransport.o
+ TLS-OBJS-$(CONFIG_SCHANNEL)              += tls_schannel.o
+ OBJS-$(CONFIG_TLS_PROTOCOL)              += tls.o $(TLS-OBJS-yes)
+diff --git a/libavformat/hlsenc.c b/libavformat/hlsenc.c
+index ef8973cea1..633a8630a1 100644
+--- a/libavformat/hlsenc.c
++++ b/libavformat/hlsenc.c
+@@ -31,6 +31,9 @@
+ #include <gcrypt.h>
+ #elif CONFIG_OPENSSL
+ #include <openssl/rand.h>
++#elif CONFIG_WOLFSSL
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/rand.h>
+ #endif
+ 
+ #include "libavutil/avassert.h"
+@@ -704,6 +707,9 @@ static int randomize(uint8_t *buf, int len)
+ #elif CONFIG_OPENSSL
+     if (RAND_bytes(buf, len))
+         return 0;
++#elif CONFIG_WOLFSSL
++    if (wolfSSL_RAND_bytes(buf, len))
++        return 0;
+ #else
+     return AVERROR(ENOSYS);
+ #endif
+diff --git a/libavformat/network.c b/libavformat/network.c
+index 0f5a575f77..98fc782f79 100644
+--- a/libavformat/network.c
++++ b/libavformat/network.c
+@@ -31,7 +31,7 @@
+ int ff_tls_init(void)
+ {
+ #if CONFIG_TLS_PROTOCOL
+-#if CONFIG_OPENSSL
++#if CONFIG_OPENSSL || CONFIG_WOLFSSL
+     int ret;
+     if ((ret = ff_openssl_init()) < 0)
+         return ret;
+@@ -46,7 +46,7 @@ int ff_tls_init(void)
+ void ff_tls_deinit(void)
+ {
+ #if CONFIG_TLS_PROTOCOL
+-#if CONFIG_OPENSSL
++#if CONFIG_OPENSSL || CONFIG_WOLFSSL
+     ff_openssl_deinit();
+ #endif
+ #if CONFIG_GNUTLS
+diff --git a/libavformat/rtmpdh.c b/libavformat/rtmpdh.c
+index 5ddae537a1..e333900eb1 100644
+--- a/libavformat/rtmpdh.c
++++ b/libavformat/rtmpdh.c
+@@ -139,7 +139,7 @@ static int bn_modexp(FFBigNum bn, FFBigNum y, FFBigNum q, FFBigNum p)
+     gcry_mpi_powm(bn, y, q, p);
+     return 0;
+ }
+-#elif CONFIG_OPENSSL
++#elif CONFIG_OPENSSL || CONFIG_WOLFSSL
+ #define bn_new(bn)                  bn = BN_new()
+ #define bn_free(bn)                 BN_free(bn)
+ #define bn_set_word(bn, w)          BN_set_word(bn, w)
+diff --git a/libavformat/rtmpdh.h b/libavformat/rtmpdh.h
+index 8cc1a42b63..c7f1bcf345 100644
+--- a/libavformat/rtmpdh.h
++++ b/libavformat/rtmpdh.h
+@@ -39,6 +39,12 @@ typedef gcry_mpi_t FFBigNum;
+ #include <openssl/bn.h>
+ #include <openssl/dh.h>
+ 
++typedef BIGNUM *FFBigNum;
++#elif CONFIG_WOLFSSL
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/bn.h>
++#include <wolfssl/openssl/dh.h>
++
+ typedef BIGNUM *FFBigNum;
+ #elif CONFIG_MBEDTLS
+ #include <mbedtls/bignum.h>
+diff --git a/libavformat/tls_openssl.c b/libavformat/tls_openssl.c
+index 1d813cbbb5..553dc72837 100644
+--- a/libavformat/tls_openssl.c
++++ b/libavformat/tls_openssl.c
+@@ -32,9 +32,16 @@
+ #include "libavutil/parseutils.h"
+ #include "libavutil/thread.h"
+ 
++#if CONFIG_WOLFSSL
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/bio.h>
++#include <wolfssl/openssl/ssl.h>
++#include <wolfssl/openssl/err.h>
++#else
+ #include <openssl/bio.h>
+ #include <openssl/ssl.h>
+ #include <openssl/err.h>
++#endif
+ 
+ static int openssl_init;
+ 
+@@ -300,7 +307,11 @@ static int tls_open(URLContext *h, const char *uri, int flags, AVDictionary **op
+         goto fail;
+     }
+ #if OPENSSL_VERSION_NUMBER >= 0x1010000fL
++#if CONFIG_WOLFSSL
++    p->url_bio_method = BIO_meth_new(WOLFSSL_BIO_UNDEF, "urlprotocol bio");
++#else
+     p->url_bio_method = BIO_meth_new(BIO_TYPE_SOURCE_SINK, "urlprotocol bio");
++#endif
+     BIO_meth_set_write(p->url_bio_method, url_bio_bwrite);
+     BIO_meth_set_read(p->url_bio_method, url_bio_bread);
+     BIO_meth_set_puts(p->url_bio_method, url_bio_bputs);
+-- 
+2.25.1
+
