@@ -1,0 +1,4 @@
+263a264
+> #if !QT_CONFIG(wolfssl)
+264a266
+> #endif
