@@ -1,0 +1,92 @@
+From 011ef3e69ecc641d085cdba424e7312b8dfc49a8 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 1 Apr 2022 11:32:23 +0200
+Subject: [PATCH] Patch for wolfSSL
+
+This patch is made for git version 2.35.1/
+
+Compile wolfSSL with:
+```
+./configure --enable-opensslextra
+make
+make install
+```
+
+Compile git with:
+```
+patch -p1 < /path/to/this/patch
+make USE_WOLFSSL=1 OPENSSL_SHA1=1 OPENSSL_SHA256=1
+make USE_WOLFSSL=1 OPENSSL_SHA1=1 OPENSSL_SHA256=1 install
+```
+
+If you gave installed wolfSSL in a non-standard directory then you can use the `WOLFSSSLDIR` variable to point git to that directory as such:
+```
+make USE_WOLFSSL=1 OPENSSL_SHA1=1 OPENSSL_SHA256=1 WOLFSSSLDIR=/path/to/wolfssl/install
+make USE_WOLFSSL=1 OPENSSL_SHA1=1 OPENSSL_SHA256=1 WOLFSSSLDIR=/path/to/wolfssl/install install
+```
+
+All of the tests run with `make USE_WOLFSSL=1 OPENSSL_SHA1=1 OPENSSL_SHA256=1 test` should pass
+---
+ Makefile | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 5580859afd..ad4114759d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -27,6 +27,9 @@ all::
+ #
+ # Define NO_OPENSSL environment variable if you do not have OpenSSL.
+ #
++# Define USE_WOLFSSL environment variable if you want to use wolfSSL instead
++# of OpenSSL
++#
+ # Define USE_LIBPCRE if you have and want to use libpcre. Various
+ # commands such as log and grep offer runtime options to use
+ # Perl-compatible regular expressions instead of standard or extended
+@@ -1458,7 +1461,7 @@ else
+ 		endif
+ 	endif
+ endif
+-IMAP_SEND_LDFLAGS += $(OPENSSL_LINK) $(OPENSSL_LIBSSL) $(LIB_4_CRYPTO)
++IMAP_SEND_LDFLAGS += $(OPENSSL_LINK) $(OPENSSL_LIBSSL) $(LIB_4_CRYPTO) $(WOLFSSL_LINK)
+ 
+ ifdef ZLIB_PATH
+ 	BASIC_CFLAGS += -I$(ZLIB_PATH)/include
+@@ -1466,6 +1469,15 @@ ifdef ZLIB_PATH
+ endif
+ EXTLIBS += -lz
+ 
++ifdef USE_WOLFSSL
++	NO_OPENSSL = YesPlease
++	ifndef WOLFSSSLDIR
++		WOLFSSSLDIR = /usr/local
++	endif
++	BASIC_CFLAGS += -I$(WOLFSSSLDIR)/include -I$(WOLFSSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++	WOLFSSL_LINK = -L$(WOLFSSSLDIR)/$(lib) $(CC_LD_DYNPATH)$(WOLFSSSLDIR)/$(lib)
++endif
++
+ ifndef NO_OPENSSL
+ 	OPENSSL_LIBSSL = -lssl
+ 	ifdef OPENSSLDIR
+@@ -1478,11 +1490,16 @@ ifndef NO_OPENSSL
+ 		OPENSSL_LIBSSL += -lcrypto
+ 	endif
+ else
+-	BASIC_CFLAGS += -DNO_OPENSSL
++	ifndef NO_OPENSSL
++		BASIC_CFLAGS += -DNO_OPENSSL
++	endif
+ 	OPENSSL_LIBSSL =
+ endif
+ ifdef NO_OPENSSL
+ 	LIB_4_CRYPTO =
++	ifdef USE_WOLFSSL
++		LIB_4_CRYPTO = $(WOLFSSL_LINK) -lwolfssl
++	endif
+ else
+ ifdef NEEDS_SSL_WITH_CRYPTO
+ 	LIB_4_CRYPTO = $(OPENSSL_LINK) -lcrypto -lssl
+-- 
+2.25.1
+
