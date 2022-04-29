@@ -1,0 +1,302 @@
+From 7178bc5e64e291b7aaeb06eec2efaaf5f92f50ed Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 22 Apr 2022 13:10:27 +0200
+Subject: [PATCH 1/6] SAE-PK support with wolfSSL
+
+Implement SAE-PK with the using the wolfSSL backend
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/crypto_wolfssl.c | 255 ++++++++++++++++++++++++++++++++++++
+ tests/hwsim/test_sae.py     |   2 +
+ 2 files changed, 257 insertions(+)
+
+diff --git a/src/crypto/crypto_wolfssl.c b/src/crypto/crypto_wolfssl.c
+index 1dddafed08..8864957f83 100644
+--- a/src/crypto/crypto_wolfssl.c
++++ b/src/crypto/crypto_wolfssl.c
+@@ -26,6 +26,7 @@
+ #include <wolfssl/wolfcrypt/dh.h>
+ #include <wolfssl/wolfcrypt/cmac.h>
+ #include <wolfssl/wolfcrypt/ecc.h>
++#include <wolfssl/wolfcrypt/asn_public.h>
+ #include <wolfssl/openssl/bn.h>
+ 
+ 
+@@ -1829,6 +1830,260 @@ size_t crypto_ecdh_prime_len(struct crypto_ecdh *ecdh)
+ 	return crypto_ec_prime_len(ecdh->ec);
+ }
+ 
++struct crypto_ec_key {
++	ecc_key* eckey;
++	WC_RNG* rng; /* Needs to be initialized before use.
++	 	 	 	  * *NOT* initialized in crypto_ec_key_init */
++};
++
++static struct crypto_ec_key* crypto_ec_key_init(void)
++{
++	struct crypto_ec_key* key;
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_init starting");
++	key = os_zalloc(sizeof(struct crypto_ec_key));
++	if (key) {
++		key->eckey = wc_ecc_key_new(NULL);
++		/* Omit key->rng initialization because it seeds itself and thus
++		 * consumes entropy that may never be used. Lazy initialize when
++		 * necessary. */
++		if (!key->eckey) {
++			wpa_printf(MSG_ERROR, "wolfSSL: crypto_ec_key_init failed");
++			crypto_ec_key_deinit(key);
++			key = NULL;
++		}
++	}
++	return key;
++}
++
++void crypto_ec_key_deinit(struct crypto_ec_key *key)
++{
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_deinit starting");
++	if (key) {
++		wc_rng_free(key->rng);
++		wc_ecc_key_free(key->eckey);
++		os_free(key);
++	}
++}
++
++struct crypto_ec_key * crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
++{
++	struct crypto_ec_key *ret = NULL;
++	word32 idx = 0;
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_parse_priv starting");
++
++	if (!der && der_len == 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: invalid input parameters");
++        goto fail;
++	}
++
++	ret = crypto_ec_key_init();
++	if (!ret) {
++		wpa_printf(MSG_ERROR, "wolfSSL: crypto_ec_key_init failed");
++        goto fail;
++	}
++
++	if (wc_EccPrivateKeyDecode(der, &idx, ret->eckey, (word32)der_len) != 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: wc_EccPrivateKeyDecode failed");
++        goto fail;
++	}
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_parse_priv success");
++
++    return ret;
++fail:
++	if (ret)
++		crypto_ec_key_deinit(ret);
++	return NULL;
++}
++
++int crypto_ec_key_group(struct crypto_ec_key *key)
++{
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_group starting");
++
++	if (!key || !key->eckey || !key->eckey->dp) {
++		wpa_printf(MSG_ERROR, "wolfSSL: invalid input parameters");
++		return -1;
++	}
++
++	switch (key->eckey->dp->id) {
++	case ECC_SECP256R1:
++		return 19;
++	case ECC_SECP384R1:
++		return 20;
++	case ECC_SECP521R1:
++		return 21;
++	case ECC_BRAINPOOLP256R1:
++		return 28;
++	case ECC_BRAINPOOLP384R1:
++		return 29;
++	case ECC_BRAINPOOLP512R1:
++		return 30;
++	}
++	wpa_printf(MSG_ERROR, "wolfSSL: Unsupported curve (id=%d) in EC key",
++			key->eckey->dp->id);
++	return -1;
++}
++
++struct wpabuf * crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key)
++{
++	byte *der = NULL;
++	int derLen;
++	struct wpabuf *ret = NULL;
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_group starting");
++
++	if (!key || !key->eckey) {
++		wpa_printf(MSG_ERROR, "wolfSSL: invalid input parameters");
++		goto fail;
++	}
++
++	derLen = wc_EccPublicKeyDerSize(key->eckey, 1);
++	if (derLen <= 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: wc_EccPublicKeyDerSize failed");
++		goto fail;
++	}
++
++	der = os_malloc(derLen);
++	if (!der) {
++		wpa_printf(MSG_ERROR, "wolfSSL: os_malloc failed");
++		goto fail;
++	}
++
++	derLen = wc_EccPublicKeyToDer(key->eckey, der, derLen, 1);
++	if (derLen <= 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: wc_EccPublicKeyToDer failed");
++		goto fail;
++	}
++
++	ret = wpabuf_alloc_copy(der, derLen);
++	os_free(der);
++	if (ret)
++		wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_group success");
++	else
++		wpa_printf(MSG_ERROR, "wolfSSL: wpabuf_alloc_copy failed");
++	return ret;
++
++fail:
++	if (der)
++		os_free(der);
++	return NULL;
++}
++
++struct crypto_ec_key * crypto_ec_key_parse_pub(const u8 *der, size_t der_len)
++{
++	word32 idx = 0;
++	struct crypto_ec_key *ret = NULL;
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_parse_pub starting");
++
++	if (!der || der_len == 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: invalid input parameters");
++		goto fail;
++	}
++
++	ret = crypto_ec_key_init();
++	if (!ret) {
++		wpa_printf(MSG_ERROR, "wolfSSL: crypto_ec_key_init failed");
++        goto fail;
++	}
++
++	if (wc_EccPublicKeyDecode(der, &idx, ret->eckey, (word32)der_len) != 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: wc_EccPublicKeyDecode failed");
++		goto fail;
++	}
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_parse_pub success");
++
++	return ret;
++fail:
++	if (ret)
++		crypto_ec_key_deinit(ret);
++	return NULL;
++}
++
++
++struct wpabuf * crypto_ec_key_sign(struct crypto_ec_key *key, const u8 *data,
++				   size_t len)
++{
++	byte *der = NULL;
++	int derLen;
++	word32 w32DerLen;
++	struct wpabuf *ret = NULL;
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_sign starting");
++
++	if (!key || !key->eckey || !data || len == 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: invalid input parameters");
++		goto fail;
++	}
++
++	if (!key->rng) {
++		/* Lazy init key->rng */
++		key->rng = wc_rng_new(NULL, 0, NULL);
++		if (!key->rng) {
++			wpa_printf(MSG_ERROR, "wolfSSL: wc_rng_new failed");
++			goto fail;
++		}
++	}
++
++	derLen = wc_ecc_sig_size(key->eckey);
++	if (derLen <= 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: wc_ecc_sig_size failed");
++		goto fail;
++	}
++
++	der = os_malloc(derLen);
++	if (!der) {
++		wpa_printf(MSG_ERROR, "wolfSSL: os_malloc failed");
++		goto fail;
++	}
++
++	w32DerLen = (word32)derLen;
++	if (wc_ecc_sign_hash(data, len, der, &w32DerLen, key->rng, key->eckey)
++			!= 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: wc_ecc_sign_hash failed");
++		goto fail;
++	}
++
++	ret = wpabuf_alloc_copy(der, derLen);
++	os_free(der);
++	if (ret)
++		wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_sign success");
++	else
++		wpa_printf(MSG_ERROR, "wolfSSL: wpabuf_alloc_copy failed");
++	return ret;
++fail:
++	if (der)
++		os_free(der);
++	return NULL;
++}
++
++
++int crypto_ec_key_verify_signature(struct crypto_ec_key *key, const u8 *data,
++				   size_t len, const u8 *sig, size_t sig_len)
++{
++	int res = 0;
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_verify_signature starting");
++
++	if (!key || !key->eckey || !data || len == 0 || !sig || sig_len == 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: invalid input parameters");
++		return -1;
++	}
++
++	if (wc_ecc_verify_hash(sig, sig_len, data, len, &res, key->eckey) != 0) {
++		wpa_printf(MSG_ERROR, "wolfSSL: wc_ecc_verify_hash failed");
++		return -1;
++	}
++
++	wpa_printf(MSG_DEBUG, "wolfSSL: crypto_ec_key_verify_signature %s",
++			res == 1 ? "success" : "failed");
++
++	return res;
++}
++
+ #endif /* CONFIG_ECC */
+ 
+ 
+diff --git a/tests/hwsim/test_sae.py b/tests/hwsim/test_sae.py
+index 276a484436..c3061b43f4 100644
+--- a/tests/hwsim/test_sae.py
++++ b/tests/hwsim/test_sae.py
+@@ -2119,6 +2119,8 @@ def run_sae_pwe_group(dev, apdev, group):
+     if group in [27, 28, 29, 30]:
+         if tls.startswith("OpenSSL") and ("run=OpenSSL 1." in tls or "run=OpenSSL 3." in tls):
+             logger.info("Add Brainpool EC groups since OpenSSL is new enough")
++        elif tls.startswith("wolfSSL"):
++            logger.info("Make sure Brainpool EC groups were enabled when compiling wolfSSL")
+         else:
+             raise HwsimSkip("Brainpool curve not supported")
+     start_sae_pwe_ap(apdev[0], group, 2)
+-- 
+2.25.1
+

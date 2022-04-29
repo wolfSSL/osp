@@ -1,0 +1,1269 @@
+From 04fc474608bac55bc31d47c6c09b84cf6665a3ba Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 19 Apr 2022 17:31:32 +0200
+Subject: [PATCH] Support for Android key store and FIPS
+
+---
+ src/crypto/crypto_wolfssl.c   |   8 +-
+ src/crypto/fips_prf_wolfssl.c |   5 +-
+ src/crypto/tls_wolfssl.c      | 741 +++++++++++++++++++++++++++++++---
+ wpa_supplicant/Android.mk     |  52 +++
+ 4 files changed, 755 insertions(+), 51 deletions(-)
+
+diff --git a/src/crypto/crypto_wolfssl.c b/src/crypto/crypto_wolfssl.c
+index 1dddafed08..51707c035f 100644
+--- a/src/crypto/crypto_wolfssl.c
++++ b/src/crypto/crypto_wolfssl.c
+@@ -12,7 +12,10 @@
+ #include "crypto.h"
+ 
+ /* wolfSSL headers */
+-#include <wolfssl/options.h>
++#ifndef ANDROID
++    /* build settings come from user_settings.h */
++    #include <wolfssl/options.h>
++#endif
+ #include <wolfssl/wolfcrypt/md4.h>
+ #include <wolfssl/wolfcrypt/md5.h>
+ #include <wolfssl/wolfcrypt/sha.h>
+@@ -28,6 +31,9 @@
+ #include <wolfssl/wolfcrypt/ecc.h>
+ #include <wolfssl/openssl/bn.h>
+ 
++#ifdef ANDROID
++#include <android/log.h>
++#endif
+ 
+ #ifndef CONFIG_FIPS
+ 
+diff --git a/src/crypto/fips_prf_wolfssl.c b/src/crypto/fips_prf_wolfssl.c
+index feb39db5a6..7b1e6585a3 100644
+--- a/src/crypto/fips_prf_wolfssl.c
++++ b/src/crypto/fips_prf_wolfssl.c
+@@ -7,7 +7,10 @@
+  */
+ 
+ #include "includes.h"
+-#include <wolfssl/options.h>
++#ifndef ANDROID
++    /* build settings come from user_settings.h */
++    #include <wolfssl/options.h>
++#endif
+ #include <wolfssl/wolfcrypt/sha.h>
+ 
+ #include "common.h"
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 18116652c8..fe6a28162c 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -15,17 +15,37 @@
+ #include "tls.h"
+ 
+ /* wolfSSL includes */
+-#include <wolfssl/options.h>
++#ifndef ANDROID
++    /* build settings come from user_settings.h */
++    #include <wolfssl/options.h>
++#endif
+ #include <wolfssl/ssl.h>
+ #include <wolfssl/error-ssl.h>
+ #include <wolfssl/wolfcrypt/asn.h>
++#include <wolfssl/wolfcrypt/rsa.h>
++#include <wolfssl/wolfcrypt/ecc.h>
++#ifdef WOLF_CRYPTO_CB
++#include <wolfssl/wolfcrypt/cryptocb.h>
++#endif
++#include <wolfssl/wolfcrypt/error-crypt.h>
+ #include <wolfssl/openssl/x509v3.h>
+ 
++#ifdef ANDROID
++#include <android/log.h>
++#endif
++
+ #if defined(EAP_FAST) || defined(EAP_FAST_DYNAMIC) || defined(EAP_SERVER_FAST)
+ #define HAVE_AESGCM
+ #include <wolfssl/wolfcrypt/aes.h>
+ #endif
+ 
++#if defined(CONFIG_FIPS)
++#include <wolfssl/wolfcrypt/fips_test.h>
++#endif
++#ifdef ANDROID
++#include <android/log.h>
++#endif
++
+ #if !defined(CONFIG_FIPS) &&                             \
+     (defined(EAP_FAST) || defined(EAP_FAST_DYNAMIC) ||   \
+      defined(EAP_SERVER_FAST))
+@@ -36,6 +56,109 @@
+ #define RAN_LEN             32
+ #define SESSION_TICKET_LEN  256
+ 
++#ifdef ANDROID
++
++/* forward declarations */
++#ifdef HAVE_PK_CALLBACKS
++#ifdef HAVE_ECC
++static int myEccSign(WOLFSSL* ssl, const byte* in, word32 inSz,
++        byte* out, word32* outSz, const byte* key, word32 keySz, void* ctx);
++#endif
++#ifndef NO_RSA
++static int myRsaSign(WOLFSSL* ssl, const byte* in, word32 inSz,
++        byte* out, word32* outSz, const byte* key, word32 keySz, void* ctx);
++static int myRsaSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
++        byte** out, const byte* key, word32 keySz, void* ctx);
++#endif
++#endif
++
++#include <wolfssl/openssl/pem.h>
++#include <keystore/keystore_get.h>
++
++static BIO * BIO_from_keystore(const char *key)
++{
++	BIO *bio = NULL;
++	uint8_t *value = NULL;
++    int length = 0;
++
++	length = keystore_get(key, strlen(key), &value);
++	if (length != -1 && (bio = BIO_new(BIO_s_mem())) != NULL) {
++		BIO_write(bio, value, length);
++    }
++	free(value);
++
++	return bio;
++}
++
++static int tls_add_ca_from_keystore(WOLFSSL_CTX* ctx, const char *key_alias)
++{
++	BIO *bio = BIO_from_keystore(key_alias);
++	STACK_OF(X509_INFO) *stack = NULL;
++    const unsigned char* derCert = NULL;
++    int derCertSz = 0;
++	int i;
++
++	if (bio) {
++		stack = PEM_X509_INFO_read_bio(bio, NULL, NULL, NULL);
++		BIO_free(bio);
++	}
++
++	if (!stack) {
++		wpa_printf(MSG_WARNING, "TLS: Failed to parse certificate: %s",
++			   key_alias);
++		return -1;
++	}
++
++	for (i = 0; i < sk_X509_INFO_num(stack); ++i) {
++		X509_INFO *info = sk_X509_INFO_value(stack, i);
++
++		if (info->x509) {
++            derCert = wolfSSL_X509_get_der(info->x509, &derCertSz);
++            if (derCert != NULL && derCertSz > 0) {
++                if (wolfSSL_CTX_load_verify_buffer(ctx, derCert, derCertSz,
++                                   SSL_FILETYPE_ASN1) != SSL_SUCCESS) {
++                    wpa_printf(MSG_ERROR, "SSL: failed to load DER cert from keystore");
++                    return -1;
++                }
++            }
++            wpa_printf(MSG_DEBUG, "SSL: loaded DER cert from keystore OK");
++        }
++	}
++
++	sk_X509_INFO_pop_free(stack, X509_INFO_free);
++
++	return 0;
++}
++
++
++static int tls_add_ca_from_keystore_encoded(WOLFSSL_CTX* ctx,
++					    const char *encoded_key_alias)
++{
++	int rc = -1;
++	int len = os_strlen(encoded_key_alias);
++	unsigned char *decoded_alias;
++
++	if (len & 1) {
++		wpa_printf(MSG_WARNING, "Invalid hex-encoded alias: %s",
++			   encoded_key_alias);
++		return rc;
++	}
++
++	decoded_alias = os_malloc(len / 2 + 1);
++	if (decoded_alias) {
++		if (!hexstr2bin(encoded_key_alias, decoded_alias, len / 2)) {
++			decoded_alias[len / 2] = '\0';
++			rc = tls_add_ca_from_keystore(
++				ctx, (const char *) decoded_alias);
++		}
++		os_free(decoded_alias);
++	}
++
++	return rc;
++}
++
++#endif /* ANDROID */
++
+ static int tls_ref_count = 0;
+ 
+ static int tls_ex_idx_session = 0;
+@@ -192,15 +315,40 @@ static void remove_session_cb(WOLFSSL_CTX *ctx, WOLFSSL_SESSION *sess)
+ }
+ 
+ 
++#if defined(CONFIG_FIPS) && defined(HAVE_FIPS)
++#ifdef ANDROID
++/* Use __android_log_print to make sure that output always makes it to the
++ * adb console. This is useful since the actual hash of the FIPS module will
++ * get printed this way. */
++#define FIPS_LOG(...) __android_log_print(ANDROID_LOG_ERROR, __VA_ARGS__)
++#else
++#define FIPS_LOG(...) wpa_printf(MSG_ERROR, __VA_ARGS__)
++#endif
++
++static void wcFipsCb(int ok, int err, const char* hash)
++{
++    FIPS_LOG("wolfFIPS", "wolfCrypt Fips error callback, ok = %d, err = %d\n", ok, err);
++    FIPS_LOG("wolfFIPS", "message = %s\n", wc_GetErrorString(err));
++    FIPS_LOG("wolfFIPS", "hash = %s\n", hash);
++    if (err == IN_CORE_FIPS_E) {
++        FIPS_LOG("wolfFIPS", "In core integrity hash check failure, copy above hash\n");
++        FIPS_LOG("wolfFIPS", "into verifyCore[] in fips_test.c and rebuild\n");
++    }
++}
++#endif
++
+ #ifdef DEBUG_WOLFSSL
+ static void wolfSSL_logging_cb(const int log_level,
+-			       const char * const log_message)
++                   const char * const log_message)
+ {
+-	(void) log_level;
+-	wpa_printf(MSG_DEBUG, "wolfSSL log:%s", log_message);
++    (void) log_level;
++    wpa_printf(MSG_DEBUG, "wolfSSL log: %s", log_message);
+ }
+ #endif /* DEBUG_WOLFSSL */
+ 
++#ifdef ANDROID
++static int gDevId = INVALID_DEVID;
++#endif
+ 
+ void * tls_init(const struct tls_config *conf)
+ {
+@@ -209,8 +357,8 @@ void * tls_init(const struct tls_config *conf)
+ 	const char *ciphers;
+ 
+ #ifdef DEBUG_WOLFSSL
+-	wolfSSL_SetLoggingCb(wolfSSL_logging_cb);
+-	wolfSSL_Debugging_ON();
++    wolfSSL_SetLoggingCb(wolfSSL_logging_cb);
++    wolfSSL_Debugging_ON();
+ #endif /* DEBUG_WOLFSSL */
+ 
+ 	context = tls_context_new(conf);
+@@ -222,7 +370,10 @@ void * tls_init(const struct tls_config *conf)
+ 
+ 		if (wolfSSL_Init() < 0)
+ 			return NULL;
+-		/* wolfSSL_Debugging_ON(); */
++
++    #if defined(CONFIG_FIPS) && defined(HAVE_FIPS)
++        wolfCrypt_SetCb_fips(wcFipsCb);
++    #endif
+ 	}
+ 
+ 	tls_ref_count++;
+@@ -243,6 +394,22 @@ void * tls_init(const struct tls_config *conf)
+ 	context->tls_session_lifetime = conf->tls_session_lifetime;
+ 	wolfSSL_CTX_set_ex_data(ssl_ctx, 0, context);
+ 
++	/* Handling for private key signing with private key in protected keystore */
++#ifdef ANDROID
++#ifdef HAVE_PK_CALLBACKS
++	#ifdef HAVE_ECC
++	wolfSSL_CTX_SetEccSignCb(ssl_ctx, myEccSign);
++	#endif
++	#ifndef NO_RSA
++	wolfSSL_CTX_SetRsaSignCb(ssl_ctx, myRsaSign);
++	wolfSSL_CTX_SetRsaSignCheckCb(ssl_ctx, myRsaSignCheck);
++	#endif
++#endif
++
++	gDevId = 1; /* any unique value not (INVALID_DEVID -2) */
++	wolfSSL_CTX_SetDevId(ssl_ctx, gDevId);
++#endif /* ANDROID */
++
+ 	if (conf->tls_session_lifetime > 0) {
+ 		wolfSSL_CTX_set_session_id_context(ssl_ctx,
+ 						   (const unsigned char *)
+@@ -438,6 +605,33 @@ static int tls_connection_set_subject_match(struct tls_connection *conn,
+ }
+ 
+ 
++static int tls_connection_dh(struct tls_connection *conn, const char *dh_file)
++{
++	if (!dh_file)
++		return 0;
++
++	wolfSSL_set_accept_state(conn->ssl);
++
++	if (dh_file) {
++		wpa_printf(MSG_INFO, "SSL: use DH PEM file: %s", dh_file);
++		if (wolfSSL_SetTmpDH_file(conn->ssl, dh_file,
++					  SSL_FILETYPE_PEM) < 0) {
++			wpa_printf(MSG_ERROR, "SSL: use DH PEM file failed");
++			if (wolfSSL_SetTmpDH_file(conn->ssl, dh_file,
++						  SSL_FILETYPE_ASN1) < 0) {
++				wpa_printf(MSG_ERROR,
++					   "SSL: use DH DER file failed");
++				return -1;
++			}
++		}
++		wpa_printf(MSG_DEBUG, "SSL: use DH file OK");
++		return 0;
++	}
++
++	return 0;
++}
++
++
+ static int tls_connection_client_cert(struct tls_connection *conn,
+ 				      const char *client_cert,
+ 				      const u8 *client_cert_blob,
+@@ -450,7 +644,7 @@ static int tls_connection_client_cert(struct tls_connection *conn,
+ 		if (wolfSSL_use_certificate_chain_buffer_format(
+ 			    conn->ssl, client_cert_blob, blob_len,
+ 			    SSL_FILETYPE_ASN1) != SSL_SUCCESS) {
+-			wpa_printf(MSG_INFO,
++			wpa_printf(MSG_ERROR,
+ 				   "SSL: use client cert DER blob failed");
+ 			return -1;
+ 		}
+@@ -459,14 +653,36 @@ static int tls_connection_client_cert(struct tls_connection *conn,
+ 	}
+ 
+ 	if (client_cert) {
++#ifdef ANDROID
++		wpa_printf(MSG_INFO, "CLIENT_CERT=%s", client_cert);
++        if (os_strncmp("keystore://", client_cert, 11) == 0) {
++            BIO *bio = BIO_from_keystore(&client_cert[11]);
++            X509 *x509 = NULL;
++            int ret = -1;
++
++            if (bio) {
++                x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
++            }
++
++            if (x509) {
++                if (SSL_use_certificate(conn->ssl, x509) == 1) {
++                    ret = 0;
++                }
++                X509_free(x509);
++            }
++			wpa_printf(MSG_INFO, "SSL: Use from keystore %d", ret);
++
++            return ret;
++        }
++#endif /* ANDROID */
+ 		if (wolfSSL_use_certificate_chain_file(
+ 			    conn->ssl, client_cert) != SSL_SUCCESS) {
+-			wpa_printf(MSG_INFO,
++			wpa_printf(MSG_ERROR,
+ 				   "SSL: use client cert PEM file failed");
+ 			if (wolfSSL_use_certificate_chain_file_format(
+ 				    conn->ssl, client_cert,
+ 				    SSL_FILETYPE_ASN1) != SSL_SUCCESS) {
+-				wpa_printf(MSG_INFO,
++				wpa_printf(MSG_ERROR,
+ 					   "SSL: use client cert DER file failed");
+ 				return -1;
+ 			}
+@@ -515,7 +731,7 @@ static int tls_connection_private_key(void *tls_ctx,
+ 		if (wolfSSL_use_PrivateKey_buffer(conn->ssl,
+ 						  private_key_blob, blob_len,
+ 						  SSL_FILETYPE_ASN1) <= 0) {
+-			wpa_printf(MSG_INFO,
++			wpa_printf(MSG_ERROR,
+ 				   "SSL: use private DER blob failed");
+ 		} else {
+ 			wpa_printf(MSG_DEBUG, "SSL: use private key blob OK");
+@@ -526,7 +742,7 @@ static int tls_connection_private_key(void *tls_ctx,
+ 	if (!ok && private_key) {
+ 		if (wolfSSL_use_PrivateKey_file(conn->ssl, private_key,
+ 						SSL_FILETYPE_PEM) <= 0) {
+-			wpa_printf(MSG_INFO,
++			wpa_printf(MSG_ERROR,
+ 				   "SSL: use private key PEM file failed");
+ 			if (wolfSSL_use_PrivateKey_file(conn->ssl, private_key,
+ 							SSL_FILETYPE_ASN1) <= 0)
+@@ -598,7 +814,7 @@ static int tls_match_alt_subject(WOLFSSL_X509 *cert, const char *match)
+ 			type = GEN_URI;
+ 			pos += 4;
+ 		} else {
+-			wpa_printf(MSG_INFO,
++			wpa_printf(MSG_WARNING,
+ 				   "TLS: Invalid altSubjectName match '%s'",
+ 				   pos);
+ 			return 0;
+@@ -1128,6 +1344,7 @@ static int tls_connection_ca_cert(void *tls_ctx, struct tls_connection *conn,
+ 				  const char *ca_path)
+ {
+ 	WOLFSSL_CTX *ctx = tls_ctx;
++    int ret = 0;
+ 
+ 	wolfSSL_set_verify(conn->ssl, SSL_VERIFY_PEER, tls_verify_cb);
+ 	conn->ca_cert_verify = 1;
+@@ -1168,7 +1385,7 @@ static int tls_connection_ca_cert(void *tls_ctx, struct tls_connection *conn,
+ 			   "wolfSSL: Checking only server certificate match");
+ 		return 0;
+ #else /* CONFIG_SHA256 */
+-		wpa_printf(MSG_INFO,
++		wpa_printf(MSG_ERROR,
+ 			   "No SHA256 included in the build - cannot validate server certificate hash");
+ 		return -1;
+ #endif /* CONFIG_SHA256 */
+@@ -1178,36 +1395,82 @@ static int tls_connection_ca_cert(void *tls_ctx, struct tls_connection *conn,
+ 		if (wolfSSL_CTX_load_verify_buffer(ctx, ca_cert_blob, blob_len,
+ 						   SSL_FILETYPE_ASN1) !=
+ 		    SSL_SUCCESS) {
+-			wpa_printf(MSG_INFO, "SSL: failed to load CA blob");
++			wpa_printf(MSG_ERROR, "SSL: failed to load CA blob");
+ 			return -1;
+ 		}
+ 		wpa_printf(MSG_DEBUG, "SSL: use CA cert blob OK");
+ 		return 0;
+ 	}
+ 
++#ifdef ANDROID
++    /* Single alias */
++	wpa_printf(MSG_INFO, "CA_CERT %s", ca_cert);
++	if (ca_cert && os_strncmp("keystore://", ca_cert, 11) == 0) {
++		if (tls_add_ca_from_keystore(ctx, &ca_cert[11]) < 0) {
++            wpa_printf(MSG_WARNING,
++                       "wolfSSL: Failed to add ca_cert from keystore");
++			return -1;
++        }
++		return 0;
++	}
++
++	/* Multiple aliases separated by space */
++	if (ca_cert && os_strncmp("keystores://", ca_cert, 12) == 0) {
++		char *aliases = os_strdup(&ca_cert[12]);
++		const char *delim = " ";
++		int rc = 0;
++		char *savedptr;
++		char *alias;
++
++		if (!aliases)
++			return -1;
++		alias = strtok_r(aliases, delim, &savedptr);
++		for (; alias; alias = strtok_r(NULL, delim, &savedptr)) {
++			if (tls_add_ca_from_keystore_encoded(ctx, alias)) {
++				wpa_printf(MSG_WARNING,
++					   "wolfSSL: %s - Failed to add ca_cert %s from keystore",
++					   __func__, alias);
++				rc = -1;
++				break;
++			}
++		}
++		os_free(aliases);
++		if (rc) {
++			return rc;
++        }
++
++		SSL_set_verify(conn->ssl, SSL_VERIFY_PEER, tls_verify_cb);
++		return 0;
++	}
++#endif /* ANDROID */
++
+ 	if (ca_cert || ca_path) {
+ 		WOLFSSL_X509_STORE *cm = wolfSSL_X509_STORE_new();
+ 
+ 		if (!cm) {
+-			wpa_printf(MSG_INFO,
++			wpa_printf(MSG_ERROR,
+ 				   "SSL: failed to create certificate store");
+ 			return -1;
+ 		}
+ 		wolfSSL_CTX_set_cert_store(ctx, cm);
+ 
+-		if (wolfSSL_CTX_load_verify_locations(ctx, ca_cert, ca_path) !=
+-		    SSL_SUCCESS) {
+-			wpa_printf(MSG_INFO,
+-				   "SSL: failed to load ca_cert as PEM");
++		ret = wolfSSL_CTX_load_verify_locations(ctx, ca_cert, ca_path);
++        if (ret != SSL_SUCCESS) {
++			wpa_printf(MSG_ERROR,
++				   "SSL: failed to load ca_cert as PEM, ret = %d", ret);
++            wpa_printf(MSG_ERROR,
++                   "SSL: ctx = %p, ca_cert = %s", ctx, ca_cert);
+ 
+ 			if (!ca_cert)
+ 				return -1;
+ 
+-			if (wolfSSL_CTX_der_load_verify_locations(
+-				    ctx, ca_cert, SSL_FILETYPE_ASN1) !=
+-			    SSL_SUCCESS) {
+-				wpa_printf(MSG_INFO,
+-					   "SSL: failed to load ca_cert as DER");
++			ret = wolfSSL_CTX_der_load_verify_locations(
++				    ctx, ca_cert, SSL_FILETYPE_ASN1);
++            if (ret != SSL_SUCCESS) {
++				wpa_printf(MSG_ERROR,
++					   "SSL: failed to load ca_cert as DER, ret = %d", ret);
++                wpa_printf(MSG_ERROR,
++                       "SSL: ctx = %p, ca_cert = %p", ctx, ca_cert);
+ 				return -1;
+ 			}
+ 		}
+@@ -1234,6 +1497,362 @@ static void tls_set_conn_flags(WOLFSSL *ssl, unsigned int flags)
+ 		wolfSSL_set_options(ssl, SSL_OP_NO_TLSv1_2);
+ }
+ 
++#ifdef ANDROID
++/* EVP_PKEY_from_keystore comes from system/security/keystore-engine. */
++EVP_PKEY * EVP_PKEY_from_keystore(const char *key_id);
++
++/* these functions are in the security/keystore-engine/android_engine.cpp */
++extern int keystore_sign_id(const char *key_id, const uint8_t* in, size_t len,
++	uint8_t** reply, size_t* reply_len);
++
++extern int keystore_get_pubkey_id(const char *key_id, uint8_t** pubkey,
++    size_t* pubkey_len);
++
++static int keystore_sign(const char* key_id, const uint8_t* in, uint32_t in_len,
++	uint8_t* out, uint32_t* out_len)
++{
++	/* key store uses input buffer * 2 and returns pointer to second half */
++	int ret;
++	uint8_t* reply = NULL;
++	size_t reply_len = 0;
++
++	if (key_id == NULL) {
++		wpa_printf(MSG_ERROR, "keystore_sign: input error! %d\n", in_len);
++		return BAD_FUNC_ARG;
++	}
++
++	/* submit transform / sign to key store */
++	/* all inputs and outputs are expected to be big endian */
++	ret = keystore_sign_id(key_id, in, in_len, &reply, &reply_len);
++	if (ret != 0) {
++        wpa_printf(MSG_ERROR, "keystore_sign: sign error %d\n", ret);
++        return WC_HW_E;
++    }
++	else if (reply_len == 0 || reply == NULL) {
++        wpa_printf(MSG_ERROR, "keystore_sign: no signature returned\n");
++        return WC_HW_E;
++    }
++	else if (reply_len > in_len) {
++		wpa_printf(MSG_ERROR, "keystore_sign: truncate %d -> %d\n", (int)reply_len, in_len);
++		reply_len = in_len; /* truncate */
++	}
++
++	/* copy output - use leading zeros (if shorter), truncate if longer */
++	os_memset(out, 0, in_len);
++	os_memcpy(out + in_len - reply_len, reply, reply_len);
++	*out_len = reply_len;
++
++	wpa_printf(MSG_INFO, "keystore_sign: ret %d, out_len %d\n", ret, (int)*out_len);
++	return 0;
++}
++
++static int keystore_load_pubkey(const char* key_id, struct tls_connection *conn)
++{
++	int ret;
++	uint8_t* pubkey = NULL;
++	size_t pubkey_len = 0;
++
++	if (key_id == NULL) {
++		wpa_printf(MSG_ERROR, "keystore_load_pubkey: key id missing error!\n");
++		return BAD_FUNC_ARG;
++	}
++
++	ret = keystore_get_pubkey_id(key_id, &pubkey, &pubkey_len);
++	if (ret != 0) {
++        wpa_printf(MSG_ERROR, "keystore_load_pubkey: get pub error %d\n", ret);
++        return WC_HW_E;
++    }
++	else if (pubkey_len == 0 || pubkey == NULL) {
++        wpa_printf(MSG_ERROR, "keystore_load_pubkey: no pub key returned\n");
++        return WC_HW_E;
++    }
++
++	if (wolfSSL_use_PrivateKey_buffer(conn->ssl, pubkey, pubkey_len,
++			WOLFSSL_FILETYPE_ASN1) != WOLFSSL_SUCCESS) {
++		wpa_printf(MSG_ERROR, "SSL: Failed to set RSA public key!");
++	}
++
++	wpa_printf(MSG_INFO, "keystore_load_pubkey: ret %d, len %d\n",
++		ret, (int)pubkey_len);
++	return ret;
++}
++
++/* Support both PK callbacks and crypto callbacks */
++#ifdef HAVE_PK_CALLBACKS
++#ifdef HAVE_ECC
++static int myEccSign(WOLFSSL* ssl, const byte* in, word32 inSz,
++        byte* out, word32* outSz, const byte* key, word32 keySz, void* ctx)
++{
++    int         ret;
++    uint8_t*    pubkey = NULL;
++	size_t      pubkey_len = 0;
++	const char* key_id = (const char*)ctx;
++	ecc_key     eccPub;
++
++    (void)ssl;
++    (void)key;
++	(void)keySz;
++
++    wpa_printf(MSG_INFO, "myEccSign: inSz %d, keySz %d\n", inSz, keySz);
++
++	if (key_id == NULL) {
++		wpa_printf(MSG_ERROR, "myEccSign: key id missing error!\n");
++		return BAD_FUNC_ARG;
++	}
++
++	ret = keystore_get_pubkey_id(key_id, &pubkey, &pubkey_len);
++	if (ret != 0) {
++        wpa_printf(MSG_ERROR, "myEccSign: get pub error %d\n", ret);
++        return WC_HW_E;
++    }
++	else if (pubkey_len == 0 || pubkey == NULL) {
++        wpa_printf(MSG_ERROR, "myEccSign: no pub key returned\n");
++        return WC_HW_E;
++    }
++
++    ret = wc_ecc_init(&eccPub);
++    if (ret == 0) {
++		word32 keyIdx = 0;
++        ret = wc_EccPublicKeyDecode(pubkey, &keyIdx, &eccPub, (word32)pubkey_len);
++        if (ret == 0) {
++            wpa_printf(MSG_INFO, "myEccSign: Curve ID %d\n", eccPub.dp->id);
++
++			ret = keystore_sign(key_id, in, inSz, out, outSz);
++        }
++		else {
++			wpa_printf(MSG_ERROR, "myEccSign: Public decode failed! %d\n", ret);
++		}
++        wc_ecc_free(&eccPub);
++    }
++
++    wpa_printf(MSG_INFO, "myEccSign: ret %d outSz %d\n", ret, *outSz);
++
++    return ret;
++}
++#endif /* HAVE_ECC */
++
++#ifndef NO_RSA
++/* Padding Function, PKCSv15 (not exposed in wolfCrypt FIPS 3389) */
++static int RsaPadPkcsv15Type1(const byte* input, word32 inputLen,
++	byte* pkcsBlock, word32 pkcsBlockLen)
++{
++    if (input == NULL || inputLen == 0 || pkcsBlock == NULL || pkcsBlockLen == 0) {
++        return BAD_FUNC_ARG;
++    }
++
++    if (pkcsBlockLen - RSA_MIN_PAD_SZ < inputLen) {
++        wpa_printf(MSG_ERROR, "RsaPad error, invalid length");
++        return RSA_PAD_E;
++    }
++
++    pkcsBlock[0] = 0x0;       /* set first byte to zero and advance */
++    pkcsBlock++; pkcsBlockLen--;
++    pkcsBlock[0] = RSA_BLOCK_TYPE_1;  /* insert padValue */
++
++	/* pad with 0xff bytes */
++	os_memset(&pkcsBlock[1], 0xFF, pkcsBlockLen - inputLen - 2);
++
++    pkcsBlock[pkcsBlockLen-inputLen-1] = 0;     /* separator */
++    os_memcpy(pkcsBlock+pkcsBlockLen-inputLen, input, inputLen);
++
++    return 0;
++}
++
++#ifndef MAX_RSA_KEY_SZ
++#define MAX_RSA_KEY_SZ 4096
++#endif
++static int myRsaSign(WOLFSSL* ssl, const byte* in, word32 inSz,
++        byte* out, word32* outSz, const byte* key, word32 keySz, void* ctx)
++{
++    int         ret;
++    const char* key_id = (const char*)ctx;
++	uint8_t*    pubkey = NULL;
++	size_t      pubkey_len = 0;
++	RsaKey      rsapub;
++
++    (void)ssl;
++    (void)key;
++	(void)keySz;
++
++    wpa_printf(MSG_INFO, "myRsaSign: inSz %d, keySz %d\n", inSz, keySz);
++
++	if (key_id == NULL) {
++		wpa_printf(MSG_ERROR, "myRsaSign: key id missing error!\n");
++		return BAD_FUNC_ARG;
++	}
++
++	ret = keystore_get_pubkey_id(key_id, &pubkey, &pubkey_len);
++	if (ret != 0) {
++        wpa_printf(MSG_ERROR, "myRsaSign: get pub error %d\n", ret);
++        return WC_HW_E;
++    }
++	else if (pubkey_len == 0 || pubkey == NULL) {
++        wpa_printf(MSG_ERROR, "myRsaSign: no pub key returned\n");
++        return WC_HW_E;
++    }
++
++	/* load RSA public key and perform public transform */
++	ret = wc_InitRsaKey(&rsapub, NULL);
++	if (ret == 0) {
++		word32 keyIdx = 0;
++		ret = wc_RsaPublicKeyDecode(pubkey, &keyIdx, &rsapub, (word32)pubkey_len);
++		if (ret == 0) {
++			int rsaKeySz = wc_RsaEncryptSize(&rsapub);
++			if (rsaKeySz > MAX_RSA_KEY_SZ/8) {
++				wpa_printf(MSG_ERROR, "myRsaSign: key size error %d > %d\n",
++					rsaKeySz, MAX_RSA_KEY_SZ/8);
++        		ret = RSA_BUFFER_E;
++			}
++			else {
++				/* Pad with PKCSv1.5 type 1 */
++				byte inPad[MAX_RSA_KEY_SZ/8];
++				word32 inPadSz = rsaKeySz;
++				ret = RsaPadPkcsv15Type1(in, inSz, inPad, inPadSz);
++				if (ret == 0) {
++					/* Sign using the key store */
++					ret = keystore_sign(key_id, inPad, inPadSz, out, outSz);
++				}
++			}
++		}
++		else {
++			wpa_printf(MSG_ERROR, "myRsaSign: Public decode failed! %d\n", ret);
++		}
++		wc_FreeRsaKey(&rsapub);
++	}
++
++    wpa_printf(MSG_INFO, "myRsaSign: ret %d, outSz %d\n", ret, *outSz);
++
++    return ret;
++}
++static int myRsaSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
++        byte** out, const byte* key, word32 keySz, void* ctx)
++
++{
++	const char* key_id = (const char*)ctx;
++	(void)ssl;
++	(void)sig;
++	(void)sigSz;
++	(void)out;
++	(void)key;
++	(void)keySz;
++	(void)key_id;
++	/* We used sign hardware, so assume sign is good */
++	return 0;
++}
++#endif /* !NO_RSA */
++#endif /* HAVE_PK_CALLBACKS */
++
++#ifdef WOLF_CRYPTO_CB
++static int myCryptoCb(int devId, wc_CryptoInfo* info, void* ctx)
++{
++	int ret = CRYPTOCB_UNAVAILABLE;
++	const char* key_id = (const char*)ctx;
++
++    if (info->algo_type == WC_ALGO_TYPE_PK) {
++        wpa_printf(MSG_INFO, "SSL: CryptoCb: Pk Type %d\n", info->pk.type);
++
++    #ifndef NO_RSA
++        if (info->pk.type == WC_PK_TYPE_RSA) {
++            switch (info->pk.rsa.type) {
++                case RSA_PUBLIC_ENCRYPT:
++                case RSA_PUBLIC_DECRYPT:
++					/* perform software based RSA public op */
++					ret = CRYPTOCB_UNAVAILABLE; /* fallback to software */
++                    break;
++                case RSA_PRIVATE_ENCRYPT:
++                case RSA_PRIVATE_DECRYPT:
++                    /* use key store to sign */
++					wpa_printf(MSG_INFO, "SSL: CryptoCb: RSA Priv KeyStore\n");
++					ret = keystore_sign(key_id,
++						info->pk.rsa.in, info->pk.rsa.inLen,
++						info->pk.rsa.out, info->pk.rsa.outLen);
++                    break;
++            }
++			wpa_printf(MSG_INFO, "SSL: CryptoCb: RSA Type %d, Ret %d, Out %d\n",
++				info->pk.rsa.type, ret, *info->pk.rsa.outLen);
++        }
++    #endif /* !NO_RSA */
++    #ifdef HAVE_ECC
++		if (info->pk.type == WC_PK_TYPE_ECDSA_SIGN) {
++			ret = keystore_sign(key_id,
++				info->pk.eccsign.in, info->pk.eccsign.inlen,
++				info->pk.eccsign.out, info->pk.eccsign.outlen);
++
++			wpa_printf(MSG_INFO, "SSL: CryptoCb: ECC: Ret %d, Out %d\n",
++				ret, *info->pk.eccsign.outlen);
++        }
++    #endif /* HAVE_ECC */
++    }
++	(void)devId;
++
++	return ret;
++}
++#endif /* WOLF_CRYPTO_CB */
++
++#endif /* ANDROID */
++
++static int tls_connection_private_key_from_id(void *tls_ctx,
++                      struct tls_connection *conn,
++                      const char* key_id)
++{
++    int ret = -1;
++#ifdef ANDROID
++#if defined(HAVE_PK_CALLBACKS) || defined(WOLF_CRYPTO_CB)
++	ret = keystore_load_pubkey(key_id, conn);
++	if (ret != 0) {
++		wpa_printf(MSG_ERROR, "SSL: Error loading keystore public key");
++        return -1;
++	}
++	#ifdef HAVE_PK_CALLBACKS
++	/* register PK callback for signing */
++	#ifdef HAVE_ECC
++		wolfSSL_SetEccSignCtx(conn->ssl, (void*)key_id);
++	#endif
++	#ifndef NO_RSA
++		wolfSSL_SetRsaSignCtx(conn->ssl, (void*)key_id);
++		wolfSSL_SetRsaVerifyCtx(conn->ssl, (void*)key_id);
++	#endif
++	#endif
++
++	#ifdef WOLF_CRYPTO_CB
++	/* register crypto callback for signing */
++	ret = wc_CryptoCb_RegisterDevice(gDevId, myCryptoCb, (void*)key_id);
++	#endif
++#else
++    EVP_PKEY* private_key = NULL;
++
++    /* get private key as EVP_PKEY* from keystore via key_id */
++	private_key = EVP_PKEY_from_keystore(key_id);
++	if (private_key == NULL) {
++		wpa_printf(MSG_ERROR, "SSL: EVP_PKEY_from_keystore failed");
++        return -1;
++	}
++
++    /* load EVP_PKEY* private key into WOLFSSL session */
++    ret = SSL_use_PrivateKey(conn->ssl, private_key);
++    if (ret != 1) {
++		wpa_printf(MSG_ERROR, "SSL: SSL_use_PrivateKey failed %d", ret);
++        EVP_PKEY_free(private_key);
++        return -1;
++    }
++
++    /* check private key */
++    ret = SSL_check_private_key(conn->ssl);
++    if (ret != 0) {
++		wpa_printf(MSG_ERROR, "SSL: SSL_check_private_key failed %d", ret);
++        EVP_PKEY_free(private_key);
++        return -1;
++    }
++
++    EVP_PKEY_free(private_key);
++    ret = 0;
++#endif /* HAVE_PK_CALLBACKS || WOLF_CRYPTO_CB */
++#else
++	wpa_printf(MSG_ERROR, "SSL: Loading private key from key_id only supported "
++               "on Android currently");
++#endif
++	return ret;
++}
+ 
+ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
+ 			      const struct tls_connection_params *params)
+@@ -1244,7 +1863,7 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
+ 					     params->altsubject_match,
+ 					     params->suffix_match,
+ 					     params->domain_match) < 0) {
+-		wpa_printf(MSG_INFO, "Error setting subject match");
++		wpa_printf(MSG_ERROR, "Error setting subject match");
+ 		return -1;
+ 	}
+ 
+@@ -1252,28 +1871,43 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
+ 				   params->ca_cert_blob,
+ 				   params->ca_cert_blob_len,
+ 				   params->ca_path) < 0) {
+-		wpa_printf(MSG_INFO, "Error setting CA cert");
++		wpa_printf(MSG_ERROR, "Error setting CA cert");
+ 		return -1;
+ 	}
+ 
+ 	if (tls_connection_client_cert(conn, params->client_cert,
+ 				       params->client_cert_blob,
+ 				       params->client_cert_blob_len) < 0) {
+-		wpa_printf(MSG_INFO, "Error setting client cert");
++		wpa_printf(MSG_ERROR, "Error setting client cert");
+ 		return -1;
+ 	}
+ 
+-	if (tls_connection_private_key(tls_ctx, conn, params->private_key,
+-				       params->private_key_passwd,
+-				       params->private_key_blob,
+-				       params->private_key_blob_len) < 0) {
+-		wpa_printf(MSG_INFO, "Error setting private key");
++    if (params->key_id != NULL) {
++        /* load private key from keystore via key_id */
++        if (tls_connection_private_key_from_id(tls_ctx, conn,
++                                               params->key_id) < 0) {
++			wpa_printf(MSG_ERROR, "Error setting TLS private key id = %s",
++				params->key_id);
++            return -1;
++        }
++    } else {
++        if (tls_connection_private_key(tls_ctx, conn, params->private_key,
++                           params->private_key_passwd,
++                           params->private_key_blob,
++                           params->private_key_blob_len) < 0) {
++            wpa_printf(MSG_ERROR, "Error setting private key");
++            return -1;
++        }
++    }
++
++	if (tls_connection_dh(conn, params->dh_file) < 0) {
++		wpa_printf(MSG_ERROR, "Error setting DH");
+ 		return -1;
+ 	}
+ 
+ 	if (params->openssl_ciphers &&
+ 	    wolfSSL_set_cipher_list(conn->ssl, params->openssl_ciphers) != 1) {
+-		wpa_printf(MSG_INFO,
++		wpa_printf(MSG_ERROR,
+ 			   "wolfSSL: Failed to set cipher string '%s'",
+ 			   params->openssl_ciphers);
+ 		return -1;
+@@ -1303,15 +1937,15 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
+     !defined(HAVE_CERTIFICATE_STATUS_REQUEST_V2)
+ #ifdef HAVE_OCSP
+ 	if (params->flags & TLS_CONN_REQUEST_OCSP)
+-		wolfSSL_CTX_EnableOCSP(ctx, 0);
++		wolfSSL_CTX_EnableOCSP(tls_ctx, 0);
+ #else /* HAVE_OCSP */
+ 	if (params->flags & TLS_CONN_REQUIRE_OCSP) {
+-		wpa_printf(MSG_INFO,
++		wpa_printf(MSG_ERROR,
+ 			   "wolfSSL: No OCSP support included - reject configuration");
+ 		return -1;
+ 	}
+ 	if (params->flags & TLS_CONN_REQUEST_OCSP) {
+-		wpa_printf(MSG_DEBUG,
++		wpa_printf(MSG_WARNING,
+ 			   "wolfSSL: No OCSP support included - allow optional OCSP case to continue");
+ 	}
+ #endif /* HAVE_OCSP */
+@@ -1356,7 +1990,7 @@ static int tls_global_client_cert(void *ssl_ctx, const char *client_cert)
+ 	    SSL_SUCCESS &&
+ 	    wolfSSL_CTX_use_certificate_chain_file(ctx, client_cert) !=
+ 	    SSL_SUCCESS) {
+-		wpa_printf(MSG_INFO, "Failed to load client certificate");
++		wpa_printf(MSG_ERROR, "Failed to load client certificate");
+ 		return -1;
+ 	}
+ 
+@@ -1390,7 +2024,7 @@ static int tls_global_private_key(void *ssl_ctx, const char *private_key,
+ 					    SSL_FILETYPE_ASN1) != 1 &&
+ 	    wolfSSL_CTX_use_PrivateKey_file(ctx, private_key,
+ 					    SSL_FILETYPE_PEM) != 1) {
+-		wpa_printf(MSG_INFO, "Failed to load private key");
++		wpa_printf(MSG_ERROR, "Failed to load private key");
+ 		ret = -1;
+ 	}
+ 
+@@ -1407,14 +2041,17 @@ static int tls_global_dh(void *ssl_ctx, const char *dh_file)
+ {
+ 	WOLFSSL_CTX *ctx = ssl_ctx;
+ 
++	if (!dh_file)
++		return 0;
++
+ 	if (dh_file) {
+ 		if (wolfSSL_CTX_SetTmpDH_file(ctx, dh_file, SSL_FILETYPE_PEM) <
+ 		    0) {
+-			wpa_printf(MSG_INFO,
++			wpa_printf(MSG_ERROR,
+ 				   "SSL: global use DH PEM file failed");
+ 			if (wolfSSL_CTX_SetTmpDH_file(ctx, dh_file,
+ 						      SSL_FILETYPE_ASN1) < 0) {
+-				wpa_printf(MSG_INFO,
++				wpa_printf(MSG_ERROR,
+ 					   "SSL: global use DH DER file failed");
+ 				return -1;
+ 			}
+@@ -1473,13 +2110,13 @@ int tls_global_set_params(void *tls_ctx,
+ 		return -1; /* not yet supported */
+ 
+ 	if (tls_global_ca_cert(tls_ctx, params->ca_cert) < 0) {
+-		wpa_printf(MSG_INFO, "SSL: Failed to load ca cert file '%s'",
++		wpa_printf(MSG_ERROR, "SSL: Failed to load ca cert file '%s'",
+ 			   params->ca_cert);
+ 		return -1;
+ 	}
+ 
+ 	if (tls_global_client_cert(tls_ctx, params->client_cert) < 0) {
+-		wpa_printf(MSG_INFO,
++		wpa_printf(MSG_ERROR,
+ 			   "SSL: Failed to load client cert file '%s'",
+ 			   params->client_cert);
+ 		return -1;
+@@ -1487,14 +2124,14 @@ int tls_global_set_params(void *tls_ctx,
+ 
+ 	if (tls_global_private_key(tls_ctx, params->private_key,
+ 				   params->private_key_passwd) < 0) {
+-		wpa_printf(MSG_INFO,
++		wpa_printf(MSG_ERROR,
+ 			   "SSL: Failed to load private key file '%s'",
+ 			   params->private_key);
+ 		return -1;
+ 	}
+ 
+ 	if (tls_global_dh(tls_ctx, params->dh_file) < 0) {
+-		wpa_printf(MSG_INFO, "SSL: Failed to load DH file '%s'",
++		wpa_printf(MSG_ERROR, "SSL: Failed to load DH file '%s'",
+ 			   params->dh_file);
+ 		return -1;
+ 	}
+@@ -1502,7 +2139,7 @@ int tls_global_set_params(void *tls_ctx,
+ 	if (params->openssl_ciphers &&
+ 	    wolfSSL_CTX_set_cipher_list(tls_ctx,
+ 					params->openssl_ciphers) != 1) {
+-		wpa_printf(MSG_INFO,
++		wpa_printf(MSG_ERROR,
+ 			   "wolfSSL: Failed to set cipher string '%s'",
+ 			   params->openssl_ciphers);
+ 		return -1;
+@@ -1737,7 +2374,7 @@ struct wpabuf * tls_connection_encrypt(void *tls_ctx,
+ 		int  err = wolfSSL_get_error(conn->ssl, res);
+ 		char msg[80];
+ 
+-		wpa_printf(MSG_INFO, "Encryption failed - SSL_write: %s",
++		wpa_printf(MSG_ERROR, "Encryption failed - SSL_write: %s",
+ 			   wolfSSL_ERR_error_string(err, msg));
+ 		return NULL;
+ 	}
+@@ -1772,7 +2409,7 @@ struct wpabuf * tls_connection_decrypt(void *tls_ctx,
+ 		return NULL;
+ 	res = wolfSSL_read(conn->ssl, wpabuf_mhead(buf), wpabuf_size(buf));
+ 	if (res < 0) {
+-		wpa_printf(MSG_INFO, "Decryption failed - SSL_read");
++		wpa_printf(MSG_ERROR, "Decryption failed - SSL_read");
+ 		wpabuf_free(buf);
+ 		return NULL;
+ 	}
+@@ -1999,6 +2636,7 @@ int tls_connection_export_key(void *tls_ctx, struct tls_connection *conn,
+ int tls_connection_get_eap_fast_key(void *tls_ctx, struct tls_connection *conn,
+ 				    u8 *out, size_t out_len)
+ {
++#ifdef OPENSSL_NEED_EAP_FAST_PRF
+ 	byte seed[SEED_LEN];
+ 	int ret = -1;
+ 	WOLFSSL *ssl;
+@@ -2046,6 +2684,11 @@ int tls_connection_get_eap_fast_key(void *tls_ctx, struct tls_connection *conn,
+ 	bin_clear_free(tmp_out, skip + out_len);
+ 
+ 	return ret;
++#else
++    wpa_printf(MSG_ERROR,
++               "wolfSSL: EAP-FAST keys cannot be exported in FIPS mode");
++    return -1;
++#endif /* OPENSSL_NEED_EAP_FAST_PRF */
+ }
+ 
+ 
+@@ -2211,7 +2854,7 @@ void tls_connection_set_success_data(struct tls_connection *conn,
+ 	return;
+ 
+ fail:
+-	wpa_printf(MSG_INFO, "wolfSSL: Failed to store success data");
++	wpa_printf(MSG_ERROR, "wolfSSL: Failed to store success data");
+ 	wpabuf_free(data);
+ }
+ 
+diff --git a/wpa_supplicant/Android.mk b/wpa_supplicant/Android.mk
+index ed1f1dc496..c0cd68910f 100644
+--- a/wpa_supplicant/Android.mk
++++ b/wpa_supplicant/Android.mk
+@@ -86,6 +86,11 @@ endif
+ 
+ ifdef CONFIG_FIPS
+ CONFIG_NO_RANDOM_POOL=
++ifeq ($(CONFIG_TLS), wolfssl)
++CONFIG_WOLFSSL_CMAC=y
++else
++CONFIG_OPENSSL_CMAC=y
++endif
+ endif
+ 
+ OBJS = config.c
+@@ -736,6 +741,9 @@ endif
+ 
+ ifdef CONFIG_EAP_PWD
+ L_CFLAGS += -DEAP_PWD
++ifeq ($(CONFIG_TLS), wolfssl)
++L_CFLAGS += -DCONFIG_ECC
++endif
+ OBJS += src/eap_peer/eap_pwd.c src/eap_common/eap_pwd_common.c
+ CONFIG_IEEE8021X_EAPOL=y
+ NEED_ECC=y
+@@ -1063,6 +1071,22 @@ ifdef CONFIG_TLSV12
+ L_CFLAGS += -DCONFIG_TLSV12
+ endif
+ 
++ifeq ($(CONFIG_TLS), wolfssl)
++CONFIG_WOLFSSL_CMAC=y
++ifdef TLS_FUNCS
++L_CFLAGS += -DWOLFSSL_USER_SETTINGS
++L_CFLAGS += -Iexternal/wolfssl
++OBJS += src/crypto/tls_wolfssl.c
++endif
++OBJS += src/crypto/crypto_wolfssl.c
++OBJS_p += src/crypto/crypto_wolfssl.c
++ifdef NEED_FIPS186_2_PRF
++OBJS += src/crypto/fips_prf_wolfssl.c
++endif
++LIBS += -lwolfssl -lm
++LIBS_p += -lwolfssl -lm
++endif
++
+ ifeq ($(CONFIG_TLS), openssl)
+ ifdef TLS_FUNCS
+ L_CFLAGS += -DEAP_TLS_OPENSSL
+@@ -1237,8 +1261,10 @@ AESOBJS += src/crypto/aes-internal.c src/crypto/aes-internal-dec.c
+ endif
+ 
+ ifneq ($(CONFIG_TLS), openssl)
++ifneq ($(CONFIG_TLS), wolfssl)
+ NEED_INTERNAL_AES_WRAP=y
+ endif
++endif
+ ifdef CONFIG_OPENSSL_INTERNAL_AES_WRAP
+ # Seems to be needed at least with BoringSSL
+ NEED_INTERNAL_AES_WRAP=y
+@@ -1269,8 +1295,10 @@ AESOBJS += src/crypto/aes-encblock.c
+ endif
+ NEED_AES_ENC=y
+ ifneq ($(CONFIG_TLS), openssl)
++ifneq ($(CONFIG_TLS), wolfssl)
+ AESOBJS += src/crypto/aes-omac1.c
+ endif
++endif
+ ifdef NEED_AES_WRAP
+ NEED_AES_ENC=y
+ ifdef NEED_INTERNAL_AES_WRAP
+@@ -1280,9 +1308,11 @@ endif
+ ifdef NEED_AES_CBC
+ NEED_AES_ENC=y
+ ifneq ($(CONFIG_TLS), openssl)
++ifneq ($(CONFIG_TLS), wolfssl)
+ AESOBJS += src/crypto/aes-cbc.c
+ endif
+ endif
++endif
+ ifdef NEED_AES_ENC
+ ifdef CONFIG_INTERNAL_AES
+ AESOBJS += src/crypto/aes-internal-enc.c
+@@ -1296,9 +1326,11 @@ SHA1OBJS =
+ ifdef NEED_SHA1
+ ifneq ($(CONFIG_TLS), openssl)
+ ifneq ($(CONFIG_TLS), gnutls)
++ifneq ($(CONFIG_TLS), wolfssl)
+ SHA1OBJS += src/crypto/sha1.c
+ endif
+ endif
++endif
+ SHA1OBJS += src/crypto/sha1-prf.c
+ ifdef CONFIG_INTERNAL_SHA1
+ SHA1OBJS += src/crypto/sha1-internal.c
+@@ -1310,9 +1342,11 @@ ifdef CONFIG_NO_WPA_PASSPHRASE
+ L_CFLAGS += -DCONFIG_NO_PBKDF2
+ else
+ ifneq ($(CONFIG_TLS), openssl)
++ifneq ($(CONFIG_TLS), wolfssl)
+ SHA1OBJS += src/crypto/sha1-pbkdf2.c
+ endif
+ endif
++endif
+ ifdef NEED_T_PRF
+ SHA1OBJS += src/crypto/sha1-tprf.c
+ endif
+@@ -1325,10 +1359,12 @@ MD5OBJS =
+ ifndef CONFIG_FIPS
+ ifneq ($(CONFIG_TLS), openssl)
+ ifneq ($(CONFIG_TLS), gnutls)
++ifneq ($(CONFIG_TLS), wolfssl)
+ MD5OBJS += src/crypto/md5.c
+ endif
+ endif
+ endif
++endif
+ ifdef NEED_MD5
+ ifdef CONFIG_INTERNAL_MD5
+ MD5OBJS += src/crypto/md5-internal.c
+@@ -1345,6 +1381,9 @@ endif
+ 
+ DESOBJS = # none needed when not internal
+ ifdef NEED_DES
++ifndef CONFIG_FIPS
++L_CFLAGS += -DCONFIG_DES
++endif
+ ifdef CONFIG_INTERNAL_DES
+ DESOBJS += src/crypto/des-internal.c
+ endif
+@@ -1377,9 +1416,11 @@ SHA256OBJS = # none by default
+ L_CFLAGS += -DCONFIG_SHA256
+ ifneq ($(CONFIG_TLS), openssl)
+ ifneq ($(CONFIG_TLS), gnutls)
++ifneq ($(CONFIG_TLS), wolfssl)
+ SHA256OBJS += src/crypto/sha256.c
+ endif
+ endif
++endif
+ SHA256OBJS += src/crypto/sha256-prf.c
+ ifdef CONFIG_INTERNAL_SHA256
+ SHA256OBJS += src/crypto/sha256-internal.c
+@@ -1415,18 +1456,22 @@ ifdef NEED_SHA384
+ L_CFLAGS += -DCONFIG_SHA384
+ ifneq ($(CONFIG_TLS), openssl)
+ ifneq ($(CONFIG_TLS), gnutls)
++ifneq ($(CONFIG_TLS), wolfssl)
+ OBJS += src/crypto/sha384.c
+ endif
+ endif
++endif
+ OBJS += src/crypto/sha384-prf.c
+ endif
+ ifdef NEED_SHA512
+ L_CFLAGS += -DCONFIG_SHA512
+ ifneq ($(CONFIG_TLS), openssl)
+ ifneq ($(CONFIG_TLS), gnutls)
++ifneq ($(CONFIG_TLS), wolfssl)
+ OBJS += src/crypto/sha512.c
+ endif
+ endif
++endif
+ OBJS += src/crypto/sha512-prf.c
+ endif
+ 
+@@ -1738,6 +1783,13 @@ endif
+ ifeq ($(CONFIG_TLS), openssl)
+ LOCAL_SHARED_LIBRARIES += libcrypto libssl libkeystore_binder
+ endif
++ifeq ($(CONFIG_TLS), wolfssl)
++ifdef CONFIG_CTRL_IFACE_HIDL
++LOCAL_SHARED_LIBRARIES += libwolfssl libkeystore-wifi-hidl
++else
++LOCAL_SHARED_LIBRARIES += libwolfssl libkeystore_binder
++endif
++endif
+ 
+ # With BoringSSL we need libkeystore-engine in order to provide access to
+ # keystore keys.
+-- 
+2.25.1
+
