@@ -1,0 +1,160 @@
+From 14a76b1152d6cc9e187be1f5e4b1bde622670486 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Thu, 28 Apr 2022 15:34:38 +0200
+Subject: [PATCH 4/6] Check the return of pbkdf2_sha1 for errors
+
+pbkdf2_sha1 may return errors and this should be checked in calls. This is especially an issue with FIPS builds because the FIPS requirement is that the password must be at least 14 characters.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/ap/ap_config.c              |  7 +++++--
+ src/ap/wpa_auth_glue.c          |  7 +++++--
+ src/crypto/crypto_wolfssl.c     | 13 +++++++++++--
+ wpa_supplicant/config.c         |  7 +++++--
+ wpa_supplicant/wpa_passphrase.c |  6 +++++-
+ wpa_supplicant/wpa_supplicant.c | 16 +++++++++++-----
+ 6 files changed, 42 insertions(+), 14 deletions(-)
+
+diff --git a/src/ap/ap_config.c b/src/ap/ap_config.c
+index 051b843e93..015e9e0c88 100644
+--- a/src/ap/ap_config.c
++++ b/src/ap/ap_config.c
+@@ -461,9 +461,12 @@ static int hostapd_derive_psk(struct hostapd_ssid *ssid)
+ 	wpa_hexdump_ascii_key(MSG_DEBUG, "PSK (ASCII passphrase)",
+ 			      (u8 *) ssid->wpa_passphrase,
+ 			      os_strlen(ssid->wpa_passphrase));
+-	pbkdf2_sha1(ssid->wpa_passphrase,
++	if (pbkdf2_sha1(ssid->wpa_passphrase,
+ 		    ssid->ssid, ssid->ssid_len,
+-		    4096, ssid->wpa_psk->psk, PMK_LEN);
++		    4096, ssid->wpa_psk->psk, PMK_LEN) != 0) {
++		wpa_printf(MSG_ERROR, "Error in pbkdf2_sha1");
++		return -1;
++	}
+ 	wpa_hexdump_key(MSG_DEBUG, "PSK (from passphrase)",
+ 			ssid->wpa_psk->psk, PMK_LEN);
+ 	return 0;
+diff --git a/src/ap/wpa_auth_glue.c b/src/ap/wpa_auth_glue.c
+index 71a487161c..fd9b928aba 100644
+--- a/src/ap/wpa_auth_glue.c
++++ b/src/ap/wpa_auth_glue.c
+@@ -391,10 +391,13 @@ static const u8 * hostapd_wpa_auth_get_psk(void *ctx, const u8 *addr,
+ 		psk = sta->psk->psk;
+ 		for (pos = sta->psk; pos; pos = pos->next) {
+ 			if (pos->is_passphrase) {
+-				pbkdf2_sha1(pos->passphrase,
++				if (pbkdf2_sha1(pos->passphrase,
+ 					    hapd->conf->ssid.ssid,
+ 					    hapd->conf->ssid.ssid_len, 4096,
+-					    pos->psk, PMK_LEN);
++					    pos->psk, PMK_LEN) != 0) {
++					wpa_printf(MSG_WARNING, "Error in pbkdf2_sha1");
++					continue;
++				}
+ 				pos->is_passphrase = 0;
+ 			}
+ 			if (pos->psk == prev_psk) {
+diff --git a/src/crypto/crypto_wolfssl.c b/src/crypto/crypto_wolfssl.c
+index 2aa85182b5..336e59a0c6 100644
+--- a/src/crypto/crypto_wolfssl.c
++++ b/src/crypto/crypto_wolfssl.c
+@@ -27,6 +27,7 @@
+ #include <wolfssl/wolfcrypt/cmac.h>
+ #include <wolfssl/wolfcrypt/ecc.h>
+ #include <wolfssl/wolfcrypt/asn_public.h>
++#include <wolfssl/wolfcrypt/error-crypt.h>
+ #include <wolfssl/openssl/bn.h>
+ 
+ 
+@@ -282,9 +283,17 @@ int hmac_sha512(const u8 *key, size_t key_len, const u8 *data,
+ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len,
+ 		int iterations, u8 *buf, size_t buflen)
+ {
+-	if (wc_PBKDF2(buf, (const byte*)passphrase, os_strlen(passphrase), ssid,
+-		      ssid_len, iterations, buflen, WC_SHA) != 0)
++	int ret = wc_PBKDF2(buf, (const byte*)passphrase, os_strlen(passphrase), ssid,
++		      ssid_len, iterations, buflen, WC_SHA);
++	if (ret != 0) {
++		if (ret == HMAC_MIN_KEYLEN_E) {
++			wpa_printf(MSG_ERROR, "wolfSSL: Password is too short. Make sure "
++				"your password is at least %d characters long. This is a "
++				"requirement for FIPS builds.",
++				HMAC_FIPS_MIN_KEY);
++		}
+ 		return -1;
++	}
+ 	return 0;
+ }
+ 
+diff --git a/wpa_supplicant/config.c b/wpa_supplicant/config.c
+index 782bb2197d..9bcf974f21 100644
+--- a/wpa_supplicant/config.c
++++ b/wpa_supplicant/config.c
+@@ -3423,8 +3423,11 @@ char * wpa_config_get_no_key(struct wpa_ssid *ssid, const char *var)
+ void wpa_config_update_psk(struct wpa_ssid *ssid)
+ {
+ #ifndef CONFIG_NO_PBKDF2
+-	pbkdf2_sha1(ssid->passphrase, ssid->ssid, ssid->ssid_len, 4096,
+-		    ssid->psk, PMK_LEN);
++	if (pbkdf2_sha1(ssid->passphrase, ssid->ssid, ssid->ssid_len, 4096,
++		    ssid->psk, PMK_LEN) != 0) {
++		wpa_printf(MSG_ERROR, "Error in pbkdf2_sha1");
++		return;
++	}
+ 	wpa_hexdump_key(MSG_MSGDUMP, "PSK (from passphrase)",
+ 			ssid->psk, PMK_LEN);
+ 	ssid->psk_set = 1;
+diff --git a/wpa_supplicant/wpa_passphrase.c b/wpa_supplicant/wpa_passphrase.c
+index 538997e625..64eb3d587a 100644
+--- a/wpa_supplicant/wpa_passphrase.c
++++ b/wpa_supplicant/wpa_passphrase.c
+@@ -58,7 +58,11 @@ int main(int argc, char *argv[])
+ 		return 1;
+ 	}
+ 
+-	pbkdf2_sha1(passphrase, (u8 *) ssid, os_strlen(ssid), 4096, psk, 32);
++	if (pbkdf2_sha1(passphrase, (u8 *) ssid, os_strlen(ssid), 4096, psk, 32)
++			!= 0) {
++		fprintf(stderr, "Error in pbkdf2_sha1\n");
++		return 1;
++	}
+ 
+ 	printf("network={\n");
+ 	printf("\tssid=\"%s\"\n", ssid);
+diff --git a/wpa_supplicant/wpa_supplicant.c b/wpa_supplicant/wpa_supplicant.c
+index 64cad0af21..d3b9b775ee 100644
+--- a/wpa_supplicant/wpa_supplicant.c
++++ b/wpa_supplicant/wpa_supplicant.c
+@@ -1774,9 +1774,12 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
+ 		if (bss && ssid->bssid_set && ssid->ssid_len == 0 &&
+ 		    ssid->passphrase && !sae_only) {
+ 			u8 psk[PMK_LEN];
+-		        pbkdf2_sha1(ssid->passphrase, bss->ssid, bss->ssid_len,
+-				    4096, psk, PMK_LEN);
+-		        wpa_hexdump_key(MSG_MSGDUMP, "PSK (from passphrase)",
++			if (pbkdf2_sha1(ssid->passphrase, bss->ssid, bss->ssid_len,
++				    4096, psk, PMK_LEN) != 0) {
++				wpa_msg(wpa_s, MSG_WARNING, "Error in pbkdf2_sha1");
++				return -1;
++			}
++			wpa_hexdump_key(MSG_MSGDUMP, "PSK (from passphrase)",
+ 					psk, PMK_LEN);
+ 			wpa_sm_set_pmk(wpa_s->wpa, psk, PMK_LEN, NULL, NULL);
+ 			psk_set = 1;
+@@ -1810,8 +1813,11 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
+ #ifndef CONFIG_NO_PBKDF2
+ 			if (wpabuf_len(pw) >= 8 && wpabuf_len(pw) < 64 && bss)
+ 			{
+-				pbkdf2_sha1(pw_str, bss->ssid, bss->ssid_len,
+-					    4096, psk, PMK_LEN);
++				if (pbkdf2_sha1(pw_str, bss->ssid, bss->ssid_len,
++					    4096, psk, PMK_LEN) != 0) {
++					wpa_msg(wpa_s, MSG_WARNING, "Error in pbkdf2_sha1");
++					return -1;
++				}
+ 				os_memset(pw_str, 0, sizeof(pw_str));
+ 				wpa_hexdump_key(MSG_MSGDUMP, "PSK (from "
+ 						"external passphrase)",
+-- 
+2.25.1
+
