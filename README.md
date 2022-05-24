@@ -31,6 +31,7 @@ Each project port included in this repository is contained in its own subdirecto
 | libest | Cisco EST stack written in C | [Link](https://github.com/cisco/libest) | [Link](https://www.wolfssl.com/wolfssl-cisco-libest-port/) | [README](./libest/README) |
 | libimobiledevice | Library to communicate with services on iOS devices | [Link](https://libimobiledevice.org/) | | [README](./libimobiledevice/README) |
 | libsignal-protocol-c | Signal Protocol C Library | [Link](https://github.com/signalapp/libsignal-protocol-c) | [Link](https://www.wolfssl.com/wolfssl-use-with-signal/) | [README](./libsignal-protocol-c/README.md) |
+| libspdm | Security Protocol and Data Model implementation | [Link](https://github.com/DMTF/libspdm) | | [README](./libspdm/1.0.0/README.md) |
 | libssh2 | client-side C library for SSH2 | [Link](https://www.libssh2.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-libssh2/) | [README](./libssh2/1.9.0/README.md) |
 | lighttpd | lighttpd web server | [Link](https://www.lighttpd.net/) | [Link](https://www.wolfssl.com/lighttpd-support-wolfssl/) | [README](./lighttpd/README) |
 | mariadb | MariaDB relational database | [Link](https://mariadb.org/) | | [README](./mariadb/10.5.11/README.md) |
