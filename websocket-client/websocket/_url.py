@@ -59,6 +59,10 @@ def parse_url(url):
         is_secure = True
         if not port:
             port = 443
+    elif scheme == "https":
+        is_secure = True
+        if not port:
+            port = 443
     else:
         raise ValueError("scheme %s is invalid" % scheme)
 
