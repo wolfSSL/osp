@@ -1,4 +1,4 @@
-From 346ae3d7cd816624d4901568642f3db1ab15f41b Mon Sep 17 00:00:00 2001
+From 4e829fbff615036c4e3e68e3b8e7b97a4d5bf19e Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Wed, 11 May 2022 12:10:25 +0200
 Subject: [PATCH] Patch for wolfSSL
@@ -32,13 +32,13 @@ make tests
 Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
 ---
  Makefile.in                                 |   1 +
- configure.ac                                | 190 +++++++++++++++++++-
+ configure.ac                                | 191 +++++++++++++++++++-
  includes.h                                  |   6 +
  log.c                                       |   9 +
  openbsd-compat/libressl-api-compat.c        |   4 +
  regress/unittests/test_helper/test_helper.c |   5 +
  ssh-rsa.c                                   |  11 ++
- 7 files changed, 224 insertions(+), 2 deletions(-)
+ 7 files changed, 225 insertions(+), 2 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
 index 7250d3f31..f7b997324 100644
@@ -53,7 +53,7 @@ index 7250d3f31..f7b997324 100644
  		PATH="$(BUILDDIR):$${PATH}" \
  		TEST_ENV=MALLOC_OPTIONS="@TEST_MALLOC_OPTIONS@" \
 diff --git a/configure.ac b/configure.ac
-index c285ea32b..791b2f2e7 100644
+index c285ea32b..b8b871059 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -561,6 +561,8 @@ SPP_MSG="no"
@@ -97,7 +97,7 @@ index c285ea32b..791b2f2e7 100644
  	SHA256Update \
  	SHA384Update \
  	SHA512Update \
-@@ -2637,7 +2650,146 @@ AC_CHECK_FUNCS([getpgrp],[
+@@ -2637,7 +2650,147 @@ AC_CHECK_FUNCS([getpgrp],[
  	)
  ])
  
@@ -148,6 +148,7 @@ index c285ea32b..791b2f2e7 100644
 +	SSL_COMPAT="wolfssl-compat.o"
 +	RAND_MSG="WolfSSL Internal"
 +	AC_DEFINE([USING_WOLFSSL], [1], [Defined if using WolfSSL])
++	AC_DEFINE([WITH_OPENSSL], [1], [Defined if using WolfSSL])
 +	AC_DEFINE([UNSUPPORTED_POSIX_THREADS_HACK], [1], [Defined if using WolfSSL])
 +	# OpenSSL tests for these. Just assume these are present for wolfSSL.
 +	AC_DEFINE([HAVE_BN_IS_PRIME_EX], [1], [Defined if using WolfSSL])
@@ -244,7 +245,7 @@ index c285ea32b..791b2f2e7 100644
  saved_CPPFLAGS="$CPPFLAGS"
  saved_LDFLAGS="$LDFLAGS"
  AC_ARG_WITH([ssl-dir],
-@@ -3168,10 +3320,19 @@ else
+@@ -3168,10 +3321,19 @@ else
  	AC_CHECK_FUNCS([crypt])
  fi
  
@@ -265,7 +266,7 @@ index c285ea32b..791b2f2e7 100644
  	enable_pkcs11="disabled; missing libcrypto"
  fi
  if test "x$ac_cv_func_dlopen" != "xyes" ; then
-@@ -3382,7 +3543,9 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
+@@ -3382,7 +3544,9 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
  	AC_DEFINE([OPENSSL_PRNG_ONLY], [1],
  		[Define if you want the OpenSSL internally seeded PRNG only])
  	RAND_MSG="OpenSSL internal ONLY"
@@ -276,7 +277,7 @@ index c285ea32b..791b2f2e7 100644
  	AC_MSG_WARN([OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible])
  else
  	AC_MSG_ERROR([OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options])
-@@ -3409,6 +3572,9 @@ AC_ARG_WITH([pam],
+@@ -3409,6 +3573,9 @@ AC_ARG_WITH([pam],
  			PAM_MSG="yes"
  
  			SSHDLIBS="$SSHDLIBS -lpam"
@@ -286,7 +287,7 @@ index c285ea32b..791b2f2e7 100644
  			AC_DEFINE([USE_PAM], [1],
  				[Define if you want to enable PAM support])
  
-@@ -5545,6 +5711,8 @@ AC_SUBST([TEST_SSH_UTF8], [$TEST_SSH_UTF8])
+@@ -5545,6 +5712,8 @@ AC_SUBST([TEST_SSH_UTF8], [$TEST_SSH_UTF8])
  AC_SUBST([TEST_MALLOC_OPTIONS], [$TEST_MALLOC_OPTIONS])
  AC_SUBST([UNSUPPORTED_ALGORITHMS], [$unsupported_algorithms])
  AC_SUBST([DEPEND], [$(cat $srcdir/.depend)])
@@ -295,7 +296,7 @@ index c285ea32b..791b2f2e7 100644
  
  CFLAGS="${CFLAGS} ${CFLAGS_AFTER}"
  LDFLAGS="${LDFLAGS} ${LDFLAGS_AFTER}"
-@@ -5610,6 +5778,7 @@ echo "         Solaris privilege support: $SPP_MSG"
+@@ -5610,6 +5779,7 @@ echo "         Solaris privilege support: $SPP_MSG"
  echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
  echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
  echo "                  BSD Auth support: $BSD_AUTH_MSG"
@@ -303,7 +304,7 @@ index c285ea32b..791b2f2e7 100644
  echo "              Random number source: $RAND_MSG"
  echo "             Privsep sandbox style: $SANDBOX_STYLE"
  echo "                   PKCS#11 support: $enable_pkcs11"
-@@ -5656,3 +5825,20 @@ if test "$AUDIT_MODULE" = "bsm" ; then
+@@ -5656,3 +5826,20 @@ if test "$AUDIT_MODULE" = "bsm" ; then
  	echo "WARNING: BSM audit support is currently considered EXPERIMENTAL."
  	echo "See the Solaris section in README.platform for details."
  fi
