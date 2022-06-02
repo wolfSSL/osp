@@ -1,8 +1,8 @@
 diff --git a/cipher.c b/cipher.c
-index 639511cf..d528d01f 100644
+index 639511cf..7950a105 100644
 --- a/cipher.c
 +++ b/cipher.c
-@@ -392,10 +392,16 @@ cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr, u_char *dest,
+@@ -392,10 +392,19 @@ cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr, u_char *dest,
  	    len) < 0)
  		return SSH_ERR_LIBCRYPTO_ERROR;
  	if (authlen) {
@@ -10,16 +10,19 @@ index 639511cf..d528d01f 100644
 +		 * EVP_Cipher call. Note that if the tag was bad on decryption, the
 +		 * error with wolfSSL will be SSH_ERR_LIBCRYPTO_ERROR rather than
 +		 * SSH_ERR_MAC_INVALID .*/
-+	#ifndef USING_WOLFSSL
++
  		/* compute tag (on encrypt) or verify tag (on decrypt) */
  		if (EVP_Cipher(cc->evp, NULL, NULL, 0) < 0)
++	#ifndef USING_WOLFSSL
  			return cc->encrypt ?
  			    SSH_ERR_LIBCRYPTO_ERROR : SSH_ERR_MAC_INVALID;
++	#else
++			return SSH_ERR_LIBCRYPTO_ERROR;
 +	#endif
  		if (cc->encrypt &&
  		    !EVP_CIPHER_CTX_ctrl(cc->evp, EVP_CTRL_GCM_GET_TAG,
  		    authlen, dest + aadlen + len))
-@@ -532,7 +538,11 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv, size_t len)
+@@ -532,7 +541,11 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv, size_t len)
  		if (!EVP_CIPHER_CTX_ctrl(cc->evp,
  		    EVP_CTRL_GCM_SET_IV_FIXED, -1, (void *)iv))
  			return SSH_ERR_LIBCRYPTO_ERROR;
@@ -423,6 +426,39 @@ index 724974b7..d6b173c6 100644
  }
  
  struct fwdarg {
+diff --git a/regress/integrity.sh b/regress/integrity.sh
+index bc030cb7..90dd05d4 100644
+--- a/regress/integrity.sh
++++ b/regress/integrity.sh
+@@ -28,6 +28,12 @@ for m in $macs; do
+ 	etmo=0
+ 	ecnt=0
+ 	skip=0
++	gcm=0
++
++	if echo "$m" | grep -q "gcm"; then
++		gcm=1
++	fi
++
+ 	for off in `jot $tries $startoffset`; do
+ 		skip=`expr $skip - 1`
+ 		if [ $skip -gt 0 ]; then
+@@ -59,6 +65,15 @@ for m in $macs; do
+ 		Bad?packet*)	elen=`expr $elen + 1`; skip=3;;
+ 		Corrupted?MAC* | *message?authentication?code?incorrect*)
+ 				emac=`expr $emac + 1`; skip=0;;
++		# With wolfSSL, a MAC error looks like a generic libcrypto error. See
++		# comments in cipher.c.
++		*error?in?libcrypto*)
++			if [ "$gcm" = 1 ]; then
++				emac=`expr $emac + 1`; skip=0
++			else
++				fail "unexpected error mac $m at $off: $out"
++			fi
++		;;
+ 		padding*)	epad=`expr $epad + 1`; skip=0;;
+ 		*Timeout,?server*)
+ 				etmo=`expr $etmo + 1`; skip=0;;
 diff --git a/regress/misc/sk-dummy/sk-dummy.c b/regress/misc/sk-dummy/sk-dummy.c
 index 4003362d..fe541212 100644
 --- a/regress/misc/sk-dummy/sk-dummy.c
