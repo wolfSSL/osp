@@ -1,5 +1,5 @@
 diff --git a/configure.in b/configure.in
-index 2134171..ca92592 100644
+index 2a4d29f78..254879f7f 100644
 --- a/configure.in
 +++ b/configure.in
 @@ -188,6 +188,12 @@ AH_BOTTOM([
@@ -50,7 +50,7 @@ index 2134171..ca92592 100644
  if test $ol_link_tls = yes ; then
  	AC_DEFINE(HAVE_TLS, 1, [define if you have TLS])
 diff --git a/libraries/libldap/tls2.c b/libraries/libldap/tls2.c
-index d25c190..690a700 100644
+index d25c190ea..690a700ee 100644
 --- a/libraries/libldap/tls2.c
 +++ b/libraries/libldap/tls2.c
 @@ -491,6 +491,10 @@ ldap_pvt_tls_get_peer_dn( void *s, struct berval *dn,
@@ -80,7 +80,7 @@ index d25c190..690a700 100644
  }
  #endif /* HAVE_TLS */
 diff --git a/libraries/libldap/tls_o.c b/libraries/libldap/tls_o.c
-index b0277df..811401f 100644
+index b0277dfe9..9ecd133be 100644
 --- a/libraries/libldap/tls_o.c
 +++ b/libraries/libldap/tls_o.c
 @@ -38,11 +38,16 @@
@@ -177,51 +177,72 @@ index b0277df..811401f 100644
  	} else {
  		if ( !SSL_CTX_load_verify_locations( ctx,
  				lt->lt_cacertfile, lt->lt_cacertdir ) )
-@@ -335,8 +363,43 @@ tlso_ctx_init( struct ldapoptions *lo, struct ldaptls *lt, int is_server )
+@@ -335,8 +363,64 @@ tlso_ctx_init( struct ldapoptions *lo, struct ldaptls *lt, int is_server )
  
  		if ( is_server ) {
  			STACK_OF(X509_NAME) *calist;
-+/* tlso_ca_list calls SSL_add_dir_cert_subjects_to_stack, which wolfSSL hasn't
++/*
++ * tlso_ca_list calls SSL_add_dir_cert_subjects_to_stack, which wolfSSL hasn't
 + * implemented. However, since we've just added all the CA certs in
 + * lt->lt_cacertdir to the wolfSSL cert manager, we can just get them from
-+ * there, which is what this #ifdef'd code does instead of tlso_ca_list. */
++ * there, which is what this #ifdef'd code does instead of tlso_ca_list.
++ */
 +#ifdef HAVE_WOLFSSL
 +			WOLFSSL_CERT_MANAGER* cert_manager = NULL;
 +			STACK_OF(X509)* certs = NULL;
 +			X509* x509;
++			X509_NAME* subj_name;
 +			int i;
 +
++			if ((calist = sk_X509_NAME_new_null()) == NULL) {
++				Debug(LDAP_DEBUG_ANY, "TLS: could not create X509_NAME stack\n",
++					0, 0, 0);
++				tlso_report_error();
++				return -1;
++			}
 +			if ((cert_manager = wolfSSL_CTX_GetCertManager(ctx)) == NULL) {
 +				Debug(LDAP_DEBUG_ANY, "TLS: could not get cert manager\n",
-+						0, 0, 0 );
++					0, 0, 0);
++				sk_X509_NAME_pop_free(calist, NULL);
 +				tlso_report_error();
 +				return -1;
 +			}
 +
 +			if ((certs = wolfSSL_CertManagerGetCerts(cert_manager)) == NULL) {
 +				Debug(LDAP_DEBUG_ANY, "TLS: could not load certs from cert "
-+						"manager\n", 0, 0, 0);
++					"manager\n", 0, 0, 0);
++				sk_X509_NAME_pop_free(calist, NULL);
 +				tlso_report_error();
 +				return -1;
 +			}
 +
 +			for (i = 0; i < sk_num(certs); ++i) {
 +				x509 = sk_X509_value(certs, i);
-+				if (X509_check_ca(x509) == 1) {
-+					sk_X509_NAME_push(calist,
-+						X509_get_subject_name(x509));
++				if (X509_check_ca(x509)) {
++					subj_name = X509_NAME_dup(X509_get_subject_name(x509));
++					if (subj_name == NULL) {
++						Debug(LDAP_DEBUG_ANY, "TLS: could not duplicate subject"
++							" name\n", 0, 0, 0);
++						sk_X509_NAME_pop_free(calist, NULL);
++						sk_X509_pop_free(certs, NULL);
++						tlso_report_error();
++						return -1;
++					}
++					else {
++						sk_X509_NAME_push(calist, subj_name);
++					}
 +				}
 +			}
 +
-+			sk_X509_free(certs);
++			sk_X509_pop_free(certs, NULL);
 +#else
  			/* List of CA names to send to a client */
  			calist = tlso_ca_list( lt->lt_cacertfile, lt->lt_cacertdir );
-+#endif
++#endif /* HAVE_WOLFSSL */
  			if ( !calist ) {
  				Debug( LDAP_DEBUG_ANY, "TLS: "
  					"could not load client CA list (file:`%s',dir:`%s').\n",
-@@ -505,13 +568,25 @@ tlso_session_my_dn( tls_session *sess, struct berval *der_dn )
+@@ -505,13 +589,25 @@ tlso_session_my_dn( tls_session *sess, struct berval *der_dn )
  	tlso_session *s = (tlso_session *)sess;
  	X509 *x;
  	X509_NAME *xn;
@@ -248,7 +269,7 @@ index b0277df..811401f 100644
  	der_dn->bv_len = i2d_X509_NAME( xn, NULL );
  	der_dn->bv_val = xn->bytes->data;
  #else
-@@ -542,12 +617,24 @@ tlso_session_peer_dn( tls_session *sess, struct berval *der_dn )
+@@ -542,12 +638,24 @@ tlso_session_peer_dn( tls_session *sess, struct berval *der_dn )
  	tlso_session *s = (tlso_session *)sess;
  	X509 *x = tlso_get_cert( s );
  	X509_NAME *xn;
@@ -274,7 +295,7 @@ index b0277df..811401f 100644
  	der_dn->bv_len = i2d_X509_NAME( xn, NULL );
  	der_dn->bv_val = xn->bytes->data;
  #else
-@@ -768,7 +855,8 @@ struct tls_data {
+@@ -768,7 +876,8 @@ struct tls_data {
  	Sockbuf_IO_Desc		*sbiod;
  };
  
