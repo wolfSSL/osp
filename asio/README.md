@@ -12,6 +12,8 @@ make -j nproc
 sudo make install
 ```
 
+Note: The encrypted key and des3 support is used by the `./src/examples/cpp11/ssl/` examples, but not required for ASIO.
+
 ## Build upstream ASIO with wolfssl autoconf patch cherry-picked
 
 
