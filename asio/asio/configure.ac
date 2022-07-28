@@ -76,6 +76,24 @@ if test x$WOLFSSL_USE == xno; then
     AM_CONDITIONAL(HAVE_OPENSSL,test x$WOLFSSL_FOUND != xno)
 fi
 
+
+# wolfSSL support
+AC_ARG_WITH(wolfssl,
+  AC_HELP_STRING([--with-wolfssl=DIR],[location of wolfssl]),
+[
+  CPPFLAGS="$CPPFLAGS -I${withval}/include/wolfssl -DASIO_USE_WOLFSSL"
+  LIBS="$LIBS -L${withval}/lib"
+  WOLFSSL_USE=no
+],[])
+
+if test x$WOLFSSL_USE != xno; then
+    AC_CHECK_HEADER([wolfssl/options.h],,
+    [
+      WOLFSSL_FOUND=no
+    ],[])
+fi
+
+# openssl support
 AC_ARG_WITH(openssl,
   AC_HELP_STRING([--with-openssl=DIR],[location of openssl]),
 [

@@ -16,13 +16,21 @@ Note: The encrypted key and des3 support is used by the `./src/examples/cpp11/ss
 
 ## Build upstream ASIO with wolfssl autoconf patch cherry-picked
 
-
-```
+```sh
 git clone https://github.com/chriskohlhoff/asio.git
 cd asio
+```
+
+Patch configure.ac to support `--with-wolfssl=`:
+```sh
+patch -p1 < asio_wolfssl_autoconf.diff
+# OR
 git remote add wolfssl https://github.com/dgarske/asio.git
 git fetch --all
 git cherry-pick remotes/wolfssl/wolfssl_autoconf
+```
+
+```sh
 cd asio
 ./autogen.sh
 ./configure --with-wolfssl=/usr/local 
