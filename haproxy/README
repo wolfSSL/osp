@@ -10,3 +10,30 @@ message.
 The test directory implements some of the *.vtc HaProxy reg-tests. These
 allow each component to be manually run and examined for errors. Most importantly,
 this allows us to plug gdb into the haproxy binary.
+
+Prerequisites:
+
+The below must be installed in order to use HaProxy.This was done on 
+Ubuntu 22.04.
+
+* HaProxy itself of course: https://www.haproxy.org/. Make sure the version,
+or checkout, matches that of the patch you are applying.
+* Lua: https://www.lua.org/
+* This is for HaProxy
+** sudo apt install libpre3-dev 
+* This is for VTest
+** sudo apt install libpre2-dev
+* sudo apt install libsystem-dev
+* VTest: https://github.com/vtest/VTest
+
+You may need to edit: ./VTest/Makefile
+to change:
+
+FLAGS=  -O2 -s -Wall -Werror
+
+to:
+
+FLAGS=  -O2 -s -Wall # -Werror
+
+otherwise VTest will not build.
+
