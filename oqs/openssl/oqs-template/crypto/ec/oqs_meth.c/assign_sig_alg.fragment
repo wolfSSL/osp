@@ -1,0 +1,18 @@
+{%- for sig in config['sigs'] %}
+    {%- for variant in sig['variants'] %}
+    case NID_{{ variant['name'] }}:
+        {%- for classical_alg in variant['mix_with'] %}
+    case NID_{{ classical_alg['name'] }}_{{ variant['name'] }}:
+        {%- endfor %}
+      return {{ variant['oqs_meth'] }};
+    {%- endfor %}
+{%- endfor %}
+{%- for kem in config['kems'] %}
+    case NID_{{ kem['name_group'] }}:
+    {% if kem['bit_security'] == 128 -%} case NID_p256_{{ kem['name_group'] }}: 
+    {%- elif kem['bit_security'] == 192 -%} case NID_p384_{{ kem['name_group'] }}: 
+    {%- elif kem['bit_security'] == 256 -%} case NID_p521_{{ kem['name_group'] }}: 
+    {%- endif %}
+      return {{ kem['oqs_alg'] }};
+{%- endfor %}
+

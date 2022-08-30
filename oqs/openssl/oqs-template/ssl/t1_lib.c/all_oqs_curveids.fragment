@@ -1,0 +1,5 @@
+{% for kem in config['kems'] %}
+    {{ kem['nid'] }}, /* {{ kem['name_group'] }} */
+    {{ kem['nid_hybrid'] }}, /* OQS {{ kem['name_group'] }} hybrid */
+{%- endfor %}
+

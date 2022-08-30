@@ -1,0 +1,110 @@
+# OID cross reference table.
+# Links signatures OIDs to their corresponding public key algorithms
+# and digests.
+
+md2WithRSAEncryption	md2	rsaEncryption
+md5WithRSAEncryption	md5	rsaEncryption
+shaWithRSAEncryption	sha	rsaEncryption
+sha1WithRSAEncryption	sha1	rsaEncryption
+md4WithRSAEncryption	md4	rsaEncryption
+sha256WithRSAEncryption sha256	rsaEncryption
+sha384WithRSAEncryption	sha384	rsaEncryption
+sha512WithRSAEncryption	sha512	rsaEncryption
+sha224WithRSAEncryption	sha224	rsaEncryption
+mdc2WithRSA		mdc2	rsaEncryption
+ripemd160WithRSA	ripemd160 rsaEncryption
+RSA_SHA3_224		sha3_224 rsaEncryption
+RSA_SHA3_256		sha3_256 rsaEncryption
+RSA_SHA3_384		sha3_384 rsaEncryption
+RSA_SHA3_512		sha3_512 rsaEncryption
+# For PSS the digest algorithm can vary and depends on the included
+# AlgorithmIdentifier. The digest "undef" indicates the public key
+# method should handle this explicitly.
+rsassaPss		undef	rsaEncryption
+ED25519		    undef	ED25519
+ED448		    undef	ED448
+##### OQS_TEMPLATE_FRAGMENT_LIST_OQS_SIGS_START
+dilithium2	sha512	dilithium2
+p256_dilithium2	sha512	p256_dilithium2
+rsa3072_dilithium2	sha512	rsa3072_dilithium2
+dilithium3	sha512	dilithium3
+p384_dilithium3	sha512	p384_dilithium3
+dilithium5	sha512	dilithium5
+p521_dilithium5	sha512	p521_dilithium5
+dilithium2_aes	sha512	dilithium2_aes
+p256_dilithium2_aes	sha512	p256_dilithium2_aes
+rsa3072_dilithium2_aes	sha512	rsa3072_dilithium2_aes
+dilithium3_aes	sha512	dilithium3_aes
+p384_dilithium3_aes	sha512	p384_dilithium3_aes
+dilithium5_aes	sha512	dilithium5_aes
+p521_dilithium5_aes	sha512	p521_dilithium5_aes
+falcon512	sha512	falcon512
+p256_falcon512	sha512	p256_falcon512
+rsa3072_falcon512	sha512	rsa3072_falcon512
+falcon1024	sha512	falcon1024
+p521_falcon1024	sha512	p521_falcon1024
+picnicl1full	sha512	picnicl1full
+p256_picnicl1full	sha512	p256_picnicl1full
+rsa3072_picnicl1full	sha512	rsa3072_picnicl1full
+picnic3l1	sha512	picnic3l1
+p256_picnic3l1	sha512	p256_picnic3l1
+rsa3072_picnic3l1	sha512	rsa3072_picnic3l1
+rainbowVclassic	sha512	rainbowVclassic
+p521_rainbowVclassic	sha512	p521_rainbowVclassic
+sphincsshake256128fsimple	sha512	sphincsshake256128fsimple
+p256_sphincsshake256128fsimple	sha512	p256_sphincsshake256128fsimple
+rsa3072_sphincsshake256128fsimple	sha512	rsa3072_sphincsshake256128fsimple
+sphincsshake256128ssimple	sha512	sphincsshake256128ssimple
+p256_sphincsshake256128ssimple	sha512	p256_sphincsshake256128ssimple
+rsa3072_sphincsshake256128ssimple	sha512	rsa3072_sphincsshake256128ssimple
+sphincsshake256192fsimple	sha512	sphincsshake256192fsimple
+p384_sphincsshake256192fsimple	sha512	p384_sphincsshake256192fsimple
+sphincsshake256192ssimple	sha512	sphincsshake256192ssimple
+p384_sphincsshake256192ssimple	sha512	p384_sphincsshake256192ssimple
+sphincsshake256256fsimple	sha512	sphincsshake256256fsimple
+p521_sphincsshake256256fsimple	sha512	p521_sphincsshake256256fsimple
+sphincsshake256256ssimple	sha512	sphincsshake256256ssimple
+p521_sphincsshake256256ssimple	sha512	p521_sphincsshake256256ssimple
+##### OQS_TEMPLATE_FRAGMENT_LIST_OQS_SIGS_END
+
+
+# Alternative deprecated OIDs. By using the older "rsa" OID this
+# type will be recognized by not normally used.
+
+md5WithRSA		md5	rsa
+sha1WithRSA		sha1	rsa
+
+dsaWithSHA		sha	dsa
+dsaWithSHA1		sha1	dsa
+
+dsaWithSHA1_2		sha1	dsa_2
+
+ecdsa_with_SHA1		sha1	X9_62_id_ecPublicKey
+ecdsa_with_SHA224	sha224	X9_62_id_ecPublicKey
+ecdsa_with_SHA256	sha256	X9_62_id_ecPublicKey
+ecdsa_with_SHA384	sha384	X9_62_id_ecPublicKey
+ecdsa_with_SHA512	sha512	X9_62_id_ecPublicKey
+ecdsa_with_Recommended	undef	X9_62_id_ecPublicKey
+ecdsa_with_Specified	undef	X9_62_id_ecPublicKey
+
+dsa_with_SHA224		sha224	dsa
+dsa_with_SHA256		sha256	dsa
+
+id_GostR3411_94_with_GostR3410_2001	id_GostR3411_94 id_GostR3410_2001
+id_GostR3411_94_with_GostR3410_94	id_GostR3411_94 id_GostR3410_94
+id_GostR3411_94_with_GostR3410_94_cc	id_GostR3411_94 id_GostR3410_94_cc
+id_GostR3411_94_with_GostR3410_2001_cc	id_GostR3411_94 id_GostR3410_2001_cc
+id_tc26_signwithdigest_gost3410_2012_256 id_GostR3411_2012_256 id_GostR3410_2012_256
+id_tc26_signwithdigest_gost3410_2012_512 id_GostR3411_2012_512 id_GostR3410_2012_512
+# ECDH KDFs and their corresponding message digests and schemes
+dhSinglePass_stdDH_sha1kdf_scheme		sha1	dh_std_kdf
+dhSinglePass_stdDH_sha224kdf_scheme		sha224	dh_std_kdf
+dhSinglePass_stdDH_sha256kdf_scheme		sha256	dh_std_kdf
+dhSinglePass_stdDH_sha384kdf_scheme		sha384	dh_std_kdf
+dhSinglePass_stdDH_sha512kdf_scheme		sha512	dh_std_kdf
+
+dhSinglePass_cofactorDH_sha1kdf_scheme		sha1	dh_cofactor_kdf
+dhSinglePass_cofactorDH_sha224kdf_scheme	sha224	dh_cofactor_kdf
+dhSinglePass_cofactorDH_sha256kdf_scheme	sha256	dh_cofactor_kdf
+dhSinglePass_cofactorDH_sha384kdf_scheme	sha384	dh_cofactor_kdf
+dhSinglePass_cofactorDH_sha512kdf_scheme	sha512	dh_cofactor_kdf
