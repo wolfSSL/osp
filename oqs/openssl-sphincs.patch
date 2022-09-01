@@ -1,0 +1,1630 @@
+diff --git a/README.md b/README.md
+index ebf18dae0..9d46ea928 100644
+--- a/README.md
++++ b/README.md
+@@ -103,9 +103,9 @@ The following digital signature algorithms from liboqs are supported by the fork
+ - **Falcon**:`falcon512`\*, `falcon1024`\*
+ - **Picnic**:`picnicl1fs`, `picnicl1ur`, `picnicl1full`\*, `picnic3l1`\*, `picnic3l3`, `picnic3l5`
+ - **Rainbow**:`rainbowIIIclassic`, `rainbowIIIcircumzenithal`, `rainbowIIIcompressed`, `rainbowVclassic`\*, `rainbowVcircumzenithal`, `rainbowVcompressed`
+-- **SPHINCS-Haraka**:`sphincsharaka128frobust`\*, `sphincsharaka128fsimple`, `sphincsharaka128srobust`, `sphincsharaka128ssimple`, `sphincsharaka192frobust`, `sphincsharaka192fsimple`, `sphincsharaka192srobust`, `sphincsharaka192ssimple`, `sphincsharaka256frobust`, `sphincsharaka256fsimple`, `sphincsharaka256srobust`, `sphincsharaka256ssimple`
+-- **SPHINCS-SHA256**:`sphincssha256128frobust`\*, `sphincssha256128fsimple`, `sphincssha256128srobust`, `sphincssha256128ssimple`, `sphincssha256192frobust`, `sphincssha256192fsimple`, `sphincssha256192srobust`, `sphincssha256192ssimple`, `sphincssha256256frobust`, `sphincssha256256fsimple`, `sphincssha256256srobust`, `sphincssha256256ssimple`
+-- **SPHINCS-SHAKE256**:`sphincsshake256128frobust`\*, `sphincsshake256128fsimple`, `sphincsshake256128srobust`, `sphincsshake256128ssimple`, `sphincsshake256192frobust`, `sphincsshake256192fsimple`, `sphincsshake256192srobust`, `sphincsshake256192ssimple`, `sphincsshake256256frobust`, `sphincsshake256256fsimple`, `sphincsshake256256srobust`, `sphincsshake256256ssimple`
++- **SPHINCS-Haraka**:`sphincsharaka128frobust`, `sphincsharaka128fsimple`, `sphincsharaka128srobust`, `sphincsharaka128ssimple`, `sphincsharaka192frobust`, `sphincsharaka192fsimple`, `sphincsharaka192srobust`, `sphincsharaka192ssimple`, `sphincsharaka256frobust`, `sphincsharaka256fsimple`, `sphincsharaka256srobust`, `sphincsharaka256ssimple`
++- **SPHINCS-SHA256**:`sphincssha256128frobust`, `sphincssha256128fsimple`, `sphincssha256128srobust`, `sphincssha256128ssimple`, `sphincssha256192frobust`, `sphincssha256192fsimple`, `sphincssha256192srobust`, `sphincssha256192ssimple`, `sphincssha256256frobust`, `sphincssha256256fsimple`, `sphincssha256256srobust`, `sphincssha256256ssimple`
++- **SPHINCS-SHAKE256**:`sphincsshake256128frobust`, `sphincsshake256128fsimple`\*, `sphincsshake256128srobust`, `sphincsshake256128ssimple`\*, `sphincsshake256192frobust`, `sphincsshake256192fsimple`\*, `sphincsshake256192srobust`, `sphincsshake256192ssimple`\*, `sphincsshake256256frobust`, `sphincsshake256256fsimple`\*, `sphincsshake256256srobust`, `sphincsshake256256ssimple`\*
+ <!--- OQS_TEMPLATE_FRAGMENT_LIST_SIGS_END -->
+ 
+ The following hybrid algorithms are supported; they combine a quantum-safe algorithm listed above with a traditional digital signature algorithm (`<SIG>` is any one of the algorithms listed above):
+diff --git a/apps/s_cb.c b/apps/s_cb.c
+index dc3a26d79..4cacd8c21 100644
+--- a/apps/s_cb.c
++++ b/apps/s_cb.c
+@@ -300,24 +300,34 @@ static const char *get_sigtype(int nid)
+         return "Rainbow-V-Classic";
+     case NID_p521_rainbowVclassic:
+         return "ECDSA p521 - Rainbow-V-Classic";
+-    case NID_sphincsharaka128frobust:
+-        return "SPHINCS+-Haraka-128f-robust";
+-    case NID_p256_sphincsharaka128frobust:
+-        return "ECDSA p256 - SPHINCS+-Haraka-128f-robust";
+-    case NID_rsa3072_sphincsharaka128frobust:
+-        return "RSA3072 - SPHINCS+-Haraka-128f-robust";
+-    case NID_sphincssha256128frobust:
+-        return "SPHINCS+-SHA256-128f-robust";
+-    case NID_p256_sphincssha256128frobust:
+-        return "ECDSA p256 - SPHINCS+-SHA256-128f-robust";
+-    case NID_rsa3072_sphincssha256128frobust:
+-        return "RSA3072 - SPHINCS+-SHA256-128f-robust";
+-    case NID_sphincsshake256128frobust:
+-        return "SPHINCS+-SHAKE256-128f-robust";
+-    case NID_p256_sphincsshake256128frobust:
+-        return "ECDSA p256 - SPHINCS+-SHAKE256-128f-robust";
+-    case NID_rsa3072_sphincsshake256128frobust:
+-        return "RSA3072 - SPHINCS+-SHAKE256-128f-robust";
++    case NID_sphincsshake256128fsimple:
++        return "SPHINCS+-SHAKE256-128f-simple";
++    case NID_p256_sphincsshake256128fsimple:
++        return "ECDSA p256 - SPHINCS+-SHAKE256-128f-simple";
++    case NID_rsa3072_sphincsshake256128fsimple:
++        return "RSA3072 - SPHINCS+-SHAKE256-128f-simple";
++    case NID_sphincsshake256128ssimple:
++        return "SPHINCS+-SHAKE256-128s-simple";
++    case NID_p256_sphincsshake256128ssimple:
++        return "ECDSA p256 - SPHINCS+-SHAKE256-128s-simple";
++    case NID_rsa3072_sphincsshake256128ssimple:
++        return "RSA3072 - SPHINCS+-SHAKE256-128s-simple";
++    case NID_sphincsshake256192fsimple:
++        return "SPHINCS+-SHAKE256-192f-simple";
++    case NID_p384_sphincsshake256192fsimple:
++        return "ECDSA p384 - SPHINCS+-SHAKE256-192f-simple";
++    case NID_sphincsshake256192ssimple:
++        return "SPHINCS+-SHAKE256-192s-simple";
++    case NID_p384_sphincsshake256192ssimple:
++        return "ECDSA p384 - SPHINCS+-SHAKE256-192s-simple";
++    case NID_sphincsshake256256fsimple:
++        return "SPHINCS+-SHAKE256-256f-simple";
++    case NID_p521_sphincsshake256256fsimple:
++        return "ECDSA p521 - SPHINCS+-SHAKE256-256f-simple";
++    case NID_sphincsshake256256ssimple:
++        return "SPHINCS+-SHAKE256-256s-simple";
++    case NID_p521_sphincsshake256256ssimple:
++        return "ECDSA p521 - SPHINCS+-SHAKE256-256s-simple";
+ ///// OQS_TEMPLATE_FRAGMENT_SIG_NAME_STR_END
+     default:
+         return NULL;
+diff --git a/crypto/asn1/standard_methods.h b/crypto/asn1/standard_methods.h
+index 54bee05d2..3719b98f2 100644
+--- a/crypto/asn1/standard_methods.h
++++ b/crypto/asn1/standard_methods.h
+@@ -87,14 +87,19 @@ static const EVP_PKEY_ASN1_METHOD *standard_methods[] = {
+     &rsa3072_picnic3l1_asn1_meth,
+     &rainbowVclassic_asn1_meth,
+     &p521_rainbowVclassic_asn1_meth,
+-    &sphincsharaka128frobust_asn1_meth,
+-    &p256_sphincsharaka128frobust_asn1_meth,
+-    &rsa3072_sphincsharaka128frobust_asn1_meth,
+-    &sphincssha256128frobust_asn1_meth,
+-    &p256_sphincssha256128frobust_asn1_meth,
+-    &rsa3072_sphincssha256128frobust_asn1_meth,
+-    &sphincsshake256128frobust_asn1_meth,
+-    &p256_sphincsshake256128frobust_asn1_meth,
+-    &rsa3072_sphincsshake256128frobust_asn1_meth,
++    &sphincsshake256128fsimple_asn1_meth,
++    &p256_sphincsshake256128fsimple_asn1_meth,
++    &rsa3072_sphincsshake256128fsimple_asn1_meth,
++    &sphincsshake256128ssimple_asn1_meth,
++    &p256_sphincsshake256128ssimple_asn1_meth,
++    &rsa3072_sphincsshake256128ssimple_asn1_meth,
++    &sphincsshake256192fsimple_asn1_meth,
++    &p384_sphincsshake256192fsimple_asn1_meth,
++    &sphincsshake256192ssimple_asn1_meth,
++    &p384_sphincsshake256192ssimple_asn1_meth,
++    &sphincsshake256256fsimple_asn1_meth,
++    &p521_sphincsshake256256fsimple_asn1_meth,
++    &sphincsshake256256ssimple_asn1_meth,
++    &p521_sphincsshake256256ssimple_asn1_meth,
+ ///// OQS_TEMPLATE_FRAGMENT_SIG_ASN1_METHS_END
+ };
+diff --git a/crypto/ec/oqs_meth.c b/crypto/ec/oqs_meth.c
+index 90fd3b2a9..bb28af622 100644
+--- a/crypto/ec/oqs_meth.c
++++ b/crypto/ec/oqs_meth.c
+@@ -103,15 +103,20 @@ int oqssl_sig_nids_list[] = {
+         NID_rsa3072_picnic3l1,
+         NID_rainbowVclassic,
+         NID_p521_rainbowVclassic,
+-        NID_sphincsharaka128frobust,
+-        NID_p256_sphincsharaka128frobust,
+-        NID_rsa3072_sphincsharaka128frobust,
+-        NID_sphincssha256128frobust,
+-        NID_p256_sphincssha256128frobust,
+-        NID_rsa3072_sphincssha256128frobust,
+-        NID_sphincsshake256128frobust,
+-        NID_p256_sphincsshake256128frobust,
+-        NID_rsa3072_sphincsshake256128frobust,
++        NID_sphincsshake256128fsimple,
++        NID_p256_sphincsshake256128fsimple,
++        NID_rsa3072_sphincsshake256128fsimple,
++        NID_sphincsshake256128ssimple,
++        NID_p256_sphincsshake256128ssimple,
++        NID_rsa3072_sphincsshake256128ssimple,
++        NID_sphincsshake256192fsimple,
++        NID_p384_sphincsshake256192fsimple,
++        NID_sphincsshake256192ssimple,
++        NID_p384_sphincsshake256192ssimple,
++        NID_sphincsshake256256fsimple,
++        NID_p521_sphincsshake256256fsimple,
++        NID_sphincsshake256256ssimple,
++        NID_p521_sphincsshake256256ssimple,
+ /////// OQS_TEMPLATE_FRAGMENT_LIST_KNOWN_NIDS_END
+ };
+ 
+@@ -219,18 +224,26 @@ char* get_oqs_alg_name(int openssl_nid)
+     case NID_rainbowVclassic:
+     case NID_p521_rainbowVclassic:
+       return OQS_SIG_alg_rainbow_V_classic;
+-    case NID_sphincsharaka128frobust:
+-    case NID_p256_sphincsharaka128frobust:
+-    case NID_rsa3072_sphincsharaka128frobust:
+-      return OQS_SIG_alg_sphincs_haraka_128f_robust;
+-    case NID_sphincssha256128frobust:
+-    case NID_p256_sphincssha256128frobust:
+-    case NID_rsa3072_sphincssha256128frobust:
+-      return OQS_SIG_alg_sphincs_sha256_128f_robust;
+-    case NID_sphincsshake256128frobust:
+-    case NID_p256_sphincsshake256128frobust:
+-    case NID_rsa3072_sphincsshake256128frobust:
+-      return OQS_SIG_alg_sphincs_shake256_128f_robust;
++    case NID_sphincsshake256128fsimple:
++    case NID_p256_sphincsshake256128fsimple:
++    case NID_rsa3072_sphincsshake256128fsimple:
++      return OQS_SIG_alg_sphincs_shake256_128f_simple;
++    case NID_sphincsshake256128ssimple:
++    case NID_p256_sphincsshake256128ssimple:
++    case NID_rsa3072_sphincsshake256128ssimple:
++      return OQS_SIG_alg_sphincs_shake256_128s_simple;
++    case NID_sphincsshake256192fsimple:
++    case NID_p384_sphincsshake256192fsimple:
++      return OQS_SIG_alg_sphincs_shake256_192f_simple;
++    case NID_sphincsshake256192ssimple:
++    case NID_p384_sphincsshake256192ssimple:
++      return OQS_SIG_alg_sphincs_shake256_192s_simple;
++    case NID_sphincsshake256256fsimple:
++    case NID_p521_sphincsshake256256fsimple:
++      return OQS_SIG_alg_sphincs_shake256_256f_simple;
++    case NID_sphincsshake256256ssimple:
++    case NID_p521_sphincsshake256256ssimple:
++      return OQS_SIG_alg_sphincs_shake256_256s_simple;
+     case NID_frodo640aes:
+     case NID_p256_frodo640aes:
+       return OQS_KEM_alg_frodokem_640_aes;
+@@ -360,12 +373,14 @@ static int is_oqs_hybrid_alg(int openssl_nid)
+     case NID_p256_picnic3l1:
+     case NID_rsa3072_picnic3l1:
+     case NID_p521_rainbowVclassic:
+-    case NID_p256_sphincsharaka128frobust:
+-    case NID_rsa3072_sphincsharaka128frobust:
+-    case NID_p256_sphincssha256128frobust:
+-    case NID_rsa3072_sphincssha256128frobust:
+-    case NID_p256_sphincsshake256128frobust:
+-    case NID_rsa3072_sphincsshake256128frobust:
++    case NID_p256_sphincsshake256128fsimple:
++    case NID_rsa3072_sphincsshake256128fsimple:
++    case NID_p256_sphincsshake256128ssimple:
++    case NID_rsa3072_sphincsshake256128ssimple:
++    case NID_p384_sphincsshake256192fsimple:
++    case NID_p384_sphincsshake256192ssimple:
++    case NID_p521_sphincsshake256256fsimple:
++    case NID_p521_sphincsshake256256ssimple:
+ ///// OQS_TEMPLATE_FRAGMENT_LIST_HYBRID_NIDS_END
+       return 1;
+     default:
+@@ -384,26 +399,28 @@ static int get_classical_nid(int hybrid_id)
+     case NID_rsa3072_falcon512:
+     case NID_rsa3072_picnicl1full:
+     case NID_rsa3072_picnic3l1:
+-    case NID_rsa3072_sphincsharaka128frobust:
+-    case NID_rsa3072_sphincssha256128frobust:
+-    case NID_rsa3072_sphincsshake256128frobust:
++    case NID_rsa3072_sphincsshake256128fsimple:
++    case NID_rsa3072_sphincsshake256128ssimple:
+       return NID_rsaEncryption;
+     case NID_p256_dilithium2:
+     case NID_p256_dilithium2_aes:
+     case NID_p256_falcon512:
+     case NID_p256_picnicl1full:
+     case NID_p256_picnic3l1:
+-    case NID_p256_sphincsharaka128frobust:
+-    case NID_p256_sphincssha256128frobust:
+-    case NID_p256_sphincsshake256128frobust:
++    case NID_p256_sphincsshake256128fsimple:
++    case NID_p256_sphincsshake256128ssimple:
+       return NID_X9_62_prime256v1;
+     case NID_p384_dilithium3:
+     case NID_p384_dilithium3_aes:
++    case NID_p384_sphincsshake256192fsimple:
++    case NID_p384_sphincsshake256192ssimple:
+       return NID_secp384r1;
+     case NID_p521_dilithium5:
+     case NID_p521_dilithium5_aes:
+     case NID_p521_falcon1024:
+     case NID_p521_rainbowVclassic:
++    case NID_p521_sphincsshake256256fsimple:
++    case NID_p521_sphincsshake256256ssimple:
+       return NID_secp521r1;///// OQS_TEMPLATE_FRAGMENT_ASSIGN_CLASSICAL_NIDS_END
+     default:
+       return 0;
+@@ -442,15 +459,20 @@ static int get_oqs_nid(int hybrid_id)
+       return NID_picnic3l1;
+     case NID_p521_rainbowVclassic:
+       return NID_rainbowVclassic;
+-    case NID_p256_sphincsharaka128frobust:
+-    case NID_rsa3072_sphincsharaka128frobust:
+-      return NID_sphincsharaka128frobust;
+-    case NID_p256_sphincssha256128frobust:
+-    case NID_rsa3072_sphincssha256128frobust:
+-      return NID_sphincssha256128frobust;
+-    case NID_p256_sphincsshake256128frobust:
+-    case NID_rsa3072_sphincsshake256128frobust:
+-      return NID_sphincsshake256128frobust;
++    case NID_p256_sphincsshake256128fsimple:
++    case NID_rsa3072_sphincsshake256128fsimple:
++      return NID_sphincsshake256128fsimple;
++    case NID_p256_sphincsshake256128ssimple:
++    case NID_rsa3072_sphincsshake256128ssimple:
++      return NID_sphincsshake256128ssimple;
++    case NID_p384_sphincsshake256192fsimple:
++      return NID_sphincsshake256192fsimple;
++    case NID_p384_sphincsshake256192ssimple:
++      return NID_sphincsshake256192ssimple;
++    case NID_p521_sphincsshake256256fsimple:
++      return NID_sphincsshake256256fsimple;
++    case NID_p521_sphincsshake256256ssimple:
++      return NID_sphincsshake256256ssimple;
+ ///// OQS_TEMPLATE_FRAGMENT_ASSIGN_OQS_NID_END
+     default:
+       return 0;
+@@ -606,18 +628,26 @@ static int get_oqs_security_bits(int openssl_nid)
+     case NID_rainbowVclassic:
+     case NID_p521_rainbowVclassic:
+       return 256;
+-    case NID_sphincsharaka128frobust:
+-    case NID_p256_sphincsharaka128frobust:
+-    case NID_rsa3072_sphincsharaka128frobust:
++    case NID_sphincsshake256128fsimple:
++    case NID_p256_sphincsshake256128fsimple:
++    case NID_rsa3072_sphincsshake256128fsimple:
+       return 128;
+-    case NID_sphincssha256128frobust:
+-    case NID_p256_sphincssha256128frobust:
+-    case NID_rsa3072_sphincssha256128frobust:
+-      return 128;
+-    case NID_sphincsshake256128frobust:
+-    case NID_p256_sphincsshake256128frobust:
+-    case NID_rsa3072_sphincsshake256128frobust:
++    case NID_sphincsshake256128ssimple:
++    case NID_p256_sphincsshake256128ssimple:
++    case NID_rsa3072_sphincsshake256128ssimple:
+       return 128;
++    case NID_sphincsshake256192fsimple:
++    case NID_p384_sphincsshake256192fsimple:
++      return 192;
++    case NID_sphincsshake256192ssimple:
++    case NID_p384_sphincsshake256192ssimple:
++      return 192;
++    case NID_sphincsshake256256fsimple:
++    case NID_p521_sphincsshake256256fsimple:
++      return 256;
++    case NID_sphincsshake256256ssimple:
++    case NID_p521_sphincsshake256256ssimple:
++      return 256;
+ ///// OQS_TEMPLATE_FRAGMENT_GET_SIG_SECURITY_BITS_END
+     default:
+       return 0;
+@@ -1217,15 +1247,20 @@ static int oqs_item_verify(EVP_MD_CTX *ctx, const ASN1_ITEM *it, void *asn,
+         nid != NID_rsa3072_picnic3l1 &&
+         nid != NID_rainbowVclassic &&
+         nid != NID_p521_rainbowVclassic &&
+-        nid != NID_sphincsharaka128frobust &&
+-        nid != NID_p256_sphincsharaka128frobust &&
+-        nid != NID_rsa3072_sphincsharaka128frobust &&
+-        nid != NID_sphincssha256128frobust &&
+-        nid != NID_p256_sphincssha256128frobust &&
+-        nid != NID_rsa3072_sphincssha256128frobust &&
+-        nid != NID_sphincsshake256128frobust &&
+-        nid != NID_p256_sphincsshake256128frobust &&
+-        nid != NID_rsa3072_sphincsshake256128frobust &&
++        nid != NID_sphincsshake256128fsimple &&
++        nid != NID_p256_sphincsshake256128fsimple &&
++        nid != NID_rsa3072_sphincsshake256128fsimple &&
++        nid != NID_sphincsshake256128ssimple &&
++        nid != NID_p256_sphincsshake256128ssimple &&
++        nid != NID_rsa3072_sphincsshake256128ssimple &&
++        nid != NID_sphincsshake256192fsimple &&
++        nid != NID_p384_sphincsshake256192fsimple &&
++        nid != NID_sphincsshake256192ssimple &&
++        nid != NID_p384_sphincsshake256192ssimple &&
++        nid != NID_sphincsshake256256fsimple &&
++        nid != NID_p521_sphincsshake256256fsimple &&
++        nid != NID_sphincsshake256256ssimple &&
++        nid != NID_p521_sphincsshake256256ssimple &&
+         1 /* This is just to faciliate templating. */
+ ///// OQS_TEMPLATE_FRAGMENT_CHECK_IF_KNOWN_NID_END
+     ) || ptype != V_ASN1_UNDEF) {
+@@ -1813,13 +1848,18 @@ DEFINE_OQS_EVP_METHODS(p256_picnic3l1, NID_p256_picnic3l1, "p256_picnic3l1", "Op
+ DEFINE_OQS_EVP_METHODS(rsa3072_picnic3l1, NID_rsa3072_picnic3l1, "rsa3072_picnic3l1", "OpenSSL RSA3072 Picnic3 L1 algorithm")
+ DEFINE_OQS_EVP_METHODS(rainbowVclassic, NID_rainbowVclassic, "rainbowVclassic", "OpenSSL Rainbow-V-Classic algorithm")
+ DEFINE_OQS_EVP_METHODS(p521_rainbowVclassic, NID_p521_rainbowVclassic, "p521_rainbowVclassic", "OpenSSL ECDSA p521 Rainbow-V-Classic algorithm")
+-DEFINE_OQS_EVP_METHODS(sphincsharaka128frobust, NID_sphincsharaka128frobust, "sphincsharaka128frobust", "OpenSSL SPHINCS+-Haraka-128f-robust algorithm")
+-DEFINE_OQS_EVP_METHODS(p256_sphincsharaka128frobust, NID_p256_sphincsharaka128frobust, "p256_sphincsharaka128frobust", "OpenSSL ECDSA p256 SPHINCS+-Haraka-128f-robust algorithm")
+-DEFINE_OQS_EVP_METHODS(rsa3072_sphincsharaka128frobust, NID_rsa3072_sphincsharaka128frobust, "rsa3072_sphincsharaka128frobust", "OpenSSL RSA3072 SPHINCS+-Haraka-128f-robust algorithm")
+-DEFINE_OQS_EVP_METHODS(sphincssha256128frobust, NID_sphincssha256128frobust, "sphincssha256128frobust", "OpenSSL SPHINCS+-SHA256-128f-robust algorithm")
+-DEFINE_OQS_EVP_METHODS(p256_sphincssha256128frobust, NID_p256_sphincssha256128frobust, "p256_sphincssha256128frobust", "OpenSSL ECDSA p256 SPHINCS+-SHA256-128f-robust algorithm")
+-DEFINE_OQS_EVP_METHODS(rsa3072_sphincssha256128frobust, NID_rsa3072_sphincssha256128frobust, "rsa3072_sphincssha256128frobust", "OpenSSL RSA3072 SPHINCS+-SHA256-128f-robust algorithm")
+-DEFINE_OQS_EVP_METHODS(sphincsshake256128frobust, NID_sphincsshake256128frobust, "sphincsshake256128frobust", "OpenSSL SPHINCS+-SHAKE256-128f-robust algorithm")
+-DEFINE_OQS_EVP_METHODS(p256_sphincsshake256128frobust, NID_p256_sphincsshake256128frobust, "p256_sphincsshake256128frobust", "OpenSSL ECDSA p256 SPHINCS+-SHAKE256-128f-robust algorithm")
+-DEFINE_OQS_EVP_METHODS(rsa3072_sphincsshake256128frobust, NID_rsa3072_sphincsshake256128frobust, "rsa3072_sphincsshake256128frobust", "OpenSSL RSA3072 SPHINCS+-SHAKE256-128f-robust algorithm")
++DEFINE_OQS_EVP_METHODS(sphincsshake256128fsimple, NID_sphincsshake256128fsimple, "sphincsshake256128fsimple", "OpenSSL SPHINCS+-SHAKE256-128f-simple algorithm")
++DEFINE_OQS_EVP_METHODS(p256_sphincsshake256128fsimple, NID_p256_sphincsshake256128fsimple, "p256_sphincsshake256128fsimple", "OpenSSL ECDSA p256 SPHINCS+-SHAKE256-128f-simple algorithm")
++DEFINE_OQS_EVP_METHODS(rsa3072_sphincsshake256128fsimple, NID_rsa3072_sphincsshake256128fsimple, "rsa3072_sphincsshake256128fsimple", "OpenSSL RSA3072 SPHINCS+-SHAKE256-128f-simple algorithm")
++DEFINE_OQS_EVP_METHODS(sphincsshake256128ssimple, NID_sphincsshake256128ssimple, "sphincsshake256128ssimple", "OpenSSL SPHINCS+-SHAKE256-128s-simple algorithm")
++DEFINE_OQS_EVP_METHODS(p256_sphincsshake256128ssimple, NID_p256_sphincsshake256128ssimple, "p256_sphincsshake256128ssimple", "OpenSSL ECDSA p256 SPHINCS+-SHAKE256-128s-simple algorithm")
++DEFINE_OQS_EVP_METHODS(rsa3072_sphincsshake256128ssimple, NID_rsa3072_sphincsshake256128ssimple, "rsa3072_sphincsshake256128ssimple", "OpenSSL RSA3072 SPHINCS+-SHAKE256-128s-simple algorithm")
++DEFINE_OQS_EVP_METHODS(sphincsshake256192fsimple, NID_sphincsshake256192fsimple, "sphincsshake256192fsimple", "OpenSSL SPHINCS+-SHAKE256-192f-simple algorithm")
++DEFINE_OQS_EVP_METHODS(p384_sphincsshake256192fsimple, NID_p384_sphincsshake256192fsimple, "p384_sphincsshake256192fsimple", "OpenSSL ECDSA p384 SPHINCS+-SHAKE256-192f-simple algorithm")
++DEFINE_OQS_EVP_METHODS(sphincsshake256192ssimple, NID_sphincsshake256192ssimple, "sphincsshake256192ssimple", "OpenSSL SPHINCS+-SHAKE256-192s-simple algorithm")
++DEFINE_OQS_EVP_METHODS(p384_sphincsshake256192ssimple, NID_p384_sphincsshake256192ssimple, "p384_sphincsshake256192ssimple", "OpenSSL ECDSA p384 SPHINCS+-SHAKE256-192s-simple algorithm")
++DEFINE_OQS_EVP_METHODS(sphincsshake256256fsimple, NID_sphincsshake256256fsimple, "sphincsshake256256fsimple", "OpenSSL SPHINCS+-SHAKE256-256f-simple algorithm")
++DEFINE_OQS_EVP_METHODS(p521_sphincsshake256256fsimple, NID_p521_sphincsshake256256fsimple, "p521_sphincsshake256256fsimple", "OpenSSL ECDSA p521 SPHINCS+-SHAKE256-256f-simple algorithm")
++DEFINE_OQS_EVP_METHODS(sphincsshake256256ssimple, NID_sphincsshake256256ssimple, "sphincsshake256256ssimple", "OpenSSL SPHINCS+-SHAKE256-256s-simple algorithm")
++DEFINE_OQS_EVP_METHODS(p521_sphincsshake256256ssimple, NID_p521_sphincsshake256256ssimple, "p521_sphincsshake256256ssimple", "OpenSSL ECDSA p521 SPHINCS+-SHAKE256-256s-simple algorithm")
+ ///// OQS_TEMPLATE_FRAGMENT_DEFINE_OQS_EVP_METHS_END
+diff --git a/crypto/evp/pmeth_lib.c b/crypto/evp/pmeth_lib.c
+index 47845eddc..1767d1095 100644
+--- a/crypto/evp/pmeth_lib.c
++++ b/crypto/evp/pmeth_lib.c
+@@ -96,15 +96,20 @@ static const EVP_PKEY_METHOD *standard_methods[] = {
+     &rsa3072_picnic3l1_pkey_meth,
+     &rainbowVclassic_pkey_meth,
+     &p521_rainbowVclassic_pkey_meth,
+-    &sphincsharaka128frobust_pkey_meth,
+-    &p256_sphincsharaka128frobust_pkey_meth,
+-    &rsa3072_sphincsharaka128frobust_pkey_meth,
+-    &sphincssha256128frobust_pkey_meth,
+-    &p256_sphincssha256128frobust_pkey_meth,
+-    &rsa3072_sphincssha256128frobust_pkey_meth,
+-    &sphincsshake256128frobust_pkey_meth,
+-    &p256_sphincsshake256128frobust_pkey_meth,
+-    &rsa3072_sphincsshake256128frobust_pkey_meth,
++    &sphincsshake256128fsimple_pkey_meth,
++    &p256_sphincsshake256128fsimple_pkey_meth,
++    &rsa3072_sphincsshake256128fsimple_pkey_meth,
++    &sphincsshake256128ssimple_pkey_meth,
++    &p256_sphincsshake256128ssimple_pkey_meth,
++    &rsa3072_sphincsshake256128ssimple_pkey_meth,
++    &sphincsshake256192fsimple_pkey_meth,
++    &p384_sphincsshake256192fsimple_pkey_meth,
++    &sphincsshake256192ssimple_pkey_meth,
++    &p384_sphincsshake256192ssimple_pkey_meth,
++    &sphincsshake256256fsimple_pkey_meth,
++    &p521_sphincsshake256256fsimple_pkey_meth,
++    &sphincsshake256256ssimple_pkey_meth,
++    &p521_sphincsshake256256ssimple_pkey_meth,
+ ///// OQS_TEMPLATE_FRAGMENT_LIST_PKEY_METHS_END
+ };
+ 
+diff --git a/crypto/objects/obj_dat.h b/crypto/objects/obj_dat.h
+index 1be5dab46..6876560a0 100644
+--- a/crypto/objects/obj_dat.h
++++ b/crypto/objects/obj_dat.h
+@@ -10,7 +10,7 @@
+  */
+ 
+ /* Serialized OID's */
+-static const unsigned char so[8035] = {
++static const unsigned char so[8065] = {
+     0x2A,0x86,0x48,0x86,0xF7,0x0D,                 /* [    0] OBJ_rsadsi */
+     0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,            /* [    6] OBJ_pkcs */
+     0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x02,       /* [   13] OBJ_md2 */
+@@ -1103,18 +1103,23 @@ static const unsigned char so[8035] = {
+     0x2B,0x06,0x01,0x04,0x01,0x82,0x37,0x59,0x02,0x01,0x17,  /* [ 7955] OBJ_rsa3072_picnic3l1 */
+     0x2B,0xCE,0x0F,0x05,0x03,0x01,0x01,            /* [ 7966] OBJ_rainbowVclassic */
+     0x2B,0xCE,0x0F,0x05,0x03,0x02,0x01,            /* [ 7973] OBJ_p521_rainbowVclassic */
+-    0x2B,0xCE,0x0F,0x06,0x01,0x01,                 /* [ 7980] OBJ_sphincsharaka128frobust */
+-    0x2B,0xCE,0x0F,0x06,0x01,0x02,                 /* [ 7986] OBJ_p256_sphincsharaka128frobust */
+-    0x2B,0xCE,0x0F,0x06,0x01,0x03,                 /* [ 7992] OBJ_rsa3072_sphincsharaka128frobust */
+-    0x2B,0xCE,0x0F,0x06,0x04,0x01,                 /* [ 7998] OBJ_sphincssha256128frobust */
+-    0x2B,0xCE,0x0F,0x06,0x04,0x02,                 /* [ 8004] OBJ_p256_sphincssha256128frobust */
+-    0x2B,0xCE,0x0F,0x06,0x04,0x03,                 /* [ 8010] OBJ_rsa3072_sphincssha256128frobust */
+-    0x2B,0xCE,0x0F,0x06,0x07,0x01,                 /* [ 8016] OBJ_sphincsshake256128frobust */
+-    0x2B,0xCE,0x0F,0x06,0x07,0x02,                 /* [ 8022] OBJ_p256_sphincsshake256128frobust */
+-    0x2B,0xCE,0x0F,0x06,0x07,0x03,                 /* [ 8028] OBJ_rsa3072_sphincsshake256128frobust */
++    0x2B,0xCE,0x0F,0x06,0x07,0x04,                 /* [ 7980] OBJ_sphincsshake256128fsimple */
++    0x2B,0xCE,0x0F,0x06,0x07,0x05,                 /* [ 7986] OBJ_p256_sphincsshake256128fsimple */
++    0x2B,0xCE,0x0F,0x06,0x07,0x06,                 /* [ 7992] OBJ_rsa3072_sphincsshake256128fsimple */
++    0x2B,0xCE,0x0F,0x06,0x07,0x0A,                 /* [ 7998] OBJ_sphincsshake256128ssimple */
++    0x2B,0xCE,0x0F,0x06,0x07,0x0B,                 /* [ 8004] OBJ_p256_sphincsshake256128ssimple */
++    0x2B,0xCE,0x0F,0x06,0x07,0x0C,                 /* [ 8010] OBJ_rsa3072_sphincsshake256128ssimple */
++    0x2B,0xCE,0x0F,0x06,0x08,0x03,                 /* [ 8016] OBJ_sphincsshake256192fsimple */
++    0x2B,0xCE,0x0F,0x06,0x08,0x04,                 /* [ 8022] OBJ_p384_sphincsshake256192fsimple */
++    0x2B,0xCE,0x0F,0x06,0x08,0x07,                 /* [ 8028] OBJ_sphincsshake256192ssimple */
++    0x2B,0xCE,0x0F,0x06,0x08,0x08,                 /* [ 8034] OBJ_p384_sphincsshake256192ssimple */
++    0x2B,0xCE,0x0F,0x06,0x09,0x03,                 /* [ 8040] OBJ_sphincsshake256256fsimple */
++    0x2B,0xCE,0x0F,0x06,0x09,0x04,                 /* [ 8046] OBJ_p521_sphincsshake256256fsimple */
++    0x2B,0xCE,0x0F,0x06,0x09,0x07,                 /* [ 8052] OBJ_sphincsshake256256ssimple */
++    0x2B,0xCE,0x0F,0x06,0x09,0x08,                 /* [ 8058] OBJ_p521_sphincsshake256256ssimple */
+ };
+ 
+-#define NUM_NID 1301
++#define NUM_NID 1306
+ static const ASN1_OBJECT nid_objs[NUM_NID] = {
+     {"UNDEF", "undefined", NID_undef},
+     {"rsadsi", "RSA Data Security, Inc.", NID_rsadsi, 6, &so[0]},
+@@ -2408,18 +2413,23 @@ static const ASN1_OBJECT nid_objs[NUM_NID] = {
+     {"rsa3072_picnic3l1", "rsa3072_picnic3l1", NID_rsa3072_picnic3l1, 11, &so[7955]},
+     {"rainbowVclassic", "rainbowVclassic", NID_rainbowVclassic, 7, &so[7966]},
+     {"p521_rainbowVclassic", "p521_rainbowVclassic", NID_p521_rainbowVclassic, 7, &so[7973]},
+-    {"sphincsharaka128frobust", "sphincsharaka128frobust", NID_sphincsharaka128frobust, 6, &so[7980]},
+-    {"p256_sphincsharaka128frobust", "p256_sphincsharaka128frobust", NID_p256_sphincsharaka128frobust, 6, &so[7986]},
+-    {"rsa3072_sphincsharaka128frobust", "rsa3072_sphincsharaka128frobust", NID_rsa3072_sphincsharaka128frobust, 6, &so[7992]},
+-    {"sphincssha256128frobust", "sphincssha256128frobust", NID_sphincssha256128frobust, 6, &so[7998]},
+-    {"p256_sphincssha256128frobust", "p256_sphincssha256128frobust", NID_p256_sphincssha256128frobust, 6, &so[8004]},
+-    {"rsa3072_sphincssha256128frobust", "rsa3072_sphincssha256128frobust", NID_rsa3072_sphincssha256128frobust, 6, &so[8010]},
+-    {"sphincsshake256128frobust", "sphincsshake256128frobust", NID_sphincsshake256128frobust, 6, &so[8016]},
+-    {"p256_sphincsshake256128frobust", "p256_sphincsshake256128frobust", NID_p256_sphincsshake256128frobust, 6, &so[8022]},
+-    {"rsa3072_sphincsshake256128frobust", "rsa3072_sphincsshake256128frobust", NID_rsa3072_sphincsshake256128frobust, 6, &so[8028]},
++    {"sphincsshake256128fsimple", "sphincsshake256128fsimple", NID_sphincsshake256128fsimple, 6, &so[7980]},
++    {"p256_sphincsshake256128fsimple", "p256_sphincsshake256128fsimple", NID_p256_sphincsshake256128fsimple, 6, &so[7986]},
++    {"rsa3072_sphincsshake256128fsimple", "rsa3072_sphincsshake256128fsimple", NID_rsa3072_sphincsshake256128fsimple, 6, &so[7992]},
++    {"sphincsshake256128ssimple", "sphincsshake256128ssimple", NID_sphincsshake256128ssimple, 6, &so[7998]},
++    {"p256_sphincsshake256128ssimple", "p256_sphincsshake256128ssimple", NID_p256_sphincsshake256128ssimple, 6, &so[8004]},
++    {"rsa3072_sphincsshake256128ssimple", "rsa3072_sphincsshake256128ssimple", NID_rsa3072_sphincsshake256128ssimple, 6, &so[8010]},
++    {"sphincsshake256192fsimple", "sphincsshake256192fsimple", NID_sphincsshake256192fsimple, 6, &so[8016]},
++    {"p384_sphincsshake256192fsimple", "p384_sphincsshake256192fsimple", NID_p384_sphincsshake256192fsimple, 6, &so[8022]},
++    {"sphincsshake256192ssimple", "sphincsshake256192ssimple", NID_sphincsshake256192ssimple, 6, &so[8028]},
++    {"p384_sphincsshake256192ssimple", "p384_sphincsshake256192ssimple", NID_p384_sphincsshake256192ssimple, 6, &so[8034]},
++    {"sphincsshake256256fsimple", "sphincsshake256256fsimple", NID_sphincsshake256256fsimple, 6, &so[8040]},
++    {"p521_sphincsshake256256fsimple", "p521_sphincsshake256256fsimple", NID_p521_sphincsshake256256fsimple, 6, &so[8046]},
++    {"sphincsshake256256ssimple", "sphincsshake256256ssimple", NID_sphincsshake256256ssimple, 6, &so[8052]},
++    {"p521_sphincsshake256256ssimple", "p521_sphincsshake256256ssimple", NID_p521_sphincsshake256256ssimple, 6, &so[8058]},
+ };
+ 
+-#define NUM_SN 1290
++#define NUM_SN 1295
+ static const unsigned int sn_objs[NUM_SN] = {
+      364,    /* "AD_DVCS" */
+      419,    /* "AES-128-CBC" */
+@@ -3347,9 +3357,8 @@ static const unsigned int sn_objs[NUM_SN] = {
+     1285,    /* "p256_picnicl1full" */
+     1261,    /* "p256_sntrup653" */
+     1262,    /* "p256_sntrup761" */
+-    1293,    /* "p256_sphincsharaka128frobust" */
+-    1296,    /* "p256_sphincssha256128frobust" */
+-    1299,    /* "p256_sphincsshake256128frobust" */
++    1293,    /* "p256_sphincsshake256128fsimple" */
++    1296,    /* "p256_sphincsshake256128ssimple" */
+     1250,    /* "p384_bikel3" */
+     1269,    /* "p384_dilithium3" */
+     1276,    /* "p384_dilithium3_aes" */
+@@ -3363,6 +3372,8 @@ static const unsigned int sn_objs[NUM_SN] = {
+     1259,    /* "p384_ntrulpr857" */
+     1247,    /* "p384_saber" */
+     1263,    /* "p384_sntrup857" */
++    1299,    /* "p384_sphincsshake256192fsimple" */
++    1301,    /* "p384_sphincsshake256192ssimple" */
+     1271,    /* "p521_dilithium5" */
+     1278,    /* "p521_dilithium5_aes" */
+     1283,    /* "p521_falcon1024" */
+@@ -3378,6 +3389,8 @@ static const unsigned int sn_objs[NUM_SN] = {
+     1260,    /* "p521_ntrulpr1277" */
+     1291,    /* "p521_rainbowVclassic" */
+     1264,    /* "p521_sntrup1277" */
++    1303,    /* "p521_sphincsshake256256fsimple" */
++    1305,    /* "p521_sphincsshake256256ssimple" */
+      489,    /* "pagerTelephoneNumber" */
+      374,    /* "path" */
+      112,    /* "pbeWithMD5AndCast5CBC" */
+@@ -3449,9 +3462,8 @@ static const unsigned int sn_objs[NUM_SN] = {
+     1281,    /* "rsa3072_falcon512" */
+     1289,    /* "rsa3072_picnic3l1" */
+     1286,    /* "rsa3072_picnicl1full" */
+-    1294,    /* "rsa3072_sphincsharaka128frobust" */
+-    1297,    /* "rsa3072_sphincssha256128frobust" */
+-    1300,    /* "rsa3072_sphincsshake256128frobust" */
++    1294,    /* "rsa3072_sphincsshake256128fsimple" */
++    1297,    /* "rsa3072_sphincsshake256128ssimple" */
+        6,    /* "rsaEncryption" */
+      644,    /* "rsaOAEPEncryptionSET" */
+      377,    /* "rsaSignature" */
+@@ -3648,9 +3660,12 @@ static const unsigned int sn_objs[NUM_SN] = {
+     1226,    /* "sntrup653" */
+     1227,    /* "sntrup761" */
+     1228,    /* "sntrup857" */
+-    1292,    /* "sphincsharaka128frobust" */
+-    1295,    /* "sphincssha256128frobust" */
+-    1298,    /* "sphincsshake256128frobust" */
++    1292,    /* "sphincsshake256128fsimple" */
++    1295,    /* "sphincsshake256128ssimple" */
++    1298,    /* "sphincsshake256192fsimple" */
++    1300,    /* "sphincsshake256192ssimple" */
++    1302,    /* "sphincsshake256256fsimple" */
++    1304,    /* "sphincsshake256256ssimple" */
+      660,    /* "street" */
+       85,    /* "subjectAltName" */
+      769,    /* "subjectDirectoryAttributes" */
+@@ -3713,7 +3728,7 @@ static const unsigned int sn_objs[NUM_SN] = {
+     1093,    /* "x509ExtAdmission" */
+ };
+ 
+-#define NUM_LN 1290
++#define NUM_LN 1295
+ static const unsigned int ln_objs[NUM_LN] = {
+      363,    /* "AD Time Stamping" */
+      405,    /* "ANSI X9.62" */
+@@ -4614,9 +4629,8 @@ static const unsigned int ln_objs[NUM_LN] = {
+     1285,    /* "p256_picnicl1full" */
+     1261,    /* "p256_sntrup653" */
+     1262,    /* "p256_sntrup761" */
+-    1293,    /* "p256_sphincsharaka128frobust" */
+-    1296,    /* "p256_sphincssha256128frobust" */
+-    1299,    /* "p256_sphincsshake256128frobust" */
++    1293,    /* "p256_sphincsshake256128fsimple" */
++    1296,    /* "p256_sphincsshake256128ssimple" */
+     1250,    /* "p384_bikel3" */
+     1269,    /* "p384_dilithium3" */
+     1276,    /* "p384_dilithium3_aes" */
+@@ -4630,6 +4644,8 @@ static const unsigned int ln_objs[NUM_LN] = {
+     1259,    /* "p384_ntrulpr857" */
+     1247,    /* "p384_saber" */
+     1263,    /* "p384_sntrup857" */
++    1299,    /* "p384_sphincsshake256192fsimple" */
++    1301,    /* "p384_sphincsshake256192ssimple" */
+     1271,    /* "p521_dilithium5" */
+     1278,    /* "p521_dilithium5_aes" */
+     1283,    /* "p521_falcon1024" */
+@@ -4645,6 +4661,8 @@ static const unsigned int ln_objs[NUM_LN] = {
+     1260,    /* "p521_ntrulpr1277" */
+     1291,    /* "p521_rainbowVclassic" */
+     1264,    /* "p521_sntrup1277" */
++    1303,    /* "p521_sphincsshake256256fsimple" */
++    1305,    /* "p521_sphincsshake256256ssimple" */
+      935,    /* "pSpecified" */
+      489,    /* "pagerTelephoneNumber" */
+      782,    /* "password based MAC" */
+@@ -4740,9 +4758,8 @@ static const unsigned int ln_objs[NUM_LN] = {
+     1281,    /* "rsa3072_falcon512" */
+     1289,    /* "rsa3072_picnic3l1" */
+     1286,    /* "rsa3072_picnicl1full" */
+-    1294,    /* "rsa3072_sphincsharaka128frobust" */
+-    1297,    /* "rsa3072_sphincssha256128frobust" */
+-    1300,    /* "rsa3072_sphincsshake256128frobust" */
++    1294,    /* "rsa3072_sphincsshake256128fsimple" */
++    1297,    /* "rsa3072_sphincsshake256128ssimple" */
+        6,    /* "rsaEncryption" */
+      644,    /* "rsaOAEPEncryptionSET" */
+      377,    /* "rsaSignature" */
+@@ -4956,9 +4973,12 @@ static const unsigned int ln_objs[NUM_LN] = {
+     1226,    /* "sntrup653" */
+     1227,    /* "sntrup761" */
+     1228,    /* "sntrup857" */
+-    1292,    /* "sphincsharaka128frobust" */
+-    1295,    /* "sphincssha256128frobust" */
+-    1298,    /* "sphincsshake256128frobust" */
++    1292,    /* "sphincsshake256128fsimple" */
++    1295,    /* "sphincsshake256128ssimple" */
++    1298,    /* "sphincsshake256192fsimple" */
++    1300,    /* "sphincsshake256192ssimple" */
++    1302,    /* "sphincsshake256256fsimple" */
++    1304,    /* "sphincsshake256256ssimple" */
+       16,    /* "stateOrProvinceName" */
+      660,    /* "streetAddress" */
+      498,    /* "subtreeMaximumQuality" */
+@@ -5007,7 +5027,7 @@ static const unsigned int ln_objs[NUM_LN] = {
+      125,    /* "zlib compression" */
+ };
+ 
+-#define NUM_OBJ 1107
++#define NUM_OBJ 1112
+ static const unsigned int obj_objs[NUM_OBJ] = {
+        0,    /* OBJ_undef                        0 */
+      181,    /* OBJ_iso                          1 */
+@@ -5378,15 +5398,20 @@ static const unsigned int obj_objs[NUM_OBJ] = {
+     1274,    /* OBJ_rsa3072_dilithium2_aes       1 3 9999 2 11 2 */
+     1276,    /* OBJ_p384_dilithium3_aes          1 3 9999 2 11 3 */
+     1278,    /* OBJ_p521_dilithium5_aes          1 3 9999 2 11 4 */
+-    1292,    /* OBJ_sphincsharaka128frobust      1 3 9999 6 1 1 */
+-    1293,    /* OBJ_p256_sphincsharaka128frobust 1 3 9999 6 1 2 */
+-    1294,    /* OBJ_rsa3072_sphincsharaka128frobust 1 3 9999 6 1 3 */
+-    1295,    /* OBJ_sphincssha256128frobust      1 3 9999 6 4 1 */
+-    1296,    /* OBJ_p256_sphincssha256128frobust 1 3 9999 6 4 2 */
+-    1297,    /* OBJ_rsa3072_sphincssha256128frobust 1 3 9999 6 4 3 */
+-    1298,    /* OBJ_sphincsshake256128frobust    1 3 9999 6 7 1 */
+-    1299,    /* OBJ_p256_sphincsshake256128frobust 1 3 9999 6 7 2 */
+-    1300,    /* OBJ_rsa3072_sphincsshake256128frobust 1 3 9999 6 7 3 */
++    1292,    /* OBJ_sphincsshake256128fsimple    1 3 9999 6 7 4 */
++    1293,    /* OBJ_p256_sphincsshake256128fsimple 1 3 9999 6 7 5 */
++    1294,    /* OBJ_rsa3072_sphincsshake256128fsimple 1 3 9999 6 7 6 */
++    1295,    /* OBJ_sphincsshake256128ssimple    1 3 9999 6 7 10 */
++    1296,    /* OBJ_p256_sphincsshake256128ssimple 1 3 9999 6 7 11 */
++    1297,    /* OBJ_rsa3072_sphincsshake256128ssimple 1 3 9999 6 7 12 */
++    1298,    /* OBJ_sphincsshake256192fsimple    1 3 9999 6 8 3 */
++    1299,    /* OBJ_p384_sphincsshake256192fsimple 1 3 9999 6 8 4 */
++    1300,    /* OBJ_sphincsshake256192ssimple    1 3 9999 6 8 7 */
++    1301,    /* OBJ_p384_sphincsshake256192ssimple 1 3 9999 6 8 8 */
++    1302,    /* OBJ_sphincsshake256256fsimple    1 3 9999 6 9 3 */
++    1303,    /* OBJ_p521_sphincsshake256256fsimple 1 3 9999 6 9 4 */
++    1304,    /* OBJ_sphincsshake256256ssimple    1 3 9999 6 9 7 */
++    1305,    /* OBJ_p521_sphincsshake256256ssimple 1 3 9999 6 9 8 */
+      631,    /* OBJ_setAttr_GenCryptgrm          2 23 42 3 3 3 1 */
+      632,    /* OBJ_setAttr_T2Enc                2 23 42 3 3 4 1 */
+      633,    /* OBJ_setAttr_T2cleartxt           2 23 42 3 3 4 2 */
+diff --git a/crypto/objects/obj_mac.num b/crypto/objects/obj_mac.num
+index d6ed563eb..340354848 100644
+--- a/crypto/objects/obj_mac.num
++++ b/crypto/objects/obj_mac.num
+@@ -1287,12 +1287,17 @@ p256_picnic3l1		1288
+ rsa3072_picnic3l1		1289
+ rainbowVclassic		1290
+ p521_rainbowVclassic		1291
+-sphincsharaka128frobust		1292
+-p256_sphincsharaka128frobust		1293
+-rsa3072_sphincsharaka128frobust		1294
+-sphincssha256128frobust		1295
+-p256_sphincssha256128frobust		1296
+-rsa3072_sphincssha256128frobust		1297
+-sphincsshake256128frobust		1298
+-p256_sphincsshake256128frobust		1299
+-rsa3072_sphincsshake256128frobust		1300
++sphincsshake256128fsimple		1292
++p256_sphincsshake256128fsimple		1293
++rsa3072_sphincsshake256128fsimple		1294
++sphincsshake256128ssimple		1295
++p256_sphincsshake256128ssimple		1296
++rsa3072_sphincsshake256128ssimple		1297
++sphincsshake256192fsimple		1298
++p384_sphincsshake256192fsimple		1299
++sphincsshake256192ssimple		1300
++p384_sphincsshake256192ssimple		1301
++sphincsshake256256fsimple		1302
++p521_sphincsshake256256fsimple		1303
++sphincsshake256256ssimple		1304
++p521_sphincsshake256256ssimple		1305
+diff --git a/crypto/objects/obj_xref.h b/crypto/objects/obj_xref.h
+index 16dbc1bfd..4ba7711b5 100644
+--- a/crypto/objects/obj_xref.h
++++ b/crypto/objects/obj_xref.h
+@@ -106,22 +106,34 @@ static const nid_triple sigoid_srt[] = {
+     {NID_rsa3072_picnic3l1, NID_sha512, NID_rsa3072_picnic3l1},
+     {NID_rainbowVclassic, NID_sha512, NID_rainbowVclassic},
+     {NID_p521_rainbowVclassic, NID_sha512, NID_p521_rainbowVclassic},
+-    {NID_sphincsharaka128frobust, NID_sha512, NID_sphincsharaka128frobust},
+-    {NID_p256_sphincsharaka128frobust, NID_sha512,
+-     NID_p256_sphincsharaka128frobust},
+-    {NID_rsa3072_sphincsharaka128frobust, NID_sha512,
+-     NID_rsa3072_sphincsharaka128frobust},
+-    {NID_sphincssha256128frobust, NID_sha512, NID_sphincssha256128frobust},
+-    {NID_p256_sphincssha256128frobust, NID_sha512,
+-     NID_p256_sphincssha256128frobust},
+-    {NID_rsa3072_sphincssha256128frobust, NID_sha512,
+-     NID_rsa3072_sphincssha256128frobust},
+-    {NID_sphincsshake256128frobust, NID_sha512,
+-     NID_sphincsshake256128frobust},
+-    {NID_p256_sphincsshake256128frobust, NID_sha512,
+-     NID_p256_sphincsshake256128frobust},
+-    {NID_rsa3072_sphincsshake256128frobust, NID_sha512,
+-     NID_rsa3072_sphincsshake256128frobust},
++    {NID_sphincsshake256128fsimple, NID_sha512,
++     NID_sphincsshake256128fsimple},
++    {NID_p256_sphincsshake256128fsimple, NID_sha512,
++     NID_p256_sphincsshake256128fsimple},
++    {NID_rsa3072_sphincsshake256128fsimple, NID_sha512,
++     NID_rsa3072_sphincsshake256128fsimple},
++    {NID_sphincsshake256128ssimple, NID_sha512,
++     NID_sphincsshake256128ssimple},
++    {NID_p256_sphincsshake256128ssimple, NID_sha512,
++     NID_p256_sphincsshake256128ssimple},
++    {NID_rsa3072_sphincsshake256128ssimple, NID_sha512,
++     NID_rsa3072_sphincsshake256128ssimple},
++    {NID_sphincsshake256192fsimple, NID_sha512,
++     NID_sphincsshake256192fsimple},
++    {NID_p384_sphincsshake256192fsimple, NID_sha512,
++     NID_p384_sphincsshake256192fsimple},
++    {NID_sphincsshake256192ssimple, NID_sha512,
++     NID_sphincsshake256192ssimple},
++    {NID_p384_sphincsshake256192ssimple, NID_sha512,
++     NID_p384_sphincsshake256192ssimple},
++    {NID_sphincsshake256256fsimple, NID_sha512,
++     NID_sphincsshake256256fsimple},
++    {NID_p521_sphincsshake256256fsimple, NID_sha512,
++     NID_p521_sphincsshake256256fsimple},
++    {NID_sphincsshake256256ssimple, NID_sha512,
++     NID_sphincsshake256256ssimple},
++    {NID_p521_sphincsshake256256ssimple, NID_sha512,
++     NID_p521_sphincsshake256256ssimple},
+ };
+ 
+ static const nid_triple *const sigoid_srt_xref[] = {
+@@ -189,6 +201,11 @@ static const nid_triple *const sigoid_srt_xref[] = {
+     &sigoid_srt[81],
+     &sigoid_srt[82],
+     &sigoid_srt[83],
++    &sigoid_srt[84],
++    &sigoid_srt[85],
++    &sigoid_srt[86],
++    &sigoid_srt[87],
++    &sigoid_srt[88],
+     &sigoid_srt[16],
+     &sigoid_srt[23],
+     &sigoid_srt[19],
+diff --git a/crypto/objects/obj_xref.txt b/crypto/objects/obj_xref.txt
+index 33b200ee5..301f31376 100644
+--- a/crypto/objects/obj_xref.txt
++++ b/crypto/objects/obj_xref.txt
+@@ -51,15 +51,20 @@ p256_picnic3l1	sha512	p256_picnic3l1
+ rsa3072_picnic3l1	sha512	rsa3072_picnic3l1
+ rainbowVclassic	sha512	rainbowVclassic
+ p521_rainbowVclassic	sha512	p521_rainbowVclassic
+-sphincsharaka128frobust	sha512	sphincsharaka128frobust
+-p256_sphincsharaka128frobust	sha512	p256_sphincsharaka128frobust
+-rsa3072_sphincsharaka128frobust	sha512	rsa3072_sphincsharaka128frobust
+-sphincssha256128frobust	sha512	sphincssha256128frobust
+-p256_sphincssha256128frobust	sha512	p256_sphincssha256128frobust
+-rsa3072_sphincssha256128frobust	sha512	rsa3072_sphincssha256128frobust
+-sphincsshake256128frobust	sha512	sphincsshake256128frobust
+-p256_sphincsshake256128frobust	sha512	p256_sphincsshake256128frobust
+-rsa3072_sphincsshake256128frobust	sha512	rsa3072_sphincsshake256128frobust
++sphincsshake256128fsimple	sha512	sphincsshake256128fsimple
++p256_sphincsshake256128fsimple	sha512	p256_sphincsshake256128fsimple
++rsa3072_sphincsshake256128fsimple	sha512	rsa3072_sphincsshake256128fsimple
++sphincsshake256128ssimple	sha512	sphincsshake256128ssimple
++p256_sphincsshake256128ssimple	sha512	p256_sphincsshake256128ssimple
++rsa3072_sphincsshake256128ssimple	sha512	rsa3072_sphincsshake256128ssimple
++sphincsshake256192fsimple	sha512	sphincsshake256192fsimple
++p384_sphincsshake256192fsimple	sha512	p384_sphincsshake256192fsimple
++sphincsshake256192ssimple	sha512	sphincsshake256192ssimple
++p384_sphincsshake256192ssimple	sha512	p384_sphincsshake256192ssimple
++sphincsshake256256fsimple	sha512	sphincsshake256256fsimple
++p521_sphincsshake256256fsimple	sha512	p521_sphincsshake256256fsimple
++sphincsshake256256ssimple	sha512	sphincsshake256256ssimple
++p521_sphincsshake256256ssimple	sha512	p521_sphincsshake256256ssimple
+ ##### OQS_TEMPLATE_FRAGMENT_LIST_OQS_SIGS_END
+ 
+ 
+diff --git a/crypto/objects/objects.txt b/crypto/objects/objects.txt
+index c8e33a88a..59a853ff7 100644
+--- a/crypto/objects/objects.txt
++++ b/crypto/objects/objects.txt
+@@ -1775,13 +1775,18 @@ dstu4145le 2 9 : uacurve9 : DSTU curve 9
+ 1 3 6 1 4 1 311 89 2 1 23 : rsa3072_picnic3l1 : rsa3072_picnic3l1
+ 1 3 9999 5 3 1 1 : rainbowVclassic : rainbowVclassic
+ 1 3 9999 5 3 2 1 : p521_rainbowVclassic : p521_rainbowVclassic
+-1 3 9999 6 1 1 : sphincsharaka128frobust : sphincsharaka128frobust
+-1 3 9999 6 1 2 : p256_sphincsharaka128frobust : p256_sphincsharaka128frobust
+-1 3 9999 6 1 3 : rsa3072_sphincsharaka128frobust : rsa3072_sphincsharaka128frobust
+-1 3 9999 6 4 1 : sphincssha256128frobust : sphincssha256128frobust
+-1 3 9999 6 4 2 : p256_sphincssha256128frobust : p256_sphincssha256128frobust
+-1 3 9999 6 4 3 : rsa3072_sphincssha256128frobust : rsa3072_sphincssha256128frobust
+-1 3 9999 6 7 1 : sphincsshake256128frobust : sphincsshake256128frobust
+-1 3 9999 6 7 2 : p256_sphincsshake256128frobust : p256_sphincsshake256128frobust
+-1 3 9999 6 7 3 : rsa3072_sphincsshake256128frobust : rsa3072_sphincsshake256128frobust
++1 3 9999 6 7 4 : sphincsshake256128fsimple : sphincsshake256128fsimple
++1 3 9999 6 7 5 : p256_sphincsshake256128fsimple : p256_sphincsshake256128fsimple
++1 3 9999 6 7 6 : rsa3072_sphincsshake256128fsimple : rsa3072_sphincsshake256128fsimple
++1 3 9999 6 7 10 : sphincsshake256128ssimple : sphincsshake256128ssimple
++1 3 9999 6 7 11 : p256_sphincsshake256128ssimple : p256_sphincsshake256128ssimple
++1 3 9999 6 7 12 : rsa3072_sphincsshake256128ssimple : rsa3072_sphincsshake256128ssimple
++1 3 9999 6 8 3 : sphincsshake256192fsimple : sphincsshake256192fsimple
++1 3 9999 6 8 4 : p384_sphincsshake256192fsimple : p384_sphincsshake256192fsimple
++1 3 9999 6 8 7 : sphincsshake256192ssimple : sphincsshake256192ssimple
++1 3 9999 6 8 8 : p384_sphincsshake256192ssimple : p384_sphincsshake256192ssimple
++1 3 9999 6 9 3 : sphincsshake256256fsimple : sphincsshake256256fsimple
++1 3 9999 6 9 4 : p521_sphincsshake256256fsimple : p521_sphincsshake256256fsimple
++1 3 9999 6 9 7 : sphincsshake256256ssimple : sphincsshake256256ssimple
++1 3 9999 6 9 8 : p521_sphincsshake256256ssimple : p521_sphincsshake256256ssimple
+ ##### OQS_TEMPLATE_FRAGMENT_ASSIGN_SIG_OIDS_END
+diff --git a/crypto/x509/x509type.c b/crypto/x509/x509type.c
+index 1c8c4cbae..ac8f99945 100644
+--- a/crypto/x509/x509type.c
++++ b/crypto/x509/x509type.c
+@@ -75,15 +75,20 @@ int X509_certificate_type(const X509 *x, const EVP_PKEY *pkey)
+     case EVP_PKEY_RSA3072_PICNIC3L1:
+     case EVP_PKEY_RAINBOWVCLASSIC:
+     case EVP_PKEY_P521_RAINBOWVCLASSIC:
+-    case EVP_PKEY_SPHINCSHARAKA128FROBUST:
+-    case EVP_PKEY_P256_SPHINCSHARAKA128FROBUST:
+-    case EVP_PKEY_RSA3072_SPHINCSHARAKA128FROBUST:
+-    case EVP_PKEY_SPHINCSSHA256128FROBUST:
+-    case EVP_PKEY_P256_SPHINCSSHA256128FROBUST:
+-    case EVP_PKEY_RSA3072_SPHINCSSHA256128FROBUST:
+-    case EVP_PKEY_SPHINCSSHAKE256128FROBUST:
+-    case EVP_PKEY_P256_SPHINCSSHAKE256128FROBUST:
+-    case EVP_PKEY_RSA3072_SPHINCSSHAKE256128FROBUST:
++    case EVP_PKEY_SPHINCSSHAKE256128FSIMPLE:
++    case EVP_PKEY_P256_SPHINCSSHAKE256128FSIMPLE:
++    case EVP_PKEY_RSA3072_SPHINCSSHAKE256128FSIMPLE:
++    case EVP_PKEY_SPHINCSSHAKE256128SSIMPLE:
++    case EVP_PKEY_P256_SPHINCSSHAKE256128SSIMPLE:
++    case EVP_PKEY_RSA3072_SPHINCSSHAKE256128SSIMPLE:
++    case EVP_PKEY_SPHINCSSHAKE256192FSIMPLE:
++    case EVP_PKEY_P384_SPHINCSSHAKE256192FSIMPLE:
++    case EVP_PKEY_SPHINCSSHAKE256192SSIMPLE:
++    case EVP_PKEY_P384_SPHINCSSHAKE256192SSIMPLE:
++    case EVP_PKEY_SPHINCSSHAKE256256FSIMPLE:
++    case EVP_PKEY_P521_SPHINCSSHAKE256256FSIMPLE:
++    case EVP_PKEY_SPHINCSSHAKE256256SSIMPLE:
++    case EVP_PKEY_P521_SPHINCSSHAKE256256SSIMPLE:
+ ///// OQS_TEMPLATE_FRAGMENT_LIST_SIG_SWITCH_CASES_END
+         ret = EVP_PKT_SIGN;
+         break;
+diff --git a/include/crypto/asn1.h b/include/crypto/asn1.h
+index 871465708..e8e853b86 100644
+--- a/include/crypto/asn1.h
++++ b/include/crypto/asn1.h
+@@ -114,15 +114,20 @@ extern const EVP_PKEY_ASN1_METHOD p256_picnic3l1_asn1_meth;
+ extern const EVP_PKEY_ASN1_METHOD rsa3072_picnic3l1_asn1_meth;
+ extern const EVP_PKEY_ASN1_METHOD rainbowVclassic_asn1_meth;
+ extern const EVP_PKEY_ASN1_METHOD p521_rainbowVclassic_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD sphincsharaka128frobust_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD p256_sphincsharaka128frobust_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD rsa3072_sphincsharaka128frobust_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD sphincssha256128frobust_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD p256_sphincssha256128frobust_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD rsa3072_sphincssha256128frobust_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD sphincsshake256128frobust_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD p256_sphincsshake256128frobust_asn1_meth;
+-extern const EVP_PKEY_ASN1_METHOD rsa3072_sphincsshake256128frobust_asn1_meth;///// OQS_TEMPLATE_FRAGMENT_DEFINE_ASN1_METHS_END
++extern const EVP_PKEY_ASN1_METHOD sphincsshake256128fsimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD p256_sphincsshake256128fsimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD rsa3072_sphincsshake256128fsimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD sphincsshake256128ssimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD p256_sphincsshake256128ssimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD rsa3072_sphincsshake256128ssimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD sphincsshake256192fsimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD p384_sphincsshake256192fsimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD sphincsshake256192ssimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD p384_sphincsshake256192ssimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD sphincsshake256256fsimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD p521_sphincsshake256256fsimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD sphincsshake256256ssimple_asn1_meth;
++extern const EVP_PKEY_ASN1_METHOD p521_sphincsshake256256ssimple_asn1_meth;///// OQS_TEMPLATE_FRAGMENT_DEFINE_ASN1_METHS_END
+ 
+ /*
+  * These are used internally in the ASN1_OBJECT to keep track of whether the
+diff --git a/include/crypto/evp.h b/include/crypto/evp.h
+index a0b23e48d..99e5790dd 100644
+--- a/include/crypto/evp.h
++++ b/include/crypto/evp.h
+@@ -140,15 +140,20 @@ extern const EVP_PKEY_METHOD p256_picnic3l1_pkey_meth;
+ extern const EVP_PKEY_METHOD rsa3072_picnic3l1_pkey_meth;
+ extern const EVP_PKEY_METHOD rainbowVclassic_pkey_meth;
+ extern const EVP_PKEY_METHOD p521_rainbowVclassic_pkey_meth;
+-extern const EVP_PKEY_METHOD sphincsharaka128frobust_pkey_meth;
+-extern const EVP_PKEY_METHOD p256_sphincsharaka128frobust_pkey_meth;
+-extern const EVP_PKEY_METHOD rsa3072_sphincsharaka128frobust_pkey_meth;
+-extern const EVP_PKEY_METHOD sphincssha256128frobust_pkey_meth;
+-extern const EVP_PKEY_METHOD p256_sphincssha256128frobust_pkey_meth;
+-extern const EVP_PKEY_METHOD rsa3072_sphincssha256128frobust_pkey_meth;
+-extern const EVP_PKEY_METHOD sphincsshake256128frobust_pkey_meth;
+-extern const EVP_PKEY_METHOD p256_sphincsshake256128frobust_pkey_meth;
+-extern const EVP_PKEY_METHOD rsa3072_sphincsshake256128frobust_pkey_meth;///// OQS_TEMPLATE_FRAGMENT_DEFINE_EVP_METHS_END
++extern const EVP_PKEY_METHOD sphincsshake256128fsimple_pkey_meth;
++extern const EVP_PKEY_METHOD p256_sphincsshake256128fsimple_pkey_meth;
++extern const EVP_PKEY_METHOD rsa3072_sphincsshake256128fsimple_pkey_meth;
++extern const EVP_PKEY_METHOD sphincsshake256128ssimple_pkey_meth;
++extern const EVP_PKEY_METHOD p256_sphincsshake256128ssimple_pkey_meth;
++extern const EVP_PKEY_METHOD rsa3072_sphincsshake256128ssimple_pkey_meth;
++extern const EVP_PKEY_METHOD sphincsshake256192fsimple_pkey_meth;
++extern const EVP_PKEY_METHOD p384_sphincsshake256192fsimple_pkey_meth;
++extern const EVP_PKEY_METHOD sphincsshake256192ssimple_pkey_meth;
++extern const EVP_PKEY_METHOD p384_sphincsshake256192ssimple_pkey_meth;
++extern const EVP_PKEY_METHOD sphincsshake256256fsimple_pkey_meth;
++extern const EVP_PKEY_METHOD p521_sphincsshake256256fsimple_pkey_meth;
++extern const EVP_PKEY_METHOD sphincsshake256256ssimple_pkey_meth;
++extern const EVP_PKEY_METHOD p521_sphincsshake256256ssimple_pkey_meth;///// OQS_TEMPLATE_FRAGMENT_DEFINE_EVP_METHS_END
+ 
+ struct evp_md_st {
+     int type;
+diff --git a/include/openssl/evp.h b/include/openssl/evp.h
+index 92f489000..bfd05222b 100644
+--- a/include/openssl/evp.h
++++ b/include/openssl/evp.h
+@@ -91,19 +91,24 @@
+ # define EVP_PKEY_RSA3072_PICNIC3L1 NID_rsa3072_picnic3l1
+ # define EVP_PKEY_RAINBOWVCLASSIC NID_rainbowVclassic
+ # define EVP_PKEY_P521_RAINBOWVCLASSIC NID_p521_rainbowVclassic
+-# define EVP_PKEY_SPHINCSHARAKA128FROBUST NID_sphincsharaka128frobust
+-# define EVP_PKEY_P256_SPHINCSHARAKA128FROBUST NID_p256_sphincsharaka128frobust
+-# define EVP_PKEY_RSA3072_SPHINCSHARAKA128FROBUST NID_rsa3072_sphincsharaka128frobust
+-# define EVP_PKEY_SPHINCSSHA256128FROBUST NID_sphincssha256128frobust
+-# define EVP_PKEY_P256_SPHINCSSHA256128FROBUST NID_p256_sphincssha256128frobust
+-# define EVP_PKEY_RSA3072_SPHINCSSHA256128FROBUST NID_rsa3072_sphincssha256128frobust
+-# define EVP_PKEY_SPHINCSSHAKE256128FROBUST NID_sphincsshake256128frobust
+-# define EVP_PKEY_P256_SPHINCSSHAKE256128FROBUST NID_p256_sphincsshake256128frobust
+-# define EVP_PKEY_RSA3072_SPHINCSSHAKE256128FROBUST NID_rsa3072_sphincsshake256128frobust
+-#define OQS_OPENSSL_SIG_algs_length 36
++# define EVP_PKEY_SPHINCSSHAKE256128FSIMPLE NID_sphincsshake256128fsimple
++# define EVP_PKEY_P256_SPHINCSSHAKE256128FSIMPLE NID_p256_sphincsshake256128fsimple
++# define EVP_PKEY_RSA3072_SPHINCSSHAKE256128FSIMPLE NID_rsa3072_sphincsshake256128fsimple
++# define EVP_PKEY_SPHINCSSHAKE256128SSIMPLE NID_sphincsshake256128ssimple
++# define EVP_PKEY_P256_SPHINCSSHAKE256128SSIMPLE NID_p256_sphincsshake256128ssimple
++# define EVP_PKEY_RSA3072_SPHINCSSHAKE256128SSIMPLE NID_rsa3072_sphincsshake256128ssimple
++# define EVP_PKEY_SPHINCSSHAKE256192FSIMPLE NID_sphincsshake256192fsimple
++# define EVP_PKEY_P384_SPHINCSSHAKE256192FSIMPLE NID_p384_sphincsshake256192fsimple
++# define EVP_PKEY_SPHINCSSHAKE256192SSIMPLE NID_sphincsshake256192ssimple
++# define EVP_PKEY_P384_SPHINCSSHAKE256192SSIMPLE NID_p384_sphincsshake256192ssimple
++# define EVP_PKEY_SPHINCSSHAKE256256FSIMPLE NID_sphincsshake256256fsimple
++# define EVP_PKEY_P521_SPHINCSSHAKE256256FSIMPLE NID_p521_sphincsshake256256fsimple
++# define EVP_PKEY_SPHINCSSHAKE256256SSIMPLE NID_sphincsshake256256ssimple
++# define EVP_PKEY_P521_SPHINCSSHAKE256256SSIMPLE NID_p521_sphincsshake256256ssimple
++#define OQS_OPENSSL_SIG_algs_length 41
+ #define OQS_OPENSSL_KEM_algs_length 34
+ #define IS_OQS_OPENSSL_KEM_NID(a) ((a >= 0x01FF) && (a <= NID_p521_sntrup1277))
+-#define IS_OQS_OPENSSL_SIG_NID(a) ((a >= NID_dilithium2) && (a <= NID_rsa3072_sphincsshake256128frobust))
++#define IS_OQS_OPENSSL_SIG_NID(a) ((a >= NID_dilithium2) && (a <= NID_p521_sphincsshake256256ssimple))
+ /////// OQS_TEMPLATE_FRAGMENT_DEFINE_EVP_PKEYS_END
+ const char *OQSKEM_options(void);
+ const char *OQSSIG_options(void);
+diff --git a/include/openssl/obj_mac.h b/include/openssl/obj_mac.h
+index 4e838b3dc..1955bc54a 100644
+--- a/include/openssl/obj_mac.h
++++ b/include/openssl/obj_mac.h
+@@ -5604,47 +5604,72 @@
+ #define NID_p521_rainbowVclassic                1291
+ #define OBJ_p521_rainbowVclassic                1L,3L,9999L,5L,3L,2L,1L
+ 
+-#define SN_sphincsharaka128frobust              "sphincsharaka128frobust"
+-#define LN_sphincsharaka128frobust              "sphincsharaka128frobust"
+-#define NID_sphincsharaka128frobust             1292
+-#define OBJ_sphincsharaka128frobust             1L,3L,9999L,6L,1L,1L
+-
+-#define SN_p256_sphincsharaka128frobust         "p256_sphincsharaka128frobust"
+-#define LN_p256_sphincsharaka128frobust         "p256_sphincsharaka128frobust"
+-#define NID_p256_sphincsharaka128frobust                1293
+-#define OBJ_p256_sphincsharaka128frobust                1L,3L,9999L,6L,1L,2L
+-
+-#define SN_rsa3072_sphincsharaka128frobust              "rsa3072_sphincsharaka128frobust"
+-#define LN_rsa3072_sphincsharaka128frobust              "rsa3072_sphincsharaka128frobust"
+-#define NID_rsa3072_sphincsharaka128frobust             1294
+-#define OBJ_rsa3072_sphincsharaka128frobust             1L,3L,9999L,6L,1L,3L
+-
+-#define SN_sphincssha256128frobust              "sphincssha256128frobust"
+-#define LN_sphincssha256128frobust              "sphincssha256128frobust"
+-#define NID_sphincssha256128frobust             1295
+-#define OBJ_sphincssha256128frobust             1L,3L,9999L,6L,4L,1L
+-
+-#define SN_p256_sphincssha256128frobust         "p256_sphincssha256128frobust"
+-#define LN_p256_sphincssha256128frobust         "p256_sphincssha256128frobust"
+-#define NID_p256_sphincssha256128frobust                1296
+-#define OBJ_p256_sphincssha256128frobust                1L,3L,9999L,6L,4L,2L
+-
+-#define SN_rsa3072_sphincssha256128frobust              "rsa3072_sphincssha256128frobust"
+-#define LN_rsa3072_sphincssha256128frobust              "rsa3072_sphincssha256128frobust"
+-#define NID_rsa3072_sphincssha256128frobust             1297
+-#define OBJ_rsa3072_sphincssha256128frobust             1L,3L,9999L,6L,4L,3L
+-
+-#define SN_sphincsshake256128frobust            "sphincsshake256128frobust"
+-#define LN_sphincsshake256128frobust            "sphincsshake256128frobust"
+-#define NID_sphincsshake256128frobust           1298
+-#define OBJ_sphincsshake256128frobust           1L,3L,9999L,6L,7L,1L
+-
+-#define SN_p256_sphincsshake256128frobust               "p256_sphincsshake256128frobust"
+-#define LN_p256_sphincsshake256128frobust               "p256_sphincsshake256128frobust"
+-#define NID_p256_sphincsshake256128frobust              1299
+-#define OBJ_p256_sphincsshake256128frobust              1L,3L,9999L,6L,7L,2L
+-
+-#define SN_rsa3072_sphincsshake256128frobust            "rsa3072_sphincsshake256128frobust"
+-#define LN_rsa3072_sphincsshake256128frobust            "rsa3072_sphincsshake256128frobust"
+-#define NID_rsa3072_sphincsshake256128frobust           1300
+-#define OBJ_rsa3072_sphincsshake256128frobust           1L,3L,9999L,6L,7L,3L
++#define SN_sphincsshake256128fsimple            "sphincsshake256128fsimple"
++#define LN_sphincsshake256128fsimple            "sphincsshake256128fsimple"
++#define NID_sphincsshake256128fsimple           1292
++#define OBJ_sphincsshake256128fsimple           1L,3L,9999L,6L,7L,4L
++
++#define SN_p256_sphincsshake256128fsimple               "p256_sphincsshake256128fsimple"
++#define LN_p256_sphincsshake256128fsimple               "p256_sphincsshake256128fsimple"
++#define NID_p256_sphincsshake256128fsimple              1293
++#define OBJ_p256_sphincsshake256128fsimple              1L,3L,9999L,6L,7L,5L
++
++#define SN_rsa3072_sphincsshake256128fsimple            "rsa3072_sphincsshake256128fsimple"
++#define LN_rsa3072_sphincsshake256128fsimple            "rsa3072_sphincsshake256128fsimple"
++#define NID_rsa3072_sphincsshake256128fsimple           1294
++#define OBJ_rsa3072_sphincsshake256128fsimple           1L,3L,9999L,6L,7L,6L
++
++#define SN_sphincsshake256128ssimple            "sphincsshake256128ssimple"
++#define LN_sphincsshake256128ssimple            "sphincsshake256128ssimple"
++#define NID_sphincsshake256128ssimple           1295
++#define OBJ_sphincsshake256128ssimple           1L,3L,9999L,6L,7L,10L
++
++#define SN_p256_sphincsshake256128ssimple               "p256_sphincsshake256128ssimple"
++#define LN_p256_sphincsshake256128ssimple               "p256_sphincsshake256128ssimple"
++#define NID_p256_sphincsshake256128ssimple              1296
++#define OBJ_p256_sphincsshake256128ssimple              1L,3L,9999L,6L,7L,11L
++
++#define SN_rsa3072_sphincsshake256128ssimple            "rsa3072_sphincsshake256128ssimple"
++#define LN_rsa3072_sphincsshake256128ssimple            "rsa3072_sphincsshake256128ssimple"
++#define NID_rsa3072_sphincsshake256128ssimple           1297
++#define OBJ_rsa3072_sphincsshake256128ssimple           1L,3L,9999L,6L,7L,12L
++
++#define SN_sphincsshake256192fsimple            "sphincsshake256192fsimple"
++#define LN_sphincsshake256192fsimple            "sphincsshake256192fsimple"
++#define NID_sphincsshake256192fsimple           1298
++#define OBJ_sphincsshake256192fsimple           1L,3L,9999L,6L,8L,3L
++
++#define SN_p384_sphincsshake256192fsimple               "p384_sphincsshake256192fsimple"
++#define LN_p384_sphincsshake256192fsimple               "p384_sphincsshake256192fsimple"
++#define NID_p384_sphincsshake256192fsimple              1299
++#define OBJ_p384_sphincsshake256192fsimple              1L,3L,9999L,6L,8L,4L
++
++#define SN_sphincsshake256192ssimple            "sphincsshake256192ssimple"
++#define LN_sphincsshake256192ssimple            "sphincsshake256192ssimple"
++#define NID_sphincsshake256192ssimple           1300
++#define OBJ_sphincsshake256192ssimple           1L,3L,9999L,6L,8L,7L
++
++#define SN_p384_sphincsshake256192ssimple               "p384_sphincsshake256192ssimple"
++#define LN_p384_sphincsshake256192ssimple               "p384_sphincsshake256192ssimple"
++#define NID_p384_sphincsshake256192ssimple              1301
++#define OBJ_p384_sphincsshake256192ssimple              1L,3L,9999L,6L,8L,8L
++
++#define SN_sphincsshake256256fsimple            "sphincsshake256256fsimple"
++#define LN_sphincsshake256256fsimple            "sphincsshake256256fsimple"
++#define NID_sphincsshake256256fsimple           1302
++#define OBJ_sphincsshake256256fsimple           1L,3L,9999L,6L,9L,3L
++
++#define SN_p521_sphincsshake256256fsimple               "p521_sphincsshake256256fsimple"
++#define LN_p521_sphincsshake256256fsimple               "p521_sphincsshake256256fsimple"
++#define NID_p521_sphincsshake256256fsimple              1303
++#define OBJ_p521_sphincsshake256256fsimple              1L,3L,9999L,6L,9L,4L
++
++#define SN_sphincsshake256256ssimple            "sphincsshake256256ssimple"
++#define LN_sphincsshake256256ssimple            "sphincsshake256256ssimple"
++#define NID_sphincsshake256256ssimple           1304
++#define OBJ_sphincsshake256256ssimple           1L,3L,9999L,6L,9L,7L
++
++#define SN_p521_sphincsshake256256ssimple               "p521_sphincsshake256256ssimple"
++#define LN_p521_sphincsshake256256ssimple               "p521_sphincsshake256256ssimple"
++#define NID_p521_sphincsshake256256ssimple              1305
++#define OBJ_p521_sphincsshake256256ssimple              1L,3L,9999L,6L,9L,8L
+diff --git a/oqs-interop-test/common.py b/oqs-interop-test/common.py
+index 86cb5f1e8..9580f231b 100644
+--- a/oqs-interop-test/common.py
++++ b/oqs-interop-test/common.py
+@@ -35,9 +35,12 @@ signatures = [
+     'picnicl1full',
+     'picnic3l1',
+     'rainbowVclassic',
+-    'sphincsharaka128frobust',
+-    'sphincssha256128frobust',
+-    'sphincsshake256128frobust',
++    'sphincsshake256128fsimple',
++    'sphincsshake256128ssimple',
++    'sphincsshake256192fsimple',
++    'sphincsshake256192ssimple',
++    'sphincsshake256256fsimple',
++    'sphincsshake256256ssimple',
+ ##### OQS_TEMPLATE_FRAGMENT_PQ_SIG_ALGS_END
+ ]
+ 
+diff --git a/oqs-template/generate.yml b/oqs-template/generate.yml
+index fc1e19508..d308132bd 100644
+--- a/oqs-template/generate.yml
++++ b/oqs-template/generate.yml
+@@ -827,7 +827,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_haraka_128f_robust'
+         oid: '1.3.9999.6.1.1'
+         code_point: '0xfe42'
+-        enable: true
++        enable: false
+         mix_with: [{'name': 'p256',
+                     'pretty_name': 'ECDSA p256',
+                     'oid': '1.3.9999.6.1.2',
+@@ -978,7 +978,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_sha256_128f_robust'
+         oid: '1.3.9999.6.4.1'
+         code_point: '0xfe5e'
+-        enable: true
++        enable: false
+         mix_with: [{'name': 'p256',
+                     'pretty_name': 'ECDSA p256',
+                     'oid': '1.3.9999.6.4.2',
+@@ -1129,7 +1129,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_shake256_128f_robust'
+         oid: '1.3.9999.6.7.1'
+         code_point: '0xfe7a'
+-        enable: true
++        enable: false
+         mix_with: [{'name': 'p256',
+                     'pretty_name': 'ECDSA p256',
+                     'oid': '1.3.9999.6.7.2',
+@@ -1144,7 +1144,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_shake256_128f_simple'
+         oid: '1.3.9999.6.7.4'
+         code_point: '0xfe7d'
+-        enable: false
++        enable: true
+         mix_with: [{'name': 'p256',
+                     'pretty_name': 'ECDSA p256',
+                     'oid': '1.3.9999.6.7.5',
+@@ -1174,7 +1174,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_shake256_128s_simple'
+         oid: '1.3.9999.6.7.10'
+         code_point: '0xfe83'
+-        enable: false
++        enable: true
+         mix_with: [{'name': 'p256',
+                     'pretty_name': 'ECDSA p256',
+                     'oid': '1.3.9999.6.7.11',
+@@ -1200,7 +1200,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_shake256_192f_simple'
+         oid: '1.3.9999.6.8.3'
+         code_point: '0xfe88'
+-        enable: false
++        enable: true
+         mix_with: [{'name': 'p384',
+                     'pretty_name': 'ECDSA p384',
+                     'oid': '1.3.9999.6.8.4',
+@@ -1222,7 +1222,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_shake256_192s_simple'
+         oid: '1.3.9999.6.8.7'
+         code_point: '0xfe8c'
+-        enable: false
++        enable: true
+         mix_with: [{'name': 'p384',
+                     'pretty_name': 'ECDSA p384',
+                     'oid': '1.3.9999.6.8.8',
+@@ -1244,7 +1244,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_shake256_256f_simple'
+         oid: '1.3.9999.6.9.3'
+         code_point: '0xfe90'
+-        enable: false
++        enable: true
+         mix_with: [{'name': 'p521',
+                     'pretty_name': 'ECDSA p521',
+                     'oid': '1.3.9999.6.9.4',
+@@ -1266,7 +1266,7 @@ sigs:
+         oqs_meth: 'OQS_SIG_alg_sphincs_shake256_256s_simple'
+         oid: '1.3.9999.6.9.7'
+         code_point: '0xfe94'
+-        enable: false
++        enable: true
+         mix_with: [{'name': 'p521',
+                     'pretty_name': 'ECDSA p521',
+                     'oid': '1.3.9999.6.9.8',
+diff --git a/oqs-template/oqs-sig-info.md b/oqs-template/oqs-sig-info.md
+index 35d11b438..de9284af9 100644
+--- a/oqs-template/oqs-sig-info.md
++++ b/oqs-template/oqs-sig-info.md
+@@ -19,22 +19,22 @@
+ | falcon512 **hybrid with** rsa3072                 | v1.2                     |            3 |                    1 | 0xfe0d       | 1.3.9999.3.3              |
+ | falcon1024                                        | v1.2                     |            3 |                    5 | 0xfe0e       | 1.3.9999.3.4              |
+ | falcon1024 **hybrid with** p521                   | v1.2                     |            3 |                    5 | 0xfe0f       | 1.3.9999.3.5              |
+-| picnicl1fs                                        | 3.0.15                   |            3 |                    1 | 0xfe15       | 1.3.6.1.4.1.311.89.2.1.1  |
+-| picnicl1fs **hybrid with** p256                   | 3.0.15                   |            3 |                    1 | 0xfe16       | 1.3.6.1.4.1.311.89.2.1.2  |
+-| picnicl1fs **hybrid with** rsa3072                | 3.0.15                   |            3 |                    1 | 0xfe17       | 1.3.6.1.4.1.311.89.2.1.3  |
+-| picnicl1ur                                        | 3.0.15                   |            3 |                    1 | 0xfe18       | 1.3.6.1.4.1.311.89.2.1.4  |
+-| picnicl1ur **hybrid with** p256                   | 3.0.15                   |            3 |                    1 | 0xfe19       | 1.3.6.1.4.1.311.89.2.1.5  |
+-| picnicl1ur **hybrid with** rsa3072                | 3.0.15                   |            3 |                    1 | 0xfe1a       | 1.3.6.1.4.1.311.89.2.1.6  |
+-| picnicl1full                                      | 3.0.15                   |            3 |                    1 | 0xfe96       | 1.3.6.1.4.1.311.89.2.1.7  |
+-| picnicl1full **hybrid with** p256                 | 3.0.15                   |            3 |                    1 | 0xfe97       | 1.3.6.1.4.1.311.89.2.1.8  |
+-| picnicl1full **hybrid with** rsa3072              | 3.0.15                   |            3 |                    1 | 0xfe98       | 1.3.6.1.4.1.311.89.2.1.9  |
+-| picnic3l1                                         | 3.0.15                   |            3 |                    1 | 0xfe1b       | 1.3.6.1.4.1.311.89.2.1.21 |
+-| picnic3l1 **hybrid with** p256                    | 3.0.15                   |            3 |                    1 | 0xfe1c       | 1.3.6.1.4.1.311.89.2.1.22 |
+-| picnic3l1 **hybrid with** rsa3072                 | 3.0.15                   |            3 |                    1 | 0xfe1d       | 1.3.6.1.4.1.311.89.2.1.23 |
+-| picnic3l3                                         | 3.0.15                   |            3 |                    3 | 0xfe1e       | 1.3.6.1.4.1.311.89.2.1.24 |
+-| picnic3l3 **hybrid with** p384                    | 3.0.15                   |            3 |                    3 | 0xfe1f       | 1.3.6.1.4.1.311.89.2.1.25 |
+-| picnic3l5                                         | 3.0.15                   |            3 |                    5 | 0xfe20       | 1.3.6.1.4.1.311.89.2.1.26 |
+-| picnic3l5 **hybrid with** p521                    | 3.0.15                   |            3 |                    5 | 0xfe21       | 1.3.6.1.4.1.311.89.2.1.27 |
++| picnicl1fs                                        | 3.0.16                   |            3 |                    1 | 0xfe15       | 1.3.6.1.4.1.311.89.2.1.1  |
++| picnicl1fs **hybrid with** p256                   | 3.0.16                   |            3 |                    1 | 0xfe16       | 1.3.6.1.4.1.311.89.2.1.2  |
++| picnicl1fs **hybrid with** rsa3072                | 3.0.16                   |            3 |                    1 | 0xfe17       | 1.3.6.1.4.1.311.89.2.1.3  |
++| picnicl1ur                                        | 3.0.16                   |            3 |                    1 | 0xfe18       | 1.3.6.1.4.1.311.89.2.1.4  |
++| picnicl1ur **hybrid with** p256                   | 3.0.16                   |            3 |                    1 | 0xfe19       | 1.3.6.1.4.1.311.89.2.1.5  |
++| picnicl1ur **hybrid with** rsa3072                | 3.0.16                   |            3 |                    1 | 0xfe1a       | 1.3.6.1.4.1.311.89.2.1.6  |
++| picnicl1full                                      | 3.0.16                   |            3 |                    1 | 0xfe96       | 1.3.6.1.4.1.311.89.2.1.7  |
++| picnicl1full **hybrid with** p256                 | 3.0.16                   |            3 |                    1 | 0xfe97       | 1.3.6.1.4.1.311.89.2.1.8  |
++| picnicl1full **hybrid with** rsa3072              | 3.0.16                   |            3 |                    1 | 0xfe98       | 1.3.6.1.4.1.311.89.2.1.9  |
++| picnic3l1                                         | 3.0.16                   |            3 |                    1 | 0xfe1b       | 1.3.6.1.4.1.311.89.2.1.21 |
++| picnic3l1 **hybrid with** p256                    | 3.0.16                   |            3 |                    1 | 0xfe1c       | 1.3.6.1.4.1.311.89.2.1.22 |
++| picnic3l1 **hybrid with** rsa3072                 | 3.0.16                   |            3 |                    1 | 0xfe1d       | 1.3.6.1.4.1.311.89.2.1.23 |
++| picnic3l3                                         | 3.0.16                   |            3 |                    3 | 0xfe1e       | 1.3.6.1.4.1.311.89.2.1.24 |
++| picnic3l3 **hybrid with** p384                    | 3.0.16                   |            3 |                    3 | 0xfe1f       | 1.3.6.1.4.1.311.89.2.1.25 |
++| picnic3l5                                         | 3.0.16                   |            3 |                    5 | 0xfe20       | 1.3.6.1.4.1.311.89.2.1.26 |
++| picnic3l5 **hybrid with** p521                    | 3.0.16                   |            3 |                    5 | 0xfe21       | 1.3.6.1.4.1.311.89.2.1.27 |
+ | rainbowIclassic                                   | NIST Round 3 submission  |            3 |                    1 | 0xfe27       | 1.3.9999.5.1.1.1          |
+ | rainbowIclassic **hybrid with** p256              | NIST Round 3 submission  |            3 |                    1 | 0xfe28       | 1.3.9999.5.1.2.1          |
+ | rainbowIclassic **hybrid with** rsa3072           | NIST Round 3 submission  |            3 |                    1 | 0xfe29       | 1.3.9999.5.1.3.1          |
+diff --git a/oqs-test/common.py b/oqs-test/common.py
+index 73f9d31d0..3f59341f3 100644
+--- a/oqs-test/common.py
++++ b/oqs-test/common.py
+@@ -16,9 +16,9 @@ signatures = [
+     'ecdsap256', 'rsa3072',
+ ##### OQS_TEMPLATE_FRAGMENT_SIG_ALGS_START
+     # post-quantum signatures
+-    'dilithium2','dilithium3','dilithium5','dilithium2_aes','dilithium3_aes','dilithium5_aes','falcon512','falcon1024','picnicl1full','picnic3l1','rainbowVclassic','sphincsharaka128frobust','sphincssha256128frobust','sphincsshake256128frobust',
++    'dilithium2','dilithium3','dilithium5','dilithium2_aes','dilithium3_aes','dilithium5_aes','falcon512','falcon1024','picnicl1full','picnic3l1','rainbowVclassic','sphincsshake256128fsimple','sphincsshake256128ssimple','sphincsshake256192fsimple','sphincsshake256192ssimple','sphincsshake256256fsimple','sphincsshake256256ssimple',
+     # post-quantum + classical signatures
+-    'p256_dilithium2','rsa3072_dilithium2','p384_dilithium3','p521_dilithium5','p256_dilithium2_aes','rsa3072_dilithium2_aes','p384_dilithium3_aes','p521_dilithium5_aes','p256_falcon512','rsa3072_falcon512','p521_falcon1024','p256_picnicl1full','rsa3072_picnicl1full','p256_picnic3l1','rsa3072_picnic3l1','p521_rainbowVclassic','p256_sphincsharaka128frobust','rsa3072_sphincsharaka128frobust','p256_sphincssha256128frobust','rsa3072_sphincssha256128frobust','p256_sphincsshake256128frobust','rsa3072_sphincsshake256128frobust',
++    'p256_dilithium2','rsa3072_dilithium2','p384_dilithium3','p521_dilithium5','p256_dilithium2_aes','rsa3072_dilithium2_aes','p384_dilithium3_aes','p521_dilithium5_aes','p256_falcon512','rsa3072_falcon512','p521_falcon1024','p256_picnicl1full','rsa3072_picnicl1full','p256_picnic3l1','rsa3072_picnic3l1','p521_rainbowVclassic','p256_sphincsshake256128fsimple','rsa3072_sphincsshake256128fsimple','p256_sphincsshake256128ssimple','rsa3072_sphincsshake256128ssimple','p384_sphincsshake256192fsimple','p384_sphincsshake256192ssimple','p521_sphincsshake256256fsimple','p521_sphincsshake256256ssimple',
+ ##### OQS_TEMPLATE_FRAGMENT_SIG_ALGS_END
+ ]
+ 
+diff --git a/qsc.h b/qsc.h
+index 3b3b5e5c7..f7c0a0aec 100644
+--- a/qsc.h
++++ b/qsc.h
+@@ -101,15 +101,20 @@
+ 	oid_add_from_string("rsa3072_picnic3l1", "1.3.6.1.4.1.311.89.2.1.23"); \
+ 	oid_add_from_string("rainbowVclassic", "1.3.9999.5.3.1.1"); \
+ 	oid_add_from_string("p521_rainbowVclassic", "1.3.9999.5.3.2.1"); \
+-	oid_add_from_string("sphincsharaka128frobust", "1.3.9999.6.1.1"); \
+-	oid_add_from_string("p256_sphincsharaka128frobust", "1.3.9999.6.1.2"); \
+-	oid_add_from_string("rsa3072_sphincsharaka128frobust", "1.3.9999.6.1.3"); \
+-	oid_add_from_string("sphincssha256128frobust", "1.3.9999.6.4.1"); \
+-	oid_add_from_string("p256_sphincssha256128frobust", "1.3.9999.6.4.2"); \
+-	oid_add_from_string("rsa3072_sphincssha256128frobust", "1.3.9999.6.4.3"); \
+-	oid_add_from_string("sphincsshake256128frobust", "1.3.9999.6.7.1"); \
+-	oid_add_from_string("p256_sphincsshake256128frobust", "1.3.9999.6.7.2"); \
+-	oid_add_from_string("rsa3072_sphincsshake256128frobust", "1.3.9999.6.7.3"); \
++	oid_add_from_string("sphincsshake256128fsimple", "1.3.9999.6.7.4"); \
++	oid_add_from_string("p256_sphincsshake256128fsimple", "1.3.9999.6.7.5"); \
++	oid_add_from_string("rsa3072_sphincsshake256128fsimple", "1.3.9999.6.7.6"); \
++	oid_add_from_string("sphincsshake256128ssimple", "1.3.9999.6.7.10"); \
++	oid_add_from_string("p256_sphincsshake256128ssimple", "1.3.9999.6.7.11"); \
++	oid_add_from_string("rsa3072_sphincsshake256128ssimple", "1.3.9999.6.7.12"); \
++	oid_add_from_string("sphincsshake256192fsimple", "1.3.9999.6.8.3"); \
++	oid_add_from_string("p384_sphincsshake256192fsimple", "1.3.9999.6.8.4"); \
++	oid_add_from_string("sphincsshake256192ssimple", "1.3.9999.6.8.7"); \
++	oid_add_from_string("p384_sphincsshake256192ssimple", "1.3.9999.6.8.8"); \
++	oid_add_from_string("sphincsshake256256fsimple", "1.3.9999.6.9.3"); \
++	oid_add_from_string("p521_sphincsshake256256fsimple", "1.3.9999.6.9.4"); \
++	oid_add_from_string("sphincsshake256256ssimple", "1.3.9999.6.9.7"); \
++	oid_add_from_string("p521_sphincsshake256256ssimple", "1.3.9999.6.9.8"); \
+ 
+ 
+ ///// OQS_TEMPLATE_FRAGMENT_ASSIGN_SIG_OIDS_END
+diff --git a/ssl/ssl_cert_table.h b/ssl/ssl_cert_table.h
+index 134827b22..f33168ae6 100644
+--- a/ssl/ssl_cert_table.h
++++ b/ssl/ssl_cert_table.h
+@@ -50,14 +50,19 @@ static const SSL_CERT_LOOKUP ssl_cert_info [] = {
+     {EVP_PKEY_RSA3072_PICNIC3L1, SSL_aRSA3072_PICNIC3L1}, /* SSL_PKEY_RSA3072_PICNIC3L1 */
+     {EVP_PKEY_RAINBOWVCLASSIC, SSL_aRAINBOWVCLASSIC}, /* SSL_PKEY_RAINBOWVCLASSIC */
+     {EVP_PKEY_P521_RAINBOWVCLASSIC, SSL_aP521_RAINBOWVCLASSIC}, /* SSL_PKEY_P521_RAINBOWVCLASSIC */
+-    {EVP_PKEY_SPHINCSHARAKA128FROBUST, SSL_aSPHINCSHARAKA128FROBUST}, /* SSL_PKEY_SPHINCSHARAKA128FROBUST */
+-    {EVP_PKEY_P256_SPHINCSHARAKA128FROBUST, SSL_aP256_SPHINCSHARAKA128FROBUST}, /* SSL_PKEY_P256_SPHINCSHARAKA128FROBUST */
+-    {EVP_PKEY_RSA3072_SPHINCSHARAKA128FROBUST, SSL_aRSA3072_SPHINCSHARAKA128FROBUST}, /* SSL_PKEY_RSA3072_SPHINCSHARAKA128FROBUST */
+-    {EVP_PKEY_SPHINCSSHA256128FROBUST, SSL_aSPHINCSSHA256128FROBUST}, /* SSL_PKEY_SPHINCSSHA256128FROBUST */
+-    {EVP_PKEY_P256_SPHINCSSHA256128FROBUST, SSL_aP256_SPHINCSSHA256128FROBUST}, /* SSL_PKEY_P256_SPHINCSSHA256128FROBUST */
+-    {EVP_PKEY_RSA3072_SPHINCSSHA256128FROBUST, SSL_aRSA3072_SPHINCSSHA256128FROBUST}, /* SSL_PKEY_RSA3072_SPHINCSSHA256128FROBUST */
+-    {EVP_PKEY_SPHINCSSHAKE256128FROBUST, SSL_aSPHINCSSHAKE256128FROBUST}, /* SSL_PKEY_SPHINCSSHAKE256128FROBUST */
+-    {EVP_PKEY_P256_SPHINCSSHAKE256128FROBUST, SSL_aP256_SPHINCSSHAKE256128FROBUST}, /* SSL_PKEY_P256_SPHINCSSHAKE256128FROBUST */
+-    {EVP_PKEY_RSA3072_SPHINCSSHAKE256128FROBUST, SSL_aRSA3072_SPHINCSSHAKE256128FROBUST}, /* SSL_PKEY_RSA3072_SPHINCSSHAKE256128FROBUST */
++    {EVP_PKEY_SPHINCSSHAKE256128FSIMPLE, SSL_aSPHINCSSHAKE256128FSIMPLE}, /* SSL_PKEY_SPHINCSSHAKE256128FSIMPLE */
++    {EVP_PKEY_P256_SPHINCSSHAKE256128FSIMPLE, SSL_aP256_SPHINCSSHAKE256128FSIMPLE}, /* SSL_PKEY_P256_SPHINCSSHAKE256128FSIMPLE */
++    {EVP_PKEY_RSA3072_SPHINCSSHAKE256128FSIMPLE, SSL_aRSA3072_SPHINCSSHAKE256128FSIMPLE}, /* SSL_PKEY_RSA3072_SPHINCSSHAKE256128FSIMPLE */
++    {EVP_PKEY_SPHINCSSHAKE256128SSIMPLE, SSL_aSPHINCSSHAKE256128SSIMPLE}, /* SSL_PKEY_SPHINCSSHAKE256128SSIMPLE */
++    {EVP_PKEY_P256_SPHINCSSHAKE256128SSIMPLE, SSL_aP256_SPHINCSSHAKE256128SSIMPLE}, /* SSL_PKEY_P256_SPHINCSSHAKE256128SSIMPLE */
++    {EVP_PKEY_RSA3072_SPHINCSSHAKE256128SSIMPLE, SSL_aRSA3072_SPHINCSSHAKE256128SSIMPLE}, /* SSL_PKEY_RSA3072_SPHINCSSHAKE256128SSIMPLE */
++    {EVP_PKEY_SPHINCSSHAKE256192FSIMPLE, SSL_aSPHINCSSHAKE256192FSIMPLE}, /* SSL_PKEY_SPHINCSSHAKE256192FSIMPLE */
++    {EVP_PKEY_P384_SPHINCSSHAKE256192FSIMPLE, SSL_aP384_SPHINCSSHAKE256192FSIMPLE}, /* SSL_PKEY_P384_SPHINCSSHAKE256192FSIMPLE */
++    {EVP_PKEY_SPHINCSSHAKE256192SSIMPLE, SSL_aSPHINCSSHAKE256192SSIMPLE}, /* SSL_PKEY_SPHINCSSHAKE256192SSIMPLE */
++    {EVP_PKEY_P384_SPHINCSSHAKE256192SSIMPLE, SSL_aP384_SPHINCSSHAKE256192SSIMPLE}, /* SSL_PKEY_P384_SPHINCSSHAKE256192SSIMPLE */
++    {EVP_PKEY_SPHINCSSHAKE256256FSIMPLE, SSL_aSPHINCSSHAKE256256FSIMPLE}, /* SSL_PKEY_SPHINCSSHAKE256256FSIMPLE */
++    {EVP_PKEY_P521_SPHINCSSHAKE256256FSIMPLE, SSL_aP521_SPHINCSSHAKE256256FSIMPLE}, /* SSL_PKEY_P521_SPHINCSSHAKE256256FSIMPLE */
++    {EVP_PKEY_SPHINCSSHAKE256256SSIMPLE, SSL_aSPHINCSSHAKE256256SSIMPLE}, /* SSL_PKEY_SPHINCSSHAKE256256SSIMPLE */
++    {EVP_PKEY_P521_SPHINCSSHAKE256256SSIMPLE, SSL_aP521_SPHINCSSHAKE256256SSIMPLE}, /* SSL_PKEY_P521_SPHINCSSHAKE256256SSIMPLE */
+ ///// OQS_TEMPLATE_FRAGMENT_GIVE_SSL_CERT_INFO_END
+ };
+diff --git a/ssl/ssl_local.h b/ssl/ssl_local.h
+index 545a2ada7..e7a3be486 100644
+--- a/ssl/ssl_local.h
++++ b/ssl/ssl_local.h
+@@ -257,24 +257,34 @@
+ #define SSL_aRAINBOWVCLASSIC 0x200000000U
+ /* ECDSA p521 - Rainbow-V-Classic auth */
+ #define SSL_aP521_RAINBOWVCLASSIC 0x400000000U
+-/* SPHINCS+-Haraka-128f-robust auth */
+-#define SSL_aSPHINCSHARAKA128FROBUST 0x800000000U
+-/* ECDSA p256 - SPHINCS+-Haraka-128f-robust auth */
+-#define SSL_aP256_SPHINCSHARAKA128FROBUST 0x1000000000U
+-/* RSA3072 - SPHINCS+-Haraka-128f-robust auth */
+-#define SSL_aRSA3072_SPHINCSHARAKA128FROBUST 0x2000000000U
+-/* SPHINCS+-SHA256-128f-robust auth */
+-#define SSL_aSPHINCSSHA256128FROBUST 0x4000000000U
+-/* ECDSA p256 - SPHINCS+-SHA256-128f-robust auth */
+-#define SSL_aP256_SPHINCSSHA256128FROBUST 0x8000000000U
+-/* RSA3072 - SPHINCS+-SHA256-128f-robust auth */
+-#define SSL_aRSA3072_SPHINCSSHA256128FROBUST 0x10000000000U
+-/* SPHINCS+-SHAKE256-128f-robust auth */
+-#define SSL_aSPHINCSSHAKE256128FROBUST 0x20000000000U
+-/* ECDSA p256 - SPHINCS+-SHAKE256-128f-robust auth */
+-#define SSL_aP256_SPHINCSSHAKE256128FROBUST 0x40000000000U
+-/* RSA3072 - SPHINCS+-SHAKE256-128f-robust auth */
+-#define SSL_aRSA3072_SPHINCSSHAKE256128FROBUST 0x80000000000U
++/* SPHINCS+-SHAKE256-128f-simple auth */
++#define SSL_aSPHINCSSHAKE256128FSIMPLE 0x800000000U
++/* ECDSA p256 - SPHINCS+-SHAKE256-128f-simple auth */
++#define SSL_aP256_SPHINCSSHAKE256128FSIMPLE 0x1000000000U
++/* RSA3072 - SPHINCS+-SHAKE256-128f-simple auth */
++#define SSL_aRSA3072_SPHINCSSHAKE256128FSIMPLE 0x2000000000U
++/* SPHINCS+-SHAKE256-128s-simple auth */
++#define SSL_aSPHINCSSHAKE256128SSIMPLE 0x4000000000U
++/* ECDSA p256 - SPHINCS+-SHAKE256-128s-simple auth */
++#define SSL_aP256_SPHINCSSHAKE256128SSIMPLE 0x8000000000U
++/* RSA3072 - SPHINCS+-SHAKE256-128s-simple auth */
++#define SSL_aRSA3072_SPHINCSSHAKE256128SSIMPLE 0x10000000000U
++/* SPHINCS+-SHAKE256-192f-simple auth */
++#define SSL_aSPHINCSSHAKE256192FSIMPLE 0x20000000000U
++/* ECDSA p384 - SPHINCS+-SHAKE256-192f-simple auth */
++#define SSL_aP384_SPHINCSSHAKE256192FSIMPLE 0x40000000000U
++/* SPHINCS+-SHAKE256-192s-simple auth */
++#define SSL_aSPHINCSSHAKE256192SSIMPLE 0x80000000000U
++/* ECDSA p384 - SPHINCS+-SHAKE256-192s-simple auth */
++#define SSL_aP384_SPHINCSSHAKE256192SSIMPLE 0x100000000000U
++/* SPHINCS+-SHAKE256-256f-simple auth */
++#define SSL_aSPHINCSSHAKE256256FSIMPLE 0x200000000000U
++/* ECDSA p521 - SPHINCS+-SHAKE256-256f-simple auth */
++#define SSL_aP521_SPHINCSSHAKE256256FSIMPLE 0x400000000000U
++/* SPHINCS+-SHAKE256-256s-simple auth */
++#define SSL_aSPHINCSSHAKE256256SSIMPLE 0x800000000000U
++/* ECDSA p521 - SPHINCS+-SHAKE256-256s-simple auth */
++#define SSL_aP521_SPHINCSSHAKE256256SSIMPLE 0x1000000000000U
+ ///// OQS_TEMPLATE_FRAGMENT_DEFINE_SIG_MASKS_END
+ /* Any appropriate signature auth (for TLS 1.3 ciphersuites) */
+ # define SSL_aANY                0x00000000U
+@@ -486,17 +496,22 @@
+ #define SSL_PKEY_RSA3072_PICNIC3L1 33
+ #define SSL_PKEY_RAINBOWVCLASSIC 34
+ #define SSL_PKEY_P521_RAINBOWVCLASSIC 35
+-#define SSL_PKEY_SPHINCSHARAKA128FROBUST 36
+-#define SSL_PKEY_P256_SPHINCSHARAKA128FROBUST 37
+-#define SSL_PKEY_RSA3072_SPHINCSHARAKA128FROBUST 38
+-#define SSL_PKEY_SPHINCSSHA256128FROBUST 39
+-#define SSL_PKEY_P256_SPHINCSSHA256128FROBUST 40
+-#define SSL_PKEY_RSA3072_SPHINCSSHA256128FROBUST 41
+-#define SSL_PKEY_SPHINCSSHAKE256128FROBUST 42
+-#define SSL_PKEY_P256_SPHINCSSHAKE256128FROBUST 43
+-#define SSL_PKEY_RSA3072_SPHINCSSHAKE256128FROBUST 44
+-
+-#define SSL_PKEY_NUM 45
++#define SSL_PKEY_SPHINCSSHAKE256128FSIMPLE 36
++#define SSL_PKEY_P256_SPHINCSSHAKE256128FSIMPLE 37
++#define SSL_PKEY_RSA3072_SPHINCSSHAKE256128FSIMPLE 38
++#define SSL_PKEY_SPHINCSSHAKE256128SSIMPLE 39
++#define SSL_PKEY_P256_SPHINCSSHAKE256128SSIMPLE 40
++#define SSL_PKEY_RSA3072_SPHINCSSHAKE256128SSIMPLE 41
++#define SSL_PKEY_SPHINCSSHAKE256192FSIMPLE 42
++#define SSL_PKEY_P384_SPHINCSSHAKE256192FSIMPLE 43
++#define SSL_PKEY_SPHINCSSHAKE256192SSIMPLE 44
++#define SSL_PKEY_P384_SPHINCSSHAKE256192SSIMPLE 45
++#define SSL_PKEY_SPHINCSSHAKE256256FSIMPLE 46
++#define SSL_PKEY_P521_SPHINCSSHAKE256256FSIMPLE 47
++#define SSL_PKEY_SPHINCSSHAKE256256SSIMPLE 48
++#define SSL_PKEY_P521_SPHINCSSHAKE256256SSIMPLE 49
++
++#define SSL_PKEY_NUM 50
+ ///// OQS_TEMPLATE_FRAGMENT_DEFINE_SSL_PKEYS_END
+ 
+ /*-
+@@ -2456,15 +2471,20 @@ typedef enum downgrade_en {
+ #define TLSEXT_SIGALG_rsa3072_picnic3l1 0xfe1d
+ #define TLSEXT_SIGALG_rainbowVclassic 0xfe3c
+ #define TLSEXT_SIGALG_p521_rainbowVclassic 0xfe3d
+-#define TLSEXT_SIGALG_sphincsharaka128frobust 0xfe42
+-#define TLSEXT_SIGALG_p256_sphincsharaka128frobust 0xfe43
+-#define TLSEXT_SIGALG_rsa3072_sphincsharaka128frobust 0xfe44
+-#define TLSEXT_SIGALG_sphincssha256128frobust 0xfe5e
+-#define TLSEXT_SIGALG_p256_sphincssha256128frobust 0xfe5f
+-#define TLSEXT_SIGALG_rsa3072_sphincssha256128frobust 0xfe60
+-#define TLSEXT_SIGALG_sphincsshake256128frobust 0xfe7a
+-#define TLSEXT_SIGALG_p256_sphincsshake256128frobust 0xfe7b
+-#define TLSEXT_SIGALG_rsa3072_sphincsshake256128frobust 0xfe7c
++#define TLSEXT_SIGALG_sphincsshake256128fsimple 0xfe7d
++#define TLSEXT_SIGALG_p256_sphincsshake256128fsimple 0xfe7e
++#define TLSEXT_SIGALG_rsa3072_sphincsshake256128fsimple 0xfe7f
++#define TLSEXT_SIGALG_sphincsshake256128ssimple 0xfe83
++#define TLSEXT_SIGALG_p256_sphincsshake256128ssimple 0xfe84
++#define TLSEXT_SIGALG_rsa3072_sphincsshake256128ssimple 0xfe85
++#define TLSEXT_SIGALG_sphincsshake256192fsimple 0xfe88
++#define TLSEXT_SIGALG_p384_sphincsshake256192fsimple 0xfe89
++#define TLSEXT_SIGALG_sphincsshake256192ssimple 0xfe8c
++#define TLSEXT_SIGALG_p384_sphincsshake256192ssimple 0xfe8d
++#define TLSEXT_SIGALG_sphincsshake256256fsimple 0xfe90
++#define TLSEXT_SIGALG_p521_sphincsshake256256fsimple 0xfe91
++#define TLSEXT_SIGALG_sphincsshake256256ssimple 0xfe94
++#define TLSEXT_SIGALG_p521_sphincsshake256256ssimple 0xfe95
+ ///// OQS_TEMPLATE_FRAGMENT_DEFINE_SIG_CODE_POINTS_END
+ 
+ /* Known PSK key exchange modes */
+diff --git a/ssl/t1_lib.c b/ssl/t1_lib.c
+index 36c2e9ad5..27dd74d4f 100644
+--- a/ssl/t1_lib.c
++++ b/ssl/t1_lib.c
+@@ -949,15 +949,20 @@ static const uint16_t tls12_sigalgs[] = {
+     TLSEXT_SIGALG_rsa3072_picnic3l1,
+     TLSEXT_SIGALG_rainbowVclassic,
+     TLSEXT_SIGALG_p521_rainbowVclassic,
+-    TLSEXT_SIGALG_sphincsharaka128frobust,
+-    TLSEXT_SIGALG_p256_sphincsharaka128frobust,
+-    TLSEXT_SIGALG_rsa3072_sphincsharaka128frobust,
+-    TLSEXT_SIGALG_sphincssha256128frobust,
+-    TLSEXT_SIGALG_p256_sphincssha256128frobust,
+-    TLSEXT_SIGALG_rsa3072_sphincssha256128frobust,
+-    TLSEXT_SIGALG_sphincsshake256128frobust,
+-    TLSEXT_SIGALG_p256_sphincsshake256128frobust,
+-    TLSEXT_SIGALG_rsa3072_sphincsshake256128frobust,
++    TLSEXT_SIGALG_sphincsshake256128fsimple,
++    TLSEXT_SIGALG_p256_sphincsshake256128fsimple,
++    TLSEXT_SIGALG_rsa3072_sphincsshake256128fsimple,
++    TLSEXT_SIGALG_sphincsshake256128ssimple,
++    TLSEXT_SIGALG_p256_sphincsshake256128ssimple,
++    TLSEXT_SIGALG_rsa3072_sphincsshake256128ssimple,
++    TLSEXT_SIGALG_sphincsshake256192fsimple,
++    TLSEXT_SIGALG_p384_sphincsshake256192fsimple,
++    TLSEXT_SIGALG_sphincsshake256192ssimple,
++    TLSEXT_SIGALG_p384_sphincsshake256192ssimple,
++    TLSEXT_SIGALG_sphincsshake256256fsimple,
++    TLSEXT_SIGALG_p521_sphincsshake256256fsimple,
++    TLSEXT_SIGALG_sphincsshake256256ssimple,
++    TLSEXT_SIGALG_p521_sphincsshake256256ssimple,
+ ///// OQS_TEMPLATE_FRAGMENT_DEFINE_TLS12_SIGALGS_END
+ 
+     TLSEXT_SIGALG_rsa_pss_pss_sha256,
+@@ -1169,32 +1174,47 @@ static const SIGALG_LOOKUP sigalg_lookup_tbl[] = {
+     {"p521_rainbowVclassic", TLSEXT_SIGALG_p521_rainbowVclassic,
+      NID_undef, -1, EVP_PKEY_P521_RAINBOWVCLASSIC, SSL_PKEY_P521_RAINBOWVCLASSIC,
+      NID_undef, NID_undef},
+-    {"sphincsharaka128frobust", TLSEXT_SIGALG_sphincsharaka128frobust,
+-     NID_undef, -1, EVP_PKEY_SPHINCSHARAKA128FROBUST, SSL_PKEY_SPHINCSHARAKA128FROBUST,
++    {"sphincsshake256128fsimple", TLSEXT_SIGALG_sphincsshake256128fsimple,
++     NID_undef, -1, EVP_PKEY_SPHINCSSHAKE256128FSIMPLE, SSL_PKEY_SPHINCSSHAKE256128FSIMPLE,
+      NID_undef, NID_undef},
+-    {"p256_sphincsharaka128frobust", TLSEXT_SIGALG_p256_sphincsharaka128frobust,
+-     NID_undef, -1, EVP_PKEY_P256_SPHINCSHARAKA128FROBUST, SSL_PKEY_P256_SPHINCSHARAKA128FROBUST,
++    {"p256_sphincsshake256128fsimple", TLSEXT_SIGALG_p256_sphincsshake256128fsimple,
++     NID_undef, -1, EVP_PKEY_P256_SPHINCSSHAKE256128FSIMPLE, SSL_PKEY_P256_SPHINCSSHAKE256128FSIMPLE,
+      NID_undef, NID_undef},
+-    {"rsa3072_sphincsharaka128frobust", TLSEXT_SIGALG_rsa3072_sphincsharaka128frobust,
+-     NID_undef, -1, EVP_PKEY_RSA3072_SPHINCSHARAKA128FROBUST, SSL_PKEY_RSA3072_SPHINCSHARAKA128FROBUST,
++    {"rsa3072_sphincsshake256128fsimple", TLSEXT_SIGALG_rsa3072_sphincsshake256128fsimple,
++     NID_undef, -1, EVP_PKEY_RSA3072_SPHINCSSHAKE256128FSIMPLE, SSL_PKEY_RSA3072_SPHINCSSHAKE256128FSIMPLE,
+      NID_undef, NID_undef},
+-    {"sphincssha256128frobust", TLSEXT_SIGALG_sphincssha256128frobust,
+-     NID_undef, -1, EVP_PKEY_SPHINCSSHA256128FROBUST, SSL_PKEY_SPHINCSSHA256128FROBUST,
++    {"sphincsshake256128ssimple", TLSEXT_SIGALG_sphincsshake256128ssimple,
++     NID_undef, -1, EVP_PKEY_SPHINCSSHAKE256128SSIMPLE, SSL_PKEY_SPHINCSSHAKE256128SSIMPLE,
+      NID_undef, NID_undef},
+-    {"p256_sphincssha256128frobust", TLSEXT_SIGALG_p256_sphincssha256128frobust,
+-     NID_undef, -1, EVP_PKEY_P256_SPHINCSSHA256128FROBUST, SSL_PKEY_P256_SPHINCSSHA256128FROBUST,
++    {"p256_sphincsshake256128ssimple", TLSEXT_SIGALG_p256_sphincsshake256128ssimple,
++     NID_undef, -1, EVP_PKEY_P256_SPHINCSSHAKE256128SSIMPLE, SSL_PKEY_P256_SPHINCSSHAKE256128SSIMPLE,
+      NID_undef, NID_undef},
+-    {"rsa3072_sphincssha256128frobust", TLSEXT_SIGALG_rsa3072_sphincssha256128frobust,
+-     NID_undef, -1, EVP_PKEY_RSA3072_SPHINCSSHA256128FROBUST, SSL_PKEY_RSA3072_SPHINCSSHA256128FROBUST,
++    {"rsa3072_sphincsshake256128ssimple", TLSEXT_SIGALG_rsa3072_sphincsshake256128ssimple,
++     NID_undef, -1, EVP_PKEY_RSA3072_SPHINCSSHAKE256128SSIMPLE, SSL_PKEY_RSA3072_SPHINCSSHAKE256128SSIMPLE,
+      NID_undef, NID_undef},
+-    {"sphincsshake256128frobust", TLSEXT_SIGALG_sphincsshake256128frobust,
+-     NID_undef, -1, EVP_PKEY_SPHINCSSHAKE256128FROBUST, SSL_PKEY_SPHINCSSHAKE256128FROBUST,
++    {"sphincsshake256192fsimple", TLSEXT_SIGALG_sphincsshake256192fsimple,
++     NID_undef, -1, EVP_PKEY_SPHINCSSHAKE256192FSIMPLE, SSL_PKEY_SPHINCSSHAKE256192FSIMPLE,
+      NID_undef, NID_undef},
+-    {"p256_sphincsshake256128frobust", TLSEXT_SIGALG_p256_sphincsshake256128frobust,
+-     NID_undef, -1, EVP_PKEY_P256_SPHINCSSHAKE256128FROBUST, SSL_PKEY_P256_SPHINCSSHAKE256128FROBUST,
++    {"p384_sphincsshake256192fsimple", TLSEXT_SIGALG_p384_sphincsshake256192fsimple,
++     NID_undef, -1, EVP_PKEY_P384_SPHINCSSHAKE256192FSIMPLE, SSL_PKEY_P384_SPHINCSSHAKE256192FSIMPLE,
+      NID_undef, NID_undef},
+-    {"rsa3072_sphincsshake256128frobust", TLSEXT_SIGALG_rsa3072_sphincsshake256128frobust,
+-     NID_undef, -1, EVP_PKEY_RSA3072_SPHINCSSHAKE256128FROBUST, SSL_PKEY_RSA3072_SPHINCSSHAKE256128FROBUST,
++    {"sphincsshake256192ssimple", TLSEXT_SIGALG_sphincsshake256192ssimple,
++     NID_undef, -1, EVP_PKEY_SPHINCSSHAKE256192SSIMPLE, SSL_PKEY_SPHINCSSHAKE256192SSIMPLE,
++     NID_undef, NID_undef},
++    {"p384_sphincsshake256192ssimple", TLSEXT_SIGALG_p384_sphincsshake256192ssimple,
++     NID_undef, -1, EVP_PKEY_P384_SPHINCSSHAKE256192SSIMPLE, SSL_PKEY_P384_SPHINCSSHAKE256192SSIMPLE,
++     NID_undef, NID_undef},
++    {"sphincsshake256256fsimple", TLSEXT_SIGALG_sphincsshake256256fsimple,
++     NID_undef, -1, EVP_PKEY_SPHINCSSHAKE256256FSIMPLE, SSL_PKEY_SPHINCSSHAKE256256FSIMPLE,
++     NID_undef, NID_undef},
++    {"p521_sphincsshake256256fsimple", TLSEXT_SIGALG_p521_sphincsshake256256fsimple,
++     NID_undef, -1, EVP_PKEY_P521_SPHINCSSHAKE256256FSIMPLE, SSL_PKEY_P521_SPHINCSSHAKE256256FSIMPLE,
++     NID_undef, NID_undef},
++    {"sphincsshake256256ssimple", TLSEXT_SIGALG_sphincsshake256256ssimple,
++     NID_undef, -1, EVP_PKEY_SPHINCSSHAKE256256SSIMPLE, SSL_PKEY_SPHINCSSHAKE256256SSIMPLE,
++     NID_undef, NID_undef},
++    {"p521_sphincsshake256256ssimple", TLSEXT_SIGALG_p521_sphincsshake256256ssimple,
++     NID_undef, -1, EVP_PKEY_P521_SPHINCSSHAKE256256SSIMPLE, SSL_PKEY_P521_SPHINCSSHAKE256256SSIMPLE,
+      NID_undef, NID_undef},
+ ///// OQS_TEMPLATE_FRAGMENT_POPULATE_SIGALG_TBL_END
+ };
+@@ -1493,24 +1513,34 @@ static int sigalg_security_bits(const SIGALG_LOOKUP *lu)
+             secbits = 256;
+         else if(lu->sigalg == TLSEXT_SIGALG_p521_rainbowVclassic)
+             secbits = 256;
+-        else if(lu->sigalg == TLSEXT_SIGALG_sphincsharaka128frobust)
+-            secbits = 128;
+-        else if(lu->sigalg == TLSEXT_SIGALG_p256_sphincsharaka128frobust)
+-            secbits = 128;
+-        else if(lu->sigalg == TLSEXT_SIGALG_rsa3072_sphincsharaka128frobust)
+-            secbits = 128;
+-        else if(lu->sigalg == TLSEXT_SIGALG_sphincssha256128frobust)
++        else if(lu->sigalg == TLSEXT_SIGALG_sphincsshake256128fsimple)
+             secbits = 128;
+-        else if(lu->sigalg == TLSEXT_SIGALG_p256_sphincssha256128frobust)
++        else if(lu->sigalg == TLSEXT_SIGALG_p256_sphincsshake256128fsimple)
+             secbits = 128;
+-        else if(lu->sigalg == TLSEXT_SIGALG_rsa3072_sphincssha256128frobust)
++        else if(lu->sigalg == TLSEXT_SIGALG_rsa3072_sphincsshake256128fsimple)
+             secbits = 128;
+-        else if(lu->sigalg == TLSEXT_SIGALG_sphincsshake256128frobust)
++        else if(lu->sigalg == TLSEXT_SIGALG_sphincsshake256128ssimple)
+             secbits = 128;
+-        else if(lu->sigalg == TLSEXT_SIGALG_p256_sphincsshake256128frobust)
++        else if(lu->sigalg == TLSEXT_SIGALG_p256_sphincsshake256128ssimple)
+             secbits = 128;
+-        else if(lu->sigalg == TLSEXT_SIGALG_rsa3072_sphincsshake256128frobust)
++        else if(lu->sigalg == TLSEXT_SIGALG_rsa3072_sphincsshake256128ssimple)
+             secbits = 128;
++        else if(lu->sigalg == TLSEXT_SIGALG_sphincsshake256192fsimple)
++            secbits = 192;
++        else if(lu->sigalg == TLSEXT_SIGALG_p384_sphincsshake256192fsimple)
++            secbits = 192;
++        else if(lu->sigalg == TLSEXT_SIGALG_sphincsshake256192ssimple)
++            secbits = 192;
++        else if(lu->sigalg == TLSEXT_SIGALG_p384_sphincsshake256192ssimple)
++            secbits = 192;
++        else if(lu->sigalg == TLSEXT_SIGALG_sphincsshake256256fsimple)
++            secbits = 256;
++        else if(lu->sigalg == TLSEXT_SIGALG_p521_sphincsshake256256fsimple)
++            secbits = 256;
++        else if(lu->sigalg == TLSEXT_SIGALG_sphincsshake256256ssimple)
++            secbits = 256;
++        else if(lu->sigalg == TLSEXT_SIGALG_p521_sphincsshake256256ssimple)
++            secbits = 256;
+ ///// OQS_TEMPLATE_FRAGMENT_MAP_SIGALG_TO_BIT_SECURITY_END
+     }
+     return secbits;
+@@ -2954,15 +2984,20 @@ void tls1_set_cert_validity(SSL *s)
+     tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_RSA3072_PICNIC3L1);
+     tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_RAINBOWVCLASSIC);
+     tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P521_RAINBOWVCLASSIC);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSHARAKA128FROBUST);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P256_SPHINCSHARAKA128FROBUST);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_RSA3072_SPHINCSHARAKA128FROBUST);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSSHA256128FROBUST);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P256_SPHINCSSHA256128FROBUST);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_RSA3072_SPHINCSSHA256128FROBUST);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSSHAKE256128FROBUST);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P256_SPHINCSSHAKE256128FROBUST);
+-    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_RSA3072_SPHINCSSHAKE256128FROBUST);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSSHAKE256128FSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P256_SPHINCSSHAKE256128FSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_RSA3072_SPHINCSSHAKE256128FSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSSHAKE256128SSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P256_SPHINCSSHAKE256128SSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_RSA3072_SPHINCSSHAKE256128SSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSSHAKE256192FSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P384_SPHINCSSHAKE256192FSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSSHAKE256192SSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P384_SPHINCSSHAKE256192SSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSSHAKE256256FSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P521_SPHINCSSHAKE256256FSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_SPHINCSSHAKE256256SSIMPLE);
++    tls1_check_chain(s, NULL, NULL, NULL, SSL_PKEY_P521_SPHINCSSHAKE256256SSIMPLE);
+ ///// OQS_TEMPLATE_FRAGMENT_ADD_CERT_CHAIN_CHECKS_END
+ }
+ 
+diff --git a/ssl/t1_trce.c b/ssl/t1_trce.c
+index e0b9705bf..451e52977 100644
+--- a/ssl/t1_trce.c
++++ b/ssl/t1_trce.c
+@@ -675,15 +675,20 @@ static const ssl_trace_tbl ssl_sigalg_tbl[] = {
+     {TLSEXT_SIGALG_rsa3072_picnic3l1, "rsa3072_picnic3l1"},
+     {TLSEXT_SIGALG_rainbowVclassic, "rainbowVclassic"},
+     {TLSEXT_SIGALG_p521_rainbowVclassic, "p521_rainbowVclassic"},
+-    {TLSEXT_SIGALG_sphincsharaka128frobust, "sphincsharaka128frobust"},
+-    {TLSEXT_SIGALG_p256_sphincsharaka128frobust, "p256_sphincsharaka128frobust"},
+-    {TLSEXT_SIGALG_rsa3072_sphincsharaka128frobust, "rsa3072_sphincsharaka128frobust"},
+-    {TLSEXT_SIGALG_sphincssha256128frobust, "sphincssha256128frobust"},
+-    {TLSEXT_SIGALG_p256_sphincssha256128frobust, "p256_sphincssha256128frobust"},
+-    {TLSEXT_SIGALG_rsa3072_sphincssha256128frobust, "rsa3072_sphincssha256128frobust"},
+-    {TLSEXT_SIGALG_sphincsshake256128frobust, "sphincsshake256128frobust"},
+-    {TLSEXT_SIGALG_p256_sphincsshake256128frobust, "p256_sphincsshake256128frobust"},
+-    {TLSEXT_SIGALG_rsa3072_sphincsshake256128frobust, "rsa3072_sphincsshake256128frobust"},
++    {TLSEXT_SIGALG_sphincsshake256128fsimple, "sphincsshake256128fsimple"},
++    {TLSEXT_SIGALG_p256_sphincsshake256128fsimple, "p256_sphincsshake256128fsimple"},
++    {TLSEXT_SIGALG_rsa3072_sphincsshake256128fsimple, "rsa3072_sphincsshake256128fsimple"},
++    {TLSEXT_SIGALG_sphincsshake256128ssimple, "sphincsshake256128ssimple"},
++    {TLSEXT_SIGALG_p256_sphincsshake256128ssimple, "p256_sphincsshake256128ssimple"},
++    {TLSEXT_SIGALG_rsa3072_sphincsshake256128ssimple, "rsa3072_sphincsshake256128ssimple"},
++    {TLSEXT_SIGALG_sphincsshake256192fsimple, "sphincsshake256192fsimple"},
++    {TLSEXT_SIGALG_p384_sphincsshake256192fsimple, "p384_sphincsshake256192fsimple"},
++    {TLSEXT_SIGALG_sphincsshake256192ssimple, "sphincsshake256192ssimple"},
++    {TLSEXT_SIGALG_p384_sphincsshake256192ssimple, "p384_sphincsshake256192ssimple"},
++    {TLSEXT_SIGALG_sphincsshake256256fsimple, "sphincsshake256256fsimple"},
++    {TLSEXT_SIGALG_p521_sphincsshake256256fsimple, "p521_sphincsshake256256fsimple"},
++    {TLSEXT_SIGALG_sphincsshake256256ssimple, "sphincsshake256256ssimple"},
++    {TLSEXT_SIGALG_p521_sphincsshake256256ssimple, "p521_sphincsshake256256ssimple"},
+ ///// OQS_TEMPLATE_FRAGMENT_POPULATE_SIGALG_TBL_END
+ };
+ 
