@@ -35,6 +35,7 @@ $ cd liboqs/
 $ git checkout af76ca3b1f2fbc1f4f0967595f3bb07692fb3d82
 $ mkdir build
 $ cd build
+$ cmake -DOQS_USE_OPENSSL=0 ..
 $ make all
 $ sudo make install
 ```
