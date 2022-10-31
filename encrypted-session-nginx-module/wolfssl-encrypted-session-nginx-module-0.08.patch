@@ -1,0 +1,106 @@
+diff --git a/src/ngx_http_encrypted_session_cipher.c b/src/ngx_http_encrypted_session_cipher.c
+index fe968e7..4a43aa0 100644
+--- a/src/ngx_http_encrypted_session_cipher.c
++++ b/src/ngx_http_encrypted_session_cipher.c
+@@ -12,7 +12,11 @@
+ 
+ #include "ngx_http_encrypted_session_cipher.h"
+ #include <openssl/evp.h>
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++#include <openssl/sha.h>
++#else
+ #include <openssl/md5.h>
++#endif
+ #include <stdint.h>
+ 
+ 
+@@ -55,7 +60,11 @@ ngx_http_encrypted_session_aes_mac_encrypt(
+ 
+     data_size = in_len + sizeof(expires_time);
+ 
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++    buf_size = SHA256_DIGEST_LENGTH /* for the digest */
++#else
+     buf_size = MD5_DIGEST_LENGTH /* for the digest */
++#endif
+                + (data_size + block_size - 1) /* for EVP_EncryptUpdate */
+                + block_size; /* for EVP_EncryptFinal */
+ 
+@@ -87,9 +97,17 @@ ngx_http_encrypted_session_aes_mac_encrypt(
+ 
+     ngx_memcpy(data + in_len, (u_char *) &expires_time, sizeof(expires_time));
+ 
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++    wolfSSL_SHA256(data, data_size, p);
++#else
+     MD5(data, data_size, p);
++#endif
+ 
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++    p += SHA256_DIGEST_LENGTH;
++#else
+     p += MD5_DIGEST_LENGTH;
++#endif
+ 
+     ret = EVP_EncryptInit(emcf->session_ctx, cipher, key, iv);
+     if (!ret) {
+@@ -150,10 +175,18 @@ ngx_http_encrypted_session_aes_mac_decrypt(
+     uint64_t                 expires_time;
+     time_t                   now;
+ 
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++    u_char new_digest[SHA256_DIGEST_LENGTH];
++#else
+     u_char new_digest[MD5_DIGEST_LENGTH];
++#endif
+ 
+     if (key_len != ngx_http_encrypted_session_key_length
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++        || in_len < SHA256_DIGEST_LENGTH)
++#else
+         || in_len < MD5_DIGEST_LENGTH)
++#endif
+     {
+         return NGX_ERROR;
+     }
+@@ -189,8 +224,14 @@ ngx_http_encrypted_session_aes_mac_decrypt(
+ 
+     *dst = p;
+ 
+-    ret = EVP_DecryptUpdate(emcf->session_ctx, p, &len, in + MD5_DIGEST_LENGTH,
++    ret = EVP_DecryptUpdate(emcf->session_ctx, p, &len,
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++                            in + SHA256_DIGEST_LENGTH,
++                            in_len - SHA256_DIGEST_LENGTH);
++#else
++                            in + MD5_DIGEST_LENGTH,
+                             in_len - MD5_DIGEST_LENGTH);
++#endif
+ 
+     if (!ret) {
+         dd("decrypt update failed");
+@@ -225,12 +267,23 @@ ngx_http_encrypted_session_aes_mac_decrypt(
+         return NGX_ERROR;
+     }
+ 
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++    wolfSSL_SHA256(*dst, *dst_len, new_digest);
++#else
+     MD5(*dst, *dst_len, new_digest);
++#endif
+ 
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++    if (ngx_strncmp(digest, new_digest, SHA256_DIGEST_LENGTH) != 0) {
++#else
+     if (ngx_strncmp(digest, new_digest, MD5_DIGEST_LENGTH) != 0) {
++#endif
+         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
++#if defined(WOLFSSL_NGINX) && defined(HAVE_FIPS)
++                       "failed to decrypt session: SHA256 checksum mismatch");
++#else
+                        "failed to decrypt session: MD5 checksum mismatch");
+-
++#endif
+         return NGX_ERROR;
+     }
+ 
