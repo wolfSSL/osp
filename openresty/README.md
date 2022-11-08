@@ -10,6 +10,7 @@ Patch the `configure` script to link against wolfSSL instead of OpenSSL. In the 
 patch -p1 < <version>.patch
 ```
 Patches for the following versions are available in this directory:
+* 1.19.9.1
 * 1.19.3.1
 * 1.13.6.2
 
