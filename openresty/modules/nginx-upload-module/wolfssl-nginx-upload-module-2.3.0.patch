@@ -1,0 +1,197 @@
+diff --git a/ngx_http_upload_module.c b/ngx_http_upload_module.c
+index 3ac3279..463a6db 100644
+--- a/ngx_http_upload_module.c
++++ b/ngx_http_upload_module.c
+@@ -8,7 +8,7 @@
+ #include <ngx_http.h>
+ #include <nginx.h>
+ 
+-#if nginx_version >= 1011002
++#if nginx_version >= 1011002 && !defined(WOLFSSL_NGINX)
+ 
+ #include <ngx_md5.h>
+ 
+@@ -23,7 +23,10 @@ typedef ngx_md5_t MD5_CTX;
+ #include <openssl/sha.h>
+ 
+ #else
+-
++#ifdef WOLFSSL_NGINX
++#include <wolfssl/options.h>
++#endif
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+ #if (NGX_HAVE_OPENSSL_MD5_H)
+ #include <openssl/md5.h>
+ #else
+@@ -35,6 +39,7 @@ typedef ngx_md5_t MD5_CTX;
+ #define  MD5Update  MD5_Update
+ #define  MD5Final   MD5_Final
+ #endif
++#endif
+ 
+ #if (NGX_HAVE_OPENSSL_SHA1_H)
+ #include <openssl/sha.h>
+@@ -181,17 +186,21 @@ typedef struct {
+     ngx_flag_t                    empty_field_names;
+     size_t                        limit_rate;
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+     unsigned int                  md5:1;
++#endif
+     unsigned int                  sha1:1;
+     unsigned int                  sha256:1;
+     unsigned int                  sha512:1;
+     unsigned int                  crc32:1;
+ } ngx_http_upload_loc_conf_t;
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+ typedef struct ngx_http_upload_md5_ctx_s {
+     MD5_CTX     md5;
+     u_char      md5_digest[MD5_DIGEST_LENGTH * 2];
+ } ngx_http_upload_md5_ctx_t;
++#endif
+ 
+ typedef struct ngx_http_upload_sha1_ctx_s {
+     SHA_CTX     sha1;
+@@ -269,7 +280,9 @@ typedef struct ngx_http_upload_ctx_s {
+ 
+     ngx_pool_cleanup_t          *cln;
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+     ngx_http_upload_md5_ctx_t   *md5_ctx;    
++#endif
+     ngx_http_upload_sha1_ctx_t  *sha1_ctx;    
+     ngx_http_upload_sha256_ctx_t *sha256_ctx;
+     ngx_http_upload_sha512_ctx_t *sha512_ctx;
+@@ -306,8 +320,10 @@ static void ngx_http_upload_variable_set(ngx_http_request_t *r,
+     ngx_http_variable_value_t *v, uintptr_t data);
+ static ngx_int_t ngx_http_upload_variable(ngx_http_request_t *r,
+     ngx_http_variable_value_t *v, uintptr_t data);
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+ static ngx_int_t ngx_http_upload_md5_variable(ngx_http_request_t *r,
+     ngx_http_variable_value_t *v, uintptr_t data);
++#endif
+ static ngx_int_t ngx_http_upload_sha1_variable(ngx_http_request_t *r,
+     ngx_http_variable_value_t *v, uintptr_t data);
+ static ngx_int_t ngx_http_upload_sha256_variable(ngx_http_request_t *r,
+@@ -737,14 +754,14 @@ static ngx_http_variable_t  ngx_http_upload_variables[] = { /* {{{ */
+ }; /* }}} */
+ 
+ static ngx_http_variable_t  ngx_http_upload_aggregate_variables[] = { /* {{{ */
+-
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+     { ngx_string("upload_file_md5"), NULL, ngx_http_upload_md5_variable,
+       (uintptr_t) "0123456789abcdef",
+       NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
+-
+     { ngx_string("upload_file_md5_uc"), NULL, ngx_http_upload_md5_variable,
+       (uintptr_t) "0123456789ABCDEF",
+       NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
++#endif
+ 
+     { ngx_string("upload_file_sha1"), NULL, ngx_http_upload_sha1_variable,
+       (uintptr_t) "0123456789abcdef",
+@@ -819,6 +837,7 @@ ngx_http_upload_handler(ngx_http_request_t *r)
+         ngx_http_set_ctx(r, u, ngx_http_upload_module);
+     }
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+     if(ulcf->md5) {
+         if(u->md5_ctx == NULL) {
+             u->md5_ctx = ngx_palloc(r->pool, sizeof(ngx_http_upload_md5_ctx_t));
+@@ -828,6 +848,7 @@ ngx_http_upload_handler(ngx_http_request_t *r)
+         }
+     }else
+         u->md5_ctx = NULL;
++#endif
+ 
+     if(ulcf->sha1) {
+         if(u->sha1_ctx == NULL) {
+@@ -1525,8 +1546,10 @@ static ngx_int_t ngx_http_upload_start_handler(ngx_http_upload_ctx_t *u) { /* {{
+             }
+         }
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+         if(u->md5_ctx != NULL)
+             MD5Init(&u->md5_ctx->md5);
++#endif
+ 
+         if(u->sha1_ctx != NULL)
+             SHA1_Init(&u->sha1_ctx->sha1);
+@@ -1624,8 +1648,10 @@ static void ngx_http_upload_finish_handler(ngx_http_upload_ctx_t *u) { /* {{{ */
+ 
+         ngx_close_file(u->output_file.fd);
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+         if(u->md5_ctx)
+             MD5Final(u->md5_ctx->md5_digest, &u->md5_ctx->md5);
++#endif
+ 
+         if(u->sha1_ctx)
+             SHA1_Final(u->sha1_ctx->sha1_digest, &u->sha1_ctx->sha1);
+@@ -1792,8 +1819,10 @@ static ngx_int_t ngx_http_upload_flush_output_buffer(ngx_http_upload_ctx_t *u, u
+                 len = u->content_range_n.end - u->output_file.offset + 1;
+         }
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+         if(u->md5_ctx)
+             MD5Update(&u->md5_ctx->md5, buf, len);
++#endif
+ 
+         if(u->sha1_ctx)
+             SHA1_Update(&u->sha1_ctx->sha1, buf, len);
+@@ -2334,9 +2364,11 @@ ngx_http_upload_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
+     if(conf->aggregate_field_templates == NULL) {
+         conf->aggregate_field_templates = prev->aggregate_field_templates;
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+         if(prev->md5) {
+             conf->md5 = prev->md5;
+         }
++#endif
+ 
+         if(prev->sha1) {
+             conf->sha1 = prev->sha1;
+@@ -2434,6 +2467,7 @@ ngx_http_upload_variable(ngx_http_request_t *r,
+     return NGX_OK;
+ } /* }}} */
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+ static ngx_int_t /* {{{ ngx_http_upload_md5_variable */
+ ngx_http_upload_md5_variable(ngx_http_request_t *r,
+     ngx_http_variable_value_t *v,  uintptr_t data)
+@@ -2470,6 +2505,7 @@ ngx_http_upload_md5_variable(ngx_http_request_t *r,
+ 
+     return NGX_OK;
+ } /* }}} */
++#endif
+ 
+ static ngx_int_t /* {{{ ngx_http_upload_sha1_variable */
+ ngx_http_upload_sha1_variable(ngx_http_request_t *r,
+@@ -2811,10 +2847,15 @@ ngx_http_upload_set_form_field(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+             {
+                 if(cmd->offset != offsetof(ngx_http_upload_loc_conf_t, aggregate_field_templates)) {
+                     ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+                                        "variables upload_file_md5"
+                                        ", upload_file_md5_uc"
+                                        ", upload_file_sha1"
+                                        ", upload_file_sha1_uc"
++#else
++                                       "variables upload_file_sha1"
++                                       ", upload_file_sha1_uc"
++#endif
+                                        ", upload_file_sha256"
+                                        ", upload_file_sha256_uc"
+                                        ", upload_file_sha512"
+@@ -2826,8 +2868,10 @@ ngx_http_upload_set_form_field(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+                     return NGX_CONF_ERROR;
+                 }
+ 
++#if !(defined(WOLFSSL_NGINX) && defined(HAVE_FIPS))
+                 if(v->get_handler == ngx_http_upload_md5_variable)
+                     ulcf->md5 = 1;
++#endif
+ 
+                 if(v->get_handler == ngx_http_upload_sha1_variable)
+                     ulcf->sha1 = 1;
