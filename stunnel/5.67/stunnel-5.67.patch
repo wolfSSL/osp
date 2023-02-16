@@ -1,8 +1,8 @@
 diff --git a/configure.ac b/configure.ac
-index a4948f0..243aee9 100644
+index a4948f0..2720cdb 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -449,26 +449,63 @@ find_ssl_dir() { :
+@@ -449,26 +449,65 @@ find_ssl_dir() { :
      check_ssl_dir "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk/usr"
  }
  
@@ -27,7 +27,9 @@ index a4948f0..243aee9 100644
 +if test "x$ENABLED_WOLFSSL" = "xyes"
 +then
 +    AM_CFLAGS="$AM_CFLAGS -DWITH_WOLFSSL"
-+    SSLDIR="/usr/local"
++    if test -z "$SSLDIR"; then
++        SSLDIR="/usr/local"
++    fi
 +    AC_DEFINE([WITH_WOLFSSL], [1],
 +    [Define to 1 if you using WOLFSSL header file.])
 +fi
