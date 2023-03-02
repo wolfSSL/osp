@@ -1680,24 +1680,51 @@ index e3e442e..8456c38 100644
  
      /* initialize the OpenSSL static locking */
 diff --git a/src/str.c b/src/str.c
-index f04cfb3..a13f665 100644
+index f04cfb3..46a3baa 100644
 --- a/src/str.c
 +++ b/src/str.c
+@@ -93,7 +93,7 @@ NOEXPORT LEAK_ENTRY leak_hash_table[LEAK_TABLE_SIZE],
+     *leak_results[LEAK_TABLE_SIZE];
+ NOEXPORT int leak_result_num=0;
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10101000L
++#if OPENSSL_VERSION_NUMBER >= 0x10101000L && !defined(WITH_WOLFSSL)
+ DEFINE_STACK_OF(LEAK_ENTRY)
+ #endif /* OpenSSL version >= 1.1.1 */
+ 
 @@ -107,7 +107,9 @@ NOEXPORT ALLOC_LIST *get_alloc_list_ptr(void *, const char *, int);
  NOEXPORT void str_leak_debug(const ALLOC_LIST *, int);
  
  NOEXPORT LEAK_ENTRY *leak_search(const ALLOC_LIST *);
-+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
++#if OPENSSL_VERSION_NUMBER >= 0x10101000L && !defined(WITH_WOLFSSL)
  NOEXPORT int leak_cmp(const LEAK_ENTRY *const *, const LEAK_ENTRY *const *);
 +#endif /* OpenSSL version >= 1.1.1 */
  NOEXPORT void leak_report(void);
  NOEXPORT long leak_threshold(void);
  
+@@ -563,7 +565,7 @@ NOEXPORT LEAK_ENTRY *leak_search(const ALLOC_LIST *alloc_list) {
+ void leak_table_utilization() {
+     int i, utilization=0;
+     int64_t grand_total=0;
+-#if OPENSSL_VERSION_NUMBER >= 0x10101000L
++#if OPENSSL_VERSION_NUMBER >= 0x10101000L && !defined(WITH_WOLFSSL)
+     STACK_OF(LEAK_ENTRY) *stats;
+ #endif /* OpenSSL version >= 1.1.1 */
+ 
+@@ -580,7 +582,7 @@ void leak_table_utilization() {
+     s_log(LOG_DEBUG, "Leak detection table utilization: %d/%d (%05.2f%%)",
+         utilization, LEAK_TABLE_SIZE, 100.0*utilization/LEAK_TABLE_SIZE);
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10101000L
++#if OPENSSL_VERSION_NUMBER >= 0x10101000L && !defined(WITH_WOLFSSL)
+     /* log up to 5 most frequently used heap allocations */
+     stats=sk_LEAK_ENTRY_new_reserve(leak_cmp, utilization);
+     for(i=0; i<LEAK_TABLE_SIZE; ++i)
 @@ -597,6 +599,7 @@ void leak_table_utilization() {
  #endif /* OpenSSL version >= 1.1.1 */
  }
  
-+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
++#if OPENSSL_VERSION_NUMBER >= 0x10101000L && !defined(WITH_WOLFSSL)
  NOEXPORT int leak_cmp(const LEAK_ENTRY *const *a, const LEAK_ENTRY *const *b) {
      int64_t d = (*a)->total - (*b)->total;
      if(d>0)
