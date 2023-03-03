@@ -1,5 +1,24 @@
 # Unix Build Instructions
 
+## Note for users building from https://www.stunnel.org/archive/5.x/stunnel-5.67.tar.gz
+
+The file `src/str.c` differs between the tarball and the version hosted on github. This will cause
+the patch to fail on `src/str.c`. To overcome this, it is enough to change the lines containing
+
+``
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+```
+
+into
+
+```
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(WITH_WOLFSSL)
+```
+
+The version on github uses `0x10101000L` instead which causes build errors for users using the
+version extracted from the downloaded tarball.
+
+
 ## Build wolfSSL
 + Configure wolfSSL with `./configure --enable-stunnel`. Add `--enable-debug` if you want to enable the debug version of wolfSSL.
 + Compile with `make`.
