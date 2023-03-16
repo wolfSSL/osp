@@ -64,13 +64,13 @@ ${OPENSSL} genpkey -algorithm falcon512 -outform pem -out falcon_level1_root_key
 ${OPENSSL} genpkey -algorithm falcon512 -outform pem -out falcon_level1_entity_key.pem
 
 # Generate the root certificate
-${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 365 -set_serial 512 -key falcon_level1_root_key.pem -out falcon_level1_root_cert.pem
+${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 1095 -set_serial 512 -key falcon_level1_root_key.pem -out falcon_level1_root_cert.pem
 
 # Generate the entity CSR.
 ${OPENSSL} req -new -config entity.conf -key falcon_level1_entity_key.pem -out falcon_level1_entity_req.pem
 
 # Generate the entity X.509 certificate.
-${OPENSSL} x509 -req -in falcon_level1_entity_req.pem -CA falcon_level1_root_cert.pem -CAkey falcon_level1_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 365 -set_serial 513 -out falcon_level1_entity_cert.pem
+${OPENSSL} x509 -req -in falcon_level1_entity_req.pem -CA falcon_level1_root_cert.pem -CAkey falcon_level1_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 1095 -set_serial 513 -out falcon_level1_entity_cert.pem
 
 ###############################################################################
 # Falcon NIST Level 5
@@ -81,13 +81,13 @@ ${OPENSSL} genpkey -algorithm falcon1024 -outform pem -out falcon_level5_root_ke
 ${OPENSSL} genpkey -algorithm falcon1024 -outform pem -out falcon_level5_entity_key.pem
 
 # Generate the root certificate
-${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 365 -set_serial 1024 -key falcon_level5_root_key.pem -out falcon_level5_root_cert.pem
+${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 1095 -set_serial 1024 -key falcon_level5_root_key.pem -out falcon_level5_root_cert.pem
 
 # Generate the entity CSR.
 ${OPENSSL} req -new -config entity.conf -key falcon_level5_entity_key.pem -out falcon_level5_entity_req.pem
 
 # Generate the entity X.509 certificate.
-${OPENSSL} x509 -req -in falcon_level5_entity_req.pem -CA falcon_level5_root_cert.pem -CAkey falcon_level5_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 365 -set_serial 1025 -out falcon_level5_entity_cert.pem
+${OPENSSL} x509 -req -in falcon_level5_entity_req.pem -CA falcon_level5_root_cert.pem -CAkey falcon_level5_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 1095 -set_serial 1025 -out falcon_level5_entity_cert.pem
 
 ###############################################################################
 # Verify all generated certificates.
