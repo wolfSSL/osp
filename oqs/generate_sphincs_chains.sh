@@ -68,13 +68,13 @@ ${OPENSSL} genpkey -algorithm sphincsshake256128fsimple -outform pem -out sphinc
 ${OPENSSL} genpkey -algorithm sphincsshake256128fsimple -outform pem -out sphincs_fast_level1_entity_key.pem
 
 # Generate the root certificate
-${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 365 -set_serial 20 -key sphincs_fast_level1_root_key.pem -out sphincs_fast_level1_root_cert.pem
+${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 1095 -set_serial 20 -key sphincs_fast_level1_root_key.pem -out sphincs_fast_level1_root_cert.pem
 
 # Generate the entity CSR.
 ${OPENSSL} req -new -config entity.conf -key sphincs_fast_level1_entity_key.pem -out sphincs_fast_level1_entity_req.pem
 
 # Generate the entity X.509 certificate.
-${OPENSSL} x509 -req -in sphincs_fast_level1_entity_req.pem -CA sphincs_fast_level1_root_cert.pem -CAkey sphincs_fast_level1_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 365 -set_serial 21 -out sphincs_fast_level1_entity_cert.pem
+${OPENSSL} x509 -req -in sphincs_fast_level1_entity_req.pem -CA sphincs_fast_level1_root_cert.pem -CAkey sphincs_fast_level1_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 1095 -set_serial 21 -out sphincs_fast_level1_entity_cert.pem
 
 ###############################################################################
 # SPHINCS+ NIST Level 3; Fast Variant
@@ -85,13 +85,13 @@ ${OPENSSL} genpkey -algorithm sphincsshake256192fsimple -outform pem -out sphinc
 ${OPENSSL} genpkey -algorithm sphincsshake256192fsimple -outform pem -out sphincs_fast_level3_entity_key.pem
 
 # Generate the root certificate
-${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 365 -set_serial 30 -key sphincs_fast_level3_root_key.pem -out sphincs_fast_level3_root_cert.pem
+${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 1095 -set_serial 30 -key sphincs_fast_level3_root_key.pem -out sphincs_fast_level3_root_cert.pem
 
 # Generate the entity CSR.
 ${OPENSSL} req -new -config entity.conf -key sphincs_fast_level3_entity_key.pem -out sphincs_fast_level3_entity_req.pem
 
 # Generate the entity X.509 certificate.
-${OPENSSL} x509 -req -in sphincs_fast_level3_entity_req.pem -CA sphincs_fast_level3_root_cert.pem -CAkey sphincs_fast_level3_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 365 -set_serial 31 -out sphincs_fast_level3_entity_cert.pem
+${OPENSSL} x509 -req -in sphincs_fast_level3_entity_req.pem -CA sphincs_fast_level3_root_cert.pem -CAkey sphincs_fast_level3_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 1095 -set_serial 31 -out sphincs_fast_level3_entity_cert.pem
 
 ###############################################################################
 # SPHINCS+ NIST Level 5; Fast Variant
@@ -102,13 +102,13 @@ ${OPENSSL} genpkey -algorithm sphincsshake256256fsimple -outform pem -out sphinc
 ${OPENSSL} genpkey -algorithm sphincsshake256256fsimple -outform pem -out sphincs_fast_level5_entity_key.pem
 
 # Generate the root certificate
-${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 365 -set_serial 50 -key sphincs_fast_level5_root_key.pem -out sphincs_fast_level5_root_cert.pem
+${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 1095 -set_serial 50 -key sphincs_fast_level5_root_key.pem -out sphincs_fast_level5_root_cert.pem
 
 # Generate the entity CSR.
 ${OPENSSL} req -new -config entity.conf -key sphincs_fast_level5_entity_key.pem -out sphincs_fast_level5_entity_req.pem
 
 # Generate the entity X.509 certificate.
-${OPENSSL} x509 -req -in sphincs_fast_level5_entity_req.pem -CA sphincs_fast_level5_root_cert.pem -CAkey sphincs_fast_level5_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 365 -set_serial 51 -out sphincs_fast_level5_entity_cert.pem
+${OPENSSL} x509 -req -in sphincs_fast_level5_entity_req.pem -CA sphincs_fast_level5_root_cert.pem -CAkey sphincs_fast_level5_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 1095 -set_serial 51 -out sphincs_fast_level5_entity_cert.pem
 
 ###############################################################################
 # SPHINCS+ NIST Level 1; Small Variant
@@ -119,13 +119,13 @@ ${OPENSSL} genpkey -algorithm sphincsshake256128ssimple -outform pem -out sphinc
 ${OPENSSL} genpkey -algorithm sphincsshake256128ssimple -outform pem -out sphincs_small_level1_entity_key.pem
 
 # Generate the root certificate
-${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 365 -set_serial 20 -key sphincs_small_level1_root_key.pem -out sphincs_small_level1_root_cert.pem
+${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 1095 -set_serial 20 -key sphincs_small_level1_root_key.pem -out sphincs_small_level1_root_cert.pem
 
 # Generate the entity CSR.
 ${OPENSSL} req -new -config entity.conf -key sphincs_small_level1_entity_key.pem -out sphincs_small_level1_entity_req.pem
 
 # Generate the entity X.509 certificate.
-${OPENSSL} x509 -req -in sphincs_small_level1_entity_req.pem -CA sphincs_small_level1_root_cert.pem -CAkey sphincs_small_level1_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 365 -set_serial 21 -out sphincs_small_level1_entity_cert.pem
+${OPENSSL} x509 -req -in sphincs_small_level1_entity_req.pem -CA sphincs_small_level1_root_cert.pem -CAkey sphincs_small_level1_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 1095 -set_serial 21 -out sphincs_small_level1_entity_cert.pem
 
 ###############################################################################
 # SPHINCS+ NIST Level 3; Small Variant
@@ -136,13 +136,13 @@ ${OPENSSL} genpkey -algorithm sphincsshake256192ssimple -outform pem -out sphinc
 ${OPENSSL} genpkey -algorithm sphincsshake256192ssimple -outform pem -out sphincs_small_level3_entity_key.pem
 
 # Generate the root certificate
-${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 365 -set_serial 30 -key sphincs_small_level3_root_key.pem -out sphincs_small_level3_root_cert.pem
+${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 1095 -set_serial 30 -key sphincs_small_level3_root_key.pem -out sphincs_small_level3_root_cert.pem
 
 # Generate the entity CSR.
 ${OPENSSL} req -new -config entity.conf -key sphincs_small_level3_entity_key.pem -out sphincs_small_level3_entity_req.pem
 
 # Generate the entity X.509 certificate.
-${OPENSSL} x509 -req -in sphincs_small_level3_entity_req.pem -CA sphincs_small_level3_root_cert.pem -CAkey sphincs_small_level3_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 365 -set_serial 31 -out sphincs_small_level3_entity_cert.pem
+${OPENSSL} x509 -req -in sphincs_small_level3_entity_req.pem -CA sphincs_small_level3_root_cert.pem -CAkey sphincs_small_level3_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 1095 -set_serial 31 -out sphincs_small_level3_entity_cert.pem
 
 ###############################################################################
 # SPHINCS+ NIST Level 5; Small Variant
@@ -153,13 +153,13 @@ ${OPENSSL} genpkey -algorithm sphincsshake256256ssimple -outform pem -out sphinc
 ${OPENSSL} genpkey -algorithm sphincsshake256256ssimple -outform pem -out sphincs_small_level5_entity_key.pem
 
 # Generate the root certificate
-${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 365 -set_serial 50 -key sphincs_small_level5_root_key.pem -out sphincs_small_level5_root_cert.pem
+${OPENSSL} req -x509 -config root.conf -extensions ca_extensions -days 1095 -set_serial 50 -key sphincs_small_level5_root_key.pem -out sphincs_small_level5_root_cert.pem
 
 # Generate the entity CSR.
 ${OPENSSL} req -new -config entity.conf -key sphincs_small_level5_entity_key.pem -out sphincs_small_level5_entity_req.pem
 
 # Generate the entity X.509 certificate.
-${OPENSSL} x509 -req -in sphincs_small_level5_entity_req.pem -CA sphincs_small_level5_root_cert.pem -CAkey sphincs_small_level5_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 365 -set_serial 51 -out sphincs_small_level5_entity_cert.pem
+${OPENSSL} x509 -req -in sphincs_small_level5_entity_req.pem -CA sphincs_small_level5_root_cert.pem -CAkey sphincs_small_level5_root_key.pem -extfile entity.conf -extensions x509v3_extensions -days 1095 -set_serial 51 -out sphincs_small_level5_entity_cert.pem
 
 ###############################################################################
 # Verify all generated certificates.
