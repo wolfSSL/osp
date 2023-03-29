@@ -1,0 +1,168 @@
+commit c52be38420f458b9eb7e3f3c920e36bbeea60d5c
+Author: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date:   Fri Mar 24 12:23:18 2023 +0100
+
+    Implement a non-fips version of hmac_sha256_vector
+    
+    This allows users to use sae in FIPS mode by using a version of hmac_sha256_vector that bypasses the minimum password requirement. This new function (hmac_sha256_vector_NONFIPS) is only used when it is not used in a cryptographic context. Tested with:
+      ./run-tests.py sae
+
+diff --git a/src/common/sae.c b/src/common/sae.c
+index c0f154e91..38b615d87 100644
+--- a/src/common/sae.c
++++ b/src/common/sae.c
+@@ -358,9 +358,15 @@ static int sae_derive_pwe_ecc(struct sae_data *sae, const u8 *addr1,
+ 		wpa_printf(MSG_DEBUG, "SAE: counter = %03u", counter);
+ 		const_time_select_bin(found, stub_password, password,
+ 				      password_len, tmp_password);
++#ifndef CONFIG_FIPS
+ 		if (hmac_sha256_vector(addrs, sizeof(addrs), 2,
+ 				       addr, len, pwd_seed) < 0)
+ 			break;
++#else
++		if (hmac_sha256_vector_NONFIPS(addrs, sizeof(addrs), 2,
++				       addr, len, pwd_seed) < 0)
++			break;
++#endif
+ 
+ 		res = sae_test_pwd_seed_ecc(sae, pwd_seed,
+ 					    prime, qr_bin, qnr_bin, x_cand_bin);
+diff --git a/src/crypto/crypto_wolfssl.c b/src/crypto/crypto_wolfssl.c
+index 00ecf6135..355128046 100644
+--- a/src/crypto/crypto_wolfssl.c
++++ b/src/crypto/crypto_wolfssl.c
+@@ -28,6 +28,22 @@
+ #include <wolfssl/wolfcrypt/ecc.h>
+ #include <wolfssl/openssl/bn.h>
+ 
++#include <wolfssl/wolfcrypt/error-crypt.h>
++
++#define LOG_WOLF_ERROR_VA(msg, ...) \
++	wpa_printf(MSG_ERROR, "wolfSSL: %s:%d " msg, __func__, __LINE__, __VA_ARGS__)
++
++#define LOG_WOLF_ERROR(msg) \
++	LOG_WOLF_ERROR_VA("%s", (msg))
++
++#define LOG_WOLF_ERROR_FUNC(func, err) \
++	LOG_WOLF_ERROR_VA( #func " failed with err: %d %s", (err), wc_GetErrorString(err))
++
++#define LOG_WOLF_ERROR_FUNC_NULL(func) \
++	LOG_WOLF_ERROR( #func " failed with NULL return")
++
++#define LOG_INVALID_PARAMETERS() \
++	LOG_WOLF_ERROR("invalid input parameters")
+ 
+ #ifndef CONFIG_FIPS
+ 
+@@ -155,6 +171,73 @@ int sha512_vector(size_t num_elem, const u8 *addr[], const size_t *len,
+ }
+ #endif /* CONFIG_SHA512 */
+ 
++#ifdef CONFIG_FIPS
++#ifdef CONFIG_SHA256
++int hmac_sha256_vector_NONFIPS(const u8 *key, size_t key_len, size_t num_elem,
++			   const u8 *addr[], const size_t *len, u8 *mac)
++{
++	Hmac hmac;
++	size_t i;
++	int err;
++	int ret = -1;
++	byte*  ip;
++	byte*  op;
++
++	if (TEST_FAIL())
++		return -1;
++
++	if (key == NULL || key_len == 0)
++		return -1;
++
++	if (key_len > HMAC_FIPS_MIN_KEY) {
++		LOG_WOLF_ERROR("key_len > HMAC_FIPS_MIN_KEY so FIPS version has to be used.");
++		return -1;
++	}
++
++	err = wc_HmacInit(&hmac, NULL, INVALID_DEVID);
++	if (err != 0) {
++		LOG_WOLF_ERROR_FUNC(wc_HmacInit, err);
++		return -1;
++	}
++
++	/* Directly manipulate Hmac object to force set the key. */
++	hmac.innerHashKeyed = 0;
++	hmac.macType = (byte)WC_SHA256;
++	err = wc_InitSha256(&hmac.hash.sha256);
++	if (err != 0) {
++		LOG_WOLF_ERROR_FUNC(wc_HmacInit, err);
++		goto fail;
++	}
++	ip = (byte*)hmac.ipad;
++	op = (byte*)hmac.opad;
++	os_memcpy(ip, key, key_len);
++	os_memset(ip + key_len, 0, WC_SHA256_BLOCK_SIZE - key_len);
++	for(i = 0; i < WC_SHA256_BLOCK_SIZE; i++) {
++		op[i] = ip[i] ^ OPAD;
++		ip[i] ^= IPAD;
++	}
++	/* Key is now set */
++
++	for (i = 0; i < num_elem; i++) {
++		err = wc_HmacUpdate(&hmac, addr[i], len[i]);
++		if (err != 0) {
++			LOG_WOLF_ERROR_FUNC(wc_HmacUpdate, err);
++			goto fail;
++		}
++	}
++	err = wc_HmacFinal(&hmac, mac);
++	if (err != 0) {
++		LOG_WOLF_ERROR_FUNC(wc_HmacFinal, err);
++		goto fail;
++	}
++
++	ret = 0;
++fail:
++	wc_HmacFree(&hmac);
++	return ret;
++}
++#endif
++#endif
+ 
+ static int wolfssl_hmac_vector(int type, const u8 *key,
+ 			       size_t key_len, size_t num_elem,
+diff --git a/src/crypto/sha256.h b/src/crypto/sha256.h
+index 8054bbe5c..824d69e47 100644
+--- a/src/crypto/sha256.h
++++ b/src/crypto/sha256.h
+@@ -11,6 +11,11 @@
+ 
+ #define SHA256_MAC_LEN 32
+ 
++#ifdef CONFIG_FIPS
++int hmac_sha256_vector_NONFIPS(const u8 *key, size_t key_len, size_t num_elem,
++		       const u8 *addr[], const size_t *len, u8 *mac);
++#endif
++
+ int hmac_sha256_vector(const u8 *key, size_t key_len, size_t num_elem,
+ 		       const u8 *addr[], const size_t *len, u8 *mac);
+ int hmac_sha256(const u8 *key, size_t key_len, const u8 *data,
+diff --git a/tests/hwsim/test_sae.py b/tests/hwsim/test_sae.py
+index abadc3037..c9a0c5562 100644
+--- a/tests/hwsim/test_sae.py
++++ b/tests/hwsim/test_sae.py
+@@ -25,7 +25,7 @@ def test_sae(dev, apdev):
+     """SAE with default group"""
+     check_sae_capab(dev[0])
+     params = hostapd.wpa2_params(ssid="test-sae",
+-                                 passphrase="12345678")
++                                 passphrase="1234567890ABCDEF")
+     params['wpa_key_mgmt'] = 'SAE'
+     hapd = hostapd.add_ap(apdev[0], params)
+     key_mgmt = hapd.get_config()['key_mgmt']
+@@ -33,7 +33,7 @@ def test_sae(dev, apdev):
+         raise Exception("Unexpected GET_CONFIG(key_mgmt): " + key_mgmt)
+ 
+     dev[0].request("SET sae_groups ")
+-    id = dev[0].connect("test-sae", psk="12345678", key_mgmt="SAE",
++    id = dev[0].connect("test-sae", psk="1234567890ABCDEF", key_mgmt="SAE",
+                         scan_freq="2412")
+     hapd.wait_sta()
+     if dev[0].get_status_field('sae_group') != '19':
