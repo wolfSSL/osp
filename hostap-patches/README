@@ -1,3 +1,10 @@
 This directory contains patches that have been submitted and are pending
 approval (in the pending directory) or have a very narrow use case. The patches
 can be applied using `patch -p1 < /path/to/patch`.
+
+
+###Support-for-SAE-in-FIPS.patch
+Sets the HMAC key by accessing the HMAC struct directly for key sizes less than the approved FIPS HMAC key sizes. This works around the key size restriction but should be disclosed if used because it is not compliant with the FIPS HMAC key requirements.
+
+###Support-FIPS_WARNING-MSCHAP.patch
+Adds in MD5 and DES support with CONFIG_FIPS=warning. This allows for MSCHAP and CHAP modes. Each call to an algorithm outside the FIPS boundary triggers a warning message printed out. If used it should be disclosed that the MSCHAP(v2) / CHAP modes are using algorithms outside of the FIPS boundary.

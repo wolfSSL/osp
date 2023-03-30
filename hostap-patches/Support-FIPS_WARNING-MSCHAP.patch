@@ -1,0 +1,199 @@
+diff --git a/src/crypto/crypto_wolfssl.c b/src/crypto/crypto_wolfssl.c
+index f47beeb..cdb009b 100644
+--- a/src/crypto/crypto_wolfssl.c
++++ b/src/crypto/crypto_wolfssl.c
+@@ -31,7 +31,7 @@
+ #include <wolfssl/openssl/bn.h>
+ 
+ 
+-#ifndef CONFIG_FIPS
++#if !defined(CONFIG_FIPS) || defined(CONFIG_FIPS_WARNING)
+ 
+ int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
+ {
+@@ -41,6 +41,10 @@ int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
+ 	if (TEST_FAIL())
+ 		return -1;
+ 
++#ifdef CONFIG_FIPS_WARNING
++    wpa_printf(MSG_WARNING, "MD4 is not in FIPS boundary");
++#endif
++
+ 	wc_InitMd4(&md4);
+ 
+ 	for (i = 0; i < num_elem; i++)
+@@ -60,6 +64,10 @@ int md5_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
+ 	if (TEST_FAIL())
+ 		return -1;
+ 
++#ifdef CONFIG_FIPS_WARNING
++    wpa_printf(MSG_WARNING, "MD5 is not in FIPS boundary");
++#endif
++
+ 	wc_InitMd5(&md5);
+ 
+ 	for (i = 0; i < num_elem; i++)
+@@ -194,6 +202,10 @@ static int wolfssl_hmac_vector(int type, const u8 *key,
+ int hmac_md5_vector(const u8 *key, size_t key_len, size_t num_elem,
+ 		    const u8 *addr[], const size_t *len, u8 *mac)
+ {
++#ifdef CONFIG_FIPS_WARNING
++    wpa_printf(MSG_WARNING, "HMAC-MD5 is not in FIPS boundary");
++#endif
++
+ 	return wolfssl_hmac_vector(WC_MD5, key, key_len, num_elem, addr, len,
+ 				   mac, 16);
+ }
+@@ -202,6 +214,10 @@ int hmac_md5_vector(const u8 *key, size_t key_len, size_t num_elem,
+ int hmac_md5(const u8 *key, size_t key_len, const u8 *data, size_t data_len,
+ 	     u8 *mac)
+ {
++#ifdef CONFIG_FIPS_WARNING
++    wpa_printf(MSG_WARNING, "HMAC-MD5 is not in FIPS boundary");
++#endif
++
+ 	return hmac_md5_vector(key, key_len, 1, &data, &data_len, mac);
+ }
+ 
+diff --git a/src/eap_peer/eap_ttls.c b/src/eap_peer/eap_ttls.c
+index c8e2de0..6df03ec 100644
+--- a/src/eap_peer/eap_ttls.c
++++ b/src/eap_peer/eap_ttls.c
+@@ -312,7 +312,7 @@ static int eap_ttls_v0_derive_key(struct eap_sm *sm,
+ }
+ 
+ 
+-#ifndef CONFIG_FIPS
++#if !defined(CONFIG_FIPS) || defined(CONFIG_FIPS_WARNING)
+ static u8 * eap_ttls_implicit_challenge(struct eap_sm *sm,
+ 					struct eap_ttls_data *data, size_t len)
+ {
+@@ -507,7 +507,7 @@ static int eap_ttls_phase2_request_mschapv2(struct eap_sm *sm,
+ 					    struct eap_method_ret *ret,
+ 					    struct wpabuf **resp)
+ {
+-#ifdef CONFIG_FIPS
++#if defined(CONFIG_FIPS) && !defined(CONFIG_FIPS_WARNING)
+ 	wpa_printf(MSG_ERROR, "EAP-TTLS: MSCHAPV2 not supported in FIPS build");
+ 	return -1;
+ #else /* CONFIG_FIPS */
+@@ -518,6 +518,9 @@ static int eap_ttls_phase2_request_mschapv2(struct eap_sm *sm,
+ 	size_t identity_len, password_len;
+ 	int pwhash;
+ 
++#if defined(CONFIG_FIPS_WARNING)
++	wpa_printf(MSG_WARNING, "EAP-TTLS: MSCHAPV2 goes outside of FIPS boundary");
++#endif
+ 	wpa_printf(MSG_DEBUG, "EAP-TTLS: Phase 2 MSCHAPV2 Request");
+ 
+ 	identity = eap_get_config_identity(sm, &identity_len);
+@@ -602,7 +605,7 @@ static int eap_ttls_phase2_request_mschap(struct eap_sm *sm,
+ 					  struct eap_method_ret *ret,
+ 					  struct wpabuf **resp)
+ {
+-#ifdef CONFIG_FIPS
++#if defined(CONFIG_FIPS) && !defined(CONFIG_FIPS_WARNING)
+ 	wpa_printf(MSG_ERROR, "EAP-TTLS: MSCHAP not supported in FIPS build");
+ 	return -1;
+ #else /* CONFIG_FIPS */
+@@ -612,6 +615,9 @@ static int eap_ttls_phase2_request_mschap(struct eap_sm *sm,
+ 	size_t identity_len, password_len;
+ 	int pwhash;
+ 
++#if defined(CONFIG_FIPS_WARNING)
++	wpa_printf(MSG_WARNING, "EAP-TTLS: MSCHAP goes outside of FIPS boundary");
++#endif
+ 	wpa_printf(MSG_DEBUG, "EAP-TTLS: Phase 2 MSCHAP Request");
+ 
+ 	identity = eap_get_config_identity(sm, &identity_len);
+@@ -759,7 +765,7 @@ static int eap_ttls_phase2_request_chap(struct eap_sm *sm,
+ 					struct eap_method_ret *ret,
+ 					struct wpabuf **resp)
+ {
+-#ifdef CONFIG_FIPS
++#if defined(CONFIG_FIPS) && !defined(CONFIG_FIPS_WARNING)
+ 	wpa_printf(MSG_ERROR, "EAP-TTLS: CHAP not supported in FIPS build");
+ 	return -1;
+ #else /* CONFIG_FIPS */
+@@ -768,6 +774,9 @@ static int eap_ttls_phase2_request_chap(struct eap_sm *sm,
+ 	const u8 *identity, *password;
+ 	size_t identity_len, password_len;
+ 
++#if defined(CONFIG_FIPS_WARNING)
++	wpa_printf(MSG_WARNING, "EAP-TTLS: CHAP goes outside of FIPS boundary");
++#endif
+ 	wpa_printf(MSG_DEBUG, "EAP-TTLS: Phase 2 CHAP Request");
+ 
+ 	identity = eap_get_config_identity(sm, &identity_len);
+diff --git a/tests/hwsim/utils.py b/tests/hwsim/utils.py
+index 769f824..0571eb8 100644
+--- a/tests/hwsim/utils.py
++++ b/tests/hwsim/utils.py
+@@ -92,7 +92,11 @@ def iface_is_in_bridge(bridge, ifname):
+ def skip_with_fips(dev, reason="Not supported in FIPS mode"):
+     res = dev.get_capability("fips")
+     if res and 'FIPS' in res:
+-        raise HwsimSkip(reason)
++        res = dev.get_capability("fips-warning")
++        if res and 'FIPS_WARNING' in res:
++            print("Continue with warning of FIPS boundary")
++        else:
++            raise HwsimSkip(reason)
+ 
+ def check_ext_key_id_capa(dev):
+     res = dev.get_driver_status_field('capa.flags')
+diff --git a/wpa_supplicant/Makefile b/wpa_supplicant/Makefile
+index 57620fe..f8ffdf7 100644
+--- a/wpa_supplicant/Makefile
++++ b/wpa_supplicant/Makefile
+@@ -543,6 +543,10 @@ ifndef CONFIG_FIPS
+ MS_FUNCS=y
+ CHAP=y
+ endif
++ifeq ($(CONFIG_FIPS), warning)
++MS_FUNCS=y
++CHAP=y
++endif
+ CONFIG_IEEE8021X_EAPOL=y
+ endif
+ 
+@@ -1485,6 +1489,9 @@ ifdef NEED_DES
+ ifndef CONFIG_FIPS
+ CFLAGS += -DCONFIG_DES
+ endif
++ifeq ($(CONFIG_FIPS), warning)
++CFLAGS += -DCONFIG_DES
++endif
+ ifdef CONFIG_INTERNAL_DES
+ DESOBJS += ../src/crypto/des-internal.o
+ endif
+@@ -1753,6 +1760,9 @@ endif
+ 
+ ifdef CONFIG_FIPS
+ CFLAGS += -DCONFIG_FIPS
++ifeq ($(CONFIG_FIPS), warning)
++CFLAGS += -DCONFIG_FIPS_WARNING
++endif
+ ifneq ($(CONFIG_TLS), openssl)
+ ifneq ($(CONFIG_TLS), wolfssl)
+ $(error CONFIG_FIPS=y requires CONFIG_TLS=openssl)
+diff --git a/wpa_supplicant/ctrl_iface.c b/wpa_supplicant/ctrl_iface.c
+index 9abfeb2..6e995ac 100644
+--- a/wpa_supplicant/ctrl_iface.c
++++ b/wpa_supplicant/ctrl_iface.c
+@@ -4796,6 +4796,15 @@ static int wpa_supplicant_ctrl_iface_get_capability(
+ 	}
+ #endif /* CONFIG_FIPS */
+ 
++#ifdef CONFIG_FIPS_WARNING
++	if (os_strcmp(field, "fips-warning") == 0) {
++		res = os_snprintf(buf, buflen, "FIPS_WARNING");
++		if (os_snprintf_error(buflen, res))
++			return -1;
++		return res;
++	}
++#endif /* CONFIG_FIPS_WARNING */
++
+ #ifdef CONFIG_ACS
+ 	if (os_strcmp(field, "acs") == 0) {
+ 		res = os_snprintf(buf, buflen, "ACS");
