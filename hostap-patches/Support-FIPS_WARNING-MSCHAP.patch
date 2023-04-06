@@ -143,14 +143,14 @@ index 769f824..0571eb8 100644
  def check_ext_key_id_capa(dev):
      res = dev.get_driver_status_field('capa.flags')
 diff --git a/wpa_supplicant/Makefile b/wpa_supplicant/Makefile
-index 57620fe..f8ffdf7 100644
+index 57620fe..bf62050 100644
 --- a/wpa_supplicant/Makefile
 +++ b/wpa_supplicant/Makefile
 @@ -543,6 +543,10 @@ ifndef CONFIG_FIPS
  MS_FUNCS=y
  CHAP=y
  endif
-+ifeq ($(CONFIG_FIPS), warning)
++ifdef CONFIG_FIPS_WARNING
 +MS_FUNCS=y
 +CHAP=y
 +endif
@@ -161,7 +161,7 @@ index 57620fe..f8ffdf7 100644
  ifndef CONFIG_FIPS
  CFLAGS += -DCONFIG_DES
  endif
-+ifeq ($(CONFIG_FIPS), warning)
++ifdef CONFIG_FIPS_WARNING
 +CFLAGS += -DCONFIG_DES
 +endif
  ifdef CONFIG_INTERNAL_DES
@@ -171,7 +171,7 @@ index 57620fe..f8ffdf7 100644
  
  ifdef CONFIG_FIPS
  CFLAGS += -DCONFIG_FIPS
-+ifeq ($(CONFIG_FIPS), warning)
++ifdef CONFIG_FIPS_WARNING
 +CFLAGS += -DCONFIG_FIPS_WARNING
 +endif
  ifneq ($(CONFIG_TLS), openssl)
