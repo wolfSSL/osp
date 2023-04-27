@@ -1,0 +1,198 @@
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index b4f1bbe..33bf815 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -1323,12 +1323,39 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
+ 		return -1;
+ 	}
+ 
+-	if (params->openssl_ciphers &&
+-	    wolfSSL_set_cipher_list(conn->ssl, params->openssl_ciphers) != 1) {
+-		wpa_printf(MSG_INFO,
+-			   "wolfSSL: Failed to set cipher string '%s'",
+-			   params->openssl_ciphers);
+-		return -1;
++	if (params->openssl_ciphers) {
++		if (os_strcmp(params->openssl_ciphers, "SUITEB192") == 0) {
++    #ifndef CONFIG_SUITEB192
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: CONFIG_SUITEB192 not set");
++			return -1;
++    #else
++            int setErr = 0;
++    	    setErr = wolfSSL_set_cipher_list(conn->ssl,
++                "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-=GCM-SHA384:"
++                "DHE-RSA-AES256-GCM-SHA384:TLS13-AES256-GCM-SHA384");
++            if (setErr == WOLFSSL_SUCCESS)
++                setErr = wolfSSL_SetMinEccKey_Sz(conn->ssl, 384);
++            if (setErr == WOLFSSL_SUCCESS)
++                setErr = wolfSSL_SetMinRsaKey_Sz(conn->ssl, 3072);
++            if (setErr == WOLFSSL_SUCCESS)
++                setErr = wolfSSL_SetMinDhKey_Sz(conn->ssl, 3072);
++
++            if (setErr != WOLFSSL_SUCCESS) {
++    		    return -1;
++            }
++	#endif
++		}
++
++		if (os_strcmp(params->openssl_ciphers, "SUITEB192") != 0) {
++			if (wolfSSL_set_cipher_list(conn->ssl,
++					params->openssl_ciphers) != WOLFSSL_SUCCESS) {
++				wpa_printf(MSG_ERROR,
++					"wolfSSL: Failed to set cipher string '%s'",
++					params->openssl_ciphers);
++				return -1;
++			}
++		}
+ 	}
+ 
+ 	tls_set_conn_flags(conn->ssl, params->flags);
+@@ -1553,13 +1580,39 @@ int tls_global_set_params(void *tls_ctx,
+ 		return -1;
+ 	}
+ 
+-	if (params->openssl_ciphers &&
+-	    wolfSSL_CTX_set_cipher_list(tls_ctx,
+-					params->openssl_ciphers) != 1) {
+-		wpa_printf(MSG_INFO,
+-			   "wolfSSL: Failed to set cipher string '%s'",
+-			   params->openssl_ciphers);
+-		return -1;
++	if (params->openssl_ciphers) {
++        if (os_strcmp(params->openssl_ciphers, "SUITEB192") == 0) {
++    #ifndef CONFIG_SUITEB192
++		    wpa_printf(MSG_ERROR,
++			        "wolfSSL: CONFIG_SUITEB192 not set");
++            return -1;
++    #else
++            int setErr;
++    	    setErr = wolfSSL_CTX_set_cipher_list(tls_ctx,
++                "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-=GCM-SHA384:"
++                "DHE-RSA-AES256-GCM-SHA384:TLS13-AES256-GCM-SHA384");
++            if (setErr == WOLFSSL_SUCCESS)
++                setErr = wolfSSL_CTX_SetMinEccKey_Sz(tls_ctx, 384);
++            if (setErr == WOLFSSL_SUCCESS)
++                setErr = wolfSSL_CTX_SetMinRsaKey_Sz(tls_ctx, 3072);
++            if (setErr == WOLFSSL_SUCCESS)
++                setErr = wolfSSL_CTX_SetMinDhKey_Sz(tls_ctx, 3072);
++
++            if (setErr != WOLFSSL_SUCCESS) {
++    		    return -1;
++            }
++    #endif
++        }
++
++        if (os_strcmp(params->openssl_ciphers, "SUITEB192") != 0) {
++	        if (wolfSSL_CTX_set_cipher_list(tls_ctx,
++					params->openssl_ciphers) != WOLFSSL_SUCCESS) {
++		        wpa_printf(MSG_ERROR,
++			        "wolfSSL: Failed to set cipher string '%s'",
++			        params->openssl_ciphers);
++                return -1;
++            }
++        }
+ 	}
+ 
+ 	if (params->openssl_ecdh_curves) {
+diff --git a/tests/hwsim/test_suite_b.py b/tests/hwsim/test_suite_b.py
+index f096d47..036588c 100644
+--- a/tests/hwsim/test_suite_b.py
++++ b/tests/hwsim/test_suite_b.py
+@@ -194,7 +194,8 @@ def test_suite_b_192(dev, apdev):
+                    pairwise="GCMP-256", group="GCMP-256", scan_freq="2412")
+     tls_cipher = dev[0].get_status_field("EAP TLS cipher")
+     if tls_cipher != "ECDHE-ECDSA-AES256-GCM-SHA384" and \
+-       tls_cipher != "ECDHE-ECDSA-AES-256-GCM-AEAD":
++       tls_cipher != "ECDHE-ECDSA-AES-256-GCM-AEAD" and \
++       tls_cipher != "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384":
+         raise Exception("Unexpected TLS cipher: " + tls_cipher)
+     cipher = dev[0].get_status_field("mgmt_group_cipher")
+     if cipher != "BIP-GMAC-256":
+@@ -300,9 +301,13 @@ def test_suite_b_192_radius_and_p256_cert(dev, apdev):
+                    private_key="auth_serv/ec2-user-p256.key",
+                    pairwise="GCMP-256", group="GCMP-256", scan_freq="2412",
+                    wait_connect=False)
+-    ev = dev[0].wait_event(["CTRL-EVENT-EAP-FAILURE"], timeout=10)
++    ev = dev[0].wait_event(["CTRL-EVENT-EAP-FAILURE",
++                            "EAP: Failed to initialize EAP method"], timeout=10)
+     if ev is None:
+         raise Exception("EAP-Failure not reported")
++    # Check for failing to load in the certificate
++    if "Failed to initialize EAP method" in ev:
++        return
+     ev = dev[0].wait_event(["CTRL-EVENT-DISCONNECTED"], timeout=5)
+     if ev is None:
+         raise Exception("Disconnection not reported")
+@@ -452,6 +457,8 @@ def run_suite_b_192_rsa(dev, apdev, no_ecdh=False, no_dhe=False, tls13=False):
+        tls_cipher != "DHE-RSA-AES256-GCM-SHA384" and \
+        tls_cipher != "ECDHE-RSA-AES-256-GCM-AEAD" and \
+        tls_cipher != "DHE-RSA-AES-256-GCM-AEAD" and \
++       tls_cipher != "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" and \
++       tls_cipher != "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384" and \
+        tls_cipher != "TLS_AES_256_GCM_SHA384":
+         raise Exception("Unexpected TLS cipher: " + tls_cipher)
+     cipher = dev[0].get_status_field("mgmt_group_cipher")
+@@ -499,7 +506,8 @@ def test_suite_b_192_rsa_insufficient_key(dev, apdev):
+                    private_key="auth_serv/user.key",
+                    pairwise="GCMP-256", group="GCMP-256", scan_freq="2412",
+                    wait_connect=False)
+-    ev = dev[0].wait_event(["CTRL-EVENT-EAP-TLS-CERT-ERROR"], timeout=10)
++    ev = dev[0].wait_event(["CTRL-EVENT-EAP-TLS-CERT-ERROR",
++                            "EAP: Failed to initialize EAP method"], timeout=10)
+     dev[0].request("DISCONNECT")
+     if ev is None:
+         raise Exception("Certificate error not reported")
+@@ -507,6 +515,10 @@ def test_suite_b_192_rsa_insufficient_key(dev, apdev):
+         return
+     if "reason=7" in ev and "err='certificate uses insecure algorithm'" in ev:
+         return
++
++    # Check for failing to load in the certificate
++    if "Failed to initialize EAP method" in ev:
++        return
+     raise Exception("Unexpected error reason: " + ev)
+ 
+ def test_suite_b_192_rsa_insufficient_dh(dev, apdev):
+@@ -528,13 +540,16 @@ def test_suite_b_192_rsa_insufficient_dh(dev, apdev):
+                    pairwise="GCMP-256", group="GCMP-256", scan_freq="2412",
+                    wait_connect=False)
+     ev = dev[0].wait_event(["CTRL-EVENT-EAP-STATUS status='local TLS alert'",
+-                            "CTRL-EVENT-CONNECTED"],
+-                           timeout=10)
++                            "CTRL-EVENT-CONNECTED",
++                            "CTRL-EVENT-EAP-FAILURE EAP authentication failed"],
++                            timeout=10)
+     dev[0].request("DISCONNECT")
+     if ev is None:
+         raise Exception("DH error not reported")
+     if "CTRL-EVENT-CONNECTED" in ev:
+         raise Exception("Unexpected connection")
++    if "CTRL-EVENT-EAP-FAILURE EAP authentication failed" in ev:
++        return
+     if "insufficient security" not in ev and "internal error" not in ev:
+         raise Exception("Unexpected error reason: " + ev)
+ 
+@@ -576,6 +591,7 @@ def test_suite_b_192_rsa_radius(dev, apdev):
+                    group_mgmt="BIP-GMAC-256", scan_freq="2412")
+     tls_cipher = dev[0].get_status_field("EAP TLS cipher")
+     if tls_cipher != "ECDHE-RSA-AES256-GCM-SHA384" and \
++       tls_cipher != "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" and \
+        tls_cipher != "ECDHE-RSA-AES-256-GCM-AEAD":
+         raise Exception("Unexpected TLS cipher: " + tls_cipher)
+ 
+@@ -629,9 +645,13 @@ def run_suite_b_192_rsa_radius_rsa2048_client(dev, apdev, ecdhe):
+                    pairwise="GCMP-256", group="GCMP-256",
+                    group_mgmt="BIP-GMAC-256", scan_freq="2412",
+                    wait_connect=False)
+-    ev = dev[0].wait_event(["CTRL-EVENT-EAP-FAILURE"], timeout=10)
++    ev = dev[0].wait_event(["CTRL-EVENT-EAP-FAILURE",
++                            "EAP: Failed to initialize EAP method"], timeout=10)
+     if ev is None:
+         raise Exception("EAP-Failure not reported")
++    # Check for failing to load in the certificate
++    if "Failed to initialize EAP method" in ev:
++        return
+     ev = dev[0].wait_event(["CTRL-EVENT-DISCONNECTED"], timeout=5)
+     if ev is None:
+         raise Exception("Disconnection not reported")
