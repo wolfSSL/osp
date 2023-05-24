@@ -1,6 +1,6 @@
-commit 4081446c1d2021119cc7bff54175ec48975c10b3
+commit 2eefd8a0a9321b36217f1dad25c388a7ecbf62d4
 Author: Kareem <kareem@wolfssl.com>
-Date:   Fri Feb 10 15:49:36 2023 -0700
+Date:   Wed May 24 14:42:45 2023 -0700
 
     Add wolfSSL support to hitch.
     
@@ -28,6 +28,8 @@ index cda5c30..89ce88a 100644
  		[AC_MSG_ERROR([Cannot find libev.])])
  ])
  
+-PKG_CHECK_MODULES([SSL], [libssl])
+-PKG_CHECK_MODULES([CRYPTO], [libcrypto])
 +AC_ARG_WITH([wolfssl],
 +	AS_HELP_STRING([--with-wolfssl], [Build with wolfssl]),
 +	[
@@ -43,16 +45,19 @@ index cda5c30..89ce88a 100644
 +then
 +	PKG_CHECK_MODULES([SSL], [wolfssl])
 +else
- 	PKG_CHECK_MODULES([SSL], [libssl])
- 	PKG_CHECK_MODULES([CRYPTO], [libcrypto])
++	PKG_CHECK_MODULES([SSL], [libssl])
++	PKG_CHECK_MODULES([CRYPTO], [libcrypto])
 +fi
  HITCH_SEARCH_LIBS([SOCKET], [socket], [socket])
  HITCH_SEARCH_LIBS([NSL], [nsl], [inet_ntop])
  HITCH_SEARCH_LIBS([RT], [rt], [clock_gettime])
-@@ -178,6 +194,29 @@ fi
+@@ -178,51 +194,75 @@ fi
  AC_CHECK_HEADERS([linux/futex.h])
  AM_CONDITIONAL([HAVE_LINUX_FUTEX], [test $ac_cv_header_linux_futex_h = yes])
  
+-HITCH_CHECK_FUNC([SSL_get0_alpn_selected], [$SSL_LIBS], [
+-	AC_DEFINE([OPENSSL_WITH_ALPN], [1], [OpenSSL supports ALPN])
+-])
 +if test "$with_wolfssl" != no
 +then
 +	AC_DEFINE([WITH_WOLFSSL], [1], [Hitch is being built with wolfSSL])
@@ -69,37 +74,99 @@ index cda5c30..89ce88a 100644
 +		[wolfSSL has X509_STORE_get0_objects()])
 +	AC_DEFINE([HAVE_X509_OBJECT_GET0_X509], [1],
 +		[wolfSSL has X509_OBJECT_get0_X509()])
-+
+ 
+-HITCH_CHECK_FUNC([SSL_get0_next_proto_negotiated], [$SSL_LIBS], [
+-	AC_DEFINE([OPENSSL_WITH_NPN], [1], [OpenSSL supports NPN])
+-])
 +		HITCH_CHECK_FLAGS([HITCH_CFLAGS], [
 +		-I$wolfssl_path/include,
 +		-I$wolfssl_path/include/wolfssl,
 +		-DEXTERNAL_OPTS_OPENVPN
 +	])
 +else
- 	HITCH_CHECK_FUNC([SSL_get0_alpn_selected], [$SSL_LIBS], [
- 		AC_DEFINE([OPENSSL_WITH_ALPN], [1], [OpenSSL supports ALPN])
- 	])
-@@ -223,6 +262,7 @@ AS_VERSION_COMPARE([$($PKG_CONFIG --modversion openssl)], [1.1.1],
++	HITCH_CHECK_FUNC([SSL_get0_alpn_selected], [$SSL_LIBS], [
++		AC_DEFINE([OPENSSL_WITH_ALPN], [1], [OpenSSL supports ALPN])
++	])
  
- 	AS_IF([test "x$openssl111" = xyes],
- 		[AC_DEFINE([HAVE_TLS_1_3], [1], [Define to 1 if TLSv1.3 is available])], [])
+-HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb], [$SSL_LIBS], [
+-	AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB], [1],
+-		[OpenSSL has SSL_CTX_get_default_passwd_cb()])
+-])
++	HITCH_CHECK_FUNC([SSL_get0_next_proto_negotiated], [$SSL_LIBS], [
++		AC_DEFINE([OPENSSL_WITH_NPN], [1], [OpenSSL supports NPN])
++	])
+ 
+-HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb_userdata], [$SSL_LIBS], [
+-	AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB_USERDATA], [1],
+-		[OpenSSL has SSL_CTX_get_default_passwd_cb_userdata()])
+-])
++	HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb], [$SSL_LIBS], [
++		AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB], [1],
++			[OpenSSL has SSL_CTX_get_default_passwd_cb()])
++	])
+ 
+-HITCH_CHECK_FUNC([CRYPTO_get_locking_callback], [$CRYPTO_LIBS], [
+-	AC_DEFINE([OPENSSL_WITH_LOCKS], [1], [OpenSSL needs explicit locking])
+-])
++	HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb_userdata], [$SSL_LIBS], [
++		AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB_USERDATA], [1],
++			[OpenSSL has SSL_CTX_get_default_passwd_cb_userdata()])
++	])
+ 
+-HITCH_CHECK_FUNC([X509_NAME_ENTRY_get_data], [$CRYPTO_LIBS], [
+-	AC_DEFINE([HAVE_X509_NAME_ENTRY_GET_DATA], [1],
+-		[OpenSSL has X509_NAME_ENTRY_get_data()])
+-])
++	HITCH_CHECK_FUNC([CRYPTO_get_locking_callback], [$CRYPTO_LIBS], [
++		AC_DEFINE([OPENSSL_WITH_LOCKS], [1], [OpenSSL needs explicit locking])
++	])
+ 
+-HITCH_CHECK_FUNC([X509_STORE_get0_objects], [$CRYPTO_LIBS], [
+-	AC_DEFINE([HAVE_X509_STORE_GET0_OBJECTS], [1],
+-		[OpenSSL has X509_STORE_get0_objects()])
+-])
++	HITCH_CHECK_FUNC([X509_NAME_ENTRY_get_data], [$CRYPTO_LIBS], [
++		AC_DEFINE([HAVE_X509_NAME_ENTRY_GET_DATA], [1],
++			[OpenSSL has X509_NAME_ENTRY_get_data()])
++	])
+ 
+-HITCH_CHECK_FUNC([X509_OBJECT_get0_X509], [$CRYPTO_LIBS], [
+-	AC_DEFINE([HAVE_X509_OBJECT_GET0_X509], [1],
+-		[OpenSSL has X509_OBJECT_get0_X509()])
+-])
++	HITCH_CHECK_FUNC([X509_STORE_get0_objects], [$CRYPTO_LIBS], [
++		AC_DEFINE([HAVE_X509_STORE_GET0_OBJECTS], [1],
++			[OpenSSL has X509_STORE_get0_objects()])
++	])
++
++	HITCH_CHECK_FUNC([X509_OBJECT_get0_X509], [$CRYPTO_LIBS], [
++		AC_DEFINE([HAVE_X509_OBJECT_GET0_X509], [1],
++			[OpenSSL has X509_OBJECT_get0_X509()])
++	])
+ 
+-AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
++	AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
+ 
+-AS_VERSION_COMPARE([$($PKG_CONFIG --modversion openssl)], [1.1.1],
+-	[openssl111=no],
+-	[openssl111=yes], [openssl111=yes])
++	AS_VERSION_COMPARE([$($PKG_CONFIG --modversion openssl)], [1.1.1],
++		[openssl111=no],
++		[openssl111=yes], [openssl111=yes])
+ 
+-AS_IF([test "x$openssl111" = xyes],
+-	[AC_DEFINE([HAVE_TLS_1_3], [1], [Define to 1 if TLSv1.3 is available])], [])
++	AS_IF([test "x$openssl111" = xyes],
++		[AC_DEFINE([HAVE_TLS_1_3], [1], [Define to 1 if TLSv1.3 is available])], [])
 +fi
  
  SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
  AC_SUBST(SH_TESTS)
 diff --git a/src/hitch.c b/src/hitch.c
-index 7d15207..071b017 100644
+index 7d15207..1e1ebfe 100644
 --- a/src/hitch.c
 +++ b/src/hitch.c
-@@ -36,7 +36,6 @@
-   */
- 
- #include "config.h"
--
- #include <openssl/x509.h>
- #include <openssl/x509_vfy.h>
- #include <openssl/engine.h>
-@@ -1325,6 +1324,7 @@ init_openssl(void)
+@@ -1325,6 +1325,7 @@ init_openssl(void)
  	SSL_load_error_strings();
  	OpenSSL_add_all_digests();
  
@@ -107,7 +174,7 @@ index 7d15207..071b017 100644
  	if (CONFIG->ENGINE) {
  		ENGINE *e = NULL;
  		ENGINE_load_builtin_engines();
-@@ -1345,6 +1345,7 @@ init_openssl(void)
+@@ -1345,6 +1346,7 @@ init_openssl(void)
  			ENGINE_free(e);
  		}
  	}
@@ -115,7 +182,7 @@ index 7d15207..071b017 100644
  }
  
  static void
-@@ -2034,7 +2035,7 @@ proxy_tlv_cert(struct proxystate *ps, char *dst, ssize_t dstlen)
+@@ -2034,7 +2036,7 @@ proxy_tlv_cert(struct proxystate *ps, char *dst, ssize_t dstlen)
  {
  	X509 *crt;
  	BIO *bio;
@@ -125,7 +192,7 @@ index 7d15207..071b017 100644
  	crt = SSL_get_peer_certificate(ps->ssl);
  	if (crt == NULL)
 diff --git a/src/ocsp.c b/src/ocsp.c
-index 8f5639a..437734b 100644
+index 8f5639a..4023fd9 100644
 --- a/src/ocsp.c
 +++ b/src/ocsp.c
 @@ -547,7 +547,12 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
