@@ -29,19 +29,14 @@ Some ports also contain a `wolfssl_port.c` file containing implementations of ce
 ## Steps
 
 1. Familiarize yourself with the MicroPython [documentation for user modules](https://docs.micropython.org/en/v1.19.1/develop/cmodules.html), specifically for how user modules are included in the build
-2. Clone the wolfSSL repo and checkout a compatible version tag 
+2. Clone this repo (osp) 
 ```
-# first, navigate to the directory where you wish to clone wolfSSL, then run the following
-git clone https://github.com/wolfssl/wolfssl.git
-cd wolfssl
-git checkout v5.6.0-stable
-```
-3. Clone the OSP repository 
-```
-# first, navigate to the directory where you wish to clone osp, then run the following
+# first, navigate to the directory where you wish to clone this repo (osp), then run the following
 git clone https://github.com/wolfssl/osp.git
+cd osp
+git submodule update --init -- micropython-modules/micropython-wolfssl/wolfssl
 ```
-4. **OPTIONAL but recommended:** In the main MicroPython repository, disable support for the `ussl`, `ucryptolib` and `uhashlib` modules in your port by ensuring the following C macros are defined to 0 at compile time
+3. **OPTIONAL but recommended:** In the main MicroPython repository, disable support for the `ussl`, `ucryptolib` and `uhashlib` modules in your port by ensuring the following C macros are defined to 0 at compile time
 ```C
 #define MICROPY_PY_USSL       0
 #define MICROPY_PY_UCRYPTOLIB 0
@@ -49,15 +44,15 @@ git clone https://github.com/wolfssl/osp.git
 ```
 **NOTE**: See [port-specific-macros](#port-specific-macros) section below for instructions on the best way to do this for your port.
 
-5. Ensure the C macro `MICROPY_TRACKED_ALLOC` is defined to `1` for your port at build-time. This is also detailed in the [port-specific-macros](#port-specific-macros) section below. 
-6. Run `make clean` for your port (for some ports you need to include the `BOARD` or `VARIANT` argument to make)
-7. Build your MicroPython port, providing `make` with three important command line variables: The path to the parent directory containing this user module (the OSP repo's `micropython-modules` directory) in the `USER_C_MODULES` variable, the path to your wolfSSL source tree in the `WOLFSSL_SOURCE` variable, and the target port for wolfSSL in the `WOLFSSL_PORT` variable. If your port requires other build arguments, make sure to include those too
+4. Ensure the C macro `MICROPY_TRACKED_ALLOC` is defined to `1` for your port at build-time. This is also detailed in the [port-specific-macros](#port-specific-macros) section below. 
+5. Run `make clean` for your port (for some ports you need to include the `BOARD` or `VARIANT` argument to make)
+6. Build your MicroPython port, providing `make` with two important command line variables: The path to the parent directory containing this user module (the OSP repo's `micropython-modules` directory) in the `USER_C_MODULES` variable, and the target port for wolfSSL in the `WOLFSSL_PORT` variable. If your port requires other build arguments, make sure to include those too
 ```
-make USER_C_MODULES=/path/to/osp/micropython-modules WOLFSSL_SOURCE=/path/to/wolfssl WOLFSSL_PORT=unix
+make USER_C_MODULES=/path/to/osp/micropython-modules WOLFSSL_PORT=unix
 ```
 If you want to use a custom `user_settings.h` for your port, pass it to make through the `WOLFSSL_USER_SETTINGS_FILE` variable:
 ```
-make USER_C_MODULES=/path/to/osp/micropython-modules  WOLFSSL_SOURCE=/path/to/wolfssl WOLFSSL_PORT=unix \
+make USER_C_MODULES=/path/to/osp/micropython-modules WOLFSSL_PORT=unix \
      WOLFSSL_USER_SETTINGS_FILE=/path/to/user_settings.h
 ```
 
