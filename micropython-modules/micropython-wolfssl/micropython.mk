@@ -21,11 +21,6 @@ $(info [micropython-wolfssl] WOLFSSL_SOURCE=$(WOLFSSL_SOURCE))
 $(info [micropython-wolfssl] PORT=$(WOLFSSL_PORT))
 $(info [micropython-wolfssl] PORT_DIR=$(WOLFSSL_PORT_DIR))
 
-# Check that we have a valid wolfSSL source directory 
-ifeq ($(wildcard $(WOLFSSL_SOURCE)/.*),)
-$(error no directory found for WOLFSSL_SOURCE=$(WOLFSSL_SOURCE))
-endif 
-
 # check user supplied port corresponds to a port directory with a valid user settings file
 ifneq ($(wildcard $(WOLFSSL_PORT_DIR)/user_settings.h),)
 # If port is valid, use either user supplied settings file, or default one for the port
@@ -52,7 +47,7 @@ endif
 SRC_USERMOD += $(WOLFSSL_MOD_DIR)/modussl_wolfssl.c
 SRC_USERMOD += $(WOLFSSL_MOD_DIR)/moducryptolib_wolfssl.c
 SRC_USERMOD += $(WOLFSSL_MOD_DIR)/moduhashlib_wolfssl.c
-SRC_USERMOD += $(addprefix $(WOLFSSL_SOURCE)/,\
+SRC_USERMOD += $(addprefix $(WOLFSSL_MOD_DIR)/wolfssl/,\
 	src/crl.c \
 	src/internal.c \
 	src/keys.c \

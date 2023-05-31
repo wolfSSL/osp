@@ -7,3 +7,6 @@
 [submodule "wolfEngine/libssh/libssh"]
 	path = wolfEngine/libssh/libssh
 	url = https://git.libssh.org/projects/libssh.git
+[submodule "micropython-modules/micropython-wolfssl/wolfssl"]
+	path = micropython-modules/micropython-wolfssl/wolfssl
+	url = https://github.com/wolfSSL/wolfssl.git
