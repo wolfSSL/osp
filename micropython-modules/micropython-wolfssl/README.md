@@ -29,7 +29,7 @@ Some ports also contain a `wolfssl_port.c` file containing implementations of ce
 ## Steps
 
 1. Familiarize yourself with the MicroPython [documentation for user modules](https://docs.micropython.org/en/v1.19.1/develop/cmodules.html), specifically for how user modules are included in the build
-2. Clone this repo (osp) 
+2. Clone this repo (osp)
 ```
 # first, navigate to the directory where you wish to clone this repo (osp), then run the following
 git clone https://github.com/wolfssl/osp.git
@@ -44,7 +44,7 @@ git submodule update --init -- micropython-modules/micropython-wolfssl/wolfssl
 ```
 **NOTE**: See [port-specific-macros](#port-specific-macros) section below for instructions on the best way to do this for your port.
 
-4. Ensure the C macro `MICROPY_TRACKED_ALLOC` is defined to `1` for your port at build-time. This is also detailed in the [port-specific-macros](#port-specific-macros) section below. 
+4. Ensure the C macro `MICROPY_TRACKED_ALLOC` is defined to `1` for your port at build-time. This is also detailed in the [port-specific-macros](#port-specific-macros) section below.
 5. Run `make clean` for your port (for some ports you need to include the `BOARD` or `VARIANT` argument to make)
 6. Build your MicroPython port, providing `make` with two important command line variables: The path to the parent directory containing this user module (the OSP repo's `micropython-modules` directory) in the `USER_C_MODULES` variable, and the target port for wolfSSL in the `WOLFSSL_PORT` variable. If your port requires other build arguments, make sure to include those too
 ```
@@ -72,7 +72,7 @@ Unfortunately, there is little consistency between the makefiles/cmake files for
 how to disable these modules for various ports. It is possible these instructions could become out of date if MicroPython makes changes to their build system. If the following steps don't work (if you get errors about multiple definitions for `uhashlib` and `ucryptolib` fucntions or types) then it is possible the build system has changed and you need to find another way to ensure the `MICROPY_PY_USSL`, `MICROPY_PY_UCRYPTOLIB` and `MICROPY_PY_UHASHLIB` C macros are all defined to zero at build time. `grep` will be your friend here...
 
 ### unix
-For the unix port, the three C macros above can be easily disabled by setting the `MICROPY_PY_USSL=0` makefile variable in `ports/unix/mpconfigport.mk`. This should automatically ensure the `MICROPY_PY_USSL` C macro is not set, as well as prevent the `MICROPY_PY_UCRYPTOLIB` and `MICROPY_PY_UHASHLIB` C macros  from later being defined to 1 in `port/unix/variants/mpconfigvariant_common.h`. `MICROPY_TRACKED_ALLOC` should be set to 1 by default and no further action is needed. 
+For the unix port, the three C macros above can be easily disabled by setting the `MICROPY_PY_USSL=0` makefile variable in `ports/unix/mpconfigport.mk`. This should automatically ensure the `MICROPY_PY_USSL` C macro is not set, as well as prevent the `MICROPY_PY_UCRYPTOLIB` and `MICROPY_PY_UHASHLIB` C macros  from later being defined to 1 in `port/unix/variants/mpconfigvariant_common.h`. `MICROPY_TRACKED_ALLOC` should be set to 1 by default and no further action is needed.
 
 ### stm32
 - If your board config makefile (`ports/stm32/board/$(BOARD)/mpconfigboard.mk`) contains the makefile variable "`MICROPY_PY_USSL=1`", then change the assignment to set this variable to 0.
@@ -81,7 +81,7 @@ For the unix port, the three C macros above can be easily disabled by setting th
 - Modify `ports/stm32/mpconfigport.h` such that the `MICROPY_TRACKED_ALLOC` C macro is EXPLICITLY defined to 1, and not set to the value of another macro
 
 # Using `micropython-wolfssl`
-You can now directly import the three modules (`wolfssl`, `wolfcryptolib`, `wolfhashlib`) provided by `micropython-wolfssl` using python's `import` statement. Because `micropython-wolfssl` is API compatible with the default implementations, you can simply alias the `micropython-wolfssl` modules to the name of the internal module you were using before and no further modification to your code should be needed. For example, to set up a TLS connection: 
+You can now directly import the three modules (`wolfssl`, `wolfcryptolib`, `wolfhashlib`) provided by `micropython-wolfssl` using python's `import` statement. Because `micropython-wolfssl` is API compatible with the default implementations, you can simply alias the `micropython-wolfssl` modules to the name of the internal module you were using before and no further modification to your code should be needed. For example, to set up a TLS connection:
 
 ```python
 # alias wolfssl to ussl on import
@@ -96,10 +96,10 @@ Features of the `micropython-wolfssl` modules can also be configured using the e
 
 ```
 MICROPY_PY_USSL_FINALISER    // includes MicroPython "finalizer" for SSL module
-MICROPY_PY_UHASHLIB_SHA256   // includes SHA256 algorithm 
-MICROPY_PY_UHASHLIB_SHA1     // includes SHA1 algorithm  
-MICROPY_PY_UHASHLIB_MD5      // includes MD5 algorithm 
-MICROPY_PY_UCRYPTOLIB_CTR    // includes AES counter mode 
+MICROPY_PY_UHASHLIB_SHA256   // includes SHA256 algorithm
+MICROPY_PY_UHASHLIB_SHA1     // includes SHA1 algorithm
+MICROPY_PY_UHASHLIB_MD5      // includes MD5 algorithm
+MICROPY_PY_UCRYPTOLIB_CTR    // includes AES counter mode
 MICROPY_PY_UCRYPTOLIB_CONSTS // includes AES ECB and CBC mode ROM constants
 ```
 
