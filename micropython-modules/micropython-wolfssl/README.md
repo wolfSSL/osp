@@ -103,3 +103,10 @@ MICROPY_PY_UCRYPTOLIB_CTR    // includes AES counter mode
 MICROPY_PY_UCRYPTOLIB_CONSTS // includes AES ECB and CBC mode ROM constants
 ```
 
+# Testing
+`micropython-wolfssl` contains a few supplementary tests in the `tests` directory that can be run using MicroPython's test infrastructure. To test the wolfSSL version of `ucryptolib` and `uhashlib` you can run the built-in tests in the MicroPython repo. To test the wolfSSL `ussl` module, use the tests in this repo's `tests` directory instead of the built-in ones due to error code incompatibility.
+
+In order to run the external tests using MicroPython's test runner, navigate to the MicroPython `tests` directory and invoke the runner with the the `-d` option to point to this directory. For example:
+```
+./run-tests.py -d /path/to/osp/micropython-modules/micropython-wolfssl/tests/
+```
