@@ -47,6 +47,7 @@ endif
 SRC_USERMOD += $(WOLFSSL_MOD_DIR)/modussl_wolfssl.c
 SRC_USERMOD += $(WOLFSSL_MOD_DIR)/moducryptolib_wolfssl.c
 SRC_USERMOD += $(WOLFSSL_MOD_DIR)/moduhashlib_wolfssl.c
+SRC_USERMOD += $(WOLFSSL_MOD_DIR)/wolfssl_micropy_error.c
 SRC_USERMOD += $(addprefix $(WOLFSSL_MOD_DIR)/wolfssl/,\
 	src/crl.c \
 	src/internal.c \

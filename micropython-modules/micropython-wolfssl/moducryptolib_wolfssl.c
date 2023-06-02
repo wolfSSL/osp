@@ -35,6 +35,18 @@
 
 #include "py/runtime.h"
 
+#ifdef HAVE_CONFIG_H
+    #include <config.h>
+#endif
+#ifndef WOLFSSL_USER_SETTINGS
+    #include <wolfssl/options.h>
+#endif
+#include <wolfssl/wolfcrypt/settings.h>
+
+#include "wolfssl/wolfcrypt/aes.h"
+
+#include "wolfssl_micropy_error.h"
+
 // This module implements crypto ciphers API, roughly following
 // https://www.python.org/dev/peps/pep-0272/ . Exact implementation
 // of PEP 272 can be made with a simple wrapper which adds all the
@@ -52,18 +64,8 @@ struct ctr_params {
 
     size_t offset; // in encrypted_counter
     // encrypted counter
-    uint8_t encrypted_counter[16];
+    uint8_t encrypted_counter[AES_BLOCK_SIZE];
 };
-
-#ifdef HAVE_CONFIG_H
-    #include <config.h>
-#endif
-#ifndef WOLFSSL_USER_SETTINGS
-    #include <wolfssl/options.h>
-#endif
-#include <wolfssl/wolfcrypt/settings.h>
-
-#include <wolfssl/wolfcrypt/aes.h>
 
 struct wolfssl_aes_ctx_with_key {
     union {
@@ -100,7 +102,7 @@ static inline struct ctr_params *ctr_params_from_aes(mp_obj_aes_t *o) {
     return (struct ctr_params *)&o[1];
 }
 
-STATIC void aes_initial_set_key_impl(AES_CTX_IMPL *ctx, const uint8_t *key, size_t keysize, const uint8_t iv[16]) {
+STATIC void aes_initial_set_key_impl(AES_CTX_IMPL *ctx, const uint8_t *key, size_t keysize, const uint8_t iv[AES_IV_SIZE]) {
     assert(AES_128_KEY_SIZE == keysize || AES_192_KEY_SIZE == keysize || AES_256_KEY_SIZE == keysize);
 
     ctx->u.init_data.keysize = keysize;
@@ -136,25 +138,39 @@ STATIC void aes_final_set_key_impl(AES_CTX_IMPL *ctx, bool encrypt, mp_int_t blo
     }
 }
 
-STATIC void aes_process_ecb_impl(AES_CTX_IMPL *ctx, const uint8_t in[16], uint8_t out[16], bool encrypt) {
+STATIC void aes_process_ecb_impl(AES_CTX_IMPL *ctx, const uint8_t in[AES_BLOCK_SIZE], uint8_t out[AES_BLOCK_SIZE], bool encrypt) {
+    int result = 0;
     if (encrypt) {
-        wc_AesEncryptDirect(&ctx->u.ctx, out, in);
+        result = wc_AesEncryptDirect(&ctx->u.ctx, out, in);
     } else {
-        wc_AesDecryptDirect(&ctx->u.ctx, out, in);
+        result = wc_AesDecryptDirect(&ctx->u.ctx, out, in);
+    }
+
+    if (result != 0) {
+        wolfssl_raise_error(result);
     }
 }
 
 STATIC void aes_process_cbc_impl(AES_CTX_IMPL *ctx, const uint8_t *in, uint8_t *out, size_t in_len, bool encrypt) {
+    int result = 0;
     if (encrypt) {
-        wc_AesCbcEncrypt(&ctx->u.ctx, out, in, in_len);
+        result = wc_AesCbcEncrypt(&ctx->u.ctx, out, in, in_len);
     } else {
-        wc_AesCbcDecrypt(&ctx->u.ctx, out, in, in_len);
+        result = wc_AesCbcDecrypt(&ctx->u.ctx, out, in, in_len);
     }
+
+    if (result != 0) {
+        wolfssl_raise_error(result);
+    }
+
 }
 
 #if MICROPY_PY_UCRYPTOLIB_CTR
 STATIC void aes_process_ctr_impl(AES_CTX_IMPL *ctx, const uint8_t *in, uint8_t *out, size_t in_len, struct ctr_params *ctr_params) {
-    wc_AesCtrEncrypt(&ctx->u.ctx, out, in, in_len);
+    int result = wc_AesCtrEncrypt(&ctx->u.ctx, out, in, in_len);
+    if (result != 0) {
+        wolfssl_raise_error(result);
+    }
 }
 #endif
 
@@ -183,7 +199,7 @@ STATIC mp_obj_t wolfcryptolib_aes_make_new(const mp_obj_type_t *type, size_t n_a
 
     mp_buffer_info_t keyinfo;
     mp_get_buffer_raise(args[0], &keyinfo, MP_BUFFER_READ);
-    if (32 != keyinfo.len && 16 != keyinfo.len) {
+    if (AES_256_KEY_SIZE != keyinfo.len && AES_128_KEY_SIZE!= keyinfo.len && AES_192_KEY_SIZE) {
         mp_raise_ValueError(MP_ERROR_TEXT("key"));
     }
 
@@ -192,7 +208,7 @@ STATIC mp_obj_t wolfcryptolib_aes_make_new(const mp_obj_type_t *type, size_t n_a
     if (n_args > 2 && args[2] != mp_const_none) {
         mp_get_buffer_raise(args[2], &ivinfo, MP_BUFFER_READ);
 
-        if (16 != ivinfo.len) {
+        if (AES_IV_SIZE != ivinfo.len) {
             mp_raise_ValueError(MP_ERROR_TEXT("IV"));
         }
     } else if (o->block_mode == UCRYPTOLIB_MODE_CBC || is_ctr_mode(o->block_mode)) {
@@ -220,7 +236,7 @@ STATIC mp_obj_t aes_process(size_t n_args, const mp_obj_t *args, bool encrypt) {
     mp_buffer_info_t in_bufinfo;
     mp_get_buffer_raise(in_buf, &in_bufinfo, MP_BUFFER_READ);
 
-    if (!is_ctr_mode(self->block_mode) && in_bufinfo.len % 16 != 0) {
+    if (!is_ctr_mode(self->block_mode) && in_bufinfo.len % AES_BLOCK_SIZE != 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("blksize % 16"));
     }
 
@@ -256,7 +272,7 @@ STATIC mp_obj_t aes_process(size_t n_args, const mp_obj_t *args, bool encrypt) {
         case UCRYPTOLIB_MODE_ECB: {
             uint8_t *in = in_bufinfo.buf, *out = out_buf_ptr;
             uint8_t *top = in + in_bufinfo.len;
-            for (; in < top; in += 16, out += 16) {
+            for (; in < top; in += AES_BLOCK_SIZE, out += AES_BLOCK_SIZE) {
                 aes_process_ecb_impl(&self->ctx, in, out, encrypt);
             }
             break;

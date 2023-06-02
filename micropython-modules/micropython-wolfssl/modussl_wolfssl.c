@@ -49,6 +49,8 @@
 
 #include "wolfssl/ssl.h"
 
+#include "wolfssl_micropy_error.h"
+
 #define MP_STREAM_POLL_RDWR (MP_STREAM_POLL_RD | MP_STREAM_POLL_WR)
 
 typedef struct _mp_obj_ssl_socket_t {
@@ -81,26 +83,6 @@ void wolfSSL_logging_cb(const int logLevel, const char *const logMessage)
     mp_printf(&mp_plat_print, "WOLFSSL DBG: %s\n", logMessage);
 }
 #endif
-
-STATIC NORETURN void wolfssl_raise_error(int err) {
-
-    mp_obj_str_t *o_str = m_new_obj_maybe(mp_obj_str_t);
-    byte *o_str_buf = m_new_maybe(byte, WOLFSSL_MAX_ERROR_SZ);
-    if (o_str == NULL || o_str_buf == NULL) {
-        mp_raise_OSError(err);
-    }
-
-    wolfSSL_ERR_error_string(err, (char*)o_str_buf);
-
-    // Put the exception object together
-    o_str->base.type = &mp_type_str;
-    o_str->data = o_str_buf;
-    o_str->len = strlen((char*)o_str_buf);
-    o_str->hash = qstr_compute_hash(o_str->data, o_str->len);
-    // raise
-    mp_obj_t args[2] = { MP_OBJ_NEW_SMALL_INT(err), MP_OBJ_FROM_PTR(o_str)};
-    nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
-}
 
 // _wolfssl_ssl_send is called by wolfSSL as a custom IO function to send bytes from the underlying socket
 STATIC int _wolfssl_ssl_send(WOLFSSL* ssl, char* buf, int len, void* ctx) {
