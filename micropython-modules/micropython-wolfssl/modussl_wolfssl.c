@@ -280,17 +280,6 @@ cleanup:
         }
 
         wolfSSL_Cleanup();
-
-        // BRN-TODO Python error raising
-        //if (ret == MBEDTLS_ERR_SSL_ALLOC_FAILED) {
-        //    mp_raise_OSError(MP_ENOMEM);
-        //} else if (ret == MBEDTLS_ERR_PK_BAD_INPUT_DATA) {
-        //    mp_raise_ValueError(MP_ERROR_TEXT("invalid key"));
-        //} else if (ret == MBEDTLS_ERR_X509_BAD_INPUT_DATA) {
-        //    mp_raise_ValueError(MP_ERROR_TEXT("invalid cert"));
-        //} else {
-        //    mbedtls_raise_error(ret);
-        //}
     }
 }
 

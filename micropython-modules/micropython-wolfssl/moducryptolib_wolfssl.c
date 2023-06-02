@@ -69,11 +69,11 @@ struct wolfssl_aes_ctx_with_key {
     union {
         Aes ctx;
         struct {
-            uint8_t key[32];
+            uint8_t key[AES_256_KEY_SIZE];
             uint8_t keysize;
         } init_data;
     } u;
-    unsigned char iv[16];
+    unsigned char iv[AES_IV_SIZE];
 };
 #define AES_CTX_IMPL struct wolfssl_aes_ctx_with_key
 
@@ -101,6 +101,8 @@ static inline struct ctr_params *ctr_params_from_aes(mp_obj_aes_t *o) {
 }
 
 STATIC void aes_initial_set_key_impl(AES_CTX_IMPL *ctx, const uint8_t *key, size_t keysize, const uint8_t iv[16]) {
+    assert(AES_128_KEY_SIZE == keysize || AES_192_KEY_SIZE == keysize || AES_256_KEY_SIZE == keysize);
+
     ctx->u.init_data.keysize = keysize;
     memcpy(ctx->u.init_data.key, key, keysize);
 
@@ -111,11 +113,12 @@ STATIC void aes_initial_set_key_impl(AES_CTX_IMPL *ctx, const uint8_t *key, size
 
 STATIC void aes_final_set_key_impl(AES_CTX_IMPL *ctx, bool encrypt, mp_int_t block_mode) {
     // first, copy key aside
-    uint8_t key[32];
+    uint8_t key[AES_256_KEY_SIZE];
     uint8_t keysize = ctx->u.init_data.keysize;
+
+    assert(AES_128_KEY_SIZE == keysize || AES_192_KEY_SIZE == keysize || AES_256_KEY_SIZE == keysize);
     memcpy(key, ctx->u.init_data.key, keysize);
 
-    assert(16 == keysize || 32 == keysize);
     int dir = (encrypt) ? AES_ENCRYPTION : AES_DECRYPTION;
 
     // now, override key with the context object, calling the appropriate key initialization
