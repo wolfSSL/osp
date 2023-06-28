@@ -1,0 +1,304 @@
+commit 2eefd8a0a9321b36217f1dad25c388a7ecbf62d4
+Author: Kareem <kareem@wolfssl.com>
+Date:   Wed May 24 14:42:45 2023 -0700
+
+    Add wolfSSL support to hitch.
+    
+    To use it, build wolfSSL with:
+    ./autogen.sh
+    ./configure --enable-hitch
+    make
+    sudo make install
+    
+    Then build hitch with:
+    patch -p1 < </path/to/patch/file>
+    autoreconf -ivf
+    ./configure --with-wolfssl
+    make
+    make check-recursive
+    
+    Note that, due to differences between wolfSSL and OpenSSL, hitch tests 13, 15
+    and 39 are expected to fail.
+
+diff --git a/configure.ac b/configure.ac
+index cda5c30..89ce88a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -83,8 +83,24 @@ PKG_CHECK_EXISTS([libev], [
+ 		[AC_MSG_ERROR([Cannot find libev.])])
+ ])
+ 
+-PKG_CHECK_MODULES([SSL], [libssl])
+-PKG_CHECK_MODULES([CRYPTO], [libcrypto])
++AC_ARG_WITH([wolfssl],
++	AS_HELP_STRING([--with-wolfssl], [Build with wolfssl]),
++	[
++	if test "$withval" = yes
++	then
++		wolfssl_path=/usr/local
++	else
++		wolfssl_path=$withval
++	fi
++	], [with_wolfssl=no])
++
++if test "$with_wolfssl" != no
++then
++	PKG_CHECK_MODULES([SSL], [wolfssl])
++else
++	PKG_CHECK_MODULES([SSL], [libssl])
++	PKG_CHECK_MODULES([CRYPTO], [libcrypto])
++fi
+ HITCH_SEARCH_LIBS([SOCKET], [socket], [socket])
+ HITCH_SEARCH_LIBS([NSL], [nsl], [inet_ntop])
+ HITCH_SEARCH_LIBS([RT], [rt], [clock_gettime])
+@@ -178,51 +194,75 @@ fi
+ AC_CHECK_HEADERS([linux/futex.h])
+ AM_CONDITIONAL([HAVE_LINUX_FUTEX], [test $ac_cv_header_linux_futex_h = yes])
+ 
+-HITCH_CHECK_FUNC([SSL_get0_alpn_selected], [$SSL_LIBS], [
+-	AC_DEFINE([OPENSSL_WITH_ALPN], [1], [OpenSSL supports ALPN])
+-])
++if test "$with_wolfssl" != no
++then
++	AC_DEFINE([WITH_WOLFSSL], [1], [Hitch is being built with wolfSSL])
++	AC_DEFINE([HAVE_TLS_1_3], [1], [Define to 1 if TLSv1.3 is available])
++	AC_DEFINE([OPENSSL_WITH_ALPN], [1], [wolfSSL supports ALPN])
++	AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB], [1],
++		[wolfSSL has SSL_CTX_get_default_passwd_cb()])
++	AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB_USERDATA], [1],
++		[wolfSSL has SSL_CTX_get_default_passwd_cb_userdata()])
++	AC_DEFINE([OPENSSL_WITH_LOCKS], [1], [wolfSSL needs explicit locking])
++	AC_DEFINE([HAVE_X509_NAME_ENTRY_GET_DATA], [1],
++		[wolfSSL has X509_NAME_ENTRY_get_data()])
++	AC_DEFINE([HAVE_X509_STORE_GET0_OBJECTS], [1],
++		[wolfSSL has X509_STORE_get0_objects()])
++	AC_DEFINE([HAVE_X509_OBJECT_GET0_X509], [1],
++		[wolfSSL has X509_OBJECT_get0_X509()])
+ 
+-HITCH_CHECK_FUNC([SSL_get0_next_proto_negotiated], [$SSL_LIBS], [
+-	AC_DEFINE([OPENSSL_WITH_NPN], [1], [OpenSSL supports NPN])
+-])
++		HITCH_CHECK_FLAGS([HITCH_CFLAGS], [
++		-I$wolfssl_path/include,
++		-I$wolfssl_path/include/wolfssl,
++		-DEXTERNAL_OPTS_OPENVPN
++	])
++else
++	HITCH_CHECK_FUNC([SSL_get0_alpn_selected], [$SSL_LIBS], [
++		AC_DEFINE([OPENSSL_WITH_ALPN], [1], [OpenSSL supports ALPN])
++	])
+ 
+-HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb], [$SSL_LIBS], [
+-	AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB], [1],
+-		[OpenSSL has SSL_CTX_get_default_passwd_cb()])
+-])
++	HITCH_CHECK_FUNC([SSL_get0_next_proto_negotiated], [$SSL_LIBS], [
++		AC_DEFINE([OPENSSL_WITH_NPN], [1], [OpenSSL supports NPN])
++	])
+ 
+-HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb_userdata], [$SSL_LIBS], [
+-	AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB_USERDATA], [1],
+-		[OpenSSL has SSL_CTX_get_default_passwd_cb_userdata()])
+-])
++	HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb], [$SSL_LIBS], [
++		AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB], [1],
++			[OpenSSL has SSL_CTX_get_default_passwd_cb()])
++	])
+ 
+-HITCH_CHECK_FUNC([CRYPTO_get_locking_callback], [$CRYPTO_LIBS], [
+-	AC_DEFINE([OPENSSL_WITH_LOCKS], [1], [OpenSSL needs explicit locking])
+-])
++	HITCH_CHECK_FUNC([SSL_CTX_get_default_passwd_cb_userdata], [$SSL_LIBS], [
++		AC_DEFINE([HAVE_SSL_CTX_GET_DEFAULT_PASSWD_CB_USERDATA], [1],
++			[OpenSSL has SSL_CTX_get_default_passwd_cb_userdata()])
++	])
+ 
+-HITCH_CHECK_FUNC([X509_NAME_ENTRY_get_data], [$CRYPTO_LIBS], [
+-	AC_DEFINE([HAVE_X509_NAME_ENTRY_GET_DATA], [1],
+-		[OpenSSL has X509_NAME_ENTRY_get_data()])
+-])
++	HITCH_CHECK_FUNC([CRYPTO_get_locking_callback], [$CRYPTO_LIBS], [
++		AC_DEFINE([OPENSSL_WITH_LOCKS], [1], [OpenSSL needs explicit locking])
++	])
+ 
+-HITCH_CHECK_FUNC([X509_STORE_get0_objects], [$CRYPTO_LIBS], [
+-	AC_DEFINE([HAVE_X509_STORE_GET0_OBJECTS], [1],
+-		[OpenSSL has X509_STORE_get0_objects()])
+-])
++	HITCH_CHECK_FUNC([X509_NAME_ENTRY_get_data], [$CRYPTO_LIBS], [
++		AC_DEFINE([HAVE_X509_NAME_ENTRY_GET_DATA], [1],
++			[OpenSSL has X509_NAME_ENTRY_get_data()])
++	])
+ 
+-HITCH_CHECK_FUNC([X509_OBJECT_get0_X509], [$CRYPTO_LIBS], [
+-	AC_DEFINE([HAVE_X509_OBJECT_GET0_X509], [1],
+-		[OpenSSL has X509_OBJECT_get0_X509()])
+-])
++	HITCH_CHECK_FUNC([X509_STORE_get0_objects], [$CRYPTO_LIBS], [
++		AC_DEFINE([HAVE_X509_STORE_GET0_OBJECTS], [1],
++			[OpenSSL has X509_STORE_get0_objects()])
++	])
++
++	HITCH_CHECK_FUNC([X509_OBJECT_get0_X509], [$CRYPTO_LIBS], [
++		AC_DEFINE([HAVE_X509_OBJECT_GET0_X509], [1],
++			[OpenSSL has X509_OBJECT_get0_X509()])
++	])
+ 
+-AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
++	AC_CHECK_MEMBERS([struct ssl_st.s3], [], [], [[#include <openssl/ssl.h>]])
+ 
+-AS_VERSION_COMPARE([$($PKG_CONFIG --modversion openssl)], [1.1.1],
+-	[openssl111=no],
+-	[openssl111=yes], [openssl111=yes])
++	AS_VERSION_COMPARE([$($PKG_CONFIG --modversion openssl)], [1.1.1],
++		[openssl111=no],
++		[openssl111=yes], [openssl111=yes])
+ 
+-AS_IF([test "x$openssl111" = xyes],
+-	[AC_DEFINE([HAVE_TLS_1_3], [1], [Define to 1 if TLSv1.3 is available])], [])
++	AS_IF([test "x$openssl111" = xyes],
++		[AC_DEFINE([HAVE_TLS_1_3], [1], [Define to 1 if TLSv1.3 is available])], [])
++fi
+ 
+ SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
+ AC_SUBST(SH_TESTS)
+diff --git a/src/hitch.c b/src/hitch.c
+index 7d15207..1e1ebfe 100644
+--- a/src/hitch.c
++++ b/src/hitch.c
+@@ -1325,6 +1325,7 @@ init_openssl(void)
+ 	SSL_load_error_strings();
+ 	OpenSSL_add_all_digests();
+ 
++#ifndef WITH_WOLFSSL
+ 	if (CONFIG->ENGINE) {
+ 		ENGINE *e = NULL;
+ 		ENGINE_load_builtin_engines();
+@@ -1345,6 +1346,7 @@ init_openssl(void)
+ 			ENGINE_free(e);
+ 		}
+ 	}
++#endif
+ }
+ 
+ static void
+@@ -2034,7 +2036,7 @@ proxy_tlv_cert(struct proxystate *ps, char *dst, ssize_t dstlen)
+ {
+ 	X509 *crt;
+ 	BIO *bio;
+-	struct buf_mem_st bm[1];
++	BUF_MEM bm[1];
+ 
+ 	crt = SSL_get_peer_certificate(ps->ssl);
+ 	if (crt == NULL)
+diff --git a/src/ocsp.c b/src/ocsp.c
+index 8f5639a..4023fd9 100644
+--- a/src/ocsp.c
++++ b/src/ocsp.c
+@@ -547,7 +547,12 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
+ {
+ 	ocspquery *oq;
+ 	OCSP_REQUEST *req = NULL;
++#ifndef WITH_WOLFSSL
+ 	OCSP_REQ_CTX *rctx = NULL;
++#else
++	unsigned char *httpBuf = NULL, *reqBuf = NULL, *respBuf = NULL;
++	int httpBufSz = 4096, reqSz = 0, respSz = 4096;
++#endif
+ 	STACK_OF(OPENSSL_STRING) *sk_uri;
+ 	char *host = NULL, *port = NULL, *path = NULL;
+ 	int https = 0;
+@@ -647,6 +652,30 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
+ 		}
+ 	}
+ 
++#ifdef WITH_WOLFSSL
++	/* Get request size */
++	reqSz = wolfSSL_i2d_OCSP_REQUEST(req, NULL);
++	if (reqSz < 0) {
++		goto err;
++	}
++
++	reqBuf = (unsigned char*) malloc(reqSz);
++	if (reqBuf == NULL) {
++		goto err;
++	}
++	n = wolfSSL_i2d_OCSP_REQUEST(req, &reqBuf);
++	if (n < 0) {
++		goto err;
++	}
++	httpBuf = (unsigned char*) malloc(httpBufSz);
++	if (httpBuf == NULL) {
++		goto err;
++	}
++	httpBufSz = wolfIO_HttpBuildRequestOcsp(host, path, n, httpBuf, httpBufSz);
++	if (httpBufSz <= 0) {
++		goto err;
++	}
++#else
+ 	rctx = OCSP_sendreq_new(cbio, path, NULL, 0);
+ 	if (rctx == NULL) {
+ 		ERR("{ocsp} OCSP_sendreq_new failed\n");
+@@ -663,11 +692,33 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
+ 		refresh_hint = 60;
+ 		goto retry;
+ 	}
++#endif
+ 
+ 	resp_tmo = Time_now() + CONFIG->OCSP_RESP_TMO;
+ 	while (1) {
+ 		double tnow;
++#ifdef WITH_WOLFSSL
++		if (wolfIO_Send(fd, (char*)&httpBuf, httpBufSz, 0) != httpBufSz) {
++			goto err;
++		}
++		else if (wolfIO_Send(fd, (char*)&reqBuf, reqSz, 0) != reqSz) {
++			goto err;
++		}
++		respBuf = (unsigned char*) malloc(respSz);
++		if (respBuf == NULL) {
++			goto err;
++		}
++		respSz = wolfIO_HttpProcessResponseOcsp(fd, &respBuf, httpBuf, respSz, NULL);
++		/* Translate to match OCSP_sendreq_nbio's return code behavior */
++		if (respSz == OCSP_WANT_READ)
++			n = -1;
++		else if (respSz <= 0)
++			n = 0;
++		else
++			n = 1;
++#else
+ 		n = OCSP_sendreq_nbio(&resp, rctx);
++#endif
+ 		if (n == 0) {
+ 			/* this is an error, and we can't continue */
+ 			ERR("{ocsp} OCSP_sendreq_nbio failed for %s:%s.\n",
+@@ -716,6 +767,10 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
+ 		}
+ 	}
+ 
++#ifdef WITH_WOLFSSL
++	resp = wolfSSL_d2i_OCSP_RESPONSE(NULL, (const unsigned char**) &respBuf, respSz);
++#endif
++
+ 	if (resp == NULL) {
+ 		/* fetch failed.  Retry later. */
+ 		refresh_hint = 600.0;
+@@ -736,8 +791,17 @@ hocsp_query_responder(struct ev_loop *loop, ev_timer *w, int revents)
+ retry:
+ 	HOCSP_mktask(oq->sctx, oq, refresh_hint);
+ err:
++#ifndef WITH_WOLFSSL
+ 	if (rctx)
+ 		OCSP_REQ_CTX_free(rctx);
++#else
++	if (httpBuf)
++		free(httpBuf);
++	if (reqBuf)
++		free(reqBuf);
++	if (respBuf)
++		free(respBuf);
++#endif
+ 	if (req)
+ 		OCSP_REQUEST_free(req);
+ 	if (resp)
