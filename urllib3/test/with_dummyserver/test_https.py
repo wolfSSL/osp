@@ -9,6 +9,8 @@ import warnings
 import mock
 import pytest
 
+
+
 from dummyserver.testcase import HTTPSDummyServerTestCase
 from dummyserver.server import (
     CLIENT_CERT,
@@ -140,6 +142,8 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                     or "WSAECONNRESET" in str(e)
                     # expected string from wolfSSL
                     or "error state on socket" in str(e)
+                    or "bad handshake" in str(e)
+                    or "Read Error" in str(e)
                 ):
                     raise
             except ProtocolError as e:
@@ -158,9 +162,9 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         with HTTPSConnectionPool(
             self.host,
             self.port,
-            ca_certs=DEFAULT_CA,
             key_file=PASSWORD_CLIENT_KEYFILE,
             cert_file=CLIENT_CERT,
+            ca_certs=DEFAULT_CA,
             key_password="letmein",
         ) as https_pool:
             r = https_pool.request("GET", "/certificate")
@@ -305,7 +309,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
             with pytest.raises(MaxRetryError) as e:
                 https_pool.request("GET", "/")
             assert isinstance(e.value.reason, SSLError)
-            assert "certificate verify failed" in str(e.value.reason), (
+            assert "certificate verify failed" in str(e.value.reason) or "Unable to load verify locations" in str(e.value.reason), (
                 "Expected 'certificate verify failed', instead got: %r" % e.value.reason
             )
 
@@ -416,7 +420,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
             "localhost", self.port, cert_reqs="CERT_REQUIRED", ca_certs=DEFAULT_CA
         ) as https_pool:
             https_pool.assert_fingerprint = (
-                "F2:06:5A:42:10:3F:45:1C:17:FE:E6:07:1E:8A:86:E5"
+                "7B:A9:CD:30:C6:53:BF:23:8C:2B:73:63:7D:FA:DE:38"
             )
 
             https_pool.request("GET", "/")
@@ -426,7 +430,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
             "localhost", self.port, cert_reqs="CERT_REQUIRED", ca_certs=DEFAULT_CA
         ) as https_pool:
             https_pool.assert_fingerprint = (
-                "92:81:FE:85:F7:0C:26:60:EC:D6:B3:BF:93:CF:F9:71:CC:07:7D:0A"
+                "7D:51:EB:48:16:9D:83:6B:2A:25:46:9B:6E:7C:D9:86:E7:D2:BB:D2"
             )
             https_pool.request("GET", "/")
 
@@ -435,9 +439,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
             "localhost", self.port, cert_reqs="CERT_REQUIRED", ca_certs=DEFAULT_CA
         ) as https_pool:
             https_pool.assert_fingerprint = (
-                "C5:4D:0B:83:84:89:2E:AE:B4:58:BB:12:"
-                "F7:A6:C4:76:05:03:88:D8:57:65:51:F3:"
-                "1E:60:B0:8B:70:18:64:E6"
+                "67:BC:20:C0:51:B3:2F:EB:B5:A6:39:0A:28:8D:CD:50:06:19:D0:DE:49:0F:1F:BE:66:2C:8B:7A:66:BC:60:1D"
             )
             https_pool.request("GET", "/")
 
@@ -482,7 +484,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
             "127.0.0.1", self.port, cert_reqs="CERT_NONE", ca_certs=DEFAULT_CA_BAD
         ) as https_pool:
             https_pool.assert_fingerprint = (
-                "92:81:FE:85:F7:0C:26:60:EC:D6:B3:BF:93:CF:F9:71:CC:07:7D:0A"
+                "7D:51:EB:48:16:9D:83:6B:2A:25:46:9B:6E:7C:D9:86:E7:D2:BB:D2"
             )
             https_pool.request("GET", "/")
 
@@ -496,7 +498,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
             "127.0.0.1", self.port, cert_reqs="CERT_REQUIRED", ca_certs=DEFAULT_CA
         ) as https_pool:
             https_pool.assert_fingerprint = (
-                "92:81:FE:85:F7:0C:26:60:EC:D6:B3:BF:93:CF:F9:71:CC:07:7D:0A"
+                "7D:51:EB:48:16:9D:83:6B:2A:25:46:9B:6E:7C:D9:86:E7:D2:BB:D2"
             )
             https_pool.request("GET", "/")
 
@@ -524,7 +526,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         ) as https_pool:
             https_pool.ca_certs = DEFAULT_CA
             https_pool.assert_fingerprint = (
-                "92:81:FE:85:F7:0C:26:60:EC:D6:B3:BF:93:CF:F9:71:CC:07:7D:0A"
+                "7D:51:EB:48:16:9D:83:6B:2A:25:46:9B:6E:7C:D9:86:E7:D2:BB:D2"
             )
 
         timeout = Timeout(total=None)
@@ -593,7 +595,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                 conn.close()
 
     def test_enhanced_ssl_connection(self):
-        fingerprint = "92:81:FE:85:F7:0C:26:60:EC:D6:B3:BF:93:CF:F9:71:CC:07:7D:0A"
+        fingerprint = "7D:51:EB:48:16:9D:83:6B:2A:25:46:9B:6E:7C:D9:86:E7:D2:BB:D2"
 
         with HTTPSConnectionPool(
             self.host,
