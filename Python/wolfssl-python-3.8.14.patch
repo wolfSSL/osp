@@ -27716,3 +27716,20 @@ index 41cfe07..dbac7bf 100644
  #undef pid_t
  
  /* Define to empty if the keyword does not work. */
+diff --git a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
+index 937a15a..a85dddc 100644
+--- a/Lib/test/test_ssl.py
++++ b/Lib/test/test_ssl.py
+@@ -555,10 +555,11 @@ class BasicSocketTests(unittest.TestCase):
+     def test_parse_all_sans(self):
+         p = ssl._ssl._test_decode_cert(ALLSANFILE)
+         if ssl.IS_WOLFSSL:
+-            # wolfSSL currently skips over othername, does not have RID and has
++            # wolfSSL currently skips over othername and has
+             # a slightly different order of how the entries are listed in struct
+             self.assertEqual(p['subjectAltName'],
+             (
++                ('Registered ID', 'surname'),
+                 ('IP Address', '0:0:0:0:0:0:0:1'),
+                 ('IP Address', '127.0.0.1'),
+                 ('URI', 'https://www.python.org/'),
