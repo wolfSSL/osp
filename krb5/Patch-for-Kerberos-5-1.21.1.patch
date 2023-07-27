@@ -1,0 +1,639 @@
+From 2e5672f109dcddb1bd947782fb8cfc5ae42bcdf9 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Wed, 19 Jul 2023 15:42:33 +0200
+Subject: [PATCH] Patch for Kerberos 5 1.19.2
+
+- Use `PKG_CHECK_MODULES` and `PKG_CHECK_VAR` to find wolfSSL and configure compilation options
+- Rename `WANT_READ` and `WANT_WRITE` to `K5_WANT_READ` and `K5_WANT_WRITE` respectively to avoid conflicts with wolfSSL
+- Remove Camellia tests as wolfSSL does not support it in the EVP layer
+
+Compile wolfSSL with:
+```
+./autogen.sh
+./configure --enable-krb
+make
+make install
+```
+
+Kerberos 1.19.2 may be downloaded and extracted with:
+```
+wget https://web.mit.edu/kerberos/dist/krb5/1.21/krb5-1.21.1.tar.gz
+tar -xvf krb5-1.21.1.tar.gz
+```
+
+Compile krb5 with:
+```
+patch -p1 < <path/to/this/patch>
+cd src
+autoreconf -ivf
+./configure --with-crypto-impl=wolfssl --with-tls-impl=wolfssl --disable-pkinit
+make
+```
+
+wolfSSL does not support using the `pkinit` plugin for Kerberos 5. wolfSSL also does not support the camellia cipher in the compatibility layer for Kerberos 5.
+
+The tests should all pass with:
+```
+make check
+```
+---
+ src/clients/kvno/t_kvno.py                  |  6 --
+ src/configure.ac                            | 85 ++++++++++++++++++++-
+ src/include/k5-tls.h                        |  2 +-
+ src/kdc/main.c                              | 10 +++
+ src/lib/crypto/crypto_tests/Makefile.in     |  2 -
+ src/lib/crypto/crypto_tests/camellia-test.c |  6 ++
+ src/lib/crypto/crypto_tests/t_cksums.c      |  2 +
+ src/lib/crypto/crypto_tests/t_cmac.c        |  6 ++
+ src/lib/crypto/crypto_tests/t_decrypt.c     |  2 +
+ src/lib/crypto/crypto_tests/t_derive.c      |  4 +
+ src/lib/crypto/crypto_tests/t_encrypt.c     |  3 +
+ src/lib/crypto/crypto_tests/t_short.c       |  2 +
+ src/lib/crypto/crypto_tests/t_str2key.c     |  2 +
+ src/lib/crypto/krb/cksumtypes.c             |  2 +
+ src/lib/crypto/krb/crypto_int.h             |  4 +
+ src/lib/crypto/krb/etypes.c                 |  2 +
+ src/lib/krb5/krb/t_etypes.c                 |  2 +
+ src/lib/krb5/os/sendto_kdc.c                |  8 +-
+ src/plugins/tls/k5tls/openssl.c             |  8 +-
+ src/tests/Makefile.in                       |  2 +-
+ src/tests/gssapi/t_prf.c                    |  2 +
+ src/util/k5test.py                          |  7 --
+ 22 files changed, 140 insertions(+), 29 deletions(-)
+
+diff --git a/src/clients/kvno/t_kvno.py b/src/clients/kvno/t_kvno.py
+index e98b90e8a4..b95f9764ee 100644
+--- a/src/clients/kvno/t_kvno.py
++++ b/src/clients/kvno/t_kvno.py
+@@ -26,12 +26,6 @@ mark('no options')
+ realm.run([kvno, realm.user_princ], expected_msg='user@KRBTEST.COM: kvno = 1')
+ check_cache(realm.ccache, [realm.krbtgt_princ, realm.user_princ])
+ 
+-mark('-e')
+-msgs = ('etypes requested in TGS request: camellia128-cts',
+-        '/KDC has no support for encryption type')
+-realm.run([kvno, '-e', 'camellia128-cts', realm.host_princ],
+-          expected_code=1, expected_trace=msgs)
+-
+ mark('--cached-only')
+ realm.run([kvno, '--cached-only', realm.user_princ], expected_msg='kvno = 1')
+ realm.run([kvno, '--cached-only', realm.host_princ],
+diff --git a/src/configure.ac b/src/configure.ac
+index 77be7a2025..67bc661e71 100644
+--- a/src/configure.ac
++++ b/src/configure.ac
+@@ -263,7 +263,8 @@ AC_SUBST(audit_plugin)
+ 
+ # WITH_CRYPTO_IMPL
+ 
+-CRYPTO_IMPL=builtin
++CRYPTO_IMPL_WOLFSSL=no
++CRYPTO_IMPL="builtin"
+ AC_ARG_WITH([crypto-impl],
+   [AS_HELP_STRING([--with-crypto-impl=IMPL],
+     [use specified crypto implementation @<:@builtin@:>@])],
+@@ -279,12 +280,48 @@ openssl)
+   AC_CHECK_LIB(crypto, PKCS7_get_signer_info)
+   AC_DEFINE([CRYPTO_OPENSSL], 1, [Define to use OpenSSL crypto library])
+   ;;
++wolfssl)
++  CRYPTO_IMPL=openssl
++  CRYPTO_IMPL_WOLFSSL=yes
++  if test -z "${WOLFSSL_CFLAGS}" -a -z "${WOLFSSL_LIBS}"; then
++	# If the user did not explicitly specify flags, try to autodetect.
++    PKG_CHECK_MODULES(
++      [WOLFSSL],
++      [wolfssl],
++      [WOLFSSL_FOUND=yes],
++      [WOLFSSL_FOUND=no]
++    )
++    PKG_CHECK_VAR(
++      [WOLFSSL_INCLUDEDIR],
++      [wolfssl],
++      [includedir],
++      [WOLFSSL_FOUND=yes],
++      [WOLFSSL_FOUND=no]
++    )
++    if test "x$WOLFSSL_FOUND" = "xno" ; then
++      AC_MSG_ERROR([wolfSSL not found!])
++    fi
++    WOLFSSL_CFLAGS="${WOLFSSL_CFLAGS} -I${WOLFSSL_INCLUDEDIR}/wolfssl"
++  fi
++  CFLAGS="${CFLAGS} ${WOLFSSL_CFLAGS}"
++  LIBS="${LIBS} ${WOLFSSL_LIBS}"
++  AC_CHECK_LIB(wolfssl, PKCS7_get_signer_info)
++  AC_DEFINE([CRYPTO_OPENSSL], 1, [Define to use wolfSSL compatibility layer])
++  AC_DEFINE([CRYPTO_WOLFSSL], 1, [Define to use wolfSSL compatibility layer])
++  AC_DEFINE(HAVE_LIBCRYPTO, 1, [wolfSSL])
++  AC_DEFINE(EXTERNAL_OPTS_OPENVPN, 1, [wolfSSL options.h include])
++  ;;
+ *)
+   AC_MSG_ERROR([Unknown crypto implementation $withval])
+   ;;
+ esac
+-AC_SUBST([CRYPTO_IMPL_CFLAGS])
+-AC_SUBST([CRYPTO_IMPL_LIBS])
++AC_CONFIG_COMMANDS(CRYPTO_IMPL, , CRYPTO_IMPL=$CRYPTO_IMPL)
++AC_SUBST(CRYPTO_IMPL)
++AC_SUBST(CRYPTO_IMPL_CFLAGS)
++AC_SUBST(CRYPTO_IMPL_LIBS)
++AC_SUBST(CRYPTO_IMPL_WOLFSSL)
++# Might not be necessary
++AC_CONFIG_COMMANDS(CRYPTO_IMPL_WOLFSSL, , CRYPTO_IMPL_WOLFSSL=$CRYPTO_IMPL_WOLFSSL)
+ AC_SUBST([CRYPTO_BUILTIN_TESTS])
+ 
+ # WITH_TLS_IMPL
+@@ -294,6 +331,36 @@ AC_ARG_WITH([tls-impl],
+     [use specified TLS implementation @<:@auto@:>@])],
+   [TLS_IMPL=$withval], [TLS_IMPL=auto])
+ case "$TLS_IMPL" in
++wolfssl)
++  if test -z "${WOLFSSL_CFLAGS}" -a -z "${WOLFSSL_LIBS}"; then
++	# If the user did not explicitly specify flags, try to autodetect.
++    PKG_CHECK_MODULES(
++      [WOLFSSL],
++      [wolfssl],
++      [WOLFSSL_FOUND=yes],
++      [WOLFSSL_FOUND=no]
++    )
++    PKG_CHECK_VAR(
++      [WOLFSSL_INCLUDEDIR],
++      [wolfssl],
++      [includedir],
++      [WOLFSSL_FOUND=yes],
++      [WOLFSSL_FOUND=no]
++    )
++    if test "x$WOLFSSL_FOUND" = "xno" ; then
++      AC_MSG_ERROR([wolfSSL not found!])
++    fi
++    WOLFSSL_CFLAGS="${WOLFSSL_CFLAGS} -I${WOLFSSL_INCLUDEDIR}/wolfssl"
++  fi
++  CFLAGS="${CFLAGS} ${WOLFSSL_CFLAGS}"
++  LIBS="${LIBS} ${WOLFSSL_LIBS}"
++  TLS_IMPL_LIBS="${WOLFSSL_LIBS}"
++  TLS_IMPL=openssl
++  AC_CHECK_LIB(wolfssl, wolfSSL_CTX_new)
++  AC_MSG_NOTICE([TLS module will use wolfSSL])
++  AC_DEFINE(TLS_IMPL_OPENSSL, 1, [wolfSSL])
++  AC_DEFINE(EXTERNAL_OPTS_OPENVPN, 1, [wolfSSL options.h include])
++  ;;
+ openssl|auto)
+   AC_CHECK_LIB(ssl,SSL_CTX_new,[have_lib_ssl=true],[have_lib_ssl=false],
+                -lcrypto)
+@@ -359,7 +426,11 @@ AC_ARG_WITH([spake-openssl],
+     [use OpenSSL for SPAKE preauth @<:@auto@:>@])],
+   [], [withval=auto])
+ if test "$withval" = auto -o "$withval" = yes; then
+-  AC_CHECK_LIB([crypto],[EC_POINT_new],[have_crypto=true],[have_crypto=false])
++  if test "$CRYPTO_IMPL_WOLFSSL" = yes; then
++    AC_CHECK_LIB([wolfssl],[wolfSSL_EC_POINT_new],[have_crypto=true],[have_crypto=false])
++  else
++    AC_CHECK_LIB([crypto],[EC_POINT_new],[have_crypto=true],[have_crypto=false])
++  fi
+   if test "$have_crypto" = true; then
+     AC_DEFINE(SPAKE_OPENSSL,1,[Define to use OpenSSL for SPAKE preauth])
+     SPAKE_OPENSSL_LIBS=-lcrypto
+@@ -1136,6 +1207,9 @@ if test "$enable_pkinit" = yes || test "$enable_pkinit" = try; then
+ #endif
+ int i = 1;
+ ])], k5_cv_openssl_version_okay=yes, k5_cv_openssl_version_okay=no)])
++  if test "$CRYPTO_IMPL_WOLFSSL" = yes; then
++    AC_MSG_ERROR([No CMS API support with wolfSSL.])
++  fi
+   old_LIBS="$LIBS"
+   AC_CHECK_LIB(crypto, PKCS7_get_signer_info)
+   AC_CHECK_FUNCS(EVP_PKEY_get_bn_param)
+@@ -1571,3 +1645,6 @@ V5_AC_OUTPUT_MAKEFILE(.
+ 	tests tests/asn.1 tests/create tests/hammer tests/verify tests/gssapi
+ 	tests/threads tests/shlib tests/gss-threads tests/misc
+ )
++
++echo cflags: $CFLAGS
++echo libs: $LIBS
+\ No newline at end of file
+diff --git a/src/include/k5-tls.h b/src/include/k5-tls.h
+index 0661c05882..a5597eb46c 100644
+--- a/src/include/k5-tls.h
++++ b/src/include/k5-tls.h
+@@ -47,7 +47,7 @@
+ typedef struct k5_tls_handle_st *k5_tls_handle;
+ 
+ typedef enum {
+-    DATA_READ, DONE, WANT_READ, WANT_WRITE, ERROR_TLS
++    DATA_READ, DONE, K5_WANT_READ, K5_WANT_WRITE, ERROR_TLS
+ } k5_tls_status;
+ 
+ /*
+diff --git a/src/kdc/main.c b/src/kdc/main.c
+index bfdfef5c48..f6db8f7466 100644
+--- a/src/kdc/main.c
++++ b/src/kdc/main.c
+@@ -891,6 +891,13 @@ finish_realms()
+   exit
+ */
+ 
++#include <wolfssl/wolfcrypt/logging.h>
++static void wolf_log_cb(const int logLevel, const char *const logMessage)
++{
++    (void)logLevel;
++    kdc_err(shandle.kdc_err_context, 0, "%s", logMessage);
++}
++
+ int main(int argc, char **argv)
+ {
+     krb5_error_code     retval;
+@@ -935,6 +942,9 @@ int main(int argc, char **argv)
+ 
+     initialize_kdc5_error_table();
+ 
++    wolfSSL_Debugging_ON();
++    wolfSSL_SetLoggingCb(wolf_log_cb);
++
+     /*
+      * Scan through the argument list
+      */
+diff --git a/src/lib/crypto/crypto_tests/Makefile.in b/src/lib/crypto/crypto_tests/Makefile.in
+index 1a3fe59666..2e764a3f16 100644
+--- a/src/lib/crypto/crypto_tests/Makefile.in
++++ b/src/lib/crypto/crypto_tests/Makefile.in
+@@ -44,8 +44,6 @@ check-unix: t_nfold t_encrypt t_decrypt t_prf t_cmac t_hmac \
+ 	cmp vk.txt $(srcdir)/expect-vk.txt
+ 	$(RUN_TEST) ./aes-test > vt.txt
+ 	cmp vt.txt $(srcdir)/expect-vt.txt
+-	$(RUN_TEST) ./camellia-test > camellia-vt.txt
+-	cmp camellia-vt.txt $(srcdir)/camellia-expect-vt.txt
+ 	$(RUN_TEST) $(C)t_mddriver4 -x
+ 	$(RUN_TEST) $(C)t_mddriver -x
+ 	$(RUN_TEST) ./t_sha2
+diff --git a/src/lib/crypto/crypto_tests/camellia-test.c b/src/lib/crypto/crypto_tests/camellia-test.c
+index 23d14667e1..fb722d62a7 100644
+--- a/src/lib/crypto/crypto_tests/camellia-test.c
++++ b/src/lib/crypto/crypto_tests/camellia-test.c
+@@ -30,6 +30,7 @@
+ #include <stdio.h>
+ #include "crypto_int.h"
+ 
++#ifndef HAVE_LIBWOLFSSL
+ static char key[32];
+ static char plain[16], cipher[16], zero[16];
+ 
+@@ -122,6 +123,7 @@ static void vt_test()
+     vt_test_1(16, ENCTYPE_CAMELLIA128_CTS_CMAC);
+     vt_test_1(32, ENCTYPE_CAMELLIA256_CTS_CMAC);
+ }
++#endif
+ 
+ int main (int argc, char *argv[])
+ {
+@@ -132,10 +134,14 @@ int main (int argc, char *argv[])
+ 		argv[0], argv[0]);
+ 	return 1;
+     }
++#ifdef HAVE_LIBWOLFSSL
++    printf("No Camellia support in wolfSSL EVP layer\n");
++#else
+     init();
+     if (argc == 2)
+ 	vk_test();
+     else
+ 	vt_test();
++#endif
+     return 0;
+ }
+diff --git a/src/lib/crypto/crypto_tests/t_cksums.c b/src/lib/crypto/crypto_tests/t_cksums.c
+index 557340ec5e..8ad8a510cb 100644
+--- a/src/lib/crypto/crypto_tests/t_cksums.c
++++ b/src/lib/crypto/crypto_tests/t_cksums.c
+@@ -102,6 +102,7 @@ struct test {
+         { KV5M_DATA, 16,
+           "\xEB\x38\xCC\x97\xE2\x23\x0F\x59\xDA\x41\x17\xDC\x58\x59\xD7\xEC" }
+     },
++#ifndef HAVE_LIBWOLFSSL
+     {
+         { KV5M_DATA, 11, "abcdefghijk" },
+         CKSUMTYPE_CMAC_CAMELLIA128, ENCTYPE_CAMELLIA128_CTS_CMAC, 7,
+@@ -136,6 +137,7 @@ struct test {
+         { KV5M_DATA, 16,
+           "\x3F\xA0\xB4\x23\x55\xE5\x2B\x18\x91\x87\x29\x4A\xA2\x52\xAB\x64" }
+     },
++#endif
+     {
+         { KV5M_DATA, 21,
+           "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F"
+diff --git a/src/lib/crypto/crypto_tests/t_cmac.c b/src/lib/crypto/crypto_tests/t_cmac.c
+index 565c35da7e..1a8deb91a4 100644
+--- a/src/lib/crypto/crypto_tests/t_cmac.c
++++ b/src/lib/crypto/crypto_tests/t_cmac.c
+@@ -99,6 +99,7 @@ check_result(const char *name, const unsigned char *result,
+ int
+ main(int argc, char **argv)
+ {
++#ifndef HAVE_LIBWOLFSSL
+     krb5_error_code ret;
+     krb5_context context = NULL;
+     krb5_keyblock keyblock;
+@@ -144,4 +145,9 @@ main(int argc, char **argv)
+     printf("All CMAC tests passed.\n");
+     krb5_k_free_key(context, key);
+     return 0;
++#else
++    printf("All CMAC tests skipped. wolfSSL does not have Camellia support "
++            "in the EVP layer.\n");
++    return 0;
++#endif
+ }
+diff --git a/src/lib/crypto/crypto_tests/t_decrypt.c b/src/lib/crypto/crypto_tests/t_decrypt.c
+index a40a855007..792e651b31 100644
+--- a/src/lib/crypto/crypto_tests/t_decrypt.c
++++ b/src/lib/crypto/crypto_tests/t_decrypt.c
+@@ -300,6 +300,7 @@ struct test {
+           "\xB7\x34\xD4\xD4\x98\xB6\x71\x4F\x1C\x1D" }
+     },
+ 
++#ifndef HAVE_LIBWOLFSSL
+     {
+         ENCTYPE_CAMELLIA128_CTS_CMAC,
+         { KV5M_DATA, 0, "", }, 0,
+@@ -406,6 +407,7 @@ struct test {
+           "\xF3\x4A\xD1\x25\x5A\x34\x49\x99\xAD\x37\x14\x68\x87\xA6\xC6\x84"
+           "\x57\x31\xAC\x7F\x46\x37\x6A\x05\x04\xCD\x06\x57\x14\x74" }
+     },
++#endif
+ 
+     {
+         ENCTYPE_AES128_CTS_HMAC_SHA256_128,
+diff --git a/src/lib/crypto/crypto_tests/t_derive.c b/src/lib/crypto/crypto_tests/t_derive.c
+index afbf7477f6..ad5af47508 100644
+--- a/src/lib/crypto/crypto_tests/t_derive.c
++++ b/src/lib/crypto/crypto_tests/t_derive.c
+@@ -137,6 +137,7 @@ struct test {
+           "\xD7\xBB\xA9\x07\x76\xD8\x12\x6D\x91\xF3\x4F\x31\x01\xAE\xA8\xBA" }
+     },
+ 
++#ifndef HAVE_LIBWOLFSSL
+     /* Kc, Ke, Ki for a Camellia-128 key */
+     {
+         ENCTYPE_CAMELLIA128_CTS_CMAC,
+@@ -200,6 +201,7 @@ struct test {
+           "\xFA\x62\x4F\xA0\xE5\x23\x99\x3F\xA3\x88\xAE\xFD\xC6\x7E\x67\xEB"
+           "\xCD\x8C\x08\xE8\xA0\x24\x6B\x1D\x73\xB0\xD1\xDD\x9F\xC5\x82\xB0" }
+     },
++#endif
+ 
+     /* Kc, Ke, Ki for an aes128-sha2 key. */
+     {
+@@ -289,8 +291,10 @@ get_enc_provider(krb5_enctype enctype)
+     case ENCTYPE_DES3_CBC_SHA1:              return &krb5int_enc_des3;
+     case ENCTYPE_AES128_CTS_HMAC_SHA1_96:    return &krb5int_enc_aes128;
+     case ENCTYPE_AES256_CTS_HMAC_SHA1_96:    return &krb5int_enc_aes256;
++#ifndef HAVE_LIBWOLFSSL
+     case ENCTYPE_CAMELLIA128_CTS_CMAC:       return &krb5int_enc_camellia128;
+     case ENCTYPE_CAMELLIA256_CTS_CMAC:       return &krb5int_enc_camellia256;
++#endif
+     case ENCTYPE_AES128_CTS_HMAC_SHA256_128: return &krb5int_enc_aes128;
+     case ENCTYPE_AES256_CTS_HMAC_SHA384_192: return &krb5int_enc_aes256;
+     }
+diff --git a/src/lib/crypto/crypto_tests/t_encrypt.c b/src/lib/crypto/crypto_tests/t_encrypt.c
+index bd9b94691c..c6b869f29d 100644
+--- a/src/lib/crypto/crypto_tests/t_encrypt.c
++++ b/src/lib/crypto/crypto_tests/t_encrypt.c
+@@ -42,8 +42,11 @@ krb5_enctype interesting_enctypes[] = {
+     ENCTYPE_ARCFOUR_HMAC_EXP,
+     ENCTYPE_AES256_CTS_HMAC_SHA1_96,
+     ENCTYPE_AES128_CTS_HMAC_SHA1_96,
++#ifndef HAVE_LIBWOLFSSL
++    /* No Camellia support in EVP wolfSSL layer */
+     ENCTYPE_CAMELLIA128_CTS_CMAC,
+     ENCTYPE_CAMELLIA256_CTS_CMAC,
++#endif
+     ENCTYPE_AES128_CTS_HMAC_SHA256_128,
+     ENCTYPE_AES256_CTS_HMAC_SHA384_192,
+     0
+diff --git a/src/lib/crypto/crypto_tests/t_short.c b/src/lib/crypto/crypto_tests/t_short.c
+index d4c2b97dfd..d1ba53a639 100644
+--- a/src/lib/crypto/crypto_tests/t_short.c
++++ b/src/lib/crypto/crypto_tests/t_short.c
+@@ -39,8 +39,10 @@ krb5_enctype interesting_enctypes[] = {
+     ENCTYPE_ARCFOUR_HMAC_EXP,
+     ENCTYPE_AES256_CTS_HMAC_SHA1_96,
+     ENCTYPE_AES128_CTS_HMAC_SHA1_96,
++#ifndef HAVE_LIBWOLFSSL
+     ENCTYPE_CAMELLIA128_CTS_CMAC,
+     ENCTYPE_CAMELLIA256_CTS_CMAC,
++#endif
+     ENCTYPE_AES128_CTS_HMAC_SHA256_128,
+     ENCTYPE_AES256_CTS_HMAC_SHA384_192,
+     0
+diff --git a/src/lib/crypto/crypto_tests/t_str2key.c b/src/lib/crypto/crypto_tests/t_str2key.c
+index cdb1acc6d0..82e207fb79 100644
+--- a/src/lib/crypto/crypto_tests/t_str2key.c
++++ b/src/lib/crypto/crypto_tests/t_str2key.c
+@@ -249,6 +249,7 @@ struct test {
+         FALSE
+     },
+ 
++#ifndef HAVE_LIBWOLFSSL
+     /* The same inputs applied to Camellia enctypes. */
+     {
+         ENCTYPE_CAMELLIA128_CTS_CMAC,
+@@ -410,6 +411,7 @@ struct test {
+         KRB5_ERR_BAD_S2K_PARAMS,
+         FALSE
+     },
++#endif
+ 
+     {
+         ENCTYPE_AES128_CTS_HMAC_SHA256_128,
+diff --git a/src/lib/crypto/krb/cksumtypes.c b/src/lib/crypto/krb/cksumtypes.c
+index f7ba322f24..c0840acbb4 100644
+--- a/src/lib/crypto/krb/cksumtypes.c
++++ b/src/lib/crypto/krb/cksumtypes.c
+@@ -83,6 +83,7 @@ const struct krb5_cksumtypes krb5int_cksumtypes_list[] = {
+       krb5int_hmacmd5_checksum, NULL,
+       16, 16, 0 },
+ 
++#ifndef HAVE_LIBWOLFSSL
+     { CKSUMTYPE_CMAC_CAMELLIA128,
+       "cmac-camellia128", { 0 }, "CMAC Camellia128 key",
+       &krb5int_enc_camellia128, NULL,
+@@ -94,6 +95,7 @@ const struct krb5_cksumtypes krb5int_cksumtypes_list[] = {
+       &krb5int_enc_camellia256, NULL,
+       krb5int_dk_cmac_checksum, NULL,
+       16, 16, 0 },
++#endif
+ 
+     { CKSUMTYPE_HMAC_SHA256_128_AES128,
+       "hmac-sha256-128-aes128", { 0 }, "HMAC-SHA256 AES128 key",
+diff --git a/src/lib/crypto/krb/crypto_int.h b/src/lib/crypto/krb/crypto_int.h
+index 3629616d96..a14fbd2602 100644
+--- a/src/lib/crypto/krb/crypto_int.h
++++ b/src/lib/crypto/krb/crypto_int.h
+@@ -62,7 +62,9 @@
+ #endif
+ 
+ #define K5_OPENSSL_AES
++#ifndef HAVE_LIBWOLFSSL
+ #define K5_OPENSSL_CAMELLIA
++#endif
+ #define K5_OPENSSL_DES
+ #define K5_OPENSSL_HMAC
+ #define K5_OPENSSL_MD5
+@@ -474,8 +476,10 @@ extern const struct krb5_enc_provider krb5int_enc_aes128;
+ extern const struct krb5_enc_provider krb5int_enc_aes256;
+ extern const struct krb5_enc_provider krb5int_enc_aes128_ctr;
+ extern const struct krb5_enc_provider krb5int_enc_aes256_ctr;
++#ifndef HAVE_LIBWOLFSSL
+ extern const struct krb5_enc_provider krb5int_enc_camellia128;
+ extern const struct krb5_enc_provider krb5int_enc_camellia256;
++#endif
+ 
+ extern const struct krb5_hash_provider krb5int_hash_md4;
+ extern const struct krb5_hash_provider krb5int_hash_md5;
+diff --git a/src/lib/crypto/krb/etypes.c b/src/lib/crypto/krb/etypes.c
+index fc278783b9..9f7854f50a 100644
+--- a/src/lib/crypto/krb/etypes.c
++++ b/src/lib/crypto/krb/etypes.c
+@@ -103,6 +103,7 @@ const struct krb5_keytypes krb5int_enctypes_list[] = {
+       CKSUMTYPE_HMAC_SHA1_96_AES256,
+       0 /*flags*/, 256 },
+ 
++#ifndef HAVE_LIBWOLFSSL
+     { ENCTYPE_CAMELLIA128_CTS_CMAC,
+       "camellia128-cts-cmac", { "camellia128-cts" },
+       "Camellia-128 CTS mode with CMAC",
+@@ -125,6 +126,7 @@ const struct krb5_keytypes krb5int_enctypes_list[] = {
+       krb5int_dk_cmac_prf,
+       CKSUMTYPE_CMAC_CAMELLIA256,
+       0 /*flags */, 256 },
++#endif
+ 
+     { ENCTYPE_AES128_CTS_HMAC_SHA256_128,
+       "aes128-cts-hmac-sha256-128", { "aes128-sha2" },
+diff --git a/src/lib/krb5/krb/t_etypes.c b/src/lib/krb5/krb/t_etypes.c
+index 90c9f626c6..cc43d0bef5 100644
+--- a/src/lib/krb5/krb/t_etypes.c
++++ b/src/lib/krb5/krb/t_etypes.c
+@@ -61,12 +61,14 @@ static struct {
+         ENCTYPE_DES3_CBC_SHA1, 0 },
+       0, 0
+     },
++#ifndef HAVE_LIBWOLFSSL
+     /* Family with enctype removed */
+     { "camellia -camellia256-cts-cmac",
+       { 0 },
+       { ENCTYPE_CAMELLIA128_CTS_CMAC, 0 },
+       { ENCTYPE_CAMELLIA128_CTS_CMAC, 0 }
+     },
++#endif
+     /* Default set with family added and enctype removed */
+     { "DEFAULT +aes -arcfour-hmac-md5",
+       { ENCTYPE_ARCFOUR_HMAC, ENCTYPE_DES3_CBC_SHA1, 0 },
+diff --git a/src/lib/krb5/os/sendto_kdc.c b/src/lib/krb5/os/sendto_kdc.c
+index 0f4bf23a95..cf0f749f50 100644
+--- a/src/lib/krb5/os/sendto_kdc.c
++++ b/src/lib/krb5/os/sendto_kdc.c
+@@ -1270,9 +1270,9 @@ service_https_write(krb5_context context, const krb5_data *realm,
+         TRACE_SENDTO_KDC_HTTPS_SEND(context, &conn->addr);
+         cm_read(selstate, conn->fd);
+         conn->state = READING;
+-    } else if (st == WANT_READ) {
++    } else if (st == K5_WANT_READ) {
+         cm_read(selstate, conn->fd);
+-    } else if (st == WANT_WRITE) {
++    } else if (st == K5_WANT_WRITE) {
+         cm_write(selstate, conn->fd);
+     } else if (st == ERROR_TLS) {
+         TRACE_SENDTO_KDC_HTTPS_ERROR_SEND(context, &conn->addr);
+@@ -1321,9 +1321,9 @@ https_read_bytes(krb5_context context, struct conn_state *conn,
+     if (st == DONE)
+         return TRUE;
+ 
+-    if (st == WANT_READ) {
++    if (st == K5_WANT_READ) {
+         cm_read(selstate, conn->fd);
+-    } else if (st == WANT_WRITE) {
++    } else if (st == K5_WANT_WRITE) {
+         cm_write(selstate, conn->fd);
+     } else if (st == ERROR_TLS) {
+         TRACE_SENDTO_KDC_HTTPS_ERROR_RECV(context, &conn->addr);
+diff --git a/src/plugins/tls/k5tls/openssl.c b/src/plugins/tls/k5tls/openssl.c
+index 99fda7ffcd..e561ea4af6 100644
+--- a/src/plugins/tls/k5tls/openssl.c
++++ b/src/plugins/tls/k5tls/openssl.c
+@@ -517,9 +517,9 @@ write_tls(krb5_context context, k5_tls_handle handle, const void *data,
+ 
+     e = SSL_get_error(handle->ssl, nwritten);
+     if (e == SSL_ERROR_WANT_READ)
+-        return WANT_READ;
++        return K5_WANT_READ;
+     else if (e == SSL_ERROR_WANT_WRITE)
+-        return WANT_WRITE;
++        return K5_WANT_WRITE;
+     flush_errors(context);
+     return ERROR_TLS;
+ }
+@@ -545,9 +545,9 @@ read_tls(krb5_context context, k5_tls_handle handle, void *data,
+ 
+     e = SSL_get_error(handle->ssl, nread);
+     if (e == SSL_ERROR_WANT_READ)
+-        return WANT_READ;
++        return K5_WANT_READ;
+     else if (e == SSL_ERROR_WANT_WRITE)
+-        return WANT_WRITE;
++        return K5_WANT_WRITE;
+ 
+     if (e == SSL_ERROR_ZERO_RETURN || (e == SSL_ERROR_SYSCALL && nread == 0))
+         return DONE;
+diff --git a/src/tests/Makefile.in b/src/tests/Makefile.in
+index e7cf64e086..3fccf4913e 100644
+--- a/src/tests/Makefile.in
++++ b/src/tests/Makefile.in
+@@ -1,6 +1,6 @@
+ mydir=tests
+ BUILDTOP=$(REL)..
+-SUBDIRS = asn.1 create hammer verify gssapi shlib gss-threads misc threads \
++SUBDIRS = asn.1 create hammer verify shlib gss-threads misc threads \
+ 	softpkcs11
+ 
+ RUN_DB_TEST = $(RUN_SETUP) KRB5_KDC_PROFILE=kdc.conf KRB5_CONFIG=krb5.conf \
+diff --git a/src/tests/gssapi/t_prf.c b/src/tests/gssapi/t_prf.c
+index f71774cdc9..eebe976d60 100644
+--- a/src/tests/gssapi/t_prf.c
++++ b/src/tests/gssapi/t_prf.c
+@@ -69,6 +69,7 @@ static struct {
+       "F5B68B7823D8944F33F41541B4E4D38C9B2934F8D16334A796645B066152B4BE",
+       "112F2B2D878590653CCC7DE278E9F0AA46FA5A380B62"
+       "59F774CB7C134FCD37F61A50FD0D9F89BF8FE1A6B593" },
++#ifndef HAVE_LIBWOLFSSL
+     { ENCTYPE_CAMELLIA128_CTS_CMAC,
+       "866E0466A178279A32AC0BDA92B72AEB",
+       "97FBB354BF341C3A160DCC86A7A910FDA824601DF677"
+@@ -83,6 +84,7 @@ static struct {
+       "A171AD582C1AFBBAD52ABD622EE6B6A14D19BF95C6914B2BA40FFD99A88EC660",
+       "A47CBB6E104DCC77E4DB48A7A474B977F2FB6A7A1AB6"
+       "52317D50508AE72B7BE2E4E4BA24164E029CBACF786B" },
++#endif
+     { ENCTYPE_AES128_CTS_HMAC_SHA256_128,
+       "089BCA48B105EA6EA77CA5D2F39DC5E7",
+       "ED1736209B7C59C9F6A3AE8CCC8A7C97ADFDD11688AD"
+diff --git a/src/util/k5test.py b/src/util/k5test.py
+index 8e5f5ba8e9..d4806613c2 100644
+--- a/src/util/k5test.py
++++ b/src/util/k5test.py
+@@ -1359,13 +1359,6 @@ _passes = [
+                     'supported_enctypes': 'aes128-cts:normal',
+                     'master_key_type': 'aes128-cts'}}}),
+ 
+-    # Exercise the camellia256-cts enctype.
+-    ('camellia256', None,
+-      {'libdefaults': {'permitted_enctypes': 'camellia256-cts'}},
+-      {'realms': {'$realm': {
+-                    'supported_enctypes': 'camellia256-cts:normal',
+-                    'master_key_type': 'camellia256-cts'}}}),
+-
+     # Exercise the aes128-sha2 enctype.
+     ('aes128-sha2', None,
+       {'libdefaults': {'permitted_enctypes': 'aes128-sha2'}},
+-- 
+2.34.1
+
