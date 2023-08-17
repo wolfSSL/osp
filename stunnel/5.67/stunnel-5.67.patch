@@ -1602,7 +1602,7 @@ index b62c8c7..2759b17 100644
  #endif
  
 diff --git a/src/ssl.c b/src/ssl.c
-index 31d03c6..0c6d90e 100644
+index 31d03c6..297f029 100644
 --- a/src/ssl.c
 +++ b/src/ssl.c
 @@ -103,7 +103,7 @@ int fips_available() { /* either FIPS provider or container is available */
@@ -1622,7 +1622,16 @@ index 31d03c6..0c6d90e 100644
      SSL_load_error_strings();
      SSL_library_init();
  #endif /* OPENSSL_VERSION_NUMBER>=0x10100000L */
-@@ -401,6 +402,7 @@ NOEXPORT void compression_list() {
+@@ -218,6 +219,8 @@ NOEXPORT int cb_dup_addr(CRYPTO_EX_DATA *to, CRYPTO_EX_DATA *from,
+     s_log(LOG_DEBUG, "Duplicating application specific data for %s",
+         (char *)argp);
+     src=*(void **)from_d;
++    if (src == NULL)
++        return 1;
+     len=addr_len(src);
+     dst=str_alloc_detached((size_t)len);
+     memcpy(dst, src, (size_t)len);
+@@ -401,6 +404,7 @@ NOEXPORT void compression_list() {
  NOEXPORT int prng_init(GLOBAL_OPTIONS *global) {
      int totbytes=0;
      char filename[256];
@@ -1630,7 +1639,7 @@ index 31d03c6..0c6d90e 100644
      const RAND_METHOD *meth=RAND_get_rand_method();
  
      /* skip PRNG initialization when no seeding methods are available */
-@@ -408,6 +410,7 @@ NOEXPORT int prng_init(GLOBAL_OPTIONS *global) {
+@@ -408,6 +412,7 @@ NOEXPORT int prng_init(GLOBAL_OPTIONS *global) {
          s_log(LOG_DEBUG, "No PRNG seeding methods");
          return 0; /* success */
      }
