@@ -146,6 +146,8 @@ class WrappedSocket(object):
                 raise timeout('The read operation timed out')
             else:
                 return self.recv_into(*args, **kwargs)
+        except wolfssl.SSLError as e:
+            raise ssl.SSLError('Read Error: %r' % e)
         else:
             return data
 

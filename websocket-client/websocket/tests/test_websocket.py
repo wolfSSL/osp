@@ -456,30 +456,29 @@ class WebSocketTest(unittest.TestCase):
             import wolfssl
             # inject wolfSSL, use instead of Python ssl
             ws._ssl_compat.inject_wolfssl()
-            s = ws.create_connection("wss://echo.websocket.org/")
+            s = ws.create_connection("wss://api.bitfinex.com/ws/1")
             self.assertNotEqual(s, None)
             self.assertTrue(isinstance(s.sock, wolfssl.SSLSocket))
-            s.send("Hello, World")
-            result = s.recv()
-            self.assertEqual(result, "Hello, World")
-            s.send(u"こにゃにゃちは、世界")
-            result = s.recv()
-            self.assertEqual(result, "こにゃにゃちは、世界")
-            s.close()
+            self.assertEqual(s.getstatus(), 101)
+            self.assertNotEqual(s.getheaders(), None)
+            s.settimeout(10)
+            self.assertEqual(s.gettimeout(), 10)
+            self.assertEqual(s.getsubprotocol(), None)
+            s.abort()
 
             import ssl
             # extract wolfSSL, should use normal ssl now
             ws._ssl_compat.extract_wolfssl()
-            s = ws.create_connection("wss://echo.websocket.org/")
+            s = ws.create_connection("wss://api.bitfinex.com/ws/1")
             self.assertNotEqual(s, None)
             self.assertTrue(isinstance(s.sock, ssl.SSLSocket))
-            s.send("Hello, World")
-            result = s.recv()
-            self.assertEqual(result, "Hello, World")
-            s.send(u"こにゃにゃちは、世界")
-            result = s.recv()
-            self.assertEqual(result, "こにゃにゃちは、世界")
-            s.close()
+            self.assertEqual(s.getstatus(), 101)
+            self.assertNotEqual(s.getheaders(), None)
+            s.settimeout(10)
+            self.assertEqual(s.gettimeout(), 10)
+            self.assertEqual(s.getsubprotocol(), None)
+            s.abort()
+
 
     @unittest.skipUnless(TEST_WITH_INTERNET, "Internet-requiring tests are disabled")
     def testWebSocketWihtCustomHeader(self):
