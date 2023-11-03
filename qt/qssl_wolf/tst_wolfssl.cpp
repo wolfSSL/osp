@@ -54,12 +54,12 @@ static const QByteArray PSK_CLIENT_IDENTITY = QByteArrayLiteral("Client_identity
 class tst_QSslWolfSSL : public QObject
 {
     Q_OBJECT
-    
+
     int proxyAuthCalled;
-    
+
 public:
     tst_QSslWolfSSL();
-    
+
     static void enterLoop(int secs)
     {
         ++loopLevel;
@@ -73,7 +73,7 @@ public:
 
 #ifndef QT_NO_SSL
     QSslSocketPtr newSocket();
-    
+
     enum PskConnectTestType {
         PskConnectDoNotHandlePsk,
         PskConnectEmptyCredentials,
@@ -84,7 +84,7 @@ public:
         PskConnectRightCredentialsVerifyPeer,
         PskConnectRightCredentialsDoNotVerifyPeer,
     };
-    
+
 private slots:
     void constructing();
     void hash();
@@ -100,7 +100,7 @@ private slots:
     void addCaCertificates();
     void addCaCertificates2();
     void pskServer();
-    
+
     /* server side */
     void protocolServerSide_data();
     void protocolServerSide();
@@ -126,21 +126,21 @@ private slots:
     void systemCaCertificates();
     void wildcardCertificateNames();
     void isMatchingHostname();
-    
+
     /* server 2 */
     void setEmptyKey();
     void spontaneousWrite();
     void setReadBufferSize();
-    
+
     /* server 3 */
     void waitForMinusOne();
-    
+
     /* verify server */
     void verifyMode();
     void verifyDepth();
     void disconnectFromHostWhenConnecting();
     void disconnectFromHostWhenConnected();
-    
+
     void resetProxy();
     void ignoreSslErrorsList_data();
     void ignoreSslErrorsList();
@@ -155,13 +155,13 @@ private slots:
     void encryptWithoutConnecting();
     void resume_data();
     void resume();
-    
+
     /* server 4 */
     void qtbug18498_peek();
-    
+
     /* server 5 */
     void qtbug18498_peek2();
-    
+
     void ephemeralServerKey_data();
     void ephemeralServerKey();
     void signatureAlgorithm_data();
@@ -169,7 +169,7 @@ private slots:
     void disabledProtocols_data();
     void disabledProtocols();
     void oldErrorsOnSocketReuse();
-    
+
     void dhServer();
     void ecdhServer();
     void verifyClientCertificate_data();
@@ -177,10 +177,10 @@ private slots:
     void readBufferMaxSize();
     void setEmptyDefaultConfiguration();
     void allowedProtocolNegotiation();
-    
+
     bool isMatchingHostname(const QSslCertificate &cert, const QString &peerName);
     bool isMatchingHostname(const QString &cn, const QString &hostname);
-    
+
  protected slots:
 
     static void exitLoop()
@@ -192,13 +192,13 @@ private slots:
             QTestEventLoop::instance().exitLoop();
         }
     }
-    
+
     void displayErrorSlot(const QList<QSslError> &errors)
     {
         for (const QSslError &err : errors)
             qDebug() << err.error();
     }
-    
+
     void ignoreHostNameMismatchErrorSlot(const QList<QSslError> &errors)
     {
         if (errors.size() == 1 &&
@@ -206,7 +206,7 @@ private slots:
             socket->ignoreSslErrors();
         }
     }
-    
+
     void ignoreErrorSlot()
     {
         socket->ignoreSslErrors();
@@ -231,12 +231,12 @@ public slots:
 #ifndef QT_NO_NETWORKPROXY
     void proxyAuthenticationRequired(const QNetworkProxy &, QAuthenticator *auth);
 #endif
-    
+
 private:
     static int loopLevel;
     QSslSocket *socket;
     QList<QSslError> storedExpectedSslErrors;
-    
+
     bool skip_connectTocricbuzzcom;
     bool skip_peerCertificateChainToWWWpQTpIO;
     bool skip_connectToHostEncrypted;
@@ -267,7 +267,7 @@ private:
     bool skip_verifyMode;
     bool skip_qtbug18498_peek;
     bool skip_qtbug18498_peek2;
-    
+
     bool skip_ignoreSslErrorsListWithSlot;
     bool skip_abortOnSslErrors;
     bool skip_ignoreSslErrorsList;
@@ -283,10 +283,10 @@ private:
     bool skip_signatureAlgorithm;
     bool skip_disabledProtocols;
     bool skip_oldErrorsOnSocketReuse;
-    
+
     bool skip_disconnectFromHostWhenConnected;
     bool skip_disconnectFromHostWhenConnecting;
-    
+
     bool skip_dhServer;
     bool skip_ecdhServer;
     bool skip_verifyClientCertificate;
@@ -294,7 +294,7 @@ private:
     bool skip_setEmptyDefaultConfiguration;
     bool skip_pskServer;
     bool skip_simplePskConnect;
-    
+
 public:
     static QString testDataDir;
     static QString EXAMPLE_SERVER;
@@ -608,47 +608,47 @@ void tst_QSslWolfSSL::connectTocricbuzzcom()
 {
     if (skip_connectTocricbuzzcom)
         QSKIP("connectTocricbuzzcom()");
-    
+
     if (!QSslSocket::supportsSsl())
         return;
-    
+
     QSslSocket socket;
     // connect again to a different server
     connect(&socket, SIGNAL(sslErrors(QList<QSslError>)), this,
                     SLOT(displayErrorSlot(QList<QSslError>)));
-        
+
     socket.connectToHostEncrypted("cricbuzz.com", 443);
     socket.waitForEncrypted(10000);
     const auto socketSslErrors = socket.sslHandshakeErrors();
     for (const QSslError &err : socketSslErrors)
         qDebug() << " error " << err.error();
-    
+
 }
 
 void tst_QSslWolfSSL::connectToHostEncrypted()
 {
     if (skip_connectToHostEncrypted)
         QSKIP("connectToHostEncrypted()");
-    
+
     if (!QSslSocket::supportsSsl())
         return;
-    
+
     QSslSocketPtr socket = newSocket();
 #if QT_CONFIG(schannel) // old certificate not supported with TLS 1.2
     socket->setProtocol(QSsl::SslProtocol::TlsV1_1);
 #endif
     this->socket = socket.data();
-    connect(socket.data(), SIGNAL(sslErrors(QList<QSslError>)), this, 
+    connect(socket.data(), SIGNAL(sslErrors(QList<QSslError>)), this,
                     SLOT(ignoreHostNameMismatchErrorSlot(QList<QSslError>)));
-    
+
     auto config = socket->sslConfiguration();
     QVERIFY(config.addCaCertificates(httpServerCertChainPath()));
     socket->setSslConfiguration(config);
-    
+
     socket->setLocalCertificate(testDataDir + "certs/client-cert.pem");
     socket->setPrivateKey(testDataDir + "certs/client-key.pem");
-    
-    
+
+
 #ifdef QSSLSOCKET_CERTUNTRUSTED_WORKAROUND
     connect(socket.data(), SIGNAL(sslErrors(QList<QSslError>)),
             this, SLOT(untrustedWorkaroundSlot(QList<QSslError>)));
@@ -656,7 +656,7 @@ void tst_QSslWolfSSL::connectToHostEncrypted()
     socket->connectToHostEncrypted(tst_QSslWolfSSL::EXAMPLE_SERVER, tst_QSslWolfSSL::EXAMPLE_SERVER_PORT);
     socket->waitForEncrypted(10000);
     socket->write("Authentication Succeded");
-    
+
     socket->disconnectFromHost();
     QVERIFY(socket->waitForDisconnected());
 }
@@ -692,7 +692,7 @@ void tst_QSslWolfSSL::localCertificate()
 {
     if (skip_localCertificate)
         QSKIP("localCertificate()");
-    
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -702,24 +702,24 @@ void tst_QSslWolfSSL::localCertificate()
 
     QSslSocketPtr socket = newSocket();
     this->socket = socket.data();
-    connect(socket.data(), SIGNAL(sslErrors(QList<QSslError>)), this, 
+    connect(socket.data(), SIGNAL(sslErrors(QList<QSslError>)), this,
                     SLOT(ignoreHostNameMismatchErrorSlot(QList<QSslError>)));
-    
+
     QList<QSslCertificate> localCert = QSslCertificate::fromPath(httpServerCertChainPath());
-    
+
     auto sslConfig = socket->sslConfiguration();
     sslConfig.setCaCertificates(localCert);
     socket->setSslConfiguration(sslConfig);
-    
+
     socket->setProtocol(QSsl::TlsV1_2);
     socket->setLocalCertificate(testDataDir + "certs/client-cert.pem");
     socket->setPrivateKey(testDataDir + "certs/client-key.pem");
-    
+
     socket->connectToHostEncrypted(tst_QSslWolfSSL::EXAMPLE_SERVER, tst_QSslWolfSSL::EXAMPLE_SERVER_PORT);
 
     socket->waitForEncrypted(10000);
     socket->write("Authentication Succeded");
-    
+
     socket->disconnectFromHost();
     QVERIFY(socket->waitForDisconnected());
     QCOMPARE(socket->mode(), QSslSocket::SslClientMode);
@@ -754,13 +754,13 @@ void tst_QSslWolfSSL::sessionCipher()
     this->socket = socket.data();
     /* socket->setProtocol(QSsl::SslProtocol::TlsV1_2); */
     auto config = socket->sslConfiguration();
-    
+
     QVERIFY(config.addCaCertificates(httpServerCertChainPath()));
     socket->setProtocol(QSsl::SslProtocol::TlsV1_2);
     socket->setSslConfiguration(config);
     socket->setLocalCertificate(testDataDir + "certs/client-cert.pem");
     socket->setPrivateKey(testDataDir + "certs/client-key.pem");
-    
+
     connect(socket.data(), SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(ignoreErrorSlot()));
     QVERIFY(socket->sessionCipher().isNull());
     socket->connectToHostEncrypted(tst_QSslWolfSSL::EXAMPLE_SERVER, tst_QSslWolfSSL::EXAMPLE_SERVER_PORT);
@@ -774,7 +774,7 @@ void tst_QSslWolfSSL::sessionCipher()
     qDebug() << "Session Cipher:"       << socket->sessionCipher() << Qt::endl;
     qDebug() << "";
     qDebug() << "--";
-    
+
     QVERIFY(QSslConfiguration::supportedCiphers().contains(socket->sessionCipher()));
     socket->disconnectFromHost();
     QVERIFY(socket->waitForDisconnected());
@@ -784,13 +784,13 @@ void tst_QSslWolfSSL::peerCertificateChainToWWWpQTpIO()
 {
     if (skip_peerCertificateChainToWWWpQTpIO)
         QSKIP("peerCertificateChainToWWWpQTpIO");
-    
+
     if (!QSslSocket::supportsSsl())
         return;
 
     QSslSocketPtr socket = newSocket();
     this->socket = socket.data();
- 
+
     // connect again to a different server
     socket->connectToHostEncrypted("www.qt.io", 443);
     socket->ignoreSslErrors();
@@ -800,14 +800,23 @@ void tst_QSslWolfSSL::peerCertificateChainToWWWpQTpIO()
 
     QList<QSslCertificate> certChain = socket->peerCertificateChain();
     QCOMPARE(certChain.first(), socket->peerCertificate());
-    QCOMPARE(certChain.count(), 2);
-    QCOMPARE(certChain.at(0).issuerDisplayName(), "Cloudflare Inc ECC CA-3");
-    QCOMPARE(certChain.at(1).issuerDisplayName(), "Baltimore CyberTrust Root");
-    /*for (const QSslCertificate &cert : certChain){
+    /* as of 2023.11.03. The server, which is "www.qt.io", returns 4 certs:
+    *  issuers : E1
+    *            ISRG Root X2
+    *            ISRG Root X1
+    *            DST Root CA X3
+    */
+    QCOMPARE(certChain.count(), 4);
+    QCOMPARE(certChain.at(0).issuerDisplayName(), "E1");
+    QCOMPARE(certChain.at(1).issuerDisplayName(), "ISRG Root X2");
+    QCOMPARE(certChain.at(2).issuerDisplayName(), "ISRG Root X1");
+    QCOMPARE(certChain.at(3).issuerDisplayName(), "DST Root CA X3");
+    /*qDebug() << socket->peerCertificate().subjectDisplayName();
+    for (const QSslCertificate &cert : certChain){
         qDebug() << cert.toText();
-        qDebug() << cert.issuerDisplayName() << " " << cert.serialNumber();
+        qDebug() << cert.subjectDisplayName() << " " << cert.serialNumber();
     }*/
-    
+
     socket->disconnectFromHost();
     QVERIFY(socket->waitForDisconnected());
 }
@@ -817,21 +826,21 @@ void tst_QSslWolfSSL::privateKeyOpaque()
 {
     if (skip_privateKeyOpaque)
         QSKIP("privateKeyOpaque()");
-    
+
     if (!QSslSocket::supportsSsl())
         return;
     qDebug() << "Start privateKeyOpaque";
-    
+
     QFile file(testDataDir + "certs/client-key.pem");
     QVERIFY(file.open(QIODevice::ReadOnly));
     QSslKey key(file.readAll(), QSsl::Rsa, QSsl::Pem, QSsl::PrivateKey);
     QVERIFY(!key.isNull());
 
     qDebug() << "key is verified.";
-    
+
     EVP_PKEY *pkey = q_EVP_PKEY_new();
     q_EVP_PKEY_set1_RSA(pkey, reinterpret_cast<RSA *>(key.handle()));
-    
+
     // This test does not make 100% sense yet. We just set some local CA/cert/key and use it
     // to authenticate ourselves against the server. The server does not actually check this
     // values. This test should just run the codepath inside qsslsocket_openssl.cpp
@@ -855,7 +864,7 @@ void tst_QSslWolfSSL::protocol()
 {
     if (skip_protocol)
         QSKIP("protocol()");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -870,7 +879,7 @@ void tst_QSslWolfSSL::protocol()
     /* inform client identity */
     socket->setLocalCertificate(testDataDir + "certs/client-cert.pem");
     socket->setPrivateKey(testDataDir + "certs/client-key.pem");
-    
+
 #ifdef QSSLSOCKET_CERTUNTRUSTED_WORKAROUND
     connect(socket, SIGNAL(sslErrors(QList<QSslError>)),
             this, SLOT(untrustedWorkaroundSlot(QList<QSslError>)));
@@ -957,7 +966,7 @@ class SslServer : public QTcpServer
 {
     Q_OBJECT
 
-    
+
 public:
     SslServer(const QString &keyFile = tst_QSslWolfSSL::testDataDir + "certs/fluke.key",
               const QString &certFile = tst_QSslWolfSSL::testDataDir + "certs/fluke.cert",
@@ -1111,7 +1120,7 @@ void tst_QSslWolfSSL::protocolServerSide()
 {
     if (skip_protocolServerSide)
         QSKIP("protocolServerSide()");
-    
+
     if (!QSslSocket::supportsSsl()) {
         qWarning("SSL not supported, skipping test");
         return;
@@ -1154,12 +1163,12 @@ void tst_QSslWolfSSL::protocolServerSide()
         // the loop, so the server socket is not created yet.
         if (server.socket)
             QVERIFY(server.socket->error() == QAbstractSocket::UnknownSocketError);
-        
+
         const auto socketSslErrors = server.socket->sslHandshakeErrors();
         qDebug() << "server errors ";
         for (const QSslError &err : socketSslErrors)
             qDebug() << err.error();
-        
+
         QCOMPARE(client.state(), expectedState);
     } else if (server.socket->error() != QAbstractSocket::UnknownSocketError) {
         QVERIFY(client.error() == QAbstractSocket::UnknownSocketError);
@@ -1173,7 +1182,7 @@ void tst_QSslWolfSSL::serverCipherPreferences()
 {
     if (skip_serverCipherPreferences)
         QSKIP("serverCipherPreferences()");
-    
+
     /* minVersion = TLS1_VERSION in qsslcontext_openssl */
     /* not available SSLv3 cipher suites */
     #if QT_CONFIG(openssl)
@@ -1183,7 +1192,7 @@ void tst_QSslWolfSSL::serverCipherPreferences()
         const char* cipher1 = "AES128-SHA256";
         const char* cipher2 = "AES256-SHA256";
      #endif
-     
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -1210,7 +1219,7 @@ void tst_QSslWolfSSL::serverCipherPreferences()
         /*for (const QSslCipher &cipher : sslConfig.ciphers()) {
             qDebug() << "local cipher : " << cipher.name().toLatin1();
         }*/
-    
+
         // upon SSL wrong version error, errorOccurred will be triggered, not sslErrors
         connect(socket, SIGNAL(errorOccurred(QAbstractSocket::SocketError)), &loop, SLOT(quit()));
         connect(socket, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(ignoreErrorSlot()));
@@ -1262,7 +1271,7 @@ void tst_QSslWolfSSL::setCaCertificates()
 {
     if (skip_setCaCertificates)
         QSKIP("setCaCertificates");
-    
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -1290,7 +1299,7 @@ void tst_QSslWolfSSL::localCertificateChain()
 {
     if (skip_localCertificateChain)
         QSKIP("localCertificateChain");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -1308,7 +1317,7 @@ void tst_QSslWolfSSL::setLocalCertificateChain()
 {
     if (skip_setLocalCertificateChain)
         QSKIP("setLocalCertificateChain");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -1351,7 +1360,7 @@ void tst_QSslWolfSSL::setSocketDescriptor()
 {
     if (skip_setSocketDescriptor)
         QSKIP("setSocketDescriptor");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -1400,15 +1409,15 @@ void tst_QSslWolfSSL::setSslConfiguration()
 {
     if (skip_setSslConfiguration)
         QSKIP("setSslConfiguration");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
     QSslSocketPtr socket = newSocket();
     this->socket = socket.data();
-    connect(socket.data(), SIGNAL(sslErrors(QList<QSslError>)), this, 
+    connect(socket.data(), SIGNAL(sslErrors(QList<QSslError>)), this,
                     SLOT(ignoreHostNameMismatchErrorSlot(QList<QSslError>)));
-                    
+
     QFETCH(QSslConfiguration, configuration);
     socket->setSslConfiguration(configuration);
 #if QT_CONFIG(schannel) // old certificate not supported with TLS 1.2
@@ -1417,7 +1426,7 @@ void tst_QSslWolfSSL::setSslConfiguration()
     this->socket = socket.data();
     socket->connectToHostEncrypted(tst_QSslWolfSSL::EXAMPLE_SERVER, tst_QSslWolfSSL::EXAMPLE_SERVER_PORT);
     QFETCH(bool, works);
-    
+
     socket->waitForEncrypted(10000);
     if (works) {
         socket->disconnectFromHost();
@@ -1429,7 +1438,7 @@ void tst_QSslWolfSSL::waitForEncrypted()
 {
     if (skip_waitForEncrypted)
         QSKIP("waitForEncrypted");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -1446,7 +1455,7 @@ void tst_QSslWolfSSL::waitForEncryptedMinusOne()
 {
     if (skip_waitForEncryptedMinusOne)
         QSKIP("waitForEncryptedMinusOne");
-        
+
 #ifdef Q_OS_WIN
     QSKIP("QTBUG-24451 - indefinite wait may hang");
 #endif
@@ -1474,7 +1483,7 @@ void tst_QSslWolfSSL::addDefaultCaCertificate()
 {
     if (skip_addDefaultCaCertificate)
         QSKIP("addDefaultCaCertificate");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -1504,7 +1513,7 @@ void tst_QSslWolfSSL::defaultCaCertificates()
 {
     if (skip_defaultCaCertificates)
         QSKIP("defaultCaCertificates");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -1517,7 +1526,7 @@ void tst_QSslWolfSSL::defaultCiphers()
 {
     if (skip_defaultCiphers)
         QSKIP("defaultCiphers");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -1545,7 +1554,7 @@ void tst_QSslWolfSSL::supportedCiphers()
 {
     if (skip_supportedCiphers)
         QSKIP("supportedCiphers");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -1560,7 +1569,7 @@ void tst_QSslWolfSSL::systemCaCertificates()
 {
     if (skip_systemCaCertificates)
         QSKIP("systemCaCertificates");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -1573,7 +1582,7 @@ void tst_QSslWolfSSL::wildcardCertificateNames()
 {
     if (skip_wildcardCertificateNames)
         QSKIP("wildcardCertificateNames");
-        
+
     // Passing CN matches
     QCOMPARE( QSslSocketPrivate::isMatchingHostname(QString("www.example.com"), QString("www.example.com")), true );
     QCOMPARE( QSslSocketPrivate::isMatchingHostname(QString("WWW.EXAMPLE.COM"), QString("www.example.com")), true );
@@ -1607,7 +1616,7 @@ void tst_QSslWolfSSL::isMatchingHostname()
 {
     if (skip_isMatchingHostname)
         QSKIP("isMatchingHostname");
-        
+
     // with normalization:  (the certificate has *.SCHÄUFELE.DE as a CN)
     // openssl req -x509 -nodes -subj "/CN=*.SCHÄUFELE.DE" -newkey rsa:512 -keyout /dev/null -out xn--schufele-2za.crt
     QList<QSslCertificate> certs = QSslCertificate::fromPath(testDataDir + "certs/xn--schufele-2za.crt");
@@ -1667,7 +1676,7 @@ void tst_QSslWolfSSL::setEmptyKey()
 {
     if (skip_setEmptyKey)
         QSKIP("setEmptyKey");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -1690,12 +1699,12 @@ void tst_QSslWolfSSL::spontaneousWrite()
 {
     if (skip_spontaneousWrite)
         QSKIP("spontaneousWrite");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
 
-    
+
     SslServer server;
     QSslSocket *receiver = new QSslSocket(this);
     connect(receiver, SIGNAL(readyRead()), SLOT(exitLoop()));
@@ -1739,12 +1748,12 @@ void tst_QSslWolfSSL::setReadBufferSize()
 {
     if (skip_setReadBufferSize)
         QSKIP("setReadBufferSize");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
 
-    
+
     SslServer server;
     QSslSocket *receiver = new QSslSocket(this);
     connect(receiver, SIGNAL(readyRead()), SLOT(exitLoop()));
@@ -1918,7 +1927,7 @@ void tst_QSslWolfSSL::waitForMinusOne()
 {
     if (skip_waitForMinusOne)
         QSKIP("waitForMinusOne");
-        
+
 #ifdef Q_OS_WIN
     QSKIP("QTBUG-24451 - indefinite wait may hang");
 #endif
@@ -1926,10 +1935,10 @@ void tst_QSslWolfSSL::waitForMinusOne()
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
 
-    
+
     ThreadedSslServer server;
     connect(&server, SIGNAL(listening()), SLOT(exitLoop()));
-    
+
     // start the thread and wait for it to be ready
     server.start();
     enterLoop(1);
@@ -1938,7 +1947,7 @@ void tst_QSslWolfSSL::waitForMinusOne()
     // connect to the server
     QSslSocket socket;
     QTest::qSleep(100);
-    
+
     socket.connectToHost("127.0.0.1", server.serverPort);
     QVERIFY(socket.waitForConnected(-1));
     socket.ignoreSslErrors();
@@ -1987,7 +1996,7 @@ void tst_QSslWolfSSL::verifyMode()
 {
     if (skip_verifyMode)
         QSKIP("verifyMode");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -2006,15 +2015,15 @@ void tst_QSslWolfSSL::verifyMode()
     socket.setPeerVerifyMode(QSslSocket::VerifyNone);
     socket.connectToHostEncrypted(tst_QSslWolfSSL::EXAMPLE_SERVER, tst_QSslWolfSSL::EXAMPLE_SERVER_PORT);
     socket.waitForEncrypted();
-    
+
     QList<QSslError> expectedErrors = QList<QSslError>()
                                       << QSslError(QSslError::HostNameMismatch);
-    
+
     qDebug() << "EXAMPLE SERVER" << tst_QSslWolfSSL::EXAMPLE_SERVER;
     qDebug() << "PORT " << tst_QSslWolfSSL::EXAMPLE_SERVER_PORT;
     auto config = socket.sslConfiguration();
     isMatchingHostname(config.peerCertificate(), tst_QSslWolfSSL::EXAMPLE_SERVER);
-    
+
     QCOMPARE(socket.sslHandshakeErrors().size(), expectedErrors.size());
     socket.abort();
 
@@ -2049,7 +2058,7 @@ void tst_QSslWolfSSL::disconnectFromHostWhenConnecting()
 {
     if (skip_disconnectFromHostWhenConnecting)
         QSKIP("disconnectFromHostWhenConnecting");
-    
+
     QSslSocketPtr socket = newSocket();
     socket->connectToHostEncrypted(tst_QSslWolfSSL::EXAMPLE_SERVER, tst_QSslWolfSSL::EXAMPLE_SERVER_PORT);
     socket->ignoreSslErrors();
@@ -2081,7 +2090,7 @@ void tst_QSslWolfSSL::disconnectFromHostWhenConnected()
 {
     if (skip_disconnectFromHostWhenConnected)
         QSKIP("disconnectFromHostWhenConnected");
-        
+
     QSslSocketPtr socket = newSocket();
     socket->connectToHostEncrypted(tst_QSslWolfSSL::EXAMPLE_SERVER, tst_QSslWolfSSL::EXAMPLE_SERVER_PORT);
     socket->ignoreSslErrors();
@@ -2173,11 +2182,11 @@ void tst_QSslWolfSSL::qtbug18498_peek()
 {
     if (skip_qtbug18498_peek)
         QSKIP("qtbug18498_peek");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
-    
+
     SslServer4 server;
     QVERIFY(server.listen(QHostAddress::LocalHost));
 
@@ -2249,7 +2258,7 @@ void tst_QSslWolfSSL::qtbug18498_peek2()
 {
     if (skip_qtbug18498_peek2)
         QSKIP("qtbug18498_peek2");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -2355,7 +2364,7 @@ void tst_QSslWolfSSL::resetProxy()
 {
     if (skip_resetProxy)
         QSKIP("resetProxy");
-        
+
 #ifndef QT_NO_NETWORKPROXY
 
     // check fix for bug 199941
@@ -2420,7 +2429,7 @@ void tst_QSslWolfSSL::ignoreSslErrorsList_data()
     QSslError anothererror(QSslError::InvalidCaCertificate, certs.at(0));
     #endif
     QSslError wrongError(FLUKE_CERTIFICATE_ERROR);
-    
+
     QTest::newRow("SSL-failure-empty-list") << expectedSslErrors << 1;
     expectedSslErrors.append(wrongError);
     QTest::newRow("SSL-failure-wrong-error") << expectedSslErrors << 1;
@@ -2438,7 +2447,7 @@ void tst_QSslWolfSSL::ignoreSslErrorsList()
 {
     if (skip_ignoreSslErrorsList)
         QSKIP("ignoreSslErrorsList");
-        
+
     QSslSocket socket;
     connect(&socket, SIGNAL(proxyAuthenticationRequired(QNetworkProxy,QAuthenticator*)),
             this, SLOT(proxyAuthenticationRequired(QNetworkProxy,QAuthenticator*)));
@@ -2450,13 +2459,13 @@ void tst_QSslWolfSSL::ignoreSslErrorsList()
 
     QFETCH(int, expectedSslErrorSignalCount);
     QSignalSpy sslErrorsSpy(&socket, SIGNAL(errorOccurred(QAbstractSocket::SocketError)));
-    
-    /*connect(&socket, SIGNAL(sslErrors(QList<QSslError>)), this, 
+
+    /*connect(&socket, SIGNAL(sslErrors(QList<QSslError>)), this,
                     SLOT(displayErrorSlot(QList<QSslError>)));
     const auto socketSslErrors = socket.sslHandshakeErrors();
     for (const QSslError &err : socketSslErrors)
         qDebug() << " error " << err.error();*/
-        
+
     /* launched openssl s_server -accept 11111 -key /wolf-path/certs/server-key.pem -cert /wolf-path/certs/server-cert.pem */
     socket.connectToHostEncrypted(tst_QSslWolfSSL::EXAMPLE_SERVER, tst_QSslWolfSSL::EXAMPLE_SERVER_PORT);
 
@@ -2464,7 +2473,7 @@ void tst_QSslWolfSSL::ignoreSslErrorsList()
     /*const auto socketSslErrors = socket.sslHandshakeErrors();
     for (const QSslError &err : socketSslErrors)
         qDebug() << err.error();*/
-    
+
     QCOMPARE(sslErrorsSpy.count(), expectedSslErrorSignalCount);
 }
 
@@ -2483,7 +2492,7 @@ void tst_QSslWolfSSL::ignoreSslErrorsListWithSlot()
 {
     if (skip_ignoreSslErrorsListWithSlot)
         QSKIP("ignoreSslErrorsListWithSlot");
-        
+
     QSslSocket socket;
     this->socket = &socket;
 
@@ -2499,7 +2508,7 @@ void tst_QSslWolfSSL::ignoreSslErrorsListWithSlot()
 
     QFETCH(int, expectedSslErrorSignalCount);
     bool expectEncryptionSuccess = (expectedSslErrorSignalCount == 0);
-    
+
     if ((socket.waitForEncrypted(10000) != expectEncryptionSuccess))
         QSKIP("Skipping flaky test - See QTBUG-29941");
 }
@@ -2508,7 +2517,7 @@ void tst_QSslWolfSSL::abortOnSslErrors()
 {
     if (skip_abortOnSslErrors)
         QSKIP("abortOnSslErrors");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -2534,7 +2543,7 @@ void tst_QSslWolfSSL::readFromClosedSocket()
 {
     if (skip_readFromClosedSocket)
         QSKIP("readFromClosedSocket");
-        
+
     QSslSocketPtr socket = newSocket();
 #if QT_CONFIG(schannel) // old certificate not supported with TLS 1.2
     socket->setProtocol(QSsl::SslProtocol::TlsV1_1);
@@ -2553,7 +2562,7 @@ void tst_QSslWolfSSL::readFromClosedSocket()
     socket->write("\n");
     socket->waitForBytesWritten();
     socket->waitForReadyRead();
-    
+
     if ((socket->state() != QAbstractSocket::ConnectedState))
         QSKIP("Skipping flaky test - See QTBUG-29941");
 #if 1
@@ -2571,7 +2580,7 @@ void tst_QSslWolfSSL::writeBigChunk()
 {
     if (skip_writeBigChunk)
         QSKIP("writeBigChunk");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -2620,12 +2629,12 @@ void tst_QSslWolfSSL::blacklistedCertificates()
 {
     if (skip_blacklistedCertificates)
         QSKIP("blacklistedCertificates");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
 
-    
+
     SslServer server(testDataDir + "certs/fake-login.live.com.key", testDataDir + "certs/fake-login.live.com.pem");
     QSslSocket *receiver = new QSslSocket(this);
     connect(receiver, SIGNAL(readyRead()), SLOT(exitLoop()));
@@ -2635,7 +2644,7 @@ void tst_QSslWolfSSL::blacklistedCertificates()
     receiver->connectToHost("127.0.0.1", server.serverPort());
     QVERIFY(receiver->waitForConnected(5000));
     server.waitForNewConnection(0);
-    
+
     QSslSocket *sender = server.socket;
     QVERIFY(sender);
     QCOMPARE(sender->state(), QAbstractSocket::ConnectedState);
@@ -2656,7 +2665,7 @@ void tst_QSslWolfSSL::versionAccessors()
 {
     if (skip_versionAccessors)
         QSKIP("versionAccessors");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -2669,7 +2678,7 @@ void tst_QSslWolfSSL::sslOptions()
 {
     if (skip_sslOptions)
         QSKIP("sslOptions");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -2725,7 +2734,7 @@ void tst_QSslWolfSSL::encryptWithoutConnecting()
 {
     if (skip_encryptWithoutConnecting)
         QSKIP("encryptWithoutConnecting");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -2757,7 +2766,7 @@ void tst_QSslWolfSSL::resume_data()
     #else
     QSslError anothererror(QSslError::InvalidCaCertificate, certs.at(0));
     #endif
-    
+
     errorsList.append(wrongError);
     QTest::newRow("ignoreSpecificErrors-Wrong") << true << errorsList << false;
     errorsList.clear();
@@ -2771,7 +2780,7 @@ void tst_QSslWolfSSL::resume()
 {
     if (skip_resume)
         QSKIP("resume");
-        
+
     // make sure the server certificate is not in the list of accepted certificates,
     // we want to trigger the sslErrors signal
     auto sslConfig = QSslConfiguration::defaultConfiguration();
@@ -2846,7 +2855,7 @@ void tst_QSslWolfSSL::ephemeralServerKey()
 {
     if (skip_ephemeralServerKey)
         QSKIP("ephemeralServerKey");
-        
+
     if (!QSslSocket::supportsSsl())
         return;
 
@@ -2965,7 +2974,7 @@ void tst_QSslWolfSSL::signatureAlgorithm()
 {
     if (skip_signatureAlgorithm)
         QSKIP("signatureAlgorithm");
-        
+
     QFETCH(QByteArrayList, serverSigAlgPairs);
     QFETCH(QSsl::SslProtocol, serverProtocol);
     QFETCH(QByteArrayList, clientSigAlgPairs);
@@ -3009,7 +3018,7 @@ void tst_QSslWolfSSL::disabledProtocols()
 
     if (skip_disabledProtocols)
         QSKIP("disabledProtocols");
-    
+
     QFETCH(const QSsl::SslProtocol, disabledProtocol);
     const int timeoutMS = 500;
     // Test a client socket.
@@ -3070,7 +3079,7 @@ void tst_QSslWolfSSL::oldErrorsOnSocketReuse()
 
     if (skip_oldErrorsOnSocketReuse)
         QSKIP("oldErrorsOnSocketReuse");
-        
+
     SslServer server;
     server.protocol = QSsl::TlsV1_1;
     server.m_certFile = testDataDir + "certs/fluke.cert";
@@ -3117,7 +3126,7 @@ void tst_QSslWolfSSL::dhServer()
 {
     if (skip_dhServer)
         QSKIP("dhServer");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -3151,7 +3160,7 @@ void tst_QSslWolfSSL::ecdhServer()
 {
     if (skip_ecdhServer)
         QSKIP("skip_ecdhServer");
-        
+
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");
 #endif
@@ -3257,7 +3266,7 @@ void tst_QSslWolfSSL::verifyClientCertificate()
 {
     if (skip_verifyClientCertificate)
         QSKIP("verifyClientCertificate");
-        
+
 #if QT_CONFIG(securetransport)
     // We run both client and server on the same machine,
     // this means, client can update keychain with client's certificates,
@@ -3300,12 +3309,12 @@ void tst_QSslWolfSSL::verifyClientCertificate()
     connect(socket, SIGNAL(disconnected()), &loop, SLOT(quit()));
     connect(socket, SIGNAL(encrypted()), &loop, SLOT(quit()));
 
-    
+
     client.connectToHostEncrypted(QHostAddress(QHostAddress::LocalHost).toString(), server.serverPort());
-    
+
     loop.exec();
     //qDebug() << "server.socket->peerCertificateChain().size()" << server.socket->peerCertificateChain().size();
-    
+
     QFETCH(bool, works);
     QAbstractSocket::SocketState expectedState = (works) ? QAbstractSocket::ConnectedState : QAbstractSocket::UnconnectedState;
 
@@ -3342,11 +3351,11 @@ void tst_QSslWolfSSL::verifyClientCertificate()
 void tst_QSslWolfSSL::readBufferMaxSize()
 {
 
-    
+
 #if QT_CONFIG(securetransport) || QT_CONFIG(schannel)
     if (skip_readBufferMaxSize)
         QSKIP("readBufferMaxSize");
-        
+
     // QTBUG-55170:
     // SecureTransport back-end was ignoring read-buffer
     // size limit, resulting (potentially) in a constantly
@@ -3410,7 +3419,7 @@ void tst_QSslWolfSSL::setEmptyDefaultConfiguration() // this test should be last
 {
     if (skip_setEmptyDefaultConfiguration)
         QSKIP("setEmptyDefaultConfiguration");
-        
+
     // used to produce a crash in QSslConfigurationPrivate::deepCopyDefaultConfiguration, QTBUG-13265
 
     if (!QSslSocket::supportsSsl())
@@ -3624,7 +3633,7 @@ void tst_QSslWolfSSL::pskServer()
     connect(&socket, SIGNAL(preSharedKeyAuthenticationRequired(QSslPreSharedKeyAuthenticator*)), &provider, SLOT(providePsk(QSslPreSharedKeyAuthenticator*)));
     socket.setPeerVerifyMode(QSslSocket::VerifyNone);
     socket.setProtocol(QSsl::TlsV1_0);
-    
+
     PskServer server;
     server.m_pskProvider.setIdentity(provider.m_identity);
     server.m_pskProvider.setPreSharedKey(provider.m_psk);
