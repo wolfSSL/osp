@@ -74,7 +74,7 @@ index 8fe067b..d312491 100644
  * openssl (optional) - enables TLS support. need relatively up to date
    version. pkg-config is needed to find openssl dependencies (such as -lz).
 +* wolfssl (optional) - enables TLS support, as an alternate to openssl.
-+  need 5.6.1 or higher.
++  need 5.6.5 or higher.
  
  ## Environment
  
@@ -168,7 +168,7 @@ index e1d0c32..b7f06a9 100644
 +    #endif
 +    #include <wolfssl/wolfcrypt/settings.h>
 +    #include <wolfssl/ssl.h>], [ WOLFSSL_CTX* ssl_ctx = WOLFSSL_CTX_new(wolfTLS_server_method());
-+                                assert(LIBWOLFSSL_VERSION_HEX >= 0x05006003L);],
++                                assert(LIBWOLFSSL_VERSION_HEX >= 0x05006004L);],
 +           [ wolfssl_linked=yes ], [ wolfssl_linked=no ])
 +        if test $wolfssl_linked = yes; then
 +          if test ! -z "$ledir" ; then
@@ -189,7 +189,7 @@ index e1d0c32..b7f06a9 100644
 +      LDFLAGS="$saved_LDFLAGS"
 +      CPPFLAGS="$saved_CPPFLAGS"
 +      if test $le_found = no ; then
-+        AC_MSG_ERROR([wolfssl (at least version 5.6.1) is required.  You can get it from $WOLFSSL_URL
++        AC_MSG_ERROR([wolfssl (at least version 5.6.5) is required.  You can get it from $WOLFSSL_URL
 +
 +          If it's already installed, specify its path using --with-wolfssl=/dir/
 +    ])
