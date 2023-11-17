@@ -1,8 +1,26 @@
+commit 1b3d301ffd4f7b67a2a822e7d1277dce5e78b54e
+Author: Kareem <kareem@wolfssl.com>
+Date:   Fri Nov 17 13:14:10 2023 -0700
+
+    Add wolfSSL support to memcached.
+    
+    To use, build wolfSSL with:
+    ./configure --enable-memcached
+    make
+    sudo make install
+    
+    Then build and test memcached with:
+    ./configure --enable-wolfssl
+    make
+    make test
+    
+    All memcached tests are expected to pass.
+
 diff --git a/Makefile.am b/Makefile.am
-index 43315cf..e71f9a8 100644
+index e91d39d..196e16c 100644
 --- a/Makefile.am
 +++ b/Makefile.am
-@@ -77,6 +77,10 @@ if ENABLE_TLS
+@@ -78,6 +78,10 @@ if ENABLE_TLS
  memcached_SOURCES += tls.c tls.h
  endif
  
@@ -13,7 +31,7 @@ index 43315cf..e71f9a8 100644
  memcached_debug_SOURCES = $(memcached_SOURCES)
  memcached_CPPFLAGS = -DNDEBUG
  memcached_debug_LDADD = @PROFILER_LDFLAGS@
-@@ -162,6 +166,21 @@ test_basic_tls:
+@@ -165,6 +169,21 @@ test_basic_tls:
  	fi
  endif
  
@@ -35,7 +53,7 @@ index 43315cf..e71f9a8 100644
  test:	memcached-debug sizes testapp
  	$(builddir)/sizes
  	$(builddir)/testapp
-@@ -169,6 +188,11 @@ if ENABLE_TLS
+@@ -172,6 +191,11 @@ if ENABLE_TLS
  	@if test $(SSL_TEST)1 = 1; then \
            $(MAKE) SSL_TEST=1  test_basic_tls; \
  	fi
@@ -61,7 +79,7 @@ index 8fe067b..d312491 100644
  ## Environment
  
 diff --git a/configure.ac b/configure.ac
-index e6bc4ba..0dc5432 100644
+index e1d0c32..b7f06a9 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -114,6 +114,9 @@ AS_IF([test "x$enable_sasl_pwdb" = "xyes"],
@@ -74,7 +92,7 @@ index e6bc4ba..0dc5432 100644
  
  AC_ARG_ENABLE(asan,
    [AS_HELP_STRING([--enable-asan], [Compile with ASAN EXPERIMENTAL ])])
-@@ -228,6 +231,10 @@ if test "x$enable_tls" = "xyes"; then
+@@ -231,6 +234,10 @@ if test "x$enable_tls" = "xyes"; then
      AC_DEFINE([TLS],1,[Set to nonzero if you want to enable TLS])
  fi
  
@@ -85,7 +103,7 @@ index e6bc4ba..0dc5432 100644
  if test "x$enable_asan" = "xyes"; then
      AC_DEFINE([ASAN],1,[Set to nonzero if you want to compile using ASAN])
  fi
-@@ -258,6 +265,7 @@ AM_CONDITIONAL([ENABLE_SASL],[test "$enable_sasl" = "yes"])
+@@ -265,6 +272,7 @@ AM_CONDITIONAL([ENABLE_SASL],[test "$enable_sasl" = "yes"])
  AM_CONDITIONAL([ENABLE_EXTSTORE],[test "$enable_extstore" != "no"])
  AM_CONDITIONAL([ENABLE_ARM_CRC32],[test "$enable_arm_crc32" = "yes"])
  AM_CONDITIONAL([ENABLE_TLS],[test "$enable_tls" = "yes"])
@@ -93,7 +111,7 @@ index e6bc4ba..0dc5432 100644
  AM_CONDITIONAL([ENABLE_ASAN],[test "$enable_asan" = "yes"])
  AM_CONDITIONAL([ENABLE_STATIC],[test "$enable_static" = "yes"])
  AM_CONDITIONAL([DISABLE_UNIX_SOCKET],[test "$enable_unix_socket" = "no"])
-@@ -533,6 +541,104 @@ if test "x$enable_tls" = "xyes"; then
+@@ -541,6 +549,104 @@ if test "x$enable_tls" = "xyes"; then
    ])
  fi
  
@@ -199,7 +217,7 @@ index e6bc4ba..0dc5432 100644
    LIBS="$LIBS -ldl"
    LDFLAGS="-static $LDFLAGS"
 diff --git a/memcached.c b/memcached.c
-index 15bbf36..cced468 100644
+index 5feb86f..0e759b8 100644
 --- a/memcached.c
 +++ b/memcached.c
 @@ -54,6 +54,10 @@
@@ -234,7 +252,7 @@ index 15bbf36..cced468 100644
  #endif
      /* By default this string should be NULL for getaddrinfo() */
      settings.inter = NULL;
-@@ -727,7 +735,7 @@ conn *conn_new(const int sfd, enum conn_states init_state,
+@@ -742,7 +750,7 @@ conn *conn_new(const int sfd, enum conn_states init_state,
          }
      }
  
@@ -243,7 +261,7 @@ index 15bbf36..cced468 100644
      c->ssl = NULL;
      c->ssl_wbuf = NULL;
      c->ssl_enabled = false;
-@@ -762,6 +770,14 @@ conn *conn_new(const int sfd, enum conn_states init_state,
+@@ -777,6 +785,14 @@ conn *conn_new(const int sfd, enum conn_states init_state,
          c->ssl_enabled = true;
          SSL_set_info_callback(c->ssl, ssl_callback);
      } else
@@ -258,7 +276,7 @@ index 15bbf36..cced468 100644
  #else
      // This must be NULL if TLS is not enabled.
      assert(ssl == NULL);
-@@ -888,7 +904,7 @@ void conn_free(conn *c) {
+@@ -903,7 +919,7 @@ void conn_free(conn *c) {
          conns[c->sfd] = NULL;
          if (c->rbuf)
              free(c->rbuf);
@@ -267,7 +285,7 @@ index 15bbf36..cced468 100644
          if (c->ssl_wbuf)
              c->ssl_wbuf = NULL;
  #endif
-@@ -927,6 +943,12 @@ static void conn_close(conn *c) {
+@@ -942,6 +958,12 @@ static void conn_close(conn *c) {
          SSL_shutdown(c->ssl);
          SSL_free(c->ssl);
      }
@@ -280,7 +298,7 @@ index 15bbf36..cced468 100644
  #endif
      close(c->sfd);
      c->close_reason = 0;
-@@ -1889,7 +1911,7 @@ void server_stats(ADD_STAT add_stats, conn *c) {
+@@ -1914,7 +1936,7 @@ void server_stats(ADD_STAT add_stats, conn *c) {
  #ifdef PROXY
      proxy_stats(settings.proxy_ctx, add_stats, c);
  #endif
@@ -289,7 +307,7 @@ index 15bbf36..cced468 100644
      if (settings.ssl_enabled) {
          if (settings.ssl_session_cache) {
              APPEND_STAT("ssl_new_sessions", "%llu", (unsigned long long)stats.ssl_new_sessions);
-@@ -1976,7 +1998,7 @@ void process_stat_settings(ADD_STAT add_stats, void *c) {
+@@ -2001,7 +2023,7 @@ void process_stat_settings(ADD_STAT add_stats, void *c) {
      APPEND_STAT("slab_automove_freeratio", "%.3f", settings.slab_automove_freeratio);
      APPEND_STAT("ext_drop_unread", "%s", settings.ext_drop_unread ? "yes" : "no");
  #endif
@@ -298,7 +316,7 @@ index 15bbf36..cced468 100644
      APPEND_STAT("ssl_enabled", "%s", settings.ssl_enabled ? "yes" : "no");
      APPEND_STAT("ssl_chain_cert", "%s", settings.ssl_chain_cert);
      APPEND_STAT("ssl_key", "%s", settings.ssl_key);
-@@ -3038,8 +3060,12 @@ static void drive_machine(conn *c) {
+@@ -3064,8 +3086,12 @@ static void drive_machine(conn *c) {
                  close(sfd);
              } else {
                  void *ssl_v = NULL;
@@ -311,7 +329,7 @@ index 15bbf36..cced468 100644
                  if (c->ssl_enabled) {
                      assert(IS_TCP(c->transport) && settings.ssl_enabled);
  
-@@ -3051,7 +3077,11 @@ static void drive_machine(conn *c) {
+@@ -3077,7 +3103,11 @@ static void drive_machine(conn *c) {
                          break;
                      }
                      SSL_LOCK();
@@ -323,7 +341,7 @@ index 15bbf36..cced468 100644
                      SSL_UNLOCK();
                      if (ssl == NULL) {
                          if (settings.verbose) {
-@@ -3060,6 +3090,7 @@ static void drive_machine(conn *c) {
+@@ -3086,6 +3116,7 @@ static void drive_machine(conn *c) {
                          close(sfd);
                          break;
                      }
@@ -331,7 +349,7 @@ index 15bbf36..cced468 100644
                      SSL_set_fd(ssl, sfd);
                      int ret = SSL_accept(ssl);
                      if (ret <= 0) {
-@@ -3076,6 +3107,25 @@ static void drive_machine(conn *c) {
+@@ -3102,6 +3133,25 @@ static void drive_machine(conn *c) {
                              break;
                          }
                      }
@@ -357,7 +375,7 @@ index 15bbf36..cced468 100644
                  }
                  ssl_v = (void*) ssl;
  #endif
-@@ -3640,7 +3690,7 @@ static int server_socket(const char *interface,
+@@ -3675,7 +3725,7 @@ static int server_socket(const char *interface,
                  fprintf(stderr, "failed to create listening connection\n");
                  exit(EXIT_FAILURE);
              }
@@ -366,7 +384,7 @@ index 15bbf36..cced468 100644
              listen_conn_add->ssl_enabled = ssl_enabled;
  #else
              assert(ssl_enabled == false);
-@@ -3660,7 +3710,7 @@ static int server_sockets(int port, enum network_transport transport,
+@@ -3695,7 +3745,7 @@ static int server_sockets(int port, enum network_transport transport,
                            FILE *portnumber_file) {
      bool ssl_enabled = false;
  
@@ -375,7 +393,7 @@ index 15bbf36..cced468 100644
      const char *notls = "notls";
      ssl_enabled = settings.ssl_enabled;
  #endif
-@@ -3684,7 +3734,7 @@ static int server_sockets(int port, enum network_transport transport,
+@@ -3719,7 +3769,7 @@ static int server_sockets(int port, enum network_transport transport,
              p = strtok_r(NULL, ";,", &b)) {
              uint64_t conntag = 0;
              int the_port = port;
@@ -384,7 +402,7 @@ index 15bbf36..cced468 100644
              ssl_enabled = settings.ssl_enabled;
              // "notls" option is valid only when memcached is run with SSL enabled.
              if (strncmp(p, notls, strlen(notls)) == 0) {
-@@ -4004,7 +4054,7 @@ static void usage(void) {
+@@ -4039,7 +4089,7 @@ static void usage(void) {
  #endif /* #ifndef DISABLE_UNIX_SOCKET */
      printf("-A, --enable-shutdown     enable ascii \"shutdown\" command\n");
      printf("-l, --listen=<addr>       interface to listen on (default: INADDR_ANY)\n");
@@ -393,7 +411,7 @@ index 15bbf36..cced468 100644
      printf("                          if TLS/SSL is enabled, 'notls' prefix can be used to\n"
             "                          disable for specific listeners (-l notls:<ip>:<port>) \n");
  #endif
-@@ -4056,7 +4106,7 @@ static void usage(void) {
+@@ -4091,7 +4141,7 @@ static void usage(void) {
      printf("-e, --memory-file=<file>  (EXPERIMENTAL) mmap a file for item memory.\n"
             "                          use only in ram disks or persistent memory mounts!\n"
             "                          enables restartable cache (stop with SIGUSR1)\n");
@@ -402,16 +420,16 @@ index 15bbf36..cced468 100644
      printf("-Z, --enable-ssl          enable TLS/SSL\n");
  #endif
      printf("-o, --extended            comma separated list of extended options\n"
-@@ -4154,7 +4204,7 @@ static void usage(void) {
-     printf("   - proxy_uring:         enable IO_URING for proxy backends.\n");
- #endif
+@@ -4187,7 +4237,7 @@ static void usage(void) {
+ #ifdef PROXY
+     printf("   - proxy_config:        path to lua config file.\n");
  #endif
 -#ifdef TLS
 +#if defined(TLS) || defined(WOLFSSL_MEMCACHED)
      printf("   - ssl_chain_cert:      certificate chain file in PEM format\n"
             "   - ssl_key:             private key, if not part of the -ssl_chain_cert\n"
             "   - ssl_keyformat:       private key format (PEM, DER or ENGINE) (default: PEM)\n");
-@@ -4170,7 +4220,7 @@ static void usage(void) {
+@@ -4203,7 +4253,7 @@ static void usage(void) {
             "   - ssl_kernel_tls:      enable kernel TLS offload\n"
             "   - ssl_min_version:     minimum protocol version to accept (default: %s)\n",
             ssl_proto_text(settings.ssl_min_version));
@@ -420,7 +438,7 @@ index 15bbf36..cced468 100644
      printf("                          valid values are 0(%s), 1(%s), 2(%s), or 3(%s).\n",
             ssl_proto_text(TLS1_VERSION), ssl_proto_text(TLS1_1_VERSION),
             ssl_proto_text(TLS1_2_VERSION), ssl_proto_text(TLS1_3_VERSION));
-@@ -4181,7 +4231,11 @@ static void usage(void) {
+@@ -4214,7 +4264,11 @@ static void usage(void) {
  #endif
      verify_default("ssl_keyformat", settings.ssl_keyformat == SSL_FILETYPE_PEM);
      verify_default("ssl_verify_mode", settings.ssl_verify_mode == SSL_VERIFY_NONE);
@@ -432,7 +450,7 @@ index 15bbf36..cced468 100644
  #endif
      printf("-N, --napi_ids            number of napi ids. see doc/napi_ids.txt for more details\n");
      return;
-@@ -4796,7 +4850,7 @@ int main (int argc, char **argv) {
+@@ -4829,7 +4883,7 @@ int main (int argc, char **argv) {
          DROP_PRIVILEGES,
          RESP_OBJ_MEM_LIMIT,
          READ_BUF_MEM_LIMIT,
@@ -441,7 +459,7 @@ index 15bbf36..cced468 100644
          SSL_CERT,
          SSL_KEY,
          SSL_VERIFY_MODE,
-@@ -4858,7 +4912,7 @@ int main (int argc, char **argv) {
+@@ -4892,7 +4946,7 @@ int main (int argc, char **argv) {
          [DROP_PRIVILEGES] = "drop_privileges",
          [RESP_OBJ_MEM_LIMIT] = "resp_obj_mem_limit",
          [READ_BUF_MEM_LIMIT] = "read_buf_mem_limit",
@@ -450,7 +468,7 @@ index 15bbf36..cced468 100644
          [SSL_CERT] = "ssl_chain_cert",
          [SSL_KEY] = "ssl_key",
          [SSL_VERIFY_MODE] = "ssl_verify_mode",
-@@ -5002,7 +5056,7 @@ int main (int argc, char **argv) {
+@@ -5037,7 +5091,7 @@ int main (int argc, char **argv) {
              break;
          case 'Z':
              /* enable secure communication*/
@@ -459,7 +477,7 @@ index 15bbf36..cced468 100644
              settings.ssl_enabled = true;
  #else
              fprintf(stderr, "This server is not built with TLS support.\n");
-@@ -5460,7 +5514,7 @@ int main (int argc, char **argv) {
+@@ -5495,7 +5549,7 @@ int main (int argc, char **argv) {
                  start_lru_maintainer = false;
                  settings.lru_segmented = false;
                  break;
@@ -468,7 +486,7 @@ index 15bbf36..cced468 100644
              case SSL_CERT:
                  if (subopts_value == NULL) {
                      fprintf(stderr, "Missing ssl_chain_cert argument\n");
-@@ -5560,6 +5614,7 @@ int main (int argc, char **argv) {
+@@ -5595,6 +5649,7 @@ int main (int argc, char **argv) {
                      return 1;
                  }
                  switch (min_version) {
@@ -476,7 +494,7 @@ index 15bbf36..cced468 100644
                      case 0:
                          settings.ssl_min_version = TLS1_VERSION;
                          break;
-@@ -5573,6 +5628,24 @@ int main (int argc, char **argv) {
+@@ -5608,6 +5663,24 @@ int main (int argc, char **argv) {
                      case 3:
                          settings.ssl_min_version = TLS1_3_VERSION;
                          break;
@@ -501,7 +519,7 @@ index 15bbf36..cced468 100644
  #endif
                      default:
                          fprintf(stderr, "Invalid ssl_min_version. Use help to see valid options.\n");
-@@ -5807,7 +5880,7 @@ int main (int argc, char **argv) {
+@@ -5845,7 +5918,7 @@ int main (int argc, char **argv) {
      }
  
  
@@ -510,7 +528,7 @@ index 15bbf36..cced468 100644
      /*
       * Setup SSL if enabled
       */
-@@ -5816,9 +5889,11 @@ int main (int argc, char **argv) {
+@@ -5854,9 +5927,11 @@ int main (int argc, char **argv) {
              fprintf(stderr, "ERROR: You cannot enable SSL without a TCP port.\n");
              exit(EX_USAGE);
          }
@@ -523,10 +541,10 @@ index 15bbf36..cced468 100644
          ssl_init();
      }
 diff --git a/memcached.h b/memcached.h
-index 9bd80b0..dde9517 100644
+index efe3103..d940d5b 100644
 --- a/memcached.h
 +++ b/memcached.h
-@@ -59,6 +59,14 @@
+@@ -61,6 +61,14 @@
  #include <openssl/ssl.h>
  #endif
  
@@ -541,7 +559,7 @@ index 9bd80b0..dde9517 100644
  /* for NAPI pinning feature */
  #ifndef SO_INCOMING_NAPI_ID
  #define SO_INCOMING_NAPI_ID 56
-@@ -397,7 +405,7 @@ struct stats {
+@@ -415,7 +423,7 @@ struct stats {
      uint64_t      extstore_compact_rescues; /* items re-written during compaction */
      uint64_t      extstore_compact_skipped; /* unhit items skipped during compaction */
  #endif
@@ -550,7 +568,7 @@ index 9bd80b0..dde9517 100644
      uint64_t      ssl_handshake_errors; /* TLS failures at accept/handshake time */
      uint64_t      ssl_new_sessions; /* successfully negotiated new (non-reused) TLS sessions */
  #endif
-@@ -507,9 +515,13 @@ struct settings {
+@@ -525,9 +533,13 @@ struct settings {
      /* start flushing to extstore after memory below this */
      unsigned int ext_global_pool_min;
  #endif
@@ -565,7 +583,7 @@ index 9bd80b0..dde9517 100644
      char *ssl_chain_cert; /* path to the server SSL chain certificate */
      char *ssl_key; /* path to the server key */
      int ssl_verify_mode; /* client certificate verify mode */
-@@ -709,7 +721,7 @@ typedef struct {
+@@ -736,7 +748,7 @@ typedef struct {
  #endif
      logger *l;                  /* logger buffer */
      void *lru_bump_buf;         /* async LRU bump buffer */
@@ -574,7 +592,7 @@ index 9bd80b0..dde9517 100644
      char   *ssl_wbuf;
  #endif
      int napi_id;                /* napi id associated with this thread */
-@@ -791,8 +803,12 @@ struct conn {
+@@ -825,8 +837,12 @@ struct conn {
      bool close_after_write; /** flush write then move to close connection */
      bool rbuf_malloced; /** read buffer was malloc'ed for ascii mget, needs free() */
      bool item_malloced; /** item for conn_nread state is a temporary malloc */
@@ -589,7 +607,7 @@ index 9bd80b0..dde9517 100644
      bool ssl_enabled;
  #endif
 diff --git a/proto_bin.c b/proto_bin.c
-index ef82de0..76b8954 100644
+index 875afa6..416e553 100644
 --- a/proto_bin.c
 +++ b/proto_bin.c
 @@ -10,6 +10,9 @@
@@ -603,7 +621,7 @@ index ef82de0..76b8954 100644
  #include <stdlib.h>
  
 diff --git a/proto_text.c b/proto_text.c
-index d316792..fa51e19 100644
+index b39b837..7c81b2a 100644
 --- a/proto_text.c
 +++ b/proto_text.c
 @@ -15,6 +15,9 @@
@@ -616,7 +634,7 @@ index d316792..fa51e19 100644
  #include <string.h>
  #include <stdlib.h>
  
-@@ -2726,7 +2729,7 @@ static void process_lru_crawler_command(conn *c, token_t *tokens, const size_t n
+@@ -2755,7 +2758,7 @@ static void process_lru_crawler_command(conn *c, token_t *tokens, const size_t n
          out_string(c, "ERROR");
      }
  }
@@ -625,7 +643,7 @@ index d316792..fa51e19 100644
  static void process_refresh_certs_command(conn *c, token_t *tokens, const size_t ntokens) {
      set_noreply_maybe(c, tokens, ntokens);
      char *errmsg = NULL;
-@@ -2948,7 +2951,7 @@ void process_command_ascii(conn *c, char *command) {
+@@ -2977,7 +2980,7 @@ void process_command_ascii(conn *c, char *command) {
          WANT_TOKENS_MIN(ntokens, 3);
          process_extstore_command(c, tokens, ntokens);
  #endif
@@ -635,7 +653,7 @@ index d316792..fa51e19 100644
          process_refresh_certs_command(c, tokens, ntokens);
  #endif
 diff --git a/testapp.c b/testapp.c
-index 387a847..393adcf 100644
+index c21b357..16521fb 100644
 --- a/testapp.c
 +++ b/testapp.c
 @@ -29,6 +29,13 @@
@@ -719,7 +737,7 @@ index 387a847..393adcf 100644
  #endif
      if (con->sock > 0) close(con->sock);
      free(con);
-@@ -529,7 +573,7 @@ static pid_t start_server(in_port_t *port_out, bool daemon, int timeout) {
+@@ -540,7 +584,7 @@ static pid_t start_server(in_port_t *port_out, bool daemon, int timeout) {
          argv[arg++] = "-1";
          argv[arg++] = "-U";
          argv[arg++] = "0";
@@ -728,7 +746,7 @@ index 387a847..393adcf 100644
          if (enable_ssl) {
              argv[arg++] = "-Z";
              argv[arg++] = "-o";
-@@ -718,6 +762,44 @@ static struct conn *connect_server(const char *hostname, in_port_t port,
+@@ -729,6 +773,44 @@ static struct conn *connect_server(const char *hostname, in_port_t port,
          c->read = ssl_read;
          c->write = ssl_write;
      } else
@@ -773,7 +791,7 @@ index 387a847..393adcf 100644
  #endif
      {
          c->read = tcp_read;
-@@ -778,6 +860,13 @@ static void send_ascii_command(const char *buf) {
+@@ -789,6 +871,13 @@ static void send_ascii_command(const char *buf) {
  
      do {
          ssize_t nw = con->write((void*)con, ptr + offset, len - offset);
@@ -787,7 +805,7 @@ index 387a847..393adcf 100644
          if (nw == -1) {
              if (errno != EINTR) {
                  fprintf(stderr, "Failed to write: %s\n", strerror(errno));
-@@ -800,6 +889,13 @@ static void read_ascii_response(char *buffer, size_t size) {
+@@ -811,6 +900,13 @@ static void read_ascii_response(char *buffer, size_t size) {
      bool need_more = true;
      do {
          ssize_t nr = con->read(con, buffer + offset, 1);
@@ -801,7 +819,7 @@ index 387a847..393adcf 100644
          if (nr == -1) {
              if (errno != EINTR) {
                  fprintf(stderr, "Failed to read: %s\n", strerror(errno));
-@@ -985,6 +1081,13 @@ static void safe_send(const void* buf, size_t len, bool hickup)
+@@ -996,6 +1092,13 @@ static void safe_send(const void* buf, size_t len, bool hickup)
              }
          }
          ssize_t nw = con->write(con, ptr + offset, num_bytes);
@@ -815,7 +833,7 @@ index 387a847..393adcf 100644
          if (nw == -1) {
              if (errno != EINTR) {
                  fprintf(stderr, "Failed to write: %s\n", strerror(errno));
-@@ -1006,6 +1109,13 @@ static bool safe_recv(void *buf, size_t len) {
+@@ -1017,6 +1120,13 @@ static bool safe_recv(void *buf, size_t len) {
      off_t offset = 0;
      do {
          ssize_t nr = con->read(con, ((char*)buf) + offset, len - offset);
@@ -829,7 +847,7 @@ index 387a847..393adcf 100644
          if (nr == -1) {
              if (errno != EINTR) {
                  fprintf(stderr, "Failed to read: %s\n", strerror(errno));
-@@ -2183,6 +2293,14 @@ static enum test_return test_issue_101(void) {
+@@ -2194,6 +2304,14 @@ static enum test_return test_issue_101(void) {
          bool more = true;
          do {
              ssize_t err = conns[ii]->write(conns[ii], command, cmdlen);
@@ -844,7 +862,7 @@ index 387a847..393adcf 100644
              if (err == -1) {
                  switch (errno) {
                  case EINTR:
-@@ -2228,6 +2346,14 @@ static enum test_return test_issue_101(void) {
+@@ -2239,6 +2357,14 @@ static enum test_return test_issue_101(void) {
          }
          if (c->ssl_ctx)
              SSL_CTX_free(c->ssl_ctx);
@@ -859,7 +877,7 @@ index 387a847..393adcf 100644
  #endif
          if (c->sock > 0) close(c->sock);
          free(conns[ii]);
-@@ -2324,6 +2450,12 @@ int main(int argc, char **argv)
+@@ -2335,6 +2461,12 @@ int main(int argc, char **argv)
          SSL_load_error_strings();
          enable_ssl = true;
      }
@@ -873,7 +891,7 @@ index 387a847..393adcf 100644
      /* Initialized directly instead of using hash_init to avoid pulling in
         the definition of settings struct from memcached.h */
 diff --git a/thread.c b/thread.c
-index 3ca1da3..b52f672 100644
+index b1ece2d..34828b9 100644
 --- a/thread.c
 +++ b/thread.c
 @@ -28,6 +28,13 @@
@@ -890,7 +908,7 @@ index 3ca1da3..b52f672 100644
  
  #define ITEMS_PER_ALLOC 64
  
-@@ -469,7 +476,7 @@ static void setup_thread(LIBEVENT_THREAD *me) {
+@@ -477,7 +484,7 @@ static void setup_thread(LIBEVENT_THREAD *me) {
          fprintf(stderr, "Failed to create IO object cache\n");
          exit(EXIT_FAILURE);
      }
@@ -899,7 +917,7 @@ index 3ca1da3..b52f672 100644
      if (settings.ssl_enabled) {
          me->ssl_wbuf = (char *)malloc((size_t)settings.ssl_wbuf_size);
          if (me->ssl_wbuf == NULL) {
-@@ -585,13 +592,19 @@ static void thread_libevent_process(evutil_socket_t fd, short which, void *arg)
+@@ -631,13 +638,19 @@ static void thread_libevent_process(evutil_socket_t fd, short which, void *arg)
                              SSL_shutdown(item->ssl);
                              SSL_free(item->ssl);
                          }
