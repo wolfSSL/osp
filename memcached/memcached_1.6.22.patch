@@ -12,7 +12,7 @@ Date:   Fri Nov 17 13:14:10 2023 -0700
     Then build and test memcached with:
     ./configure --enable-wolfssl
     make
-    make test
+    make test_tls
     
     All memcached tests are expected to pass.
 
