@@ -1,6 +1,6 @@
-commit 1b3d301ffd4f7b67a2a822e7d1277dce5e78b54e
+commit 05ef1ed6f20c777ba317aa019c432a72a4251785
 Author: Kareem <kareem@wolfssl.com>
-Date:   Fri Nov 17 13:14:10 2023 -0700
+Date:   Mon Nov 20 10:04:00 2023 -0700
 
     Add wolfSSL support to memcached.
     
@@ -15,6 +15,7 @@ Date:   Fri Nov 17 13:14:10 2023 -0700
     make test_tls
     
     All memcached tests are expected to pass.
+    Note that only wolfSSL or OpenSSL can be enabled in memcached.  Enabling both is not supported.
 
 diff --git a/Makefile.am b/Makefile.am
 index e91d39d..196e16c 100644
@@ -66,7 +67,7 @@ index e91d39d..196e16c 100644
  	@if test -n "${PARALLEL}"; then \
  	  prove $(srcdir)/t -j ${PARALLEL}; \
 diff --git a/README.md b/README.md
-index 8fe067b..d312491 100644
+index 8fe067b..0aa3f7e 100644
 --- a/README.md
 +++ b/README.md
 @@ -22,6 +22,8 @@ list to ask questions, github issues aren't seen by everyone!
@@ -79,7 +80,7 @@ index 8fe067b..d312491 100644
  ## Environment
  
 diff --git a/configure.ac b/configure.ac
-index e1d0c32..b7f06a9 100644
+index e1d0c32..b47ecba 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -114,6 +114,9 @@ AS_IF([test "x$enable_sasl_pwdb" = "xyes"],
@@ -96,7 +97,7 @@ index e1d0c32..b7f06a9 100644
      AC_DEFINE([TLS],1,[Set to nonzero if you want to enable TLS])
  fi
  
-+if test "x$enable_wolfssl" = "xyes"; then
++if test "x$enable_wolfssl" = "xyes" && test "x$enable_tls" != "xyes"; then
 +    AC_DEFINE([WOLFSSL_MEMCACHED],1,[Set to nonzero if using wolfSSL])
 +fi
 +
@@ -129,7 +130,7 @@ index e1d0c32..b7f06a9 100644
 +dnl wolfssl detection.  swiped from libevent.  modified for wolfssl detection.
 +
 +WOLFSSL_URL=https://www.wolfssl.com/
-+if test "x$enable_wolfssl" = "xyes"; then
++if test "x$enable_wolfssl" = "xyes" && test "x$enable_tls" != "xyes"; then
 +  PKG_CHECK_MODULES(WOLFSSL, wolfssl, [
 +    PKG_CHECK_VAR([WOLFSSL_INCLUDEDIR], [wolfssl], [includedir],
 +      [CFLAGS="$CFLAGS -I$WOLFSSL_INCLUDEDIR -I$WOLFSSL_INCLUDEDIR/wolfssl"])
@@ -940,13 +941,16 @@ index b1ece2d..34828b9 100644
                          c->ssl_wbuf = c->thread->ssl_wbuf;
 diff --git a/wolfssl.c b/wolfssl.c
 new file mode 100644
-index 0000000..214ca20
+index 0000000..3d0f93c
 --- /dev/null
 +++ b/wolfssl.c
-@@ -0,0 +1,307 @@
+@@ -0,0 +1,310 @@
 +#include "memcached.h"
 +
 +#ifdef WOLFSSL_MEMCACHED
++#ifdef TLS
++#error "Only one of wolfSSL or OpenSSL can be enabled.  Enabling both is not supported."
++#endif
 +
 +#include "wolfssl.h"
 +#include <string.h>
