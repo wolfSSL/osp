@@ -1,0 +1,211 @@
+diff --git a/src/OpenSSL/SSL.py b/src/OpenSSL/SSL.py
+index 0687fc3..78e9c58 100644
+--- a/src/OpenSSL/SSL.py
++++ b/src/OpenSSL/SSL.py
+@@ -22,6 +22,8 @@ from OpenSSL._util import (
+     path_string as _path_string,
+     text_to_bytes_and_warn as _text_to_bytes_and_warn,
+     no_zero_allocator as _no_zero_allocator,
++    wolfssl as _wolfssl,
++    wolfssl_debug as _wolfssl_debug
+ )
+ 
+ from OpenSSL.crypto import (
+@@ -120,10 +122,12 @@ except NameError:
+ 
+ OPENSSL_VERSION_NUMBER = _lib.OPENSSL_VERSION_NUMBER
+ SSLEAY_VERSION = _lib.SSLEAY_VERSION
+-SSLEAY_CFLAGS = _lib.SSLEAY_CFLAGS
+-SSLEAY_PLATFORM = _lib.SSLEAY_PLATFORM
+-SSLEAY_DIR = _lib.SSLEAY_DIR
+-SSLEAY_BUILT_ON = _lib.SSLEAY_BUILT_ON
++
++if not _wolfssl:
++    SSLEAY_CFLAGS = _lib.SSLEAY_CFLAGS
++    SSLEAY_PLATFORM = _lib.SSLEAY_PLATFORM
++    SSLEAY_DIR = _lib.SSLEAY_DIR
++    SSLEAY_BUILT_ON = _lib.SSLEAY_BUILT_ON
+ 
+ SENT_SHUTDOWN = _lib.SSL_SENT_SHUTDOWN
+ RECEIVED_SHUTDOWN = _lib.SSL_RECEIVED_SHUTDOWN
+@@ -191,7 +195,7 @@ SESS_CACHE_NO_INTERNAL = _lib.SSL_SESS_CACHE_NO_INTERNAL
+ SSL_ST_CONNECT = _lib.SSL_ST_CONNECT
+ SSL_ST_ACCEPT = _lib.SSL_ST_ACCEPT
+ SSL_ST_MASK = _lib.SSL_ST_MASK
+-if _lib.Cryptography_HAS_SSL_ST:
++if not _wolfssl and _lib.Cryptography_HAS_SSL_ST:
+     SSL_ST_INIT = _lib.SSL_ST_INIT
+     SSL_ST_BEFORE = _lib.SSL_ST_BEFORE
+     SSL_ST_OK = _lib.SSL_ST_OK
+@@ -306,8 +310,22 @@ class _VerifyHelper(_CallbackExceptionHelper):
+         @wraps(callback)
+         def wrapper(ok, store_ctx):
+             x509 = _lib.X509_STORE_CTX_get_current_cert(store_ctx)
+-            _lib.X509_up_ref(x509)
+-            cert = X509._from_raw_x509_ptr(x509)
++            if _wolfssl:
++                # _from_raw_x509_ptr has code to call X509_free on the X509
++                # object when it's time to do garbage collection. With wolfSSL,
++                # when that X509_free call happens, it's possible that the X509
++                # object has already been freed by FreeX509 (an internal
++                # function). That function doesn't care what the reference count
++                # is and does the free unconditionally. This causes problems
++                # when the garbage collector comes along and tries to free the
++                # already freed X509. The solution for the wolfSSL case is to
++                # duplicate the object rather than fiddling with the ref count.
++                x509_copy = _lib.X509_dup(x509)
++                cert = X509._from_raw_x509_ptr(x509_copy)
++            else:
++                _lib.X509_up_ref(x509)
++                cert = X509._from_raw_x509_ptr(x509)
++
+             error_number = _lib.X509_STORE_CTX_get_error(store_ctx)
+             error_depth = _lib.X509_STORE_CTX_get_error_depth(store_ctx)
+ 
+@@ -650,18 +668,21 @@ def _make_requires(flag, error):
+     return _requires_decorator
+ 
+ 
++npn_criteria = True if _wolfssl else _lib.Cryptography_HAS_NEXTPROTONEG
+ _requires_npn = _make_requires(
+-    _lib.Cryptography_HAS_NEXTPROTONEG, "NPN not available"
++    npn_criteria, "NPN not available"
+ )
+ 
+ 
++alpn_criteria = True if _wolfssl else _lib.Cryptography_HAS_ALPN
+ _requires_alpn = _make_requires(
+-    _lib.Cryptography_HAS_ALPN, "ALPN not available"
++    alpn_criteria, "ALPN not available"
+ )
+ 
+ 
++sni_criteria = True if _wolfssl else _lib.Cryptography_HAS_TLSEXT_HOSTNAME
+ _requires_sni = _make_requires(
+-    _lib.Cryptography_HAS_TLSEXT_HOSTNAME, "SNI not available"
++    sni_criteria, "SNI not available"
+ )
+ 
+ 
+@@ -1622,7 +1643,7 @@ class Connection(object):
+             raise WantReadError()
+         elif error == _lib.SSL_ERROR_WANT_WRITE:
+             raise WantWriteError()
+-        elif error == _lib.SSL_ERROR_ZERO_RETURN:
++        elif error == _lib.SSL_ERROR_ZERO_RETURN or (_wolfssl and error == _lib.SOCKET_PEER_CLOSED_E):
+             raise ZeroReturnError()
+         elif error == _lib.SSL_ERROR_WANT_X509_LOOKUP:
+             # TODO: This is untested.
+diff --git a/src/OpenSSL/_util.py b/src/OpenSSL/_util.py
+index cf8b888..b76f7a5 100644
+--- a/src/OpenSSL/_util.py
++++ b/src/OpenSSL/_util.py
+@@ -3,13 +3,20 @@ import warnings
+ 
+ from six import PY3, binary_type, text_type
+ 
+-from cryptography.hazmat.bindings.openssl.binding import Binding
++wolfssl = True
++wolfssl_debug = False
+ 
++if wolfssl:
++    from wolfssl._ffi import ffi, lib
++    if wolfssl_debug:
++        lib.wolfSSL_Debugging_ON()
++else:
++    from cryptography.hazmat.bindings.openssl.binding import Binding
+ 
+-binding = Binding()
+-binding.init_static_locks()
+-ffi = binding.ffi
+-lib = binding.lib
++    binding = Binding()
++    binding.init_static_locks()
++    ffi = binding.ffi
++    lib = binding.lib
+ 
+ 
+ # This is a special CFFI allocator that does not bother to zero its memory
+diff --git a/src/OpenSSL/crypto.py b/src/OpenSSL/crypto.py
+index 12e92df..e1043a6 100644
+--- a/src/OpenSSL/crypto.py
++++ b/src/OpenSSL/crypto.py
+@@ -22,6 +22,7 @@ from OpenSSL._util import (
+     UNSPECIFIED as _UNSPECIFIED,
+     text_to_bytes_and_warn as _text_to_bytes_and_warn,
+     make_assert as _make_assert,
++    wolfssl as _wolfssl
+ )
+ 
+ __all__ = [
+@@ -181,9 +182,15 @@ def _get_asn1_time(timestamp):
+     ):
+         return _ffi.string(_lib.ASN1_STRING_data(string_timestamp))
+     else:
+-        generalized_timestamp = _ffi.new("ASN1_GENERALIZEDTIME**")
+-        _lib.ASN1_TIME_to_generalizedtime(timestamp, generalized_timestamp)
+-        if generalized_timestamp[0] == _ffi.NULL:
++        if not _wolfssl:
++            generalized_timestamp = _ffi.new("ASN1_GENERALIZEDTIME**")
++            _lib.ASN1_TIME_to_generalizedtime(timestamp, generalized_timestamp)
++            null_error = generalized_timestamp[0] == _ffi.NULL
++        else:
++            generalized_timestamp = _lib.ASN1_TIME_to_generalizedtime(timestamp, _ffi.NULL)
++            null_error = generalized_timestamp == _ffi.NULL
++
++        if null_error:
+             # This may happen:
+             #   - if timestamp was not an ASN1_TIME
+             #   - if allocating memory for the ASN1_GENERALIZEDTIME failed
+@@ -195,11 +202,19 @@ def _get_asn1_time(timestamp):
+             # deterministically.
+             _untested_error("ASN1_TIME_to_generalizedtime")
+         else:
+-            string_timestamp = _ffi.cast(
+-                "ASN1_STRING*", generalized_timestamp[0])
+-            string_data = _lib.ASN1_STRING_data(string_timestamp)
+-            string_result = _ffi.string(string_data)
+-            _lib.ASN1_GENERALIZEDTIME_free(generalized_timestamp[0])
++            if not _wolfssl:
++                string_timestamp = _ffi.cast("ASN1_STRING*",
++                    generalized_timestamp[0])
++                string_data = _lib.ASN1_STRING_data(string_timestamp)
++                string_result = _ffi.string(string_data)
++                _lib.ASN1_GENERALIZEDTIME_free(generalized_timestamp[0])
++            else:
++                string_timestamp = _ffi.cast(
++                    "WOLFSSL_ASN1_TIME*", generalized_timestamp)
++                string_data = _lib.wolfSSL_ASN1_TIME_get_data(string_timestamp)
++                string_result = _ffi.string(string_data)
++                _lib.ASN1_TIME_free(generalized_timestamp)
++
+             return string_result
+ 
+ 
+@@ -1562,15 +1577,17 @@ class X509StoreFlags(object):
+     """
+     CRL_CHECK = _lib.X509_V_FLAG_CRL_CHECK
+     CRL_CHECK_ALL = _lib.X509_V_FLAG_CRL_CHECK_ALL
+-    IGNORE_CRITICAL = _lib.X509_V_FLAG_IGNORE_CRITICAL
+-    X509_STRICT = _lib.X509_V_FLAG_X509_STRICT
+-    ALLOW_PROXY_CERTS = _lib.X509_V_FLAG_ALLOW_PROXY_CERTS
+-    POLICY_CHECK = _lib.X509_V_FLAG_POLICY_CHECK
+-    EXPLICIT_POLICY = _lib.X509_V_FLAG_EXPLICIT_POLICY
+-    INHIBIT_MAP = _lib.X509_V_FLAG_INHIBIT_MAP
+-    NOTIFY_POLICY = _lib.X509_V_FLAG_NOTIFY_POLICY
+-    CHECK_SS_SIGNATURE = _lib.X509_V_FLAG_CHECK_SS_SIGNATURE
+-    CB_ISSUER_CHECK = _lib.X509_V_FLAG_CB_ISSUER_CHECK
++
++    if not _wolfssl:
++        ALLOW_PROXY_CERTS = _lib.X509_V_FLAG_ALLOW_PROXY_CERTS
++        CB_ISSUER_CHECK = _lib.X509_V_FLAG_CB_ISSUER_CHECK
++        CHECK_SS_SIGNATURE = _lib.X509_V_FLAG_CHECK_SS_SIGNATURE
++        EXPLICIT_POLICY = _lib.X509_V_FLAG_EXPLICIT_POLICY
++        IGNORE_CRITICAL = _lib.X509_V_FLAG_IGNORE_CRITICAL
++        INHIBIT_MAP = _lib.X509_V_FLAG_INHIBIT_MAP
++        NOTIFY_POLICY = _lib.X509_V_FLAG_NOTIFY_POLICY
++        X509_STRICT = _lib.X509_V_FLAG_X509_STRICT
++        POLICY_CHECK = _lib.X509_V_FLAG_POLICY_CHECK
+ 
+ 
+ class X509Store(object):
