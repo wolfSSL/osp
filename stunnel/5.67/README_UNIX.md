@@ -5,7 +5,7 @@
 The file `src/str.c` differs between the tarball and the version hosted on github. This will cause
 the patch to fail on `src/str.c`. To overcome this, it is enough to change the lines containing
 
-``
+```
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 ```
 
