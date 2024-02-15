@@ -1204,7 +1204,7 @@ static int uhash(uhash_ctx_t ahc, u_char *msg, long len, u_char *res)
  * time. The all-at-once is more optimaized than the sequential version and
  * should be preferred when the sequential interface is not required.
  */
-struct umac_ctx {
+typedef struct umac_ctx {
     uhash_ctx hash;          /* Hash function for message compression    */
     pdf_ctx pdf;             /* PDF for hashed output                    */
     void *free_ptr;          /* Address to free this struct via          */
