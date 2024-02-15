@@ -849,7 +849,7 @@ int
 userauth_passwd(Authctxt *authctxt)
 {
 	static int attempt = 0;
-	char prompt[150];
+	char prompt[256];
 	char *password;
 	const char *host = options.host_key_alias ?  options.host_key_alias :
 	    authctxt->host;
@@ -889,7 +889,7 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, void *ctxt)
 {
 	Authctxt *authctxt = ctxt;
 	char *info, *lang, *password = NULL, *retype = NULL;
-	char prompt[150];
+	char prompt[256];
 	const char *host = options.host_key_alias ? options.host_key_alias :
 	    authctxt->host;
 
