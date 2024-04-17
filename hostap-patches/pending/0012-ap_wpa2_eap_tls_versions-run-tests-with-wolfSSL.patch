@@ -1,0 +1,41 @@
+From 275769502d70da0e5d105cafd8088115f8515a79 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Wed, 20 Dec 2023 17:25:21 +0100
+Subject: [PATCH 12/24] ap_wpa2_eap_tls_versions: run tests with wolfSSL
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ tests/hwsim/test_ap_eap.py | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/tests/hwsim/test_ap_eap.py b/tests/hwsim/test_ap_eap.py
+index 14f8980132..3350da7e4e 100644
+--- a/tests/hwsim/test_ap_eap.py
++++ b/tests/hwsim/test_ap_eap.py
+@@ -6205,11 +6205,8 @@ def test_ap_wpa2_eap_tls_versions(dev, apdev):
+                           "tls_disable_tlsv1_0=1 tls_disable_tlsv1_1=1",
+                           "TLSv1.2")
+     if tls.startswith("wolfSSL"):
+-        if ("build=3.10.0" in tls and "run=3.10.0" in tls) or \
+-           ("build=3.13.0" in tls and "run=3.13.0" in tls):
+-            check_tls_ver(dev[0], hapd,
+-                          "tls_disable_tlsv1_0=1 tls_disable_tlsv1_1=1",
+-                          "TLSv1.2")
++        check_tls_ver(dev[0], hapd, 
++            "tls_disable_tlsv1_0=1 tls_disable_tlsv1_1=1", "TLSv1.2")
+     elif tls.startswith("internal"):
+         check_tls_ver(dev[0], hapd,
+                       "tls_disable_tlsv1_0=1 tls_disable_tlsv1_1=1", "TLSv1.2")
+@@ -6217,7 +6214,8 @@ def test_ap_wpa2_eap_tls_versions(dev, apdev):
+                   "tls_disable_tlsv1_0=1 tls_disable_tlsv1_1=0 tls_disable_tlsv1_2=1", "TLSv1.1")
+     check_tls_ver(dev[2], hapd,
+                   "tls_disable_tlsv1_0=0 tls_disable_tlsv1_1=1 tls_disable_tlsv1_2=1", "TLSv1")
+-    if "run=OpenSSL 1.1.1" in tls or "run=OpenSSL 3." in tls:
++    if "run=OpenSSL 1.1.1" in tls or "run=OpenSSL 3." in tls or \
++        tls.startswith("wolfSSL"):
+         check_tls_ver(dev[0], hapd,
+                       "tls_disable_tlsv1_0=1 tls_disable_tlsv1_1=1 tls_disable_tlsv1_2=1 tls_disable_tlsv1_3=0", "TLSv1.3")
+ 
+-- 
+2.34.1
+

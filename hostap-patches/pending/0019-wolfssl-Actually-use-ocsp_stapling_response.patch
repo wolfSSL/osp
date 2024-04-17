@@ -1,0 +1,76 @@
+From c7d8faa4ca17c5c656407c8cf9bbe709a3a7b834 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Wed, 31 Jan 2024 12:42:32 +0100
+Subject: [PATCH 19/24] wolfssl: Actually use ocsp_stapling_response
+
+Without a call to wolfSSL_CTX_EnableOCSP(tls_ctx, WOLFSSL_OCSP_URL_OVERRIDE); then the override URL would not be used. But since we don't actually want to enable OCSP in this step, disable it immediately after. The option will stay turned on.
+
+Fully turn on OCSP stapling and do error checking on all calls.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 44 ++++++++++++++++++++++++++++++++++------
+ 1 file changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index b88e259e40..b6869b7488 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -1872,16 +1872,48 @@ int tls_global_set_params(void *tls_ctx,
+ 
+ #ifdef HAVE_SESSION_TICKET
+ 	/* Session ticket is off by default - can't disable once on. */
+-	if (!(params->flags & TLS_CONN_DISABLE_SESSION_TICKET))
+-		wolfSSL_CTX_UseSessionTicket(tls_ctx);
++	if (!(params->flags & TLS_CONN_DISABLE_SESSION_TICKET)) {
++		if (wolfSSL_CTX_UseSessionTicket(tls_ctx) != WOLFSSL_SUCCESS) {
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: wolfSSL_CTX_UseSessionTicket failed");
++			return -1;
++		}
++	}
+ #endif /* HAVE_SESSION_TICKET */
+ 
+ #ifdef HAVE_OCSP
+ 	if (params->ocsp_stapling_response) {
+-		wolfSSL_CTX_SetOCSP_OverrideURL(tls_ctx,
+-						params->ocsp_stapling_response);
+-		wolfSSL_CTX_SetOCSP_Cb(tls_ctx, ocsp_status_cb,
+-				       ocsp_resp_free_cb, NULL);
++		if (wolfSSL_CTX_EnableOCSP(tls_ctx,
++				WOLFSSL_OCSP_URL_OVERRIDE) != WOLFSSL_SUCCESS ||
++				/* Workaround to force using the override URL without enabling OCSP */
++				wolfSSL_CTX_DisableOCSP(tls_ctx) != WOLFSSL_SUCCESS) {
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: wolfSSL_CTX_UseOCSPStapling failed");
++			return -1;
++		}
++		if (wolfSSL_CTX_UseOCSPStapling(tls_ctx, WOLFSSL_CSR_OCSP,
++					    WOLFSSL_CSR_OCSP_USE_NONCE) != WOLFSSL_SUCCESS) {
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: wolfSSL_CTX_UseOCSPStapling failed");
++			return -1;
++		}
++		if (wolfSSL_CTX_EnableOCSPStapling(tls_ctx) != WOLFSSL_SUCCESS) {
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: wolfSSL_EnableOCSPStapling failed");
++			return -1;
++		}
++		if (wolfSSL_CTX_SetOCSP_OverrideURL(tls_ctx,
++						params->ocsp_stapling_response) != WOLFSSL_SUCCESS) {
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: wolfSSL_CTX_SetOCSP_OverrideURL failed");
++			return -1;
++		}
++		if (wolfSSL_CTX_SetOCSP_Cb(tls_ctx, ocsp_status_cb,
++				       ocsp_resp_free_cb, NULL) != WOLFSSL_SUCCESS) {
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: wolfSSL_CTX_SetOCSP_Cb failed");
++			return -1;
++		}
+ 	}
+ #endif /* HAVE_OCSP */
+ 
+-- 
+2.34.1
+

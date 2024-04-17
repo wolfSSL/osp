@@ -1,0 +1,25 @@
+From 19ca3fed6e90476638d37d99d8d7aa80d6129096 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Mon, 29 Jan 2024 12:20:50 +0100
+Subject: [PATCH 17/24] wolfssl: add missing return in tls_init
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 32331d25b8..0cdc4c809a 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -378,6 +378,7 @@ void * tls_init(const struct tls_config *conf)
+ 			os_free(tls_global);
+ 			tls_global = NULL;
+ 		}
++		return NULL;
+ 	}
+ 	wolfSSL_SetIORecv(ssl_ctx, wolfssl_receive_cb);
+ 	wolfSSL_SetIOSend(ssl_ctx, wolfssl_send_cb);
+-- 
+2.34.1
+

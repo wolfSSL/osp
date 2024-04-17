@@ -1,0 +1,120 @@
+From 9593b59eca491135cce33facd7641ded19cc1e8f Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 15 Dec 2023 16:53:15 +0100
+Subject: [PATCH 03/24] wolfssl: use defines for ex_data access
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 28 ++++++++++++++++------------
+ 1 file changed, 16 insertions(+), 12 deletions(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 25616f2c7a..26832ed430 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -42,7 +42,9 @@
+ 
+ static int tls_ref_count = 0;
+ 
+-static int tls_ex_idx_session = 0;
++#define TLS_SESSION_EX_IDX (0)
++#define TLS_SSL_CTX_CTX_EX_IDX (0)
++#define TLS_SSL_CON_EX_IDX (0)
+ 
+ 
+ /* tls input data for wolfSSL Read Callback */
+@@ -184,7 +186,7 @@ static void remove_session_cb(WOLFSSL_CTX *ctx, WOLFSSL_SESSION *sess)
+ {
+ 	struct wpabuf *buf;
+ 
+-	buf = wolfSSL_SESSION_get_ex_data(sess, tls_ex_idx_session);
++	buf = wolfSSL_SESSION_get_ex_data(sess, TLS_SESSION_EX_IDX);
+ 	if (!buf)
+ 		return;
+ 	wpa_printf(MSG_DEBUG,
+@@ -192,7 +194,7 @@ static void remove_session_cb(WOLFSSL_CTX *ctx, WOLFSSL_SESSION *sess)
+ 		   buf, sess);
+ 	wpabuf_free(buf);
+ 
+-	wolfSSL_SESSION_set_ex_data(sess, tls_ex_idx_session, NULL);
++	wolfSSL_SESSION_set_ex_data(sess, TLS_SESSION_EX_IDX, NULL);
+ }
+ 
+ 
+@@ -380,7 +382,7 @@ void * tls_init(const struct tls_config *conf)
+ 	wolfSSL_SetIORecv(ssl_ctx, wolfssl_receive_cb);
+ 	wolfSSL_SetIOSend(ssl_ctx, wolfssl_send_cb);
+ 	context->tls_session_lifetime = conf->tls_session_lifetime;
+-	wolfSSL_CTX_set_ex_data(ssl_ctx, 0, context);
++	wolfSSL_CTX_set_ex_data(ssl_ctx, TLS_SSL_CTX_CTX_EX_IDX, context);
+ 
+ 	if (conf->tls_session_lifetime > 0) {
+ 		wolfSSL_CTX_set_session_id_context(ssl_ctx,
+@@ -410,7 +412,8 @@ void * tls_init(const struct tls_config *conf)
+ 
+ void tls_deinit(void *ssl_ctx)
+ {
+-	struct tls_context *context = wolfSSL_CTX_get_ex_data(ssl_ctx, 0);
++	struct tls_context *context = wolfSSL_CTX_get_ex_data(ssl_ctx,
++			TLS_SSL_CTX_CTX_EX_IDX);
+ 
+ 	if (context != tls_global)
+ 		os_free(context);
+@@ -462,8 +465,8 @@ struct tls_connection * tls_connection_init(void *tls_ctx)
+ 
+ 	wolfSSL_SetIOReadCtx(conn->ssl,  &conn->input);
+ 	wolfSSL_SetIOWriteCtx(conn->ssl, &conn->output);
+-	wolfSSL_set_ex_data(conn->ssl, 0, conn);
+-	conn->context = wolfSSL_CTX_get_ex_data(ssl_ctx, 0);
++	wolfSSL_set_ex_data(conn->ssl, TLS_SSL_CON_EX_IDX, conn);
++	conn->context = wolfSSL_CTX_get_ex_data(ssl_ctx, TLS_SSL_CTX_CTX_EX_IDX);
+ 
+ 	/* Need randoms post-hanshake for EAP-FAST, export key and deriving
+ 	 * session ID in EAP methods. */
+@@ -1109,7 +1112,7 @@ static int tls_verify_cb(int preverify_ok, WOLFSSL_X509_STORE_CTX *x509_ctx)
+ 	wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(err_cert), buf,
+ 				  sizeof(buf));
+ 
+-	conn = wolfSSL_get_ex_data(ssl, 0);
++	conn = wolfSSL_get_ex_data(ssl, TLS_SSL_CON_EX_IDX);
+ 	if (!conn) {
+ 		wpa_printf(MSG_DEBUG, "wolfSSL: No ex_data");
+ 		return 0;
+@@ -1733,7 +1736,8 @@ int tls_connection_set_verify(void *ssl_ctx, struct tls_connection *conn,
+ 
+ 	wolfSSL_set_accept_state(conn->ssl);
+ 
+-	context = wolfSSL_CTX_get_ex_data((WOLFSSL_CTX *) ssl_ctx, 0);
++	context = wolfSSL_CTX_get_ex_data((WOLFSSL_CTX *) ssl_ctx,
++			TLS_SSL_CTX_CTX_EX_IDX);
+ 	if (context && context->tls_session_lifetime == 0) {
+ 		/*
+ 		 * Set session id context to a unique value to make sure
+@@ -2361,13 +2365,13 @@ void tls_connection_set_success_data(struct tls_connection *conn,
+ 		goto fail;
+ 	}
+ 
+-	old = wolfSSL_SESSION_get_ex_data(sess, tls_ex_idx_session);
++	old = wolfSSL_SESSION_get_ex_data(sess, TLS_SESSION_EX_IDX);
+ 	if (old) {
+ 		wpa_printf(MSG_DEBUG, "wolfSSL: Replacing old success data %p",
+ 			   old);
+ 		wpabuf_free(old);
+ 	}
+-	if (wolfSSL_SESSION_set_ex_data(sess, tls_ex_idx_session, data) != 1)
++	if (wolfSSL_SESSION_set_ex_data(sess, TLS_SESSION_EX_IDX, data) != 1)
+ 		goto fail;
+ 
+ 	wpa_printf(MSG_DEBUG, "wolfSSL: Stored success data %p", data);
+@@ -2390,7 +2394,7 @@ tls_connection_get_success_data(struct tls_connection *conn)
+ 	sess = wolfSSL_get_session(conn->ssl);
+ 	if (!sess)
+ 		return NULL;
+-	return wolfSSL_SESSION_get_ex_data(sess, tls_ex_idx_session);
++	return wolfSSL_SESSION_get_ex_data(sess, TLS_SESSION_EX_IDX);
+ }
+ 
+ 
+-- 
+2.34.1
+

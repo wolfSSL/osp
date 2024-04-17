@@ -1,0 +1,28 @@
+From 2a6098431bb4a5c6c2b98f3b1a1826478002308c Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Mon, 18 Dec 2023 12:02:58 +0100
+Subject: [PATCH 04/24] wolfssl: fix get_x509_cert
+
+The conditional was checking if data was not present. We should be allocating the buffer when data *is* present.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 26832ed430..e851dd09d1 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -961,7 +961,7 @@ static struct wpabuf * get_x509_cert(WOLFSSL_X509 *cert)
+ 	int cert_len;
+ 
+ 	data = wolfSSL_X509_get_der(cert, &cert_len);
+-	if (!data)
++	if (data)
+ 		buf = wpabuf_alloc_copy(data, cert_len);
+ 
+ 	return buf;
+-- 
+2.34.1
+

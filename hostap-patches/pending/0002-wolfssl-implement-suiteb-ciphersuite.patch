@@ -1,0 +1,324 @@
+From 7271d817d80ca3c7645de1825504802fe79ab5d7 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 2 Apr 2024 16:31:46 +0200
+Subject: [PATCH 02/24] wolfssl: implement suiteb ciphersuite
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c    | 166 +++++++++++++++++++++++++++++-------
+ tests/hwsim/test_suite_b.py |  31 +++++--
+ 2 files changed, 162 insertions(+), 35 deletions(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 4db23e14ff..25616f2c7a 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -223,11 +223,127 @@ static void wolfSSL_logging_cb(const int log_level,
+ #endif /* DEBUG_WOLFSSL */
+ 
+ 
++#define SUITEB_OLDTLS_192_CIPHERS "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384"
++#define SUITEB_TLS13_192_CIPHERS "TLS13-AES256-GCM-SHA384:TLS13-CHACHA20-POLY1305-SHA256"
++#define SUITEB_TLS_192_CIPHERS SUITEB_TLS13_192_CIPHERS ":" SUITEB_OLDTLS_192_CIPHERS
++
++#define SUITEB_OLDTLS_128_CIPHERS SUITEB_OLDTLS_192_CIPHERS ":ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256"
++#define SUITEB_TLS13_128_CIPHERS SUITEB_TLS13_192_CIPHERS ":TLS13-AES128-GCM-SHA256"
++#define SUITEB_TLS_128_CIPHERS SUITEB_TLS13_128_CIPHERS ":" SUITEB_OLDTLS_128_CIPHERS
++
++#define SUITEB_TLS_192_SIGALGS "ECDSA+SHA384:RSA-PSS+SHA384:RSA+SHA384"
++#define SUITEB_TLS_128_SIGALGS SUITEB_TLS_192_SIGALGS ":ECDSA+SHA256:RSA-PSS+SHA256:RSA+SHA256"
++
++#define SUITEB_TLS_192_CURVES "P-384:P-521"
++#define SUITEB_TLS_128_CURVES "P-256:" SUITEB_TLS_192_CURVES
++
++static int handle_ciphersuites(WOLFSSL_CTX* ssl_ctx, WOLFSSL* ssl,
++		const char* openssl_ciphers, unsigned int flags)
++{
++	const char* ciphers = "DEFAULT:!aNULL";
++	const char* sigalgs = NULL;
++	const char* curves = NULL;
++	unsigned int tls13 = !(flags & TLS_CONN_DISABLE_TLSv1_3);
++	unsigned int tls13OnlyMask = TLS_CONN_DISABLE_TLSv1_2 |
++			TLS_CONN_DISABLE_TLSv1_1 | TLS_CONN_DISABLE_TLSv1_0;
++	unsigned int oldTlsOnly = ((flags & tls13OnlyMask) != tls13OnlyMask) && !tls13;
++	unsigned int tls13only = ((flags & tls13OnlyMask) == tls13OnlyMask) &&
++			!(flags & TLS_CONN_DISABLE_TLSv1_3);
++	short keySz = 0;
++	short eccKeySz = 0;
++	if (openssl_ciphers) {
++		if (os_strcmp(openssl_ciphers, "SUITEB128") == 0) {
++			if (tls13only)
++				ciphers = SUITEB_TLS13_128_CIPHERS;
++			else if (oldTlsOnly)
++				ciphers = SUITEB_OLDTLS_128_CIPHERS;
++			else
++				ciphers = SUITEB_TLS_128_CIPHERS;
++			sigalgs = SUITEB_TLS_128_SIGALGS;
++			keySz = 2048;
++			eccKeySz = 224;
++			curves = SUITEB_TLS_128_CURVES;
++		}
++		else if (os_strcmp(openssl_ciphers, "SUITEB192") == 0) {
++			if (tls13only)
++				ciphers = SUITEB_TLS13_192_CIPHERS;
++			else if (oldTlsOnly)
++				ciphers = SUITEB_OLDTLS_192_CIPHERS;
++			else
++				ciphers = SUITEB_TLS_192_CIPHERS;
++			sigalgs = SUITEB_TLS_192_SIGALGS;
++			keySz = 3072;
++			eccKeySz = 256;
++			curves = SUITEB_TLS_192_CURVES;
++		}
++		else
++			ciphers = openssl_ciphers;
++	}
++	else if (flags & TLS_CONN_SUITEB) {
++		if (tls13only)
++			ciphers = SUITEB_TLS13_192_CIPHERS;
++		else if (oldTlsOnly)
++			ciphers = SUITEB_OLDTLS_192_CIPHERS;
++		else
++			ciphers = SUITEB_TLS_192_CIPHERS;
++		sigalgs = SUITEB_TLS_192_SIGALGS;
++		keySz = 3072;
++		eccKeySz = 256;
++		curves = SUITEB_TLS_192_CURVES;
++	}
++	wpa_printf(MSG_DEBUG, "wolfSSL: cipher suites for %s", ssl_ctx ? "ctx" : "ssl");
++	wpa_printf(MSG_DEBUG, "wolfSSL: openssl_ciphers: %s", openssl_ciphers ? openssl_ciphers : "N/A");
++	wpa_printf(MSG_DEBUG, "wolfSSL: cipher suites: %s", ciphers ? ciphers : "N/A");
++	wpa_printf(MSG_DEBUG, "wolfSSL: sigalgs: %s", sigalgs ? sigalgs : "N/A");
++	wpa_printf(MSG_DEBUG, "wolfSSL: key size: %d", keySz);
++	if (ciphers) {
++		if ((ssl_ctx && wolfSSL_CTX_set_cipher_list(ssl_ctx, ciphers) != 1) ||
++				(ssl && wolfSSL_set_cipher_list(ssl, ciphers) != 1)) {
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: Failed to set cipher string '%s'", ciphers);
++			return -1;
++		}
++	}
++	if (sigalgs) {
++		if ((ssl_ctx && wolfSSL_CTX_set1_sigalgs_list(ssl_ctx, sigalgs) != 1) ||
++				(ssl && wolfSSL_set1_sigalgs_list(ssl, sigalgs) != 1)) {
++			wpa_printf(MSG_ERROR,
++					"wolfSSL: Failed to set sigalgs '%s'", sigalgs);
++			return -1;
++		}
++	}
++	if (keySz) {
++		if ((ssl_ctx && wolfSSL_CTX_SetMinRsaKey_Sz(ssl_ctx, keySz) != 1) ||
++				(ssl && wolfSSL_SetMinRsaKey_Sz(ssl, keySz) != 1) ||
++				(ssl_ctx && wolfSSL_CTX_SetMinDhKey_Sz(ssl_ctx, keySz) != 1) ||
++							(ssl && wolfSSL_SetMinDhKey_Sz(ssl, keySz) != 1)) {
++			wpa_printf(MSG_ERROR, "wolfSSL: Failed to set min key size");
++			return -1;
++		}
++	}
++	if (eccKeySz) {
++		if ((ssl_ctx && wolfSSL_CTX_SetMinEccKey_Sz(ssl_ctx, eccKeySz) != 1) ||
++				(ssl && wolfSSL_SetMinEccKey_Sz(ssl, eccKeySz) != 1) ||
++				(ssl_ctx && wolfSSL_CTX_SetTmpEC_DHE_Sz(ssl_ctx, eccKeySz/8) != 1) ||
++							(ssl && wolfSSL_SetTmpEC_DHE_Sz(ssl, eccKeySz/8) != 1)) {
++			wpa_printf(MSG_ERROR, "wolfSSL: Failed to set min ecc key size");
++			return -1;
++		}
++	}
++	if (curves) {
++		if ((ssl_ctx && wolfSSL_CTX_set1_curves_list(ssl_ctx, curves) != 1) ||
++				(ssl && wolfSSL_set1_curves_list(ssl, curves) != 1)) {
++			wpa_printf(MSG_ERROR, "wolfSSL: Failed to set curves");
++			return -1;
++		}
++	}
++	return 0;
++}
++
+ void * tls_init(const struct tls_config *conf)
+ {
+ 	WOLFSSL_CTX *ssl_ctx;
+ 	struct tls_context *context;
+-	const char *ciphers;
+ 
+ #ifdef DEBUG_WOLFSSL
+ 	wolfSSL_SetLoggingCb(wolfSSL_logging_cb);
+@@ -280,19 +396,14 @@ void * tls_init(const struct tls_config *conf)
+ 						   WOLFSSL_SESS_CACHE_OFF);
+ 	}
+ 
+-	if (conf && conf->openssl_ciphers)
+-		ciphers = conf->openssl_ciphers;
+-	else
+-		ciphers = "ALL";
+-	wpa_printf(MSG_DEBUG, "wolfSSL: cipher suites: %s", ciphers);
+-	if (wolfSSL_CTX_set_cipher_list(ssl_ctx, ciphers) != 1) {
+-		wpa_printf(MSG_ERROR,
+-			   "wolfSSL: Failed to set cipher string '%s'",
+-			   ciphers);
++	if (handle_ciphersuites(ssl_ctx, NULL, conf->openssl_ciphers,
++			conf ? conf->tls_flags : 0) != 0) {
++		wpa_printf(MSG_INFO, "Error setting ciphersuites");
+ 		tls_deinit(ssl_ctx);
+ 		return NULL;
+ 	}
+ 
++
+ 	return ssl_ctx;
+ }
+ 
+@@ -819,6 +930,8 @@ static enum tls_fail_reason wolfssl_tls_fail_reason(int err)
+ 	case X509_V_ERR_CERT_UNTRUSTED:
+ 	case X509_V_ERR_CERT_REJECTED:
+ 		return TLS_FAIL_BAD_CERTIFICATE;
++	case RSA_KEY_SIZE_E:
++		return TLS_FAIL_INSUFFICIENT_KEY_LEN;
+ 	default:
+ 		return TLS_FAIL_UNSPECIFIED;
+ 	}
+@@ -1324,13 +1437,9 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
+ 		return -1;
+ 	}
+ 
+-	wpa_printf(MSG_DEBUG, "wolfSSL: cipher suites: %s",
+-		   params->openssl_ciphers ? params->openssl_ciphers : "N/A");
+-	if (params->openssl_ciphers &&
+-	    wolfSSL_set_cipher_list(conn->ssl, params->openssl_ciphers) != 1) {
+-		wpa_printf(MSG_INFO,
+-			   "wolfSSL: Failed to set cipher string '%s'",
+-			   params->openssl_ciphers);
++	if (handle_ciphersuites(NULL, conn->ssl, params->openssl_ciphers,
++			params->flags) != 0) {
++		wpa_printf(MSG_INFO, "Error setting ciphersuites");
+ 		return -1;
+ 	}
+ 
+@@ -1556,14 +1665,9 @@ int tls_global_set_params(void *tls_ctx,
+ 		return -1;
+ 	}
+ 
+-	wpa_printf(MSG_DEBUG, "wolfSSL: cipher suites: %s",
+-		   params->openssl_ciphers ? params->openssl_ciphers : "N/A");
+-	if (params->openssl_ciphers &&
+-	    wolfSSL_CTX_set_cipher_list(tls_ctx,
+-					params->openssl_ciphers) != 1) {
+-		wpa_printf(MSG_INFO,
+-			   "wolfSSL: Failed to set cipher string '%s'",
+-			   params->openssl_ciphers);
++	if (handle_ciphersuites(tls_ctx, NULL, params->openssl_ciphers,
++			params->flags) != 0) {
++		wpa_printf(MSG_INFO, "Error setting ciphersuites");
+ 		return -1;
+ 	}
+ 
+@@ -1870,7 +1974,7 @@ int tls_connection_set_cipher_list(void *tls_ctx, struct tls_connection *conn,
+ 	if (!conn || !conn->ssl || !ciphers)
+ 		return -1;
+ 
+-	buf[0] = '\0';
++	buf[0] = buf[1] = '\0';
+ 	pos = buf;
+ 	end = pos + sizeof(buf);
+ 
+@@ -1910,9 +2014,8 @@ int tls_connection_set_cipher_list(void *tls_ctx, struct tls_connection *conn,
+ 		c++;
+ 	}
+ 
+-	wpa_printf(MSG_DEBUG, "wolfSSL: cipher suites: %s", buf + 1);
+-
+-	if (wolfSSL_set_cipher_list(conn->ssl, buf + 1) != 1) {
++	/* +1 to skip the ":" */
++	if (handle_ciphersuites(NULL, conn->ssl, buf + 1, conn->flags) != 0) {
+ 		wpa_printf(MSG_DEBUG, "Cipher suite configuration failed");
+ 		return -1;
+ 	}
+@@ -1929,7 +2032,10 @@ int tls_get_cipher(void *tls_ctx, struct tls_connection *conn,
+ 	if (!conn || !conn->ssl)
+ 		return -1;
+ 
+-	name = wolfSSL_get_cipher_name(conn->ssl);
++	if (wolfSSL_version(conn->ssl) == TLS1_3_VERSION)
++		name = wolfSSL_get_cipher(conn->ssl);
++	else
++		name = wolfSSL_get_cipher_name(conn->ssl);
+ 	if (!name)
+ 		return -1;
+ 
+diff --git a/tests/hwsim/test_suite_b.py b/tests/hwsim/test_suite_b.py
+index d03a39deef..59e255a3c6 100644
+--- a/tests/hwsim/test_suite_b.py
++++ b/tests/hwsim/test_suite_b.py
+@@ -74,7 +74,8 @@ def test_suite_b(dev, apdev):
+     hapd.wait_sta()
+     tls_cipher = dev[0].get_status_field("EAP TLS cipher")
+     if tls_cipher != "ECDHE-ECDSA-AES128-GCM-SHA256" and \
+-       tls_cipher != "ECDHE-ECDSA-AES-128-GCM-AEAD":
++       tls_cipher != "ECDHE-ECDSA-AES-128-GCM-AEAD" and \
++       tls_cipher != "ECDHE-ECDSA-AES256-GCM-SHA384":
+         raise Exception("Unexpected TLS cipher: " + tls_cipher)
+ 
+     bss = dev[0].get_bss(apdev[0]['bssid'])
+@@ -488,7 +489,16 @@ def test_suite_b_192_rsa_insufficient_key(dev, apdev):
+     params["ca_cert"] = "auth_serv/ca.pem"
+     params["server_cert"] = "auth_serv/server.pem"
+     params["private_key"] = "auth_serv/server.key"
+-    hapd = hostapd.add_ap(apdev[0], params)
++
++    try:
++        hapd = hostapd.add_ap(apdev[0], params)
++    except:
++        hapd = hostapd.add_ap(apdev[0], suite_b_192_rsa_ap_params())
++        tls = hapd.request("GET tls_library")
++        if tls.startswith("wolfSSL"):
++            # wolfSSL fails during key loading with too short key
++            return
++        raise
+ 
+     dev[0].connect("test-suite-b", key_mgmt="WPA-EAP-SUITE-B-192",
+                    ieee80211w="2",
+@@ -505,6 +515,8 @@ def test_suite_b_192_rsa_insufficient_key(dev, apdev):
+         raise Exception("Certificate error not reported")
+     if "reason=11" in ev and "err='Insufficient RSA modulus size'" in ev:
+         return
++    if "reason=11" in ev and "err='RSA key too small'" in ev:
++        return
+     if "reason=7" in ev and "err='certificate uses insecure algorithm'" in ev:
+         return
+     raise Exception("Unexpected error reason: " + ev)
+@@ -516,7 +528,16 @@ def test_suite_b_192_rsa_insufficient_dh(dev, apdev):
+     params = suite_b_192_rsa_ap_params()
+     params["tls_flags"] = "[SUITEB-NO-ECDH]"
+     params["dh_file"] = "auth_serv/dh.conf"
+-    hapd = hostapd.add_ap(apdev[0], params)
++    try:
++        hapd = hostapd.add_ap(apdev[0], params)
++    except:
++        hapd = hostapd.add_ap(apdev[0], suite_b_192_rsa_ap_params())
++        tls = hapd.request("GET tls_library")
++        if tls.startswith("wolfSSL"):
++            # wolfSSL fails during key loading with too short key
++            return
++        raise
++        
+ 
+     dev[0].connect("test-suite-b", key_mgmt="WPA-EAP-SUITE-B-192",
+                    ieee80211w="2",
+@@ -528,14 +549,14 @@ def test_suite_b_192_rsa_insufficient_dh(dev, apdev):
+                    pairwise="GCMP-256", group="GCMP-256", scan_freq="2412",
+                    wait_connect=False)
+     ev = dev[0].wait_event(["CTRL-EVENT-EAP-STATUS status='local TLS alert'",
+-                            "CTRL-EVENT-CONNECTED"],
++                            "CTRL-EVENT-CONNECTED", "CTRL-EVENT-EAP-FAILURE"],
+                            timeout=10)
+     dev[0].request("DISCONNECT")
+     if ev is None:
+         raise Exception("DH error not reported")
+     if "CTRL-EVENT-CONNECTED" in ev:
+         raise Exception("Unexpected connection")
+-    if "insufficient security" not in ev and "internal error" not in ev:
++    if "insufficient security" not in ev and "internal error" not in ev and "authentication failed" not in ev:
+         raise Exception("Unexpected error reason: " + ev)
+ 
+ def test_suite_b_192_rsa_radius(dev, apdev):
+-- 
+2.34.1
+

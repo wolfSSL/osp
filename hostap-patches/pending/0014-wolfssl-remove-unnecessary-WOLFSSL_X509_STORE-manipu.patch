@@ -1,0 +1,46 @@
+From c3e7021a1a52dca6681e5f7841d17c85fac2bb13 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 26 Jan 2024 13:32:25 +0100
+Subject: [PATCH 14/24] wolfssl: remove unnecessary WOLFSSL_X509_STORE
+ manipulation
+
+Setting a new WOLFSSL_X509_STORE is not necessary when calling  wolfSSL_CTX_load_verify_locations().
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 4016b6a46b..f126c37479 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -1383,15 +1383,8 @@ static int tls_connection_ca_cert(void *tls_ctx, struct tls_connection *conn,
+ 	}
+ 
+ 	if (ca_cert || ca_path) {
+-		WOLFSSL_X509_STORE *cm = wolfSSL_X509_STORE_new();
+-
+-		if (!cm) {
+-			wpa_printf(MSG_INFO,
+-				   "SSL: failed to create certificate store");
+-			return -1;
+-		}
+-		wolfSSL_CTX_set_cert_store(ctx, cm);
+-
++		wpa_printf(MSG_DEBUG, "SSL: loading CA's from '%s' and '%s'",
++				ca_cert ? ca_cert : "N/A", ca_path ? ca_path : "N/A");
+ 		if (wolfSSL_CTX_load_verify_locations(ctx, ca_cert, ca_path) !=
+ 		    SSL_SUCCESS) {
+ 			wpa_printf(MSG_INFO,
+@@ -1408,6 +1401,7 @@ static int tls_connection_ca_cert(void *tls_ctx, struct tls_connection *conn,
+ 				return -1;
+ 			}
+ 		}
++		wpa_printf(MSG_DEBUG, "SSL: Loaded ca_cert or ca_path");
+ 		return 0;
+ 	}
+ 
+-- 
+2.34.1
+

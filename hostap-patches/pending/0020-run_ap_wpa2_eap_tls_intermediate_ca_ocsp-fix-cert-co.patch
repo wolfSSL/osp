@@ -1,0 +1,242 @@
+From 81ffa6f942f90a836ccc3105e2cd267e5a0a0bc2 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 2 Apr 2024 17:21:45 +0200
+Subject: [PATCH 20/24] run_ap_wpa2_eap_tls_intermediate_ca_ocsp: fix cert
+ configuration
+
+When wolfSSL is on the server side, it won't send the entire chain. The client needs to have the server CA loaded to be able to verify the server and needs to load user_and_ica.pem so it sends a cert chain.
+
+Use entire cert chain PEM since the test relies on chain being sent. wolfSSL only sends the certificate that was loaded and not the full chain.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ .../iCA-server/server-revoked_and_ica.pem     | 162 +++++++++---------
+ tests/hwsim/auth_serv/ica-generate.sh         |   2 +-
+ tests/hwsim/test_ap_eap.py                    |  12 +-
+ 3 files changed, 90 insertions(+), 86 deletions(-)
+
+diff --git a/tests/hwsim/auth_serv/iCA-server/server-revoked_and_ica.pem b/tests/hwsim/auth_serv/iCA-server/server-revoked_and_ica.pem
+index 09619be1aa..22997b8655 100644
+--- a/tests/hwsim/auth_serv/iCA-server/server-revoked_and_ica.pem
++++ b/tests/hwsim/auth_serv/iCA-server/server-revoked_and_ica.pem
+@@ -1,84 +1,3 @@
+-Certificate:
+-    Data:
+-        Version: 3 (0x2)
+-        Serial Number:
+-            d8:d3:e3:a6:cb:e3:cc:f7
+-        Signature Algorithm: sha256WithRSAEncryption
+-        Issuer: C=FI, L=Tuusula, O=w1.fi, CN=Root CA
+-        Validity
+-            Not Before: May  3 15:20:10 2020 GMT
+-            Not After : May  3 15:20:10 2030 GMT
+-        Subject: C=FI, O=w1.fi, CN=Server Intermediate CA
+-        Subject Public Key Info:
+-            Public Key Algorithm: rsaEncryption
+-                RSA Public-Key: (2048 bit)
+-                Modulus:
+-                    00:a2:b0:de:7f:e6:17:69:4b:bb:8d:dc:4f:8b:95:
+-                    33:5e:13:ee:a1:01:f5:82:de:6e:fc:83:db:e7:22:
+-                    5f:b9:8d:2b:de:10:72:4e:da:81:c1:f7:f3:eb:0e:
+-                    db:5b:5f:90:92:bb:41:68:55:4f:84:d9:73:5b:0c:
+-                    6d:40:e6:c5:0f:5d:5c:5e:80:1e:64:87:5a:99:44:
+-                    8b:3d:61:20:f0:15:cc:87:95:5b:a0:46:0f:bc:5c:
+-                    14:ee:ac:4f:c8:7c:d2:c0:ef:60:94:22:b6:74:05:
+-                    4f:ca:97:01:0a:30:b4:50:44:89:d0:c2:6b:e5:7f:
+-                    ce:66:22:1a:d6:38:7c:ff:42:42:ca:58:a0:38:85:
+-                    ca:f1:b1:1f:33:27:db:bf:5c:49:96:36:7a:11:2f:
+-                    62:d7:eb:7e:9f:9b:9c:0e:2b:df:cd:59:bc:ee:e8:
+-                    6a:e3:7d:fa:06:ba:34:42:b5:7d:e7:be:e1:7b:85:
+-                    af:1b:25:a9:45:33:06:cb:cc:0d:ca:78:5c:56:52:
+-                    ac:43:7e:f6:0c:e7:fb:86:b4:ac:d7:f4:b2:54:ee:
+-                    65:7a:5c:32:6b:33:a0:68:1b:d8:ea:c8:74:94:08:
+-                    00:7f:9b:f0:da:80:0f:f2:45:13:11:63:4c:e6:d2:
+-                    97:d3:ae:12:b0:7c:e8:f0:56:c0:7b:7c:82:99:6d:
+-                    3b:5d
+-                Exponent: 65537 (0x10001)
+-        X509v3 extensions:
+-            X509v3 Subject Key Identifier: 
+-                EB:DC:8D:38:75:10:2F:E6:82:8E:FE:43:EC:9F:7E:63:22:BD:51:55
+-            X509v3 Authority Key Identifier: 
+-                keyid:A4:FD:B9:39:1B:81:B3:AA:EB:88:1D:D4:81:A9:B5:11:70:CC:A7:E1
+-
+-            X509v3 Basic Constraints: critical
+-                CA:TRUE, pathlen:0
+-            X509v3 Key Usage: critical
+-                Certificate Sign, CRL Sign
+-    Signature Algorithm: sha256WithRSAEncryption
+-         86:74:75:b2:bb:b0:85:25:48:38:e1:34:54:d5:d4:3a:9f:0e:
+-         b1:96:fd:cc:ea:15:21:72:da:9e:ef:e2:fa:ae:29:74:dc:83:
+-         36:87:88:7d:75:51:9a:c5:6e:a8:80:77:3f:5c:ed:9e:ac:57:
+-         17:ed:ab:64:4f:15:8b:47:90:0a:17:2a:7e:49:a9:01:a1:41:
+-         66:d4:fe:be:18:70:d6:23:f7:0b:0a:53:d7:75:a8:7f:0a:52:
+-         1c:1d:8c:63:6f:82:ed:ed:fd:e2:fe:86:ef:0a:4c:f8:d7:93:
+-         56:9a:a3:dd:74:02:8c:b3:31:83:c1:8a:66:c6:c0:1d:dc:00:
+-         5c:57:f4:31:31:8b:d4:84:d8:da:6d:d6:f6:e4:10:7e:bb:f2:
+-         41:95:dd:a6:0c:37:c7:22:80:e6:36:3e:34:c6:1c:73:ab:42:
+-         90:6e:f8:db:e8:b6:c0:b2:f5:17:d2:6f:d3:8c:fb:14:25:8e:
+-         72:81:45:76:86:f7:d1:d9:3d:ff:b1:a2:10:6f:c0:24:e7:70:
+-         3f:2d:cf:32:ee:06:70:d5:1b:04:84:6d:48:69:26:1e:98:5a:
+-         ed:e3:61:f5:29:45:88:25:cf:7f:c4:fb:f3:87:a7:11:95:9e:
+-         cf:a8:aa:88:db:12:32:66:66:c4:1d:12:b1:62:1d:fa:28:f4:
+-         97:ac:df:2e
+------BEGIN CERTIFICATE-----
+-MIIDaDCCAlCgAwIBAgIJANjT46bL48z3MA0GCSqGSIb3DQEBCwUAMEExCzAJBgNV
+-BAYTAkZJMRAwDgYDVQQHDAdUdXVzdWxhMQ4wDAYDVQQKDAV3MS5maTEQMA4GA1UE
+-AwwHUm9vdCBDQTAeFw0yMDA1MDMxNTIwMTBaFw0zMDA1MDMxNTIwMTBaMD4xCzAJ
+-BgNVBAYTAkZJMQ4wDAYDVQQKDAV3MS5maTEfMB0GA1UEAwwWU2VydmVyIEludGVy
+-bWVkaWF0ZSBDQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKKw3n/m
+-F2lLu43cT4uVM14T7qEB9YLebvyD2+ciX7mNK94Qck7agcH38+sO21tfkJK7QWhV
+-T4TZc1sMbUDmxQ9dXF6AHmSHWplEiz1hIPAVzIeVW6BGD7xcFO6sT8h80sDvYJQi
+-tnQFT8qXAQowtFBEidDCa+V/zmYiGtY4fP9CQspYoDiFyvGxHzMn279cSZY2ehEv
+-Ytfrfp+bnA4r381ZvO7oauN9+ga6NEK1fee+4XuFrxslqUUzBsvMDcp4XFZSrEN+
+-9gzn+4a0rNf0slTuZXpcMmszoGgb2OrIdJQIAH+b8NqAD/JFExFjTObSl9OuErB8
+-6PBWwHt8gpltO10CAwEAAaNmMGQwHQYDVR0OBBYEFOvcjTh1EC/mgo7+Q+yffmMi
+-vVFVMB8GA1UdIwQYMBaAFKT9uTkbgbOq64gd1IGptRFwzKfhMBIGA1UdEwEB/wQI
+-MAYBAf8CAQAwDgYDVR0PAQH/BAQDAgEGMA0GCSqGSIb3DQEBCwUAA4IBAQCGdHWy
+-u7CFJUg44TRU1dQ6nw6xlv3M6hUhctqe7+L6ril03IM2h4h9dVGaxW6ogHc/XO2e
+-rFcX7atkTxWLR5AKFyp+SakBoUFm1P6+GHDWI/cLClPXdah/ClIcHYxjb4Lt7f3i
+-/obvCkz415NWmqPddAKMszGDwYpmxsAd3ABcV/QxMYvUhNjabdb25BB+u/JBld2m
+-DDfHIoDmNj40xhxzq0KQbvjb6LbAsvUX0m/TjPsUJY5ygUV2hvfR2T3/saIQb8Ak
+-53A/Lc8y7gZw1RsEhG1IaSYemFrt42H1KUWIJc9/xPvzh6cRlZ7PqKqI2xIyZmbE
+-HRKxYh36KPSXrN8u
+------END CERTIFICATE-----
+ Certificate:
+     Data:
+         Version: 3 (0x2)
+@@ -165,3 +84,84 @@ zoQkEtp/qKsV/SSbzxyuL48TKCcJHlcryh/IvKSVCCdOxCFopUWfWkIcfzdZ1+0w
+ vu0mEl2A9X19lP9SVvxnDz8AIee0L0h7d4b7FiiraOFNgOteS5mIL+yjHQbFBC67
+ VvtrdZ1beINjK3B8IZShWKSOizDTKIg=
+ -----END CERTIFICATE-----
++Certificate:
++    Data:
++        Version: 3 (0x2)
++        Serial Number:
++            d8:d3:e3:a6:cb:e3:cc:f7
++        Signature Algorithm: sha256WithRSAEncryption
++        Issuer: C=FI, L=Tuusula, O=w1.fi, CN=Root CA
++        Validity
++            Not Before: May  3 15:20:10 2020 GMT
++            Not After : May  3 15:20:10 2030 GMT
++        Subject: C=FI, O=w1.fi, CN=Server Intermediate CA
++        Subject Public Key Info:
++            Public Key Algorithm: rsaEncryption
++                RSA Public-Key: (2048 bit)
++                Modulus:
++                    00:a2:b0:de:7f:e6:17:69:4b:bb:8d:dc:4f:8b:95:
++                    33:5e:13:ee:a1:01:f5:82:de:6e:fc:83:db:e7:22:
++                    5f:b9:8d:2b:de:10:72:4e:da:81:c1:f7:f3:eb:0e:
++                    db:5b:5f:90:92:bb:41:68:55:4f:84:d9:73:5b:0c:
++                    6d:40:e6:c5:0f:5d:5c:5e:80:1e:64:87:5a:99:44:
++                    8b:3d:61:20:f0:15:cc:87:95:5b:a0:46:0f:bc:5c:
++                    14:ee:ac:4f:c8:7c:d2:c0:ef:60:94:22:b6:74:05:
++                    4f:ca:97:01:0a:30:b4:50:44:89:d0:c2:6b:e5:7f:
++                    ce:66:22:1a:d6:38:7c:ff:42:42:ca:58:a0:38:85:
++                    ca:f1:b1:1f:33:27:db:bf:5c:49:96:36:7a:11:2f:
++                    62:d7:eb:7e:9f:9b:9c:0e:2b:df:cd:59:bc:ee:e8:
++                    6a:e3:7d:fa:06:ba:34:42:b5:7d:e7:be:e1:7b:85:
++                    af:1b:25:a9:45:33:06:cb:cc:0d:ca:78:5c:56:52:
++                    ac:43:7e:f6:0c:e7:fb:86:b4:ac:d7:f4:b2:54:ee:
++                    65:7a:5c:32:6b:33:a0:68:1b:d8:ea:c8:74:94:08:
++                    00:7f:9b:f0:da:80:0f:f2:45:13:11:63:4c:e6:d2:
++                    97:d3:ae:12:b0:7c:e8:f0:56:c0:7b:7c:82:99:6d:
++                    3b:5d
++                Exponent: 65537 (0x10001)
++        X509v3 extensions:
++            X509v3 Subject Key Identifier: 
++                EB:DC:8D:38:75:10:2F:E6:82:8E:FE:43:EC:9F:7E:63:22:BD:51:55
++            X509v3 Authority Key Identifier: 
++                keyid:A4:FD:B9:39:1B:81:B3:AA:EB:88:1D:D4:81:A9:B5:11:70:CC:A7:E1
++
++            X509v3 Basic Constraints: critical
++                CA:TRUE, pathlen:0
++            X509v3 Key Usage: critical
++                Certificate Sign, CRL Sign
++    Signature Algorithm: sha256WithRSAEncryption
++         86:74:75:b2:bb:b0:85:25:48:38:e1:34:54:d5:d4:3a:9f:0e:
++         b1:96:fd:cc:ea:15:21:72:da:9e:ef:e2:fa:ae:29:74:dc:83:
++         36:87:88:7d:75:51:9a:c5:6e:a8:80:77:3f:5c:ed:9e:ac:57:
++         17:ed:ab:64:4f:15:8b:47:90:0a:17:2a:7e:49:a9:01:a1:41:
++         66:d4:fe:be:18:70:d6:23:f7:0b:0a:53:d7:75:a8:7f:0a:52:
++         1c:1d:8c:63:6f:82:ed:ed:fd:e2:fe:86:ef:0a:4c:f8:d7:93:
++         56:9a:a3:dd:74:02:8c:b3:31:83:c1:8a:66:c6:c0:1d:dc:00:
++         5c:57:f4:31:31:8b:d4:84:d8:da:6d:d6:f6:e4:10:7e:bb:f2:
++         41:95:dd:a6:0c:37:c7:22:80:e6:36:3e:34:c6:1c:73:ab:42:
++         90:6e:f8:db:e8:b6:c0:b2:f5:17:d2:6f:d3:8c:fb:14:25:8e:
++         72:81:45:76:86:f7:d1:d9:3d:ff:b1:a2:10:6f:c0:24:e7:70:
++         3f:2d:cf:32:ee:06:70:d5:1b:04:84:6d:48:69:26:1e:98:5a:
++         ed:e3:61:f5:29:45:88:25:cf:7f:c4:fb:f3:87:a7:11:95:9e:
++         cf:a8:aa:88:db:12:32:66:66:c4:1d:12:b1:62:1d:fa:28:f4:
++         97:ac:df:2e
++-----BEGIN CERTIFICATE-----
++MIIDaDCCAlCgAwIBAgIJANjT46bL48z3MA0GCSqGSIb3DQEBCwUAMEExCzAJBgNV
++BAYTAkZJMRAwDgYDVQQHDAdUdXVzdWxhMQ4wDAYDVQQKDAV3MS5maTEQMA4GA1UE
++AwwHUm9vdCBDQTAeFw0yMDA1MDMxNTIwMTBaFw0zMDA1MDMxNTIwMTBaMD4xCzAJ
++BgNVBAYTAkZJMQ4wDAYDVQQKDAV3MS5maTEfMB0GA1UEAwwWU2VydmVyIEludGVy
++bWVkaWF0ZSBDQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKKw3n/m
++F2lLu43cT4uVM14T7qEB9YLebvyD2+ciX7mNK94Qck7agcH38+sO21tfkJK7QWhV
++T4TZc1sMbUDmxQ9dXF6AHmSHWplEiz1hIPAVzIeVW6BGD7xcFO6sT8h80sDvYJQi
++tnQFT8qXAQowtFBEidDCa+V/zmYiGtY4fP9CQspYoDiFyvGxHzMn279cSZY2ehEv
++Ytfrfp+bnA4r381ZvO7oauN9+ga6NEK1fee+4XuFrxslqUUzBsvMDcp4XFZSrEN+
++9gzn+4a0rNf0slTuZXpcMmszoGgb2OrIdJQIAH+b8NqAD/JFExFjTObSl9OuErB8
++6PBWwHt8gpltO10CAwEAAaNmMGQwHQYDVR0OBBYEFOvcjTh1EC/mgo7+Q+yffmMi
++vVFVMB8GA1UdIwQYMBaAFKT9uTkbgbOq64gd1IGptRFwzKfhMBIGA1UdEwEB/wQI
++MAYBAf8CAQAwDgYDVR0PAQH/BAQDAgEGMA0GCSqGSIb3DQEBCwUAA4IBAQCGdHWy
++u7CFJUg44TRU1dQ6nw6xlv3M6hUhctqe7+L6ril03IM2h4h9dVGaxW6ogHc/XO2e
++rFcX7atkTxWLR5AKFyp+SakBoUFm1P6+GHDWI/cLClPXdah/ClIcHYxjb4Lt7f3i
++/obvCkz415NWmqPddAKMszGDwYpmxsAd3ABcV/QxMYvUhNjabdb25BB+u/JBld2m
++DDfHIoDmNj40xhxzq0KQbvjb6LbAsvUX0m/TjPsUJY5ygUV2hvfR2T3/saIQb8Ak
++53A/Lc8y7gZw1RsEhG1IaSYemFrt42H1KUWIJc9/xPvzh6cRlZ7PqKqI2xIyZmbE
++HRKxYh36KPSXrN8u
++-----END CERTIFICATE-----
+diff --git a/tests/hwsim/auth_serv/ica-generate.sh b/tests/hwsim/auth_serv/ica-generate.sh
+index d3fe7b9645..555cdb06d3 100755
+--- a/tests/hwsim/auth_serv/ica-generate.sh
++++ b/tests/hwsim/auth_serv/ica-generate.sh
+@@ -58,7 +58,7 @@ cat ec-ca-openssl.cnf |
+ $OPENSSL req -config openssl.cnf.tmp -batch -new -newkey rsa:2048 -nodes -keyout iCA-server/server-revoked.key -out iCA-server/server-revoked.req -outform PEM -sha256
+ $OPENSSL ca -config openssl.cnf.tmp -batch -keyfile iCA-server/private/cakey.pem -cert iCA-server/cacert.pem -create_serial -in iCA-server/server-revoked.req -out iCA-server/server-revoked.pem -extensions ext_server -md sha256
+ $OPENSSL ca -config openssl.cnf.tmp -revoke iCA-server/server-revoked.pem -keyfile iCA-server/private/cakey.pem -cert iCA-server/cacert.pem
+-cat iCA-server/cacert.pem iCA-server/server-revoked.pem > iCA-server/server-revoked_and_ica.pem
++cat iCA-server/server-revoked.pem iCA-server/cacert.pem > iCA-server/server-revoked_and_ica.pem
+ rm openssl.cnf.tmp
+ 
+ echo
+diff --git a/tests/hwsim/test_ap_eap.py b/tests/hwsim/test_ap_eap.py
+index 3350da7e4e..580660e592 100644
+--- a/tests/hwsim/test_ap_eap.py
++++ b/tests/hwsim/test_ap_eap.py
+@@ -4972,14 +4972,18 @@ def run_ap_wpa2_eap_tls_intermediate_ca_ocsp(dev, apdev, params, md):
+     fn = ica_ocsp("server.pem", md)
+     params["ocsp_stapling_response"] = fn
+     try:
+-        hostapd.add_ap(apdev[0], params)
++        hapd = hostapd.add_ap(apdev[0], params)
+         tls = dev[0].request("GET tls_library")
+         if "GnuTLS" in tls or "wolfSSL" in tls:
+-            ca_cert = "auth_serv/iCA-user/ca-and-root.pem"
+             client_cert = "auth_serv/iCA-user/user_and_ica.pem"
+         else:
+-            ca_cert = "auth_serv/iCA-user/ca-and-root.pem"
+             client_cert = "auth_serv/iCA-user/user.pem"
++        hapd_tls = hapd.request("GET tls_library")
++        if "GnuTLS" in hapd_tls or "wolfSSL" in hapd_tls:
++            ca_cert = "auth_serv/iCA-server/ca-and-root.pem"
++            client_cert = "auth_serv/iCA-user/user_and_ica.pem"
++        else:
++            ca_cert = "auth_serv/iCA-user/ca-and-root.pem"
+         dev[0].connect("test-wpa2-eap", key_mgmt="WPA-EAP", eap="TLS",
+                        identity="tls user",
+                        ca_cert=ca_cert,
+@@ -5003,7 +5007,7 @@ def run_ap_wpa2_eap_tls_intermediate_ca_ocsp_revoked(dev, apdev, params, md):
+     check_ocsp_support(dev[0])
+     params = int_eap_server_params()
+     params["ca_cert"] = "auth_serv/iCA-server/ca-and-root.pem"
+-    params["server_cert"] = "auth_serv/iCA-server/server-revoked.pem"
++    params["server_cert"] = "auth_serv/iCA-server/server-revoked_and_ica.pem"
+     params["private_key"] = "auth_serv/iCA-server/server-revoked.key"
+     fn = ica_ocsp("server-revoked.pem", md)
+     params["ocsp_stapling_response"] = fn
+-- 
+2.34.1
+

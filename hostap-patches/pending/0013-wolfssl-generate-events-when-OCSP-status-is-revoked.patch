@@ -1,0 +1,36 @@
+From 650ba7d8d9824ac906543dc9ea08a9bfb0f0eee5 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 22 Dec 2023 12:08:22 +0100
+Subject: [PATCH 13/24] wolfssl: generate events when OCSP status is revoked
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index a58e1f7607..4016b6a46b 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -1836,6 +1836,18 @@ static struct wpabuf * wolfssl_handshake(struct tls_connection *conn,
+ 				   wolfSSL_ERR_error_string(err, msg));
+ 			conn->failed++;
+ 		}
++
++		/* Generate extra events */
++		if (err == OCSP_CERT_REVOKED || err == BAD_CERTIFICATE_STATUS_ERROR ||
++				err == OCSP_CERT_REVOKED) {
++			char buf[256];
++			WOLFSSL_X509* err_cert = wolfSSL_get_peer_certificate(conn->ssl);
++			wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(err_cert),
++					buf, sizeof(buf));
++			wolfssl_tls_fail_event(conn, err_cert, err, 0, buf,
++						   "bad certificate status response",
++						   TLS_FAIL_UNSPECIFIED);
++		}
+ 	}
+ 
+ 	return conn->output.out_data;
+-- 
+2.34.1
+

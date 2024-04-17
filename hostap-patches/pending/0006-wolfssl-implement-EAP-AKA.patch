@@ -1,0 +1,315 @@
+From 272c53e7a46a3772b82c16e1b8d7635a92f88236 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 2 Apr 2024 16:34:22 +0200
+Subject: [PATCH 06/24] wolfssl: implement EAP-AKA
+
+Implement the crypto_rsa_key set of functions in the wolfSSL backend to enable EAP-AKA and EAP-SIM
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ hostapd/Makefile            |   1 +
+ src/crypto/crypto_wolfssl.c | 256 ++++++++++++++++++++++++++++++++++++
+ wpa_supplicant/Makefile     |   1 +
+ 3 files changed, 258 insertions(+)
+
+diff --git a/hostapd/Makefile b/hostapd/Makefile
+index b3cb686734..2e69453443 100644
+--- a/hostapd/Makefile
++++ b/hostapd/Makefile
+@@ -708,6 +708,7 @@ CFLAGS += -DCONFIG_TLSV12
+ endif
+ 
+ ifeq ($(CONFIG_TLS), wolfssl)
++CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
+ CONFIG_CRYPTO=wolfssl
+ ifdef TLS_FUNCS
+ OBJS += ../src/crypto/tls_wolfssl.o
+diff --git a/src/crypto/crypto_wolfssl.c b/src/crypto/crypto_wolfssl.c
+index 269174321b..74e25fab91 100644
+--- a/src/crypto/crypto_wolfssl.c
++++ b/src/crypto/crypto_wolfssl.c
+@@ -29,6 +29,7 @@
+ #include <wolfssl/wolfcrypt/md5.h>
+ #include <wolfssl/wolfcrypt/pkcs7.h>
+ #include <wolfssl/wolfcrypt/pwdbased.h>
++#include <wolfssl/wolfcrypt/rsa.h>
+ #include <wolfssl/wolfcrypt/sha.h>
+ #include <wolfssl/wolfcrypt/sha256.h>
+ #include <wolfssl/wolfcrypt/sha512.h>
+@@ -3554,6 +3555,261 @@ fail:
+ 
+ #endif /* CONFIG_DPP */
+ 
++struct crypto_rsa_key {
++	RsaKey key;
++	WC_RNG *rng;
++};
++
++static struct crypto_rsa_key * crypto_rsa_key_init(void)
++{
++	struct crypto_rsa_key* ret;
++	int err;
++	ret = os_zalloc(sizeof(*ret));
++	if (ret) {
++		err = wc_InitRsaKey(&ret->key, NULL);
++		if (err != MP_OKAY) {
++			LOG_WOLF_ERROR_FUNC(wc_InitRsaKey, err);
++			goto fail;
++		}
++		ret->rng = wc_rng_init();
++		if (!ret->rng) {
++			LOG_WOLF_ERROR_FUNC_NULL(wc_rng_init);
++			goto fail;
++		}
++		err = wc_RsaSetRNG(&ret->key, ret->rng);
++		if (err != 0) {
++			LOG_WOLF_ERROR_FUNC(wc_RsaSetRNG, err);
++			goto fail;
++		}
++	}
++	return ret;
++fail:
++	crypto_rsa_key_free(ret);
++	return NULL;
++}
++
++void crypto_rsa_key_free(struct crypto_rsa_key *key)
++{
++	int err;
++	if (key) {
++		err = wc_FreeRsaKey(&key->key);
++		if (err != 0)
++			LOG_WOLF_ERROR_FUNC(wc_FreeRsaKey, err);
++		wc_rng_free(key->rng);
++		os_free(key);
++	}
++}
++
++static void read_rsa_key_from_x509(unsigned char *keyPem, size_t keyPemLen,
++		DerBuffer** keyDer)
++{
++	struct DecodedCert cert;
++    DerBuffer* certDer = NULL;
++    word32 derKeySz = 0;
++    int err;
++
++	err = wc_PemToDer(keyPem, (long)keyPemLen, CERT_TYPE, &certDer,
++			NULL, NULL, NULL);
++	if (err != 0) {
++		LOG_WOLF_ERROR_FUNC(wc_PemToDer, err);
++		goto fail;
++	}
++
++	wc_InitDecodedCert(&cert, certDer->buffer, certDer->length, NULL);
++	err = wc_ParseCert(&cert, CERT_TYPE, NO_VERIFY, NULL);
++	if (err != 0) {
++		LOG_WOLF_ERROR_FUNC(wc_PemToDer, err);
++		goto fail;
++	}
++
++	err = wc_GetPubKeyDerFromCert(&cert, NULL, &derKeySz);
++	if (err != LENGTH_ONLY_E) {
++		LOG_WOLF_ERROR_FUNC(wc_GetPubKeyDerFromCert, err);
++		goto fail;
++	}
++
++	if (*keyDer)
++	    wc_FreeDer(keyDer);
++	*keyDer = NULL;
++
++	err = wc_AllocDer(keyDer, derKeySz, PUBLICKEY_TYPE, NULL);
++	if (err != 0) {
++		LOG_WOLF_ERROR_FUNC(wc_AllocDer, err);
++		goto fail;
++	}
++
++	err = wc_GetPubKeyDerFromCert(&cert, (*keyDer)->buffer, &(*keyDer)->length);
++	if (err != 0) {
++		LOG_WOLF_ERROR_FUNC(wc_GetPubKeyDerFromCert, err);
++		goto fail;
++	}
++
++fail:
++	if (certDer) {
++		wc_FreeDecodedCert(&cert);
++	    wc_FreeDer(&certDer);
++	}
++	/* caller is responsible for free'ing keyDer */
++}
++
++struct crypto_rsa_key * crypto_rsa_key_read(const char *file, bool private_key)
++{
++	struct crypto_rsa_key* ret = NULL;
++	unsigned char *keyPem = NULL;
++	size_t keyPemLen = 0;
++    DerBuffer* keyDer = NULL;
++    int keyFormat = 0;
++    int err;
++    int success = 0;
++    word32 idx = 0;
++
++    keyPem = (unsigned char*)os_readfile(file, &keyPemLen);
++	if (!keyPem) {
++		LOG_WOLF_ERROR_FUNC_NULL(os_readfile);
++		goto fail;
++	}
++
++	err = wc_PemToDer(keyPem, (long)keyPemLen, private_key ? PRIVATEKEY_TYPE :
++			PUBLICKEY_TYPE, &keyDer,
++			NULL, NULL, &keyFormat);
++	if (err != 0) {
++		if (private_key) {
++			LOG_WOLF_ERROR_FUNC(wc_PemToDer, err);
++			goto fail;
++		}
++		else {
++			/* input file might be public key or x509 cert we want to extract
++			 * the key from */
++			wpa_printf(MSG_DEBUG,
++					"wolfSSL: trying to extract key from x509 cert");
++			read_rsa_key_from_x509(keyPem, keyPemLen, &keyDer);
++			if (!keyDer) {
++				LOG_WOLF_ERROR_FUNC(wc_PemToDer, err);
++				LOG_WOLF_ERROR_FUNC_NULL(read_rsa_key_from_x509);
++				goto fail;
++			}
++		}
++	}
++	if (private_key && keyFormat != RSAk) {
++		LOG_WOLF_ERROR("Private key is not RSA key");
++		goto fail;
++	}
++
++	/* No longer needed so let's free the memory early */
++	os_free(keyPem);
++	keyPem = NULL;
++
++	ret = crypto_rsa_key_init();
++	if (!ret) {
++		LOG_WOLF_ERROR_FUNC_NULL(crypto_rsa_key_init);
++		goto fail;
++	}
++
++	if (private_key)
++		err = wc_RsaPrivateKeyDecode(keyDer->buffer, &idx, &ret->key, keyDer->length);
++	else
++		err = wc_RsaPublicKeyDecode(keyDer->buffer, &idx, &ret->key, keyDer->length);
++
++	if (err != 0) {
++		if (private_key)
++			LOG_WOLF_ERROR_FUNC(wc_RsaPrivateKeyDecode, err);
++		else
++			LOG_WOLF_ERROR_FUNC(wc_RsaPublicKeyDecode, err);
++		goto fail;
++	}
++
++	success = 1;
++fail:
++	if (keyPem)
++		os_free(keyPem);
++	if (keyDer)
++	    wc_FreeDer(&keyDer);
++	if (!success && ret) {
++		crypto_rsa_key_free(ret);
++		ret = NULL;
++	}
++	return ret;
++}
++
++struct wpabuf * crypto_rsa_oaep_sha256_encrypt(struct crypto_rsa_key *key,
++					       const struct wpabuf *in)
++{
++	int err;
++	int success = 0;
++	struct wpabuf *ret = NULL;
++
++	if (!key || !in) {
++		LOG_INVALID_PARAMETERS();
++		return NULL;
++	}
++
++	ret = wpabuf_alloc(wc_RsaEncryptSize(&key->key));
++	if (!ret) {
++		LOG_WOLF_ERROR_FUNC_NULL(wpabuf_alloc);
++		goto fail;
++	}
++
++	wpa_printf(MSG_DEBUG,
++			"wolfSSL: crypto_rsa_oaep_sha256_encrypt: wpabuf_len(in) %ld "
++			"wc_RsaEncryptSize(key->key) %d", wpabuf_len(in), wc_RsaEncryptSize(&key->key));
++
++    err = wc_RsaPublicEncrypt_ex(wpabuf_head_u8(in), wpabuf_len(in),
++    		wpabuf_mhead_u8(ret), wpabuf_size(ret), &key->key, key->rng,
++    		WC_RSA_OAEP_PAD, WC_HASH_TYPE_SHA256, WC_MGF1SHA256, NULL, 0);
++    if (err <= 0) {
++		LOG_WOLF_ERROR_FUNC(wc_RsaPublicEncrypt_ex, err);
++		goto fail;
++    }
++    wpabuf_put(ret, err);
++
++	success = 1;
++fail:
++	if (!success && ret) {
++		wpabuf_free(ret);
++		ret = NULL;
++	}
++	return ret;
++}
++
++struct wpabuf * crypto_rsa_oaep_sha256_decrypt(struct crypto_rsa_key *key,
++					       const struct wpabuf *in)
++{
++	int err;
++	int success = 0;
++	struct wpabuf *ret = NULL;
++
++	if (!key || !in) {
++		LOG_INVALID_PARAMETERS();
++		return NULL;
++	}
++
++	ret = wpabuf_alloc(wc_RsaEncryptSize(&key->key));
++	if (!ret) {
++		LOG_WOLF_ERROR_FUNC_NULL(wpabuf_alloc);
++		goto fail;
++	}
++
++	wpa_printf(MSG_DEBUG,
++			"wolfSSL: crypto_rsa_oaep_sha256_decrypt: wpabuf_len(in) %ld "
++			"wc_RsaEncryptSize(key->key) %d", wpabuf_len(in), wc_RsaEncryptSize(&key->key));
++
++    err = wc_RsaPrivateDecrypt_ex(wpabuf_head_u8(in), wpabuf_len(in),
++    		wpabuf_mhead_u8(ret), wpabuf_size(ret), &key->key, WC_RSA_OAEP_PAD,
++    		WC_HASH_TYPE_SHA256, WC_MGF1SHA256, NULL, 0);
++    if (err <= 0) {
++		LOG_WOLF_ERROR_FUNC(wc_RsaPublicEncrypt_ex, err);
++		goto fail;
++    }
++    wpabuf_put(ret, err);
++
++	success = 1;
++fail:
++	if (!success && ret) {
++		wpabuf_free(ret);
++		ret = NULL;
++	}
++	return ret;
++}
+ 
+ void crypto_unload(void)
+ {
+diff --git a/wpa_supplicant/Makefile b/wpa_supplicant/Makefile
+index dd13308f7b..3f75399eb9 100644
+--- a/wpa_supplicant/Makefile
++++ b/wpa_supplicant/Makefile
+@@ -1188,6 +1188,7 @@ TLS_FUNCS=y
+ endif
+ 
+ ifeq ($(CONFIG_TLS), wolfssl)
++CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
+ ifdef TLS_FUNCS
+ CFLAGS += -DWOLFSSL_DER_LOAD
+ OBJS += ../src/crypto/tls_wolfssl.o
+-- 
+2.34.1
+

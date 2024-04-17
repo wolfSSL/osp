@@ -1,0 +1,51 @@
+From 482b3fabd0828ef7bc2016d2283ad9c06bebbd5d Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 26 Jan 2024 15:20:02 +0100
+Subject: [PATCH 16/24] wolfssl: remove unused and non-compiling code
+
+OCSP is handled internally by wolfSSL.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 25 -------------------------
+ 1 file changed, 25 deletions(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 360a4a3b48..32331d25b8 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -1275,31 +1275,6 @@ static int tls_verify_cb(int preverify_ok, WOLFSSL_X509_STORE_CTX *x509_ctx)
+ 				       TLS_FAIL_SERVER_CHAIN_PROBE);
+ 	}
+ 
+-#ifdef HAVE_OCSP_WOLFSSL
+-	if (depth == 0 && (conn->flags & TLS_CONN_REQUEST_OCSP) &&
+-	    preverify_ok) {
+-		enum ocsp_result res;
+-
+-		res = check_ocsp_resp(conn->ssl_ctx, conn->ssl, err_cert,
+-				      conn->peer_issuer,
+-				      conn->peer_issuer_issuer);
+-		if (res == OCSP_REVOKED) {
+-			preverify_ok = 0;
+-			wolfssl_tls_fail_event(conn, err_cert, err, depth, buf,
+-					       "certificate revoked",
+-					       TLS_FAIL_REVOKED);
+-			if (err == X509_V_OK)
+-				X509_STORE_CTX_set_error(
+-					x509_ctx, X509_V_ERR_CERT_REVOKED);
+-		} else if (res != OCSP_GOOD &&
+-			   (conn->flags & TLS_CONN_REQUIRE_OCSP)) {
+-			preverify_ok = 0;
+-			wolfssl_tls_fail_event(conn, err_cert, err, depth, buf,
+-					       "bad certificate status response",
+-					       TLS_FAIL_UNSPECIFIED);
+-		}
+-	}
+-#endif /* HAVE_OCSP_WOLFSSL */
+ 	if (depth == 0 && preverify_ok && context->event_cb != NULL)
+ 		context->event_cb(context->cb_ctx,
+ 				  TLS_CERT_CHAIN_SUCCESS, NULL);
+-- 
+2.34.1
+
