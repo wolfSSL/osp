@@ -1,0 +1,28 @@
+From f08de6daabf62ccfed4a92d7d6d98f4fca382bfb Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 19 Dec 2023 16:38:16 +0100
+Subject: [PATCH 07/24] openssl: Use uncompressed format for ECC keys
+
+OpenSSL <3.0 uses ECC keys in the uncompressed format. We should keep it that way for compatibility. The wolfSSL backend also uses the uncompressed format.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/crypto_openssl.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/crypto/crypto_openssl.c b/src/crypto/crypto_openssl.c
+index 2d8ff60aa9..e83a40b57c 100644
+--- a/src/crypto/crypto_openssl.c
++++ b/src/crypto/crypto_openssl.c
+@@ -3676,6 +3676,8 @@ struct wpabuf * crypto_ec_key_get_ecprivate_key(struct crypto_ec_key *key,
+ 				       0);
+ 		pkey = copy;
+ 	}
++	EVP_PKEY_set_utf8_string_param(pkey,
++			OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, "uncompressed");
+ 
+ 	ctx = OSSL_ENCODER_CTX_new_for_pkey(pkey, selection, "DER",
+ 					    "type-specific", NULL);
+-- 
+2.34.1
+

@@ -1,0 +1,31 @@
+From 4b555049694f17a22af9a2e6f73dd56542d220cd Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 26 Jan 2024 14:50:24 +0100
+Subject: [PATCH 15/24] wolfssl: log error number on failure
+
+Log raw error number after wolfSSL_accept or wolfSSL_connect error.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index f126c37479..360a4a3b48 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -1824,9 +1824,9 @@ static struct wpabuf * wolfssl_handshake(struct tls_connection *conn,
+ 			char msg[80];
+ 
+ 			wpa_printf(MSG_DEBUG,
+-				   "SSL: %s - failed %s",
++				   "SSL: %s - failed (%d) %s",
+ 				   server ? "wolfSSL_accept" :
+-				   "wolfSSL_connect",
++				   "wolfSSL_connect", err,
+ 				   wolfSSL_ERR_error_string(err, msg));
+ 			conn->failed++;
+ 		}
+-- 
+2.34.1
+

@@ -1,0 +1,64 @@
+From b529c9781a131d76922cace087218b18a040c3b4 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 2 Apr 2024 18:18:44 +0200
+Subject: [PATCH 22/24] wolfSSL: simplify option setting in tls_set_conn_flags
+
+Use one call to wolfSSL_set_options with all the relevant options already set.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 22f8d6eb78..8940de98d4 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -1565,19 +1565,23 @@ static int tls_connection_ca_cert(void *tls_ctx, struct tls_connection *conn,
+ 
+ static void tls_set_conn_flags(WOLFSSL *ssl, unsigned int flags)
+ {
++	long op = 0;
+ #ifdef HAVE_SESSION_TICKET
+ 	if (!(flags & TLS_CONN_DISABLE_SESSION_TICKET))
+ 		wolfSSL_UseSessionTicket(ssl);
+ #endif /* HAVE_SESSION_TICKET */
+ 
++	wpa_printf(MSG_DEBUG, "SSL: conn_flags: %d", flags);
++
+ 	if (flags & TLS_CONN_DISABLE_TLSv1_0)
+-		wolfSSL_set_options(ssl, SSL_OP_NO_TLSv1);
++		op |= WOLFSSL_OP_NO_TLSv1;
+ 	if (flags & TLS_CONN_DISABLE_TLSv1_1)
+-		wolfSSL_set_options(ssl, SSL_OP_NO_TLSv1_1);
++		op |= WOLFSSL_OP_NO_TLSv1_1;
+ 	if (flags & TLS_CONN_DISABLE_TLSv1_2)
+-		wolfSSL_set_options(ssl, SSL_OP_NO_TLSv1_2);
++		op |= WOLFSSL_OP_NO_TLSv1_2;
+ 	if (flags & TLS_CONN_DISABLE_TLSv1_3)
+-		wolfSSL_set_options(ssl, SSL_OP_NO_TLSv1_3);
++		op |= WOLFSSL_OP_NO_TLSv1_3;
++	wolfSSL_set_options(ssl, op);
+ }
+ 
+ 
+@@ -1947,6 +1951,7 @@ int tls_connection_set_verify(void *ssl_ctx, struct tls_connection *conn,
+ 		return -1;
+ 
+ 	wpa_printf(MSG_DEBUG, "SSL: set verify: %d", verify_peer);
++	wpa_printf(MSG_DEBUG, "SSL: flags: %d", flags);
+ 
+ 	if (verify_peer) {
+ 		conn->ca_cert_verify = 1;
+@@ -1976,6 +1981,8 @@ int tls_connection_set_verify(void *ssl_ctx, struct tls_connection *conn,
+ 					       session_ctx_len);
+ 	}
+ 
++	tls_set_conn_flags(conn->ssl, flags);
++
+ 	return 0;
+ }
+ 
+-- 
+2.34.1
+

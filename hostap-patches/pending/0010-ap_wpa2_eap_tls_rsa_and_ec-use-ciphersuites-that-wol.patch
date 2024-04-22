@@ -1,0 +1,64 @@
+From 02e20e0546875d0111d611b2af3fb8eb9db03134 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Wed, 20 Dec 2023 17:10:08 +0100
+Subject: [PATCH 10/24] ap_wpa2_eap_tls_rsa_and_ec: use ciphersuites that
+ wolfSSL understands
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ tests/hwsim/test_ap_eap.py | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/tests/hwsim/test_ap_eap.py b/tests/hwsim/test_ap_eap.py
+index 5fe2cbc711..8f4b846f57 100644
+--- a/tests/hwsim/test_ap_eap.py
++++ b/tests/hwsim/test_ap_eap.py
+@@ -6406,7 +6406,12 @@ def test_ap_wpa2_eap_tls_rsa_and_ec(dev, apdev, params):
+                 private_key="auth_serv/ec-user.key")
+     dev[0].request("REMOVE_NETWORK all")
+     dev[0].wait_disconnected()
+-
++    
++    tls = dev[1].request("GET tls_library")
++    if tls.startswith("wolfSSL"):
++        ciphers = "RSA"
++    else:
++        ciphers = "DEFAULT:-aECDH:-aECDSA"
+     # TODO: Make wpa_supplicant automatically filter out cipher suites that
+     # would require ECDH/ECDSA keys when those are not configured in the
+     # selected client certificate. And for no-client-cert case, deprioritize
+@@ -6414,7 +6419,7 @@ def test_ap_wpa2_eap_tls_rsa_and_ec(dev, apdev, params):
+     # likely to work cipher suites are selected by the server. Only do these
+     # when an explicit openssl_ciphers parameter is not set.
+     eap_connect(dev[1], hapd, "TLS", "tls user",
+-                openssl_ciphers="DEFAULT:-aECDH:-aECDSA",
++                openssl_ciphers=ciphers,
+                 ca_cert="auth_serv/ca.pem",
+                 client_cert="auth_serv/user.pem",
+                 private_key="auth_serv/user.key")
+@@ -6450,7 +6455,12 @@ def test_ap_wpa2_eap_tls_ec_and_rsa(dev, apdev, params):
+                 private_key="auth_serv/ec-user.key")
+     dev[0].request("REMOVE_NETWORK all")
+     dev[0].wait_disconnected()
+-
++    
++    tls = dev[1].request("GET tls_library")
++    if tls.startswith("wolfSSL"):
++        ciphers = "RSA"
++    else:
++        ciphers = "DEFAULT:-aECDH:-aECDSA"
+     # TODO: Make wpa_supplicant automatically filter out cipher suites that
+     # would require ECDH/ECDSA keys when those are not configured in the
+     # selected client certificate. And for no-client-cert case, deprioritize
+@@ -6458,7 +6468,7 @@ def test_ap_wpa2_eap_tls_ec_and_rsa(dev, apdev, params):
+     # likely to work cipher suites are selected by the server. Only do these
+     # when an explicit openssl_ciphers parameter is not set.
+     eap_connect(dev[1], hapd, "TLS", "tls user",
+-                openssl_ciphers="DEFAULT:-aECDH:-aECDSA",
++                openssl_ciphers=ciphers,
+                 ca_cert="auth_serv/ca.pem",
+                 client_cert="auth_serv/user.pem",
+                 private_key="auth_serv/user.key")
+-- 
+2.34.1
+

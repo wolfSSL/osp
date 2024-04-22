@@ -1,0 +1,33 @@
+From eb1720d1a82979f7777ffe4433d2b1a809113dc7 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Wed, 20 Dec 2023 16:41:11 +0100
+Subject: [PATCH 09/24] wolfssl: tune test_ap_wpa2_eap_fast_prf_oom for wolfssl
+
+The wolfSSL backend only does one malloc in tls_connection_get_eap_fast_key. Failing on the second one skips the only malloc and fails the test.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ tests/hwsim/test_ap_eap.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/tests/hwsim/test_ap_eap.py b/tests/hwsim/test_ap_eap.py
+index a201403163..5fe2cbc711 100644
+--- a/tests/hwsim/test_ap_eap.py
++++ b/tests/hwsim/test_ap_eap.py
+@@ -4248,9 +4248,12 @@ def test_ap_wpa2_eap_fast_prf_oom(dev, apdev):
+     """WPA2-Enterprise connection using EAP-FAST and OOM in PRF"""
+     check_eap_capa(dev[0], "FAST")
+     tls = dev[0].request("GET tls_library")
+-    if tls.startswith("OpenSSL") or tls.startswith("wolfSSL"):
++    if tls.startswith("OpenSSL"):
+         func = "tls_connection_get_eap_fast_key"
+         count = 2
++    elif tls.startswith("wolfSSL"):
++        func = "tls_connection_get_eap_fast_key"
++        count = 1
+     elif tls.startswith("internal"):
+         func = "tls_connection_prf"
+         count = 1
+-- 
+2.34.1
+
