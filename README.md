@@ -26,7 +26,8 @@ Each project port included in this repository is contained in its own subdirecto
 | asio | Asio C++ Library | [Link](http://think-async.com/Asio/) | [Link](https://www.wolfssl.com/wolfssl-support-asio-boost-asio-c-libraries/) | [README](./asio/asio/README) |
 | bind9 | DNS software system | [Link](https://bind9.net/) | | [README](./bind9/README) |
 | cjose | JOSE for C/C++ | [Link](https://github.com/cisco/cjose) | [Link](https://www.wolfssl.com/wolfssl-cisco-cjose-port/) | [README](./cjose/README) |
-| freeradius-server-2.1.12 | FreeRADIUS Server Project | [Link](https://freeradius.org/) | | [README](.freeradius-server-2.1.12/README) |
+| freeradius-server-2.1.12 | FreeRADIUS Server Project | [Link](https://freeradius.org/) | | [README](./freeradius-server-2.1.12/README) |
+| gRPC | RPC library and framework | [Link](https://grpc.io/) | | [README](./grpc/README) |
 | haproxy | HAProxy | [Link](https://www.haproxy.org/) |  | [README](./haproxy/README) |
 | libest | Cisco EST stack written in C | [Link](https://github.com/cisco/libest) | [Link](https://www.wolfssl.com/wolfssl-cisco-libest-port/) | [README](./libest/README) |
 | libimobiledevice | Library to communicate with services on iOS devices | [Link](https://libimobiledevice.org/) | | [README](./libimobiledevice/README) |
