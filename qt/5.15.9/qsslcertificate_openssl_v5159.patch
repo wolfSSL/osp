@@ -1,0 +1,4 @@
+350a351,353
+>         case (NID_subject_alt_name):
+>             GENERAL_NAME_free((GENERAL_NAME*)internal);
+>             break;
