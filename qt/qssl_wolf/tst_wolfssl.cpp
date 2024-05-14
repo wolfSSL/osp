@@ -337,7 +337,7 @@ void tst_QSslWolfSSL::initTestCase()
         testDataDir = QCoreApplication::applicationDirPath();
     if (!testDataDir.endsWith(QLatin1String("/")))
         testDataDir += QLatin1String("/");
-    
+
     skip_connectTocricbuzzcom               = false;
     skip_peerCertificateChainToWWWpQTpIO    = false;
     skip_connectToHostEncrypted             = false;
@@ -385,7 +385,7 @@ void tst_QSslWolfSSL::initTestCase()
     skip_oldErrorsOnSocketReuse             = false;
     skip_disconnectFromHostWhenConnected    = false;
     skip_disconnectFromHostWhenConnecting   = false;
-    
+
     skip_ecdhServer                         = false;
     skip_verifyClientCertificate            = false;
     skip_dhServer                           = false;
@@ -414,7 +414,7 @@ bool tst_QSslWolfSSL::isMatchingHostname(const QSslCertificate &cert, const QStr
         const auto subjectAlternativeNames = cert.subjectAlternativeNames();
         const auto ipAddresses = subjectAlternativeNames.equal_range(QSsl::AlternativeNameEntryType::IpAddressEntry);
         qDebug() << "subjectAlternativeNames " << subjectAlternativeNames;
-        
+
         for (auto it = ipAddresses.first; it != ipAddresses.second; it++) {
             qDebug() << "ipAddresses " << (*it);
             if (QHostAddress(*it).isEqual(hostAddress, QHostAddress::StrictConversion))
@@ -1184,11 +1184,16 @@ void tst_QSslWolfSSL::serverCipherPreferences()
         QSKIP("serverCipherPreferences()");
 
     /* minVersion = TLS1_VERSION in qsslcontext_openssl */
-    /* not available SSLv3 cipher suites */
+    /* not available SSLv3 cipher suites
+    */
     #if QT_CONFIG(openssl)
         const char* cipher1 = "AES128-SHA";
         const char* cipher2 = "AES256-SHA";
     #else
+    /*  Cipher suites below are available later versions than TLS1.2.
+    *     TLS_RSA_WITH_AES_128_CBC_SHA
+    *     TLS_RSA_WITH_AES_256_CBC_SHA256
+    */
         const char* cipher1 = "AES128-SHA256";
         const char* cipher2 = "AES256-SHA256";
      #endif
@@ -1205,6 +1210,7 @@ void tst_QSslWolfSSL::serverCipherPreferences()
     {
         SslServer server;
         server.ciphers = {QSslCipher(cipher1), QSslCipher(cipher2)};
+        server.protocol = QSsl::TlsV1_2;
         QVERIFY(server.listen());
 
         QEventLoop loop;
@@ -1214,6 +1220,7 @@ void tst_QSslWolfSSL::serverCipherPreferences()
         socket = &client;
 
         auto sslConfig = socket->sslConfiguration();
+        socket->setProtocol(QSsl::TlsV1_2);
         sslConfig.setCiphers({QSslCipher(cipher2), QSslCipher(cipher1)});
         socket->setSslConfiguration(sslConfig);
         /*for (const QSslCipher &cipher : sslConfig.ciphers()) {
@@ -1240,6 +1247,7 @@ void tst_QSslWolfSSL::serverCipherPreferences()
         config.setSslOption(QSsl::SslOptionDisableServerCipherPreference, true);
         server.config = config;
         server.ciphers = {QSslCipher(cipher1), QSslCipher(cipher2)};
+        server.protocol = QSsl::TlsV1_2;
         QVERIFY(server.listen());
 
         QEventLoop loop;
@@ -1249,6 +1257,7 @@ void tst_QSslWolfSSL::serverCipherPreferences()
         socket = &client;
 
         auto sslConfig = socket->sslConfiguration();
+        socket->setProtocol(QSsl::TlsV1_2);
         sslConfig.setCiphers({QSslCipher(cipher2), QSslCipher(cipher1)});
         socket->setSslConfiguration(sslConfig);
 
