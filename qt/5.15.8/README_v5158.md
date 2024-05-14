@@ -64,7 +64,7 @@ $v5158_path.sh
 Please follow [README](https://github.com/wolfSSL/osp/blob/master/qt/README_v515.md)
 
 Note1: <strong>For wolfSSL configuration, you need to add `-DALLOW_INVALID_CERTSIGN` for CFLAG Option to make `qsslcertificate` tests passed. </strong>
-This needs becaue higher versions than wolfSSL v5.6.4 doesn't allow a certificate which has `CA:FALSE` and `Certificate Sign` set. The certificate is qtbase/tests/auto/network/ssl/qsslcertificate/verify-certs/test-ocsp-good-cert.pem which is used for `qsslcertificate` tests.
+This needs because later versions than wolfSSL v5.6.4 doesn't allow a certificate which has `CA:FALSE` and `Certificate Sign` set. As such certificate, there is qtbase/tests/auto/network/ssl/qsslcertificate/verify-certs/test-ocsp-good-cert.pem for `qsslcertificate` test.
 
 ```
 comments from asn.c
