@@ -1,0 +1,102 @@
+From 3134cba634cfcf8cd4e484ee62402adbb6ddfc1c Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Wed, 29 May 2024 13:59:39 +0200
+Subject: [PATCH] Patch for wolfSSL
+
+Compile wolfSSL with:
+  ./configure --enable-all
+  make
+  make install
+
+Compile pam-ipmi with:
+  patch -p1 < <path/to/this/patch>
+  meson setup build
+  ninja -C build
+
+When wolfSSL is installed in a custom directory use the following template to point meson to the right directory
+  PKG_CONFIG_PATH=</dir/with/wolfssl.pc> meson setup build
+---
+ meson.build                     |  2 +-
+ src/pam_ipmicheck/meson.build   |  2 +-
+ src/pam_ipmisave/meson.build    |  2 +-
+ src/pam_ipmisave/pam_ipmisave.c | 11 ++++++-----
+ 4 files changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index 4eb0050..ad908a8 100644
+--- a/meson.build
++++ b/meson.build
+@@ -29,7 +29,7 @@ else
+ endif
+ 
+ # Dependencies
+-crypto = dependency('libcrypto', version : '>=3.0.0')
++wolfssl = dependency('wolfssl')
+ pam = compiler.find_library('pam', required: true)
+ 
+ # Subfolders
+diff --git a/src/pam_ipmicheck/meson.build b/src/pam_ipmicheck/meson.build
+index 9d67e55..a39fe83 100644
+--- a/src/pam_ipmicheck/meson.build
++++ b/src/pam_ipmicheck/meson.build
+@@ -4,7 +4,7 @@
+ libpam_ipmicheck = library(
+   'pam_ipmicheck',
+   'pam_ipmicheck.c',
+-  dependencies: [ pam, crypto ],
++  dependencies: [ pam, wolfssl ],
+   soversion: '',
+   name_prefix: '',
+   install: true,
+diff --git a/src/pam_ipmisave/meson.build b/src/pam_ipmisave/meson.build
+index e879e94..a74f0fb 100644
+--- a/src/pam_ipmisave/meson.build
++++ b/src/pam_ipmisave/meson.build
+@@ -4,7 +4,7 @@
+ libpam_ipmisave = library(
+   'pam_ipmisave',
+   'pam_ipmisave.c',
+-  dependencies: [ pam, crypto ],
++  dependencies: [ pam, wolfssl ],
+   soversion: '',
+   name_prefix: '',
+   install: true,
+diff --git a/src/pam_ipmisave/pam_ipmisave.c b/src/pam_ipmisave/pam_ipmisave.c
+index 9e7d33c..912a3c4 100644
+--- a/src/pam_ipmisave/pam_ipmisave.c
++++ b/src/pam_ipmisave/pam_ipmisave.c
+@@ -27,9 +27,10 @@
+ #include <security/pam_modules.h>
+ #include <security/pam_modutil.h>
+ 
+-#include <openssl/evp.h>
+-#include <openssl/hmac.h>
+-#include <openssl/rand.h>
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/evp.h>
++#include <wolfssl/openssl/hmac.h>
++#include <wolfssl/openssl/rand.h>
+ 
+ /*
+  * This module is intended to save password of  special group user
+@@ -38,7 +39,7 @@
+ 
+ #define MAX_SPEC_GRP_PASS_LENGTH 20
+ #define MAX_SPEC_GRP_USER_LENGTH 16
+-#define MAX_KEY_SIZE		 8
++#define PAM_MAX_KEY_SIZE		 8
+ #define DEFAULT_SPEC_PASS_FILE	 "/etc/ipmi_pass"
+ #define META_PASSWD_SIG		 "=OPENBMC="
+ 
+@@ -277,7 +278,7 @@ int update_pass_special_file(const pam_handle_t *pamh, const char *keyfilename,
+ 	char tempfilename[1024];
+ 	size_t forwholen = strlen(forwho);
+ 	size_t towhatlen = strlen(towhat);
+-	char keybuff[MAX_KEY_SIZE] = { 0 };
++	char keybuff[PAM_MAX_KEY_SIZE] = { 0 };
+ 	size_t keybuffsize = sizeof(keybuff);
+ 
+ 	const EVP_CIPHER *cipher = EVP_aes_128_cbc();
+-- 
+2.34.1
+
