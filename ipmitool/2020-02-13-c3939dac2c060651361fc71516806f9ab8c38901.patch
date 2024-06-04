@@ -1,0 +1,90 @@
+From b64f73955e22975e92ead9f3427ead30928cfbac Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 4 Jun 2024 15:33:36 +0200
+Subject: [PATCH] Patch for wolfSSL
+
+Compile wolfSSL with:
+  ./configure --enable-all
+  make
+  make install
+
+Compile pam-ipmi with:
+  patch -p1 < <path/to/this/patch>
+  autoreconf -if
+  ./configure --with-wolfssl=/usr/local
+  make
+---
+ configure.ac | 50 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index adf9bd7..21b9c61 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -176,6 +176,54 @@ AC_ARG_ENABLE([internal-md5],
+ 	[xenable_internal_md5=$enableval],
+ 	[xenable_internal_md5=no])
+ 
++AC_ARG_WITH([wolfssl],
++    [AS_HELP_STRING([--with-wolfssl=PATH],[wolfSSL prefix])],
++    [WOLFSSL_PREFIX=$withval],
++    [WOLFSSL_PREFIX="no"])
++
++if test "x$WOLFSSL_PREFIX" != "xno"; then
++
++CFLAGS="$CFLAGS -I$WOLFSSL_PREFIX/include -I$WOLFSSL_PREFIX/include/wolfssl -DEXTERNAL_OPTS_OPENVPN"
++AC_SUBST(CFLAGS)
++
++AC_CHECK_LIB([wolfssl], [wolfSSL_EVP_aes_128_cbc],
++	[if test "x$xenable_internal_md5" != "xyes"; then
++	    have_crypto=yes; LIBS="$LIBS -lwolfssl"
++	fi],
++	[have_crypto=no], [-lwolfssl])
++
++AC_CHECK_LIB([wolfssl], [wolfSSL_EVP_sha256],
++	[if test "x$xenable_internal_sha256" != "xyes"; then
++		if test "x$have_crypto" != "xyes"; then
++			LIBS="$LIBS -lwolfssl"
++		have_sha256=yes
++		fi
++		AC_DEFINE(HAVE_CRYPTO_SHA256, [1], [Define to 1 if wolfSSL supports SHA256.])
++	fi],
++	[], [-lwolfssl])
++
++AC_CHECK_LIB([wolfssl], [wolfSSL_MD5_Init],
++	[if test "x$xenable_internal_md5" != "xyes"; then
++	    if test "x$have_crypto" != "xyes"; then
++	        LIBS="$LIBS -lwolfssl"
++	        have_md5=yes
++	    fi
++	    AC_DEFINE(HAVE_CRYPTO_MD5, [1], [Define to 1 if wolfSSL supports MD5.])
++	fi],
++	[], [-lwolfssl])
++
++AC_CHECK_LIB([wolfssl], [wolfSSL_MD2_Init],
++	[if test "x$xenable_internal_md5" != "xyes"; then
++	    if test "x$have_crypto" != "xyes" && test "x$have_md5" != "xyes"; then
++	        LIBS="$LIBS -lwolfssl"
++	        have_md2=yes
++	    fi
++	    AC_DEFINE(HAVE_CRYPTO_MD2, [1], [Define to 1 if wolfSSL supports MD2.])
++	fi],
++	[], [-lwolfssl])
++	
++else dnl fallback on openssl
++
+ AC_CHECK_LIB([crypto], [EVP_aes_128_cbc],
+ 	[if test "x$xenable_internal_md5" != "xyes"; then
+ 	    have_crypto=yes; LIBS="$LIBS -lcrypto"
+@@ -212,6 +260,8 @@ AC_CHECK_LIB([crypto], [MD2_Init],
+ 	fi],
+ 	[], [-lcrypto])
+ 
++fi
++
+ dnl check for libsystemd in case dbus-intf is requested
+ AC_CHECK_LIB([systemd], [sd_bus_default],
+ 	[
+-- 
+2.34.1
+
