@@ -1,0 +1,8 @@
+This folder contains patches for ipmitool to work with wolfSSL. Patches make it
+easier to add support for newer versions of a target library. The format of
+the patch names is:
+    <year>-<month>-<day>-<commit that the patch was implemented and tested on>.patch
+The date in the patch name corresponds to the date of the commit that the
+patch was implemented and tested on to make choosing the appropriate patch
+easier. Instructions for applying each patch are included in the patch commit
+message.
