@@ -1,4 +1,4 @@
-From b64f73955e22975e92ead9f3427ead30928cfbac Mon Sep 17 00:00:00 2001
+From a6e576a302fb14367f7c37319c8e571f7134c1ae Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Tue, 4 Jun 2024 15:33:36 +0200
 Subject: [PATCH] Patch for wolfSSL
@@ -18,7 +18,7 @@ Compile pam-ipmi with:
  1 file changed, 50 insertions(+)
 
 diff --git a/configure.ac b/configure.ac
-index adf9bd7..21b9c61 100644
+index adf9bd7..9578ea8 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -176,6 +176,54 @@ AC_ARG_ENABLE([internal-md5],
@@ -32,7 +32,7 @@ index adf9bd7..21b9c61 100644
 +
 +if test "x$WOLFSSL_PREFIX" != "xno"; then
 +
-+CFLAGS="$CFLAGS -I$WOLFSSL_PREFIX/include -I$WOLFSSL_PREFIX/include/wolfssl -DEXTERNAL_OPTS_OPENVPN"
++CFLAGS="$CFLAGS -I$WOLFSSL_PREFIX/include -I$WOLFSSL_PREFIX/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -L$WOLFSSL_PREFIX/lib"
 +AC_SUBST(CFLAGS)
 +
 +AC_CHECK_LIB([wolfssl], [wolfSSL_EVP_aes_128_cbc],
