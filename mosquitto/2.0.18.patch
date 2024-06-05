@@ -1,0 +1,277 @@
+From d1fe8952fce35fa3e7f4b26e4b75b737c9a05e57 Mon Sep 17 00:00:00 2001
+From: Eric Blankenhorn <eric@wolfssl.com>
+Date: Fri, 7 Jun 2024 14:45:54 -0500
+Subject: [PATCH] Add support for wolfSSL
+
+Changes:
+- `config.mk`: add the `WITH_TLS=wolfssl` option
+- The`wolfssl/options.h` header is included by defining the `EXTERNAL_OPTS_OPENVPN` macro
+- `net_mosq.c`: UI_METHOD not implemented in wolfSSL
+- `net_mosq.h`: UI_METHOD not implemented in wolfSSL
+- `net_mosq_ocsp.c`: safestack.h not implemented in wolfSSL
+- Makefiles to use either OpenSSL or wolfSSL
+
+---
+wolfSSL
+
+```
+git clone https://github.com/wolfSSL/wolfssl.git
+cd wolfssl
+./autogen.sh
+./configure --enable-mosquitto
+make
+make install
+```
+
+Eclipse Mosquitto
+
+```
+git clone https://github.com/eclipse/mosquitto.git
+cd mosquitto
+git checkout v2.0.18
+patch -p1 < <path/to/patch/file>
+make WITH_TLS=wolfssl
+make WITH_TLS=wolfssl ptest
+```
+
+---
+ README.md                         |  1 +
+ apps/mosquitto_ctrl/Makefile      |  2 +-
+ apps/mosquitto_passwd/Makefile    |  4 ++--
+ config.mk                         | 20 ++++++++++++++++++++
+ lib/net_mosq.c                    | 12 +++++++++---
+ lib/net_mosq.h                    |  2 ++
+ lib/net_mosq_ocsp.c               |  2 ++
+ plugins/dynamic-security/Makefile |  4 ++--
+ test/broker/Makefile              |  2 +-
+ test/lib/Makefile                 |  2 +-
+ test/lib/c/Makefile               |  6 ++++++
+ 11 files changed, 47 insertions(+), 10 deletions(-)
+
+diff --git a/README.md b/README.md
+index a0d275e8..60b2c89f 100644
+--- a/README.md
++++ b/README.md
+@@ -70,6 +70,7 @@ already be built. Use `make binary` to skip building the man pages, or install
+ * cJSON - for client JSON output support. Disable with `make WITH_CJSON=no` Auto detected with CMake.
+ * libwebsockets (libwebsockets-dev) - enable with `make WITH_WEBSOCKETS=yes`
+ * openssl (libssl-dev on Debian based systems) - disable with `make WITH_TLS=no`
++  wolfssl - `make WITH_TLS=wolfssl`
+ * pthreads - for client library thread support. This is required to support the
+   `mosquitto_loop_start()` and `mosquitto_loop_stop()` functions. If compiled
+   without pthread support, the library isn't guaranteed to be thread safe.
+diff --git a/apps/mosquitto_ctrl/Makefile b/apps/mosquitto_ctrl/Makefile
+index 502f0dac..b28b0d98 100644
+--- a/apps/mosquitto_ctrl/Makefile
++++ b/apps/mosquitto_ctrl/Makefile
+@@ -28,7 +28,7 @@ OBJS= mosquitto_ctrl.o \
+ 
+ EXAMPLE_OBJS= example.o
+ 
+-ifeq ($(WITH_TLS),yes)
++ifneq ($(WITH_TLS), no)
+ ifeq ($(WITH_CJSON),yes)
+ TARGET:=mosquitto_ctrl mosquitto_ctrl_example.so
+ else
+diff --git a/apps/mosquitto_passwd/Makefile b/apps/mosquitto_passwd/Makefile
+index 1fbf5e12..8348b949 100644
+--- a/apps/mosquitto_passwd/Makefile
++++ b/apps/mosquitto_passwd/Makefile
+@@ -9,7 +9,7 @@ OBJS=   mosquitto_passwd.o \
+        misc_mosq.o \
+        password_mosq.o
+ 
+-ifeq ($(WITH_TLS),yes)
++ifneq ($(WITH_TLS), no)
+ all: mosquitto_passwd
+ else
+ all:
+@@ -37,7 +37,7 @@ password_mosq.o : ../../src/password_mosq.c ../../src/password_mosq.h
+    ${CROSS_COMPILE}${CC} $(APP_CPPFLAGS) $(APP_CFLAGS) -c $< -o $@
+ 
+ install : all
+-ifeq ($(WITH_TLS),yes)
++ifneq ($(WITH_TLS), no)
+    $(INSTALL) -d "${DESTDIR}$(prefix)/bin"
+    $(INSTALL) ${STRIP_OPTS} mosquitto_passwd "${DESTDIR}${prefix}/bin/mosquitto_passwd"
+ endif
+diff --git a/config.mk b/config.mk
+index 73daefdf..1ef342e8 100644
+--- a/config.mk
++++ b/config.mk
+@@ -253,6 +253,26 @@ ifeq ($(WITH_TLS),yes)
+    endif
+ endif
+ 
++ifeq ($(WITH_TLS),wolfssl)
++   WOLFSSLDIR ?= /usr/local
++   WOLFSSLRPATH ?= -Wl,-rpath=$(WOLFSSLDIR)/lib
++
++   APP_CPPFLAGS:=$(APP_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++   BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++   BROKER_LDADD:=$(BROKER_LDADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
++   CLIENT_CPPFLAGS:=$(CLIENT_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++   LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++   LIB_LIBADD:=$(LIB_LIBADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
++   PASSWD_LDADD:=$(PASSWD_LDADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
++   STATIC_LIB_DEPS:=$(STATIC_LIB_DEPS) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
++
++   ifeq ($(WITH_TLS_PSK),yes)
++       BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++       LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++       CLIENT_CPPFLAGS:=$(CLIENT_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++   endif
++endif
++
+ ifeq ($(WITH_THREADING),yes)
+    LIB_LDFLAGS:=$(LIB_LDFLAGS) -pthread
+    LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_THREADING
+diff --git a/lib/net_mosq.c b/lib/net_mosq.c
+index 80d9195b..c3a1122d 100644
+--- a/lib/net_mosq.c
++++ b/lib/net_mosq.c
+@@ -78,10 +78,12 @@ Contributors:
+ #include "util_mosq.h"
+ 
+ #ifdef WITH_TLS
++static bool is_tls_initialized = false;
+ int tls_ex_index_mosq = -1;
++
++#ifndef USE_WOLFSSL
+ UI_METHOD *_ui_method = NULL;
+ 
+-static bool is_tls_initialized = false;
+ 
+ /* Functions taken from OpenSSL s_server/s_client */
+ static int ui_open(UI *ui)
+@@ -125,7 +127,7 @@ UI_METHOD *net__get_ui_method(void)
+ {
+    return _ui_method;
+ }
+-
++#endif /* !USE_WOLFSSL */
+ #endif
+ 
+ int net__init(void)
+@@ -156,12 +158,14 @@ void net__cleanup(void)
+ #    if !defined(OPENSSL_NO_ENGINE)
+    ENGINE_cleanup();
+ #    endif
+-   is_tls_initialized = false;
+ #  endif
++    is_tls_initialized = false;
+ 
+    CONF_modules_unload(1);
++#ifndef USE_WOLFSSL
+    cleanup_ui_method();
+ #endif
++#endif
+ 
+ #ifdef WITH_SRV
+    ares_library_cleanup();
+@@ -189,7 +193,9 @@ void net__init_tls(void)
+ #if !defined(OPENSSL_NO_ENGINE)
+    ENGINE_load_builtin_engines();
+ #endif
++#ifndef USE_WOLFSSL
+    setup_ui_method();
++#endif
+    if(tls_ex_index_mosq == -1){
+        tls_ex_index_mosq = SSL_get_ex_new_index(0, "client context", NULL, NULL, NULL);
+    }
+diff --git a/lib/net_mosq.h b/lib/net_mosq.h
+index ded98760..90ccf08e 100644
+--- a/lib/net_mosq.h
++++ b/lib/net_mosq.h
+@@ -84,7 +84,9 @@ void net__print_ssl_error(struct mosquitto *mosq);
+ int net__socket_apply_tls(struct mosquitto *mosq);
+ int net__socket_connect_tls(struct mosquitto *mosq);
+ int mosquitto__verify_ocsp_status_cb(SSL * ssl, void *arg);
++#ifndef USE_WOLFSSL
+ UI_METHOD *net__get_ui_method(void);
++#endif
+ #define ENGINE_FINISH(e) if(e) ENGINE_finish(e)
+ #define ENGINE_SECRET_MODE "SECRET_MODE"
+ #define ENGINE_SECRET_MODE_SHA 0x1000
+diff --git a/lib/net_mosq_ocsp.c b/lib/net_mosq_ocsp.c
+index 8c762373..96732c21 100644
+--- a/lib/net_mosq_ocsp.c
++++ b/lib/net_mosq_ocsp.c
+@@ -49,7 +49,9 @@ in this Software without prior written authorization of the copyright holder.
+ #include <mosquitto_internal.h>
+ #include <net_mosq.h>
+ 
++#ifndef USE_WOLFSSL
+ #include <openssl/safestack.h>
++#endif
+ #include <openssl/tls1.h>
+ #include <openssl/ssl.h>
+ #include <openssl/ocsp.h>
+diff --git a/plugins/dynamic-security/Makefile b/plugins/dynamic-security/Makefile
+index 7ef77b7b..14176446 100644
+--- a/plugins/dynamic-security/Makefile
++++ b/plugins/dynamic-security/Makefile
+@@ -19,7 +19,7 @@ OBJS= \
+        sub_matches_sub.o
+ 
+ ifeq ($(WITH_CJSON),yes)
+-ifeq ($(WITH_TLS),yes)
++ifneq ($(WITH_TLS), no)
+ ALL_DEPS:= binary
+ else
+ ALL_DEPS:=
+@@ -76,7 +76,7 @@ test:
+ 
+ install: all
+ ifeq ($(WITH_CJSON),yes)
+-ifeq ($(WITH_TLS),yes)
++ifneq ($(WITH_TLS),no)
+    $(INSTALL) -d "${DESTDIR}$(libdir)"
+    $(INSTALL) ${STRIP_OPTS} ${PLUGIN_NAME}.so "${DESTDIR}${libdir}/${PLUGIN_NAME}.so"
+ endif
+diff --git a/test/broker/Makefile b/test/broker/Makefile
+index 63b9ae8f..a3419039 100644
+--- a/test/broker/Makefile
++++ b/test/broker/Makefile
+@@ -143,7 +143,7 @@ msg_sequence_test:
+    ./07-will-takeover.py
+ 
+ 08 :
+-ifeq ($(WITH_TLS),yes)
++ifneq ($(WITH_TLS), no)
+    ./08-ssl-bridge.py
+    ./08-ssl-connect-cert-auth-crl.py
+    ./08-ssl-connect-cert-auth-expired.py
+diff --git a/test/lib/Makefile b/test/lib/Makefile
+index 6ade78d0..d24deb03 100644
+--- a/test/lib/Makefile
++++ b/test/lib/Makefile
+@@ -60,7 +60,7 @@ c : test-compile
+    ./03-request-response-correlation.py $@/03-request-response-correlation.test
+    ./03-request-response.py $@/03-request-response.test
+    ./04-retain-qos0.py $@/04-retain-qos0.test
+-ifeq ($(WITH_TLS),yes)
++ifneq ($(WITH_TLS), no)
+    #./08-ssl-fake-cacert.py $@/08-ssl-fake-cacert.test
+    ./08-ssl-bad-cacert.py $@/08-ssl-bad-cacert.test
+    ./08-ssl-connect-cert-auth-enc.py $@/08-ssl-connect-cert-auth-enc.test
+diff --git a/test/lib/c/Makefile b/test/lib/c/Makefile
+index 40cb7d15..a94892e1 100644
+--- a/test/lib/c/Makefile
++++ b/test/lib/c/Makefile
+@@ -63,6 +63,12 @@ SRC += \
+    08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
+ LIBS += -lssl -lcrypto
+ endif
++ifeq ($(WITH_TLS),wolfssl)
++SRC += \
++   08-ssl-connect-cert-auth-custom-ssl-ctx.c \
++   08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
++LIBS += -lwolfssl
++endif
+ 
+ TESTS = ${SRC:.c=.test}
+ 
+-- 
+2.34.1
+

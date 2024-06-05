@@ -12,12 +12,13 @@ make install
 ```
 
 Eclipse Mosquitto
+If wolfSSL is installed to a custom directory, specify that dir with `WOLFSSLDIR`
 
 ```
 git clone https://github.com/eclipse/mosquitto.git
 cd mosquitto
-git checkout v2.0.15
+git checkout v2.0.18
 patch -p1 < <path/to/patch/file>
 make WITH_TLS=wolfssl
-make WITH_TLS=wolfssl test
+make WITH_TLS=wolfssl ptest
 ```
