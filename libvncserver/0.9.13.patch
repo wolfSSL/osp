@@ -1,0 +1,116 @@
+From 339c0613f0438fb8017d5c4bea849f6f3ea1a176 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Thu, 6 Jun 2024 13:38:32 +0200
+Subject: [PATCH] Patch for wolfSSL
+
+This patch implements wolfSSL support in libvncserver with CMake.
+
+Compile wolfSSL with:
+  ./configure --enable-all
+  make
+  make install
+
+Compile libvncserver with:
+  cmake -B build -DWITH_GNUTLS=OFF -DWITH_OPENSSL=OFF -DWITH_GCRYPT=OFF -DWITH_WOLFSSL=ON .
+  make -C build
+  make -C build install
+
+To link with wolfSSL in a non-standard directory compile with:
+  PKG_CONFIG_PATH=/path/to/dir/with/pkgconfig/file cmake -B build -DWITH_GNUTLS=OFF -DWITH_OPENSSL=OFF -DWITH_GCRYPT=OFF -DWITH_WOLFSSL=ON .
+
+
+Run tests with:
+  make -j -C build/ test
+---
+ CMakeLists.txt | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0b6228a2..e4a8f709 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -50,6 +50,7 @@ option(WITH_THREADS "Search for a threading library to build with multithreading
+ option(PREFER_WIN32THREADS "When searching for a threading library, prefer win32 threads if they are found" OFF)
+ option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support TLS" ON)
+ option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support TLS and use as crypto backend" ON)
++option(WITH_WOLFSSL "Search for the wolfSSL cryptography library to support TLS and use as crypto backend" ON)
+ option(WITH_SYSTEMD "Search for libsystemd to build with systemd socket activation support" ON)
+ option(WITH_GCRYPT "Search for Libgcrypt to use as crypto backend" ON)
+ option(WITH_FFMPEG "Search for FFMPEG to build an example VNC to MPEG encoder" ON)
+@@ -140,6 +141,14 @@ if(WITH_OPENSSL)
+   find_package(OpenSSL)
+ endif(WITH_OPENSSL)
+ 
++if(WITH_WOLFSSL)
++  find_package(PkgConfig REQUIRED)
++  pkg_check_modules(WOLFSSL "wolfssl")
++  if(WOLFSSL_FOUND)
++    link_directories(${WOLFSSL_LIBRARY_DIRS})
++  endif(WOLFSSL_FOUND)
++endif(WITH_WOLFSSL)
++
+ 
+ if(WITH_SYSTEMD AND NOT ANDROID AND NOT WIN32)
+   find_package(PkgConfig)
+@@ -247,6 +256,10 @@ elseif(OPENSSL_FOUND)
+   message(STATUS "Building crypto with OpenSSL")
+   set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
+   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl)
++elseif(WOLFSSL_FOUND)
++  message(STATUS "Building crypto with wolfSSL")
++  set(CRYPTO_LIBRARIES ${WOLFSSL_LIBRARIES})
++  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl)
+ else()
+   message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
+   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_included.c ${COMMON_DIR}/sha1.c ${COMMON_DIR}/d3des.c)
+@@ -269,6 +282,13 @@ if(OPENSSL_FOUND)
+   set(LIBVNCSERVER_HAVE_LIBSSL 1)
+ endif(OPENSSL_FOUND)
+ 
++if(WOLFSSL_FOUND)
++  include_directories("${WOLFSSL_INCLUDE_DIRS}" "${WOLFSSL_INCLUDEDIR}/wolfssl")
++  set(LIBVNCSERVER_HAVE_LIBWOLFSSL 1)
++  set(LIBVNCSERVER_HAVE_LIBSSL 1)
++  add_definitions(-DEXTERNAL_OPTS_OPENVPN -DOPENSSL_VERSION_NUMBER=0x10001040L)
++endif(WOLFSSL_FOUND)
++
+ if(WITH_IPv6)
+   if(WIN32 AND LIBVNCSERVER_HAVE_WS2TCPIP_H AND LIBVNCSERVER_HAVE_VPRINTF)
+     set(LIBVNCSERVER_IPv6 1)
+@@ -403,6 +423,17 @@ elseif(OPENSSL_FOUND)
+     ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
+   )
+   include_directories(${OPENSSL_INCLUDE_DIR})
++elseif(WOLFSSL_FOUND)
++  message(STATUS "Building TLS with wolfSSL")
++  set(LIBVNCCLIENT_SOURCES
++    ${LIBVNCCLIENT_SOURCES}
++    ${LIBVNCCLIENT_DIR}/tls_openssl.c
++  )
++  set(LIBVNCSERVER_SOURCES
++    ${LIBVNCSERVER_SOURCES}
++    ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
++  )
++  include_directories("${WOLFSSL_INCLUDE_DIRS}" "${WOLFSSL_INCLUDEDIR}/wolfssl")
+ else()
+   message(STATUS "Building without TLS")
+   set(LIBVNCCLIENT_SOURCES
+@@ -503,6 +534,7 @@ target_link_libraries(vncclient
+ 		      ${CRYPTO_LIBRARIES}
+                       ${GNUTLS_LIBRARIES}
+                       ${OPENSSL_LIBRARIES}
++                      ${WOLFSSL_LIBRARIES}
+ )
+ target_link_libraries(vncserver
+                       ${ADDITIONAL_LIBS}
+@@ -513,6 +545,7 @@ target_link_libraries(vncserver
+ 		      ${CRYPTO_LIBRARIES}
+                       ${GNUTLS_LIBRARIES}
+                       ${OPENSSL_LIBRARIES}
++                      ${WOLFSSL_LIBRARIES}
+ )
+ 
+ SET_TARGET_PROPERTIES(vncclient vncserver
+-- 
+2.34.1
+
