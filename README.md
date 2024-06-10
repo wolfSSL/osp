@@ -9,7 +9,7 @@ wolfSSL can provide several advantages over using the default SSL/TLS implementa
 * Portability across platforms and OS/RTOS environments
 * Low/optimized memory use (runtime and footprint)
 * [Best-tested](https://www.wolfssl.com/overview-of-testing-in-wolfssl/) SSL/TLS/crypto implementation available, reducing vulnerabilities
-* Current protocol support, up to [TLS 1.3](https://www.wolfssl.com/tls13) and DTLS 1.2
+* Current protocol support, up to [TLS 1.3](https://www.wolfssl.com/tls13) and [DTLS 1.3](https://www.wolfssl.com/whats-new-dtls-1-3/)
 * Progressive algorithm support (ChaCha20, Poly1305, Curve/Ed25519, etc)
 * [Commercial support](https://www.wolfssl.com/products/support-and-maintenance/) available direct from wolfSSL engineers
 * [Commercial licenses](https://www.wolfssl.com/license/) available (in addition to standard GPLv2)
@@ -36,6 +36,7 @@ Each project port included in this repository is contained in its own subdirecto
 | libssh2 | client-side C library for SSH2 | [Link](https://www.libssh2.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-libssh2/) | [README](./libssh2/1.9.0/README.md) |
 | lighttpd | lighttpd web server | [Link](https://www.lighttpd.net/) | [Link](https://www.wolfssl.com/lighttpd-support-wolfssl/) | [README](./lighttpd/README) |
 | mariadb | MariaDB relational database | [Link](https://mariadb.org/) | | [README](./mariadb/10.5.11/README.md) |
+| mosquitto | Eclipse Mosquitto - An open source MQTT broker | [Link](https://mosquitto.org/) | | [README](./mosquitto/README.md) |
 | net-snmp | Simple Network Management Protocol | [Link](http://www.net-snmp.org/) | | [README](./net-snmp/README.md) |
 | ntp | Network Time Protocol | [Link](http://www.ntp.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-ntp/) | [README](./ntp/4.2.8p15/README.md) |
 | NXP SE05X Middleware | wolfSSL HostCrypto support patch | [Link](https://www.nxp.com/products/security-and-authentication/authentication/edgelock-se050-plug-trust-secure-element-family-enhanced-iot-security-with-high-flexibility:SE050) | | [README](./nxp-se05x-middleware/README.md) |
