@@ -78,8 +78,8 @@ index 1fbf5e12..8348b949 100644
 --- a/apps/mosquitto_passwd/Makefile
 +++ b/apps/mosquitto_passwd/Makefile
 @@ -9,7 +9,7 @@ OBJS=   mosquitto_passwd.o \
-        misc_mosq.o \
-        password_mosq.o
+ 		misc_mosq.o \
+ 		password_mosq.o
  
 -ifeq ($(WITH_TLS),yes)
 +ifneq ($(WITH_TLS), no)
@@ -87,45 +87,45 @@ index 1fbf5e12..8348b949 100644
  else
  all:
 @@ -37,7 +37,7 @@ password_mosq.o : ../../src/password_mosq.c ../../src/password_mosq.h
-    ${CROSS_COMPILE}${CC} $(APP_CPPFLAGS) $(APP_CFLAGS) -c $< -o $@
+ 	${CROSS_COMPILE}${CC} $(APP_CPPFLAGS) $(APP_CFLAGS) -c $< -o $@
  
  install : all
 -ifeq ($(WITH_TLS),yes)
 +ifneq ($(WITH_TLS), no)
-    $(INSTALL) -d "${DESTDIR}$(prefix)/bin"
-    $(INSTALL) ${STRIP_OPTS} mosquitto_passwd "${DESTDIR}${prefix}/bin/mosquitto_passwd"
+ 	$(INSTALL) -d "${DESTDIR}$(prefix)/bin"
+ 	$(INSTALL) ${STRIP_OPTS} mosquitto_passwd "${DESTDIR}${prefix}/bin/mosquitto_passwd"
  endif
 diff --git a/config.mk b/config.mk
 index 73daefdf..1ef342e8 100644
 --- a/config.mk
 +++ b/config.mk
 @@ -253,6 +253,26 @@ ifeq ($(WITH_TLS),yes)
-    endif
+ 	endif
  endif
  
 +ifeq ($(WITH_TLS),wolfssl)
-+   WOLFSSLDIR ?= /usr/local
-+   WOLFSSLRPATH ?= -Wl,-rpath=$(WOLFSSLDIR)/lib
++	WOLFSSLDIR ?= /usr/local
++	WOLFSSLRPATH ?= -Wl,-rpath=$(WOLFSSLDIR)/lib
 +
-+   APP_CPPFLAGS:=$(APP_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
-+   BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
-+   BROKER_LDADD:=$(BROKER_LDADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
-+   CLIENT_CPPFLAGS:=$(CLIENT_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
-+   LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
-+   LIB_LIBADD:=$(LIB_LIBADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
-+   PASSWD_LDADD:=$(PASSWD_LDADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
-+   STATIC_LIB_DEPS:=$(STATIC_LIB_DEPS) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
++	APP_CPPFLAGS:=$(APP_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++	BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++	BROKER_LDADD:=$(BROKER_LDADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
++	CLIENT_CPPFLAGS:=$(CLIENT_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++	LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++	LIB_LIBADD:=$(LIB_LIBADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
++	PASSWD_LDADD:=$(PASSWD_LDADD) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
++	STATIC_LIB_DEPS:=$(STATIC_LIB_DEPS) -lwolfssl -L$(WOLFSSLDIR)/lib $(WOLFSSLRPATH)
 +
-+   ifeq ($(WITH_TLS_PSK),yes)
-+       BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
-+       LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
-+       CLIENT_CPPFLAGS:=$(CLIENT_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
-+   endif
++	ifeq ($(WITH_TLS_PSK),yes)
++		BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++		LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++		CLIENT_CPPFLAGS:=$(CLIENT_CPPFLAGS) -DWITH_TLS_PSK -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++	endif
 +endif
 +
  ifeq ($(WITH_THREADING),yes)
-    LIB_LDFLAGS:=$(LIB_LDFLAGS) -pthread
-    LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_THREADING
+ 	LIB_LDFLAGS:=$(LIB_LDFLAGS) -pthread
+ 	LIB_CPPFLAGS:=$(LIB_CPPFLAGS) -DWITH_THREADING
 diff --git a/lib/net_mosq.c b/lib/net_mosq.c
 index 80d9195b..c3a1122d 100644
 --- a/lib/net_mosq.c
@@ -146,7 +146,7 @@ index 80d9195b..c3a1122d 100644
  static int ui_open(UI *ui)
 @@ -125,7 +127,7 @@ UI_METHOD *net__get_ui_method(void)
  {
-    return _ui_method;
+ 	return _ui_method;
  }
 -
 +#endif /* !USE_WOLFSSL */
@@ -155,30 +155,30 @@ index 80d9195b..c3a1122d 100644
  int net__init(void)
 @@ -156,12 +158,14 @@ void net__cleanup(void)
  #    if !defined(OPENSSL_NO_ENGINE)
-    ENGINE_cleanup();
+	ENGINE_cleanup();
  #    endif
--   is_tls_initialized = false;
+-	is_tls_initialized = false;
  #  endif
-+    is_tls_initialized = false;
++	is_tls_initialized = false;
  
-    CONF_modules_unload(1);
+ 	CONF_modules_unload(1);
 +#ifndef USE_WOLFSSL
-    cleanup_ui_method();
+	cleanup_ui_method();
  #endif
 +#endif
  
  #ifdef WITH_SRV
-    ares_library_cleanup();
+ 	ares_library_cleanup();
 @@ -189,7 +193,9 @@ void net__init_tls(void)
  #if !defined(OPENSSL_NO_ENGINE)
-    ENGINE_load_builtin_engines();
+ 	ENGINE_load_builtin_engines();
  #endif
 +#ifndef USE_WOLFSSL
-    setup_ui_method();
+ 	setup_ui_method();
 +#endif
-    if(tls_ex_index_mosq == -1){
-        tls_ex_index_mosq = SSL_get_ex_new_index(0, "client context", NULL, NULL, NULL);
-    }
+ 	if(tls_ex_index_mosq == -1){
+ 		tls_ex_index_mosq = SSL_get_ex_new_index(0, "client context", NULL, NULL, NULL);
+ 	}
 diff --git a/lib/net_mosq.h b/lib/net_mosq.h
 index ded98760..90ccf08e 100644
 --- a/lib/net_mosq.h
@@ -212,7 +212,7 @@ index 7ef77b7b..14176446 100644
 --- a/plugins/dynamic-security/Makefile
 +++ b/plugins/dynamic-security/Makefile
 @@ -19,7 +19,7 @@ OBJS= \
-        sub_matches_sub.o
+ 		sub_matches_sub.o
  
  ifeq ($(WITH_CJSON),yes)
 -ifeq ($(WITH_TLS),yes)
@@ -226,41 +226,41 @@ index 7ef77b7b..14176446 100644
  ifeq ($(WITH_CJSON),yes)
 -ifeq ($(WITH_TLS),yes)
 +ifneq ($(WITH_TLS),no)
-    $(INSTALL) -d "${DESTDIR}$(libdir)"
-    $(INSTALL) ${STRIP_OPTS} ${PLUGIN_NAME}.so "${DESTDIR}${libdir}/${PLUGIN_NAME}.so"
+ 	$(INSTALL) -d "${DESTDIR}$(libdir)"
+ 	$(INSTALL) ${STRIP_OPTS} ${PLUGIN_NAME}.so "${DESTDIR}${libdir}/${PLUGIN_NAME}.so"
  endif
 diff --git a/test/broker/Makefile b/test/broker/Makefile
 index 63b9ae8f..a3419039 100644
 --- a/test/broker/Makefile
 +++ b/test/broker/Makefile
 @@ -143,7 +143,7 @@ msg_sequence_test:
-    ./07-will-takeover.py
+ 	./07-will-takeover.py
  
  08 :
 -ifeq ($(WITH_TLS),yes)
 +ifneq ($(WITH_TLS), no)
-    ./08-ssl-bridge.py
-    ./08-ssl-connect-cert-auth-crl.py
-    ./08-ssl-connect-cert-auth-expired.py
+ 	./08-ssl-bridge.py
+ 	./08-ssl-connect-cert-auth-crl.py
+ 	./08-ssl-connect-cert-auth-expired.py
 diff --git a/test/lib/Makefile b/test/lib/Makefile
 index 6ade78d0..d24deb03 100644
 --- a/test/lib/Makefile
 +++ b/test/lib/Makefile
 @@ -60,7 +60,7 @@ c : test-compile
-    ./03-request-response-correlation.py $@/03-request-response-correlation.test
-    ./03-request-response.py $@/03-request-response.test
-    ./04-retain-qos0.py $@/04-retain-qos0.test
+ 	./03-request-response-correlation.py $@/03-request-response-correlation.test
+ 	./03-request-response.py $@/03-request-response.test
+ 	./04-retain-qos0.py $@/04-retain-qos0.test
 -ifeq ($(WITH_TLS),yes)
 +ifneq ($(WITH_TLS), no)
-    #./08-ssl-fake-cacert.py $@/08-ssl-fake-cacert.test
-    ./08-ssl-bad-cacert.py $@/08-ssl-bad-cacert.test
-    ./08-ssl-connect-cert-auth-enc.py $@/08-ssl-connect-cert-auth-enc.test
+ 	#./08-ssl-fake-cacert.py $@/08-ssl-fake-cacert.test
+ 	./08-ssl-bad-cacert.py $@/08-ssl-bad-cacert.test
+ 	./08-ssl-connect-cert-auth-enc.py $@/08-ssl-connect-cert-auth-enc.test
 diff --git a/test/lib/c/Makefile b/test/lib/c/Makefile
 index 40cb7d15..a94892e1 100644
 --- a/test/lib/c/Makefile
 +++ b/test/lib/c/Makefile
 @@ -63,6 +63,12 @@ SRC += \
-    08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
+ 	08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
  LIBS += -lssl -lcrypto
  endif
 +ifeq ($(WITH_TLS),wolfssl)
