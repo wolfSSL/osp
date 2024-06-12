@@ -1757,7 +1757,7 @@ index 0c2aff3..509793e 100644
  #include <openssl/err.h>
  #include <openssl/rand.h>
 diff --git a/xio-openssl.c b/xio-openssl.c
-index 0205146..a3e07bb 100644
+index 0205146..6983611 100644
 --- a/xio-openssl.c
 +++ b/xio-openssl.c
 @@ -171,7 +171,11 @@ static void openssl_conn_loginfo(SSL *ssl) {
@@ -1858,7 +1858,7 @@ index 0205146..a3e07bb 100644
  #if HAVE_SSL_CTX_set_max_proto_version || defined(SSL_CTX_set_max_proto_version)
 +#if defined(WITH_WOLFSSL) && defined(WOLFSSL_TLS13)
 +    #if HAVE_SSLv23_client_method
-+    if (me_str == 0 || !strcasecmp(me_str, "SSL23")) {
++    if (!*use_dtls && (me_str == 0 || !strcasecmp(me_str, "SSL23"))) {
 +      /* Setting max to TLS 1.2 since TLS 1.3 doesn't work with socat." */
 +      if (SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION) <= 0) {
 +	 Error2("_xioopen_openssl_prepare(): SSL_CTX_set_max_proto_version(\"%s\"->%d): failed",
