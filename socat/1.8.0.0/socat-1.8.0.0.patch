@@ -1757,7 +1757,7 @@ index 0c2aff3..509793e 100644
  #include <openssl/err.h>
  #include <openssl/rand.h>
 diff --git a/xio-openssl.c b/xio-openssl.c
-index 0205146..6983611 100644
+index 0205146..ac04827 100644
 --- a/xio-openssl.c
 +++ b/xio-openssl.c
 @@ -171,7 +171,11 @@ static void openssl_conn_loginfo(SSL *ssl) {
@@ -1814,15 +1814,6 @@ index 0205146..6983611 100644
     /* OpenSSL preparation */
  #if defined(HAVE_OPENSSL_INIT_SSL) && defined(HAVE_OPENSSL_INIT_new)
     {
-@@ -1068,7 +1086,7 @@ int
- #endif
- #if HAVE_SSLv23_client_method
- 	 } else if (!strcasecmp(me_str, "SSL23")) {
--	    method = sycSSLv23_client_method();
-+       method = sycSSLv23_client_method();
- #endif
- #if HAVE_TLSv1_client_method
- 	 } else if (!strcasecmp(me_str, "TLS1") || !strcasecmp(me_str, "TLS1.0")) {
 @@ -1096,9 +1114,9 @@ int
  	    Error1("openssl-method=\"%s\": method unknown or not provided by library", me_str);
  	 }
@@ -1835,15 +1826,6 @@ index 0205146..6983611 100644
  	 method = sycSSLv23_client_method();
  #elif HAVE_TLSv1_2_client_method
  	 method = sycTLSv1_2_client_method();
-@@ -1139,7 +1157,7 @@ int
- #endif
- #if HAVE_SSLv23_server_method
- 	 } else if (!strcasecmp(me_str, "SSL23")) {
--	    method = sycSSLv23_server_method();
-+       method = sycSSLv23_server_method();
- #endif
- #if HAVE_TLSv1_server_method
- 	 } else if (!strcasecmp(me_str, "TLS1") || !strcasecmp(me_str, "TLS1.0")) {
 @@ -1235,6 +1253,7 @@ int
        /*ERR_clear_error;*/
        return STAT_RETRYLATER;
