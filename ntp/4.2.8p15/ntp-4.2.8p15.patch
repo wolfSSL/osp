@@ -1,3 +1,49 @@
+From 61dfe2d748977278d9c24ea45a6a5e5d418cd8b8 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Mon, 24 Jun 2024 18:18:32 +0200
+Subject: [PATCH] Patch for wolfSSL
+
+---
+ aclocal.m4                      |  1 +
+ configure.ac                    | 98 +++++++++++++++++++--------------
+ include/libssl_compat.h         |  4 ++
+ include/ntp_crypto.h            |  6 +-
+ include/ntp_md5.h               | 49 +++++++++--------
+ include/ntp_stdlib.h            |  2 +-
+ libntp/a_md5encrypt.c           |  4 +-
+ libntp/libssl_compat.c          |  3 +
+ libntp/ntp_crypto_rnd.c         |  3 +
+ libntp/ssl_init.c               |  4 +-
+ libntp/work_thread.c            |  2 +
+ ntpd/ntp_control.c              |  2 +-
+ ntpd/ntp_crypto.c               | 15 ++++-
+ ntpq/ntpq.c                     |  4 +-
+ sntp/aclocal.m4                 |  1 +
+ sntp/configure.ac               |  8 ++-
+ sntp/crypto.c                   |  2 +-
+ sntp/log.c                      |  2 +-
+ sntp/m4/ntp_wolfssl.m4          | 25 +++++++++
+ sntp/sntp.c                     |  2 +
+ sntp/version.c                  |  2 +-
+ tests/libntp/a_md5encrypt.c     |  3 +
+ tests/libntp/run-a_md5encrypt.c | 11 ++--
+ tests/libntp/test-libntp.h      |  2 +-
+ util/ntp-keygen.c               | 22 +++++++-
+ 25 files changed, 188 insertions(+), 89 deletions(-)
+ create mode 100644 sntp/m4/ntp_wolfssl.m4
+
+diff --git a/aclocal.m4 b/aclocal.m4
+index ec9f3a5..1831479 100644
+--- a/aclocal.m4
++++ b/aclocal.m4
+@@ -1359,6 +1359,7 @@ m4_include([sntp/m4/ntp_sntp.m4])
+ m4_include([sntp/m4/ntp_unitytest.m4])
+ m4_include([sntp/m4/ntp_ver_suffix.m4])
+ m4_include([sntp/m4/ntp_vpathhack.m4])
++m4_include([sntp/m4/ntp_wolfssl.m4])
+ m4_include([sntp/m4/openldap-thread-check.m4])
+ m4_include([sntp/m4/openldap.m4])
+ m4_include([sntp/m4/os_cflags.m4])
 diff --git a/configure.ac b/configure.ac
 index 5dc6aee..94aa248 100644
 --- a/configure.ac
@@ -175,6 +221,55 @@ index 06c90b2..258c936 100644
  /*
   * Provide OpenSSL-alike MD5 API if we're not using OpenSSL
   */
+@@ -22,28 +25,28 @@
+ #  include <md5.h>
+ # else
+ #  include "isc/md5.h"
+-   typedef isc_md5_t		MD5_CTX;
+-#  define MD5Init(c)		isc_md5_init(c)
+-#  define MD5Update(c, p, s)	isc_md5_update(c, p, s)
+-#  define MD5Final(d, c)	isc_md5_final((c), (d))	/* swapped */
++   typedef isc_md5_t    MD5_CTX;
++#  define MD5Init(c)    isc_md5_init(c)
++#  define MD5Update(c, p, s)  isc_md5_update(c, p, s)
++#  define MD5Final(d, c)  isc_md5_final((c), (d)) /* swapped */
+ # endif
+ 
+-  typedef MD5_CTX			EVP_MD_CTX;
++  typedef MD5_CTX     EVP_MD_CTX;
+ 
+-# define EVP_MD_CTX_free(c)		free(c)
+-# define EVP_MD_CTX_new()		calloc(1, sizeof(MD5_CTX))
+-# define EVP_get_digestbynid(t)		NULL
+-# define EVP_md5()			NULL
++# define EVP_MD_CTX_free(c)   free(c)
++# define EVP_MD_CTX_new()   calloc(1, sizeof(MD5_CTX))
++# define EVP_get_digestbynid(t)   NULL
++# define EVP_md5()      NULL
+ # define EVP_MD_CTX_init(c)
+ # define EVP_MD_CTX_set_flags(c, f)
+-# define EVP_DigestInit(c, dt)		(MD5Init(c), 1)
+-# define EVP_DigestInit_ex(c, dt, i)	(MD5Init(c), 1)
+-# define EVP_DigestUpdate(c, p, s)	MD5Update(c, (const void *)(p), \
+-						  s)
+-# define EVP_DigestFinal(c, d, pdl)	\
+-	do {				\
+-		MD5Final((d), (c));	\
+-		*(pdl) = 16;		\
+-	} while (0)
+-# endif	/* !OPENSSL */
+-#endif	/* NTP_MD5_H */
++# define EVP_DigestInit(c, dt)    (MD5Init(c), 1)
++# define EVP_DigestInit_ex(c, dt, i)  (MD5Init(c), 1)
++# define EVP_DigestUpdate(c, p, s)  MD5Update(c, (const void *)(p), \
++              s)
++# define EVP_DigestFinal(c, d, pdl) \
++  do {        \
++    MD5Final((d), (c)); \
++    *(pdl) = 16;    \
++  } while (0)
++# endif /* !OPENSSL */
++#endif  /* NTP_MD5_H */
 diff --git a/include/ntp_stdlib.h b/include/ntp_stdlib.h
 index 265aafa..d4a098a 100644
 --- a/include/ntp_stdlib.h
@@ -260,6 +355,24 @@ index 9258932..5c53ec7 100644
  int ssl_init_done;
  
  #if OPENSSL_VERSION_NUMBER < 0x10100000L
+diff --git a/libntp/work_thread.c b/libntp/work_thread.c
+index 03a5647..021ddd6 100644
+--- a/libntp/work_thread.c
++++ b/libntp/work_thread.c
+@@ -42,11 +42,13 @@
+ # define THREAD_MINSTACKSIZE	(64U * 1024)
+ #endif
+ #ifndef __sun
++#if !defined __USE_DYNAMIC_STACK_SIZE || !__USE_DYNAMIC_STACK_SIZE
+ #if defined(PTHREAD_STACK_MIN) && THREAD_MINSTACKSIZE < PTHREAD_STACK_MIN
+ # undef THREAD_MINSTACKSIZE
+ # define THREAD_MINSTACKSIZE PTHREAD_STACK_MIN
+ #endif
+ #endif
++#endif
+ 
+ #ifndef THREAD_MAXSTACKSIZE
+ # define THREAD_MAXSTACKSIZE	(256U * 1024)
 diff --git a/ntpd/ntp_control.c b/ntpd/ntp_control.c
 index 9c40803..eda1d12 100644
 --- a/ntpd/ntp_control.c
@@ -339,6 +452,18 @@ index 0382c0f..ba49995 100644
  #endif
  #include <ssl_applink.c>
  
+diff --git a/sntp/aclocal.m4 b/sntp/aclocal.m4
+index a22e4e1..edfb75a 100644
+--- a/sntp/aclocal.m4
++++ b/sntp/aclocal.m4
+@@ -1352,6 +1352,7 @@ m4_include([m4/ntp_sntp.m4])
+ m4_include([m4/ntp_sysexits.m4])
+ m4_include([m4/ntp_unitytest.m4])
+ m4_include([m4/ntp_ver_suffix.m4])
++m4_include([m4/ntp_wolfssl.m4])
+ m4_include([m4/openldap-thread-check.m4])
+ m4_include([m4/openldap.m4])
+ m4_include([m4/os_cflags.m4])
 diff --git a/sntp/configure.ac b/sntp/configure.ac
 index f6de8a1..2e3e00b 100644
 --- a/sntp/configure.ac
@@ -375,12 +500,25 @@ index 8a47ede..de68179 100644
  		EVP_MD_CTX_set_flags(ctx, EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
  #	    endif
  		/* [Bug 3457] DON'T use plain EVP_DigestInit! It would
+diff --git a/sntp/log.c b/sntp/log.c
+index db6614d..e50ee14 100644
+--- a/sntp/log.c
++++ b/sntp/log.c
+@@ -2,7 +2,7 @@
+ 
+ #include "log.h"
+ 
+-const char *progname;		/* for msyslog use too */
++// const char *progname;		/* for msyslog use too */
+ 
+ static int counter = 0;
+ 
 diff --git a/sntp/m4/ntp_wolfssl.m4 b/sntp/m4/ntp_wolfssl.m4
 new file mode 100644
-index 0000000..95ed702
+index 0000000..e48ff45
 --- /dev/null
 +++ b/sntp/m4/ntp_wolfssl.m4
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,25 @@
 +AC_DEFUN([NTP_WOLFSSL], [
 +AC_ARG_WITH(wolfssl,
 +    AC_HELP_STRING([--with-wolfssl=DIR],[location of wolfssl]),
@@ -391,7 +529,10 @@ index 0000000..95ed702
 +],[USE_WOLFSSL=no])
 +
 +if test $USE_WOLFSSL = yes; then
++    SAVED_CFLAGS=$CFLAGS
++    CFLAGS="$CFLAGS $CPPFLAGS_NTP"
 +    AC_CHECK_HEADER([wolfssl/options.h])
++    CFLAGS=$SAVED_CFLAGS
 +    if test $ac_cv_header_wolfssl_options_h = yes; then
 +        AC_DEFINE([OPENSSL], [], [Use OpenSSL?])
 +        AC_DEFINE([WITH_WOLFSSL], [], [Use wolfSSL?])
@@ -403,6 +544,29 @@ index 0000000..95ed702
 +    fi
 +fi
 +])
+diff --git a/sntp/sntp.c b/sntp/sntp.c
+index 2e3bfec..dc06aca 100644
+--- a/sntp/sntp.c
++++ b/sntp/sntp.c
+@@ -2,6 +2,8 @@
+ 
+ #include "main.h"
+ 
++const char* progname;
++
+ int 
+ main (
+ 	int	argc,
+diff --git a/sntp/version.c b/sntp/version.c
+index 9574047..8bde83c 100644
+--- a/sntp/version.c
++++ b/sntp/version.c
+@@ -2,4 +2,4 @@
+  * version file for sntp
+  */
+ #include <config.h>
+-const char * Version = "sntp 4.2.8p15@1.3728-o Tue Jun 23 09:22:10 UTC 2020 (10)";
++const char * Version = "sntp 4.2.8p15@1.3728-o Wed Jun 19 14:00:19 UTC 2024 (4)";
 diff --git a/tests/libntp/a_md5encrypt.c b/tests/libntp/a_md5encrypt.c
 index 844be16..3a3d621 100644
 --- a/tests/libntp/a_md5encrypt.c
@@ -417,6 +581,45 @@ index 844be16..3a3d621 100644
  # include "openssl/err.h"
  # include "openssl/rand.h"
  # include "openssl/evp.h"
+diff --git a/tests/libntp/run-a_md5encrypt.c b/tests/libntp/run-a_md5encrypt.c
+index 2d9c086..7878492 100644
+--- a/tests/libntp/run-a_md5encrypt.c
++++ b/tests/libntp/run-a_md5encrypt.c
+@@ -25,6 +25,7 @@
+ #include "config.h"
+ #include "ntp.h"
+ #include "ntp_stdlib.h"
++#include <wolfssl/options.h>
+ 
+ //=======External Functions This Runner Calls=====
+ extern void setUp(void);
+@@ -62,11 +63,11 @@ int main(int argc, char *argv[])
+   progname = argv[0];
+   suite_setup();
+   UnityBegin("a_md5encrypt.c");
+-  RUN_TEST(test_Encrypt, 40);
+-  RUN_TEST(test_DecryptValid, 41);
+-  RUN_TEST(test_DecryptInvalid, 42);
+-  RUN_TEST(test_IPv4AddressToRefId, 43);
+-  RUN_TEST(test_IPv6AddressToRefId, 44);
++  RUN_TEST(test_Encrypt, 43);
++  RUN_TEST(test_DecryptValid, 44);
++  RUN_TEST(test_DecryptInvalid, 45);
++  RUN_TEST(test_IPv4AddressToRefId, 46);
++  RUN_TEST(test_IPv6AddressToRefId, 47);
+ 
+   return (UnityEnd());
+ }
+diff --git a/tests/libntp/test-libntp.h b/tests/libntp/test-libntp.h
+index 93050b3..60461d8 100644
+--- a/tests/libntp/test-libntp.h
++++ b/tests/libntp/test-libntp.h
+@@ -5,4 +5,4 @@
+ 
+ time_t timefunc(time_t *ptr);
+ void settime(int y, int m, int d, int H, int M, int S);
+-time_t nowtime;
++extern time_t nowtime;
 diff --git a/util/ntp-keygen.c b/util/ntp-keygen.c
 index eb2cb34..cc43c97 100644
 --- a/util/ntp-keygen.c
@@ -482,3 +685,6 @@ index eb2cb34..cc43c97 100644
  	return dsa;
  }
  
+-- 
+2.34.1
+
