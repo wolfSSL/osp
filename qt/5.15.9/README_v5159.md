@@ -37,6 +37,7 @@ Please follow [README](https://github.com/wolfSSL/osp/blob/master/qt/README_v515
 
 Note1: <strong>For wolfSSL configuration, you need to add `-DALLOW_INVALID_CERTSIGN` for CFLAG Option to make `qsslcertificate` tests passed. </strong>
 This needs because later versions than wolfSSL v5.6.4 doesn't allow a certificate which has `CA:FALSE` and `Certificate Sign` set. As such certificate, there is qtbase/tests/auto/network/ssl/qsslcertificate/verify-certs/test-ocsp-good-cert.pem for `qsslcertificate` test.
+
 ```
 comments from asn.c
 /*
@@ -45,6 +46,8 @@ comments from asn.c
  *   key usage extension MUST NOT be asserted.
  */
 ```
+
+Note2: <strong>For wolfSSL configuration, you need to add `-DWOLFSSL_NO_ASN_STRICT` for CFLAG Option to make `qsslcertificate` and `qssl_wolf` tests passed. </strong> This needs because wolfSSL treates Serial number of 0 of certificate as an error. There are some certificates which are serial number of 0 in Qt repo.
 
 ## Running tests
 Please see [README](https://github.com/wolfSSL/osp/blob/master/qt/README_v515.md)
