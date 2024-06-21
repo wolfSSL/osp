@@ -1,4 +1,4 @@
-1.0 Intro to lighttpd v.1.4.51 with wolfSSL
+1.0 Intro to lighttpd v.1.4.50 with wolfSSL
 
 Lighttpd is a lightweight web server we have ported wolfSSL to. The goal of
 this manual is to help the user get started with Lighttpd using the wolfSSL
@@ -6,7 +6,8 @@ library for SSL and TLS operations.
 
 1.1 Current Status Notes
 
-This release is based off Lighttpd 1.4.51 as of August 15, 2018.
+This release is based off Lighttpd 1.4.50 as of August 15, 2018, and includes
+two security patches backported from lighttpd-1.4.51.
 
 wolfSSL offers support based in the United States as well as
 training! With our dual-licensing options, wolfSSL can provide you with the
@@ -16,7 +17,7 @@ solution that you need for your commercial application or open source project.
 
 2.1 Dependencies
 
-The lighttpd-1.4.51 with wolfSSL requires the wolfSSL library version 3.15.3 or
+The lighttpd-1.4.50 with wolfSSL requires the wolfSSL library version 3.15.3 or
 later.  Future releases of wolfSSL can be obtained from http://www.wolfssl.com.
 By default, lighttpd and wolfSSL install their libraries in different locations,
 making use of the `--prefix` option can help ensure your libarary files are in

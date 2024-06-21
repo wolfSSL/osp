@@ -1,6 +1,13 @@
 wolfSSL into lighty!
 
-See README files in:
+lighttpd 1.4.56 and later provide lighttpd mod_wolfssl with native support
+for wolfSSL.  Using the most recent lighttpd stable release is recommended.
+
+For older lighttpd releases, see README files in:
 `./lighttpd-1.4.35/wolfStartup/README`
 `./lighttpd-1.4.49/wolfStartup/README`
-`./lighttpd-1.4.51/wolfStartup/README`
+`./lighttpd-1.4.50/wolfStartup/README`
+
+Aside: a prior mistake labelled the lighttpd-1.4.50 release as lighttpd-1.4.51
+in this repository.  The directory has been renamed, but to avoid breaking
+links, a symlink has been created from lighttpd-1.4.51 -> lighttpd-1.4.50.
