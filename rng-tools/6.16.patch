@@ -1,0 +1,74 @@
+From 14c84c29e7232894aa7268fa1401e34f7a9f8bef Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Mon, 17 Jun 2024 11:30:42 +0200
+Subject: [PATCH] Patch for wolfSSL
+
+Compile wolfSSL with:
+  ./configure --enable-all
+  make
+  make install
+
+Compile rng-tools with:
+  patch -p1 < <path/to/this/patch>
+  ./configure --with-wolfssl=/usr/local
+  make
+
+Tested with:
+  make check
+---
+ configure.ac      | 25 ++++++++++++++++++++++++-
+ rngd_nistbeacon.c |  2 +-
+ 2 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index a3a168d..5fd0f1d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -171,7 +171,30 @@ AS_IF(
+ 	]
+ )
+ 
+-PKG_CHECK_MODULES([openssl], [openssl], [], [AC_MSG_ERROR([openssl is required])])
++AC_ARG_WITH(wolfssl,
++    AC_HELP_STRING([--with-wolfssl=DIR],[location of wolfssl]),
++[
++    openssl_CFLAGS="-I${withval}/include/ -I${withval}/include/wolfssl -DEXTERNAL_OPTS_OPENVPN"
++    openssl_LIBS="-L${withval}/lib -lwolfssl"
++    USE_WOLFSSL=yes
++],[USE_WOLFSSL=no])
++
++if test $USE_WOLFSSL = yes; then
++    SAVED_CFLAGS=$CFLAGS
++    CFLAGS="$CFLAGS $openssl_CFLAGS"
++    AC_CHECK_HEADER([wolfssl/options.h])
++    CFLAGS=$SAVED_CFLAGS
++    if test $ac_cv_header_wolfssl_options_h = yes; then
++        AC_DEFINE([WITH_WOLFSSL], [], [Use wolfSSL?])
++    else
++        AC_MSG_ERROR([Unable to find wolfssl.])
++    fi
++fi
++
++if test $USE_WOLFSSL = no; then
++    PKG_CHECK_MODULES([openssl], [openssl], [], [AC_MSG_ERROR([openssl is required])])
++fi
++
+ PKG_CHECK_MODULES([libcap], [libcap], [], [AC_MSG_ERROR([libcap is required])])
+ AM_CONDITIONAL([NISTBEACON], [test "x$with_nistbeacon" != "xno"])
+ AM_CONDITIONAL([PKCS11], [test "x$with_pkcs11" != "xno"])
+diff --git a/rngd_nistbeacon.c b/rngd_nistbeacon.c
+index 4974f38..5774d43 100644
+--- a/rngd_nistbeacon.c
++++ b/rngd_nistbeacon.c
+@@ -380,7 +380,7 @@ static int validate_nist_block(struct rng *ent_src)
+ 
+ 	EVP_MD_CTX_init(mdctx);
+ 
+-	if (!EVP_VerifyInit_ex(mdctx, md, NULL)) {
++	if (!EVP_VerifyInit(mdctx, md)) {
+ 		message_entsrc(ent_src,LOG_DAEMON|LOG_ERR, "Unable to Init Verifier");
+ 		goto out;
+ 	}
+-- 
+2.34.1
+
