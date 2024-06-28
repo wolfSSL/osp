@@ -1,3 +1,7 @@
+# Python OSP Patches
+
+# 3.8.5 Patch
+
 This patch is for Python version 3.8.5 which can be downloaded from Python's
 webpage here
 https://www.python.org/ftp/python/3.8.5/Python-3.8.5.tar.xz
@@ -84,4 +88,24 @@ test_nntplib:
       with wolfSSL:
           test_descriptions
           test_description
+
+
+# 3.8.14 Patch
+
+This patch is for Python version 3.8.14. Follow these steps to download
+and build python 3.8.14 with wolfssl enbabled. This requires that wolfssl
+has been built similarly as for the 3.8.5 patch instructions.
+
+Note, you may need to update your LD_LIBRARY_PATH first:
+$ export LD_LIBRARY_PATH=/usr/local/lib
+
+$ wget https://www.python.org/ftp/python/3.8.14/Python-3.8.14.tar.xz
+$ tar xvf Python-3.8.14.tar.xz
+$ cd Python-3.8.14
+$ patch -p1 < ../wolfssl-python-3.8.14.patch
+$ ./configure --with-wolfssl=/usr/local
+$ make
+
+Run the ssl tests with:
+$ make test TESTOPTS="-v test_ssl"
 

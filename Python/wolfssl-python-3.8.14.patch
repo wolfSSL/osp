@@ -1080,14 +1080,33 @@ index 71cfdcd..937a15a 100644
  
      @requires_tls_version('SSLv2')
      def test_protocol_sslv2(self):
-@@ -3822,6 +4008,7 @@ class ThreadedTests(unittest.TestCase):
-                 sock.do_handshake()
-             self.assertEqual(cm.exception.errno, errno.ENOTCONN)
- 
-+    @unittest.skipIf(ssl.IS_WOLFSSL, "wolfSSL doesn't support cipher rules.")
-     def test_no_shared_ciphers(self):
-         client_context, server_context, hostname = testing_context()
+@@ -3827,14 +4014,23 @@ class ThreadedTests(unittest.TestCase):
          # OpenSSL enables all TLS 1.3 ciphers, enforce TLS 1.2 for test
+         client_context.options |= ssl.OP_NO_TLSv1_3
+         # Force different suites on client and server
+-        client_context.set_ciphers("AES128")
+-        server_context.set_ciphers("AES256")
++        if ssl.IS_WOLFSSL:
++            # wolfSSL doesn't support cipher rules.
++            client_context.set_ciphers('ECDHE-ECDSA-AES256-GCM-SHA384')
++            server_context.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384')
++        else:
++            client_context.set_ciphers("AES128")
++            server_context.set_ciphers("AES256")
++
+         with ThreadedEchoServer(context=server_context) as server:
+             with client_context.wrap_socket(socket.socket(),
+                                             server_hostname=hostname) as s:
+                 with self.assertRaises(OSError):
+                     s.connect((HOST, server.port))
+-        self.assertIn("no shared cipher", server.conn_errors[0])
++        if ssl.IS_WOLFSSL:
++            self.assertIn("can't match cipher suite", server.conn_errors[0])
++        else:
++            self.assertIn("no shared cipher", server.conn_errors[0])
+ 
+     def test_version_basic(self):
+         """
 @@ -3853,6 +4040,8 @@ class ThreadedTests(unittest.TestCase):
                  s.connect((HOST, server.port))
                  if IS_OPENSSL_1_1_1 and has_tls_version('TLSv1_3'):
@@ -1218,8 +1237,8 @@ index 71cfdcd..937a15a 100644
 -        server_context.set_ciphers("AES256")
 +        if ssl.IS_WOLFSSL:
 +            # wolfSSL doesn't support cipher rules.
-+            client_context.set_ciphers("ECDHE-RSA-AES256-GCM-SHA384")
-+            server_context.set_ciphers("ECDHE-ECDSA-AES256-GCM-SHA384")
++            client_context.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384')
++            server_context.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384')
 +        else:
 +            client_context.set_ciphers("AES128:AES256")
 +            server_context.set_ciphers("AES256")
