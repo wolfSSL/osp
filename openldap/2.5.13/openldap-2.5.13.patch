@@ -1,0 +1,436 @@
+--- ./configure.ac.dist	2024-06-27 14:12:57.208730246 -0500
++++ ./configure.ac	2024-06-28 18:25:48.098005947 -0500
+@@ -248,8 +248,8 @@ OL_ARG_WITH(threads,
+ 	[AS_HELP_STRING([--with-threads], [with threads library auto|nt|posix|pth|lwp|manual])],
+ 	auto, [auto nt posix pth lwp yes no manual] )
+ OL_ARG_WITH(tls,
+-	[AS_HELP_STRING([--with-tls], [with TLS/SSL support auto|openssl|gnutls])],
+-	auto, [auto openssl gnutls yes no] )
++	[AS_HELP_STRING([--with-tls], [with TLS/SSL support auto|openssl|gnutls|wolfssl])],
++	auto, [auto openssl gnutls wolfssl yes no] )
+ OL_ARG_WITH(yielding_select,
+ 	[AS_HELP_STRING([--with-yielding-select], [with implicitly yielding select])],
+ 	auto, [auto yes no manual] )
+@@ -1279,6 +1279,42 @@ if test $ol_link_tls = no ; then
+ 	fi
+ fi
+ 
++dnl NOTE: caller must specify CPPFLAGS=-I/path/to/wolfssl/ to pick up
++dnl OpenSSL compatibility headers (e.g. /usr/local/include/wolfssl).
++if test $ol_link_tls = no ; then
++       if test $ol_with_tls = wolfssl || test $ol_with_tls = auto ; then
++               have_wolfssl=no
++
++               AC_CHECK_HEADERS([wolfssl/options.h])
++               if test "$ac_cv_header_wolfssl_options_h" = no &&
++                  test $ol_with_tls = wolfssl ; then
++                       AC_MSG_ERROR([wolfSSL not found)])
++               fi
++
++               AC_RUN_IFELSE([AC_LANG_PROGRAM([
++               #include <wolfssl/options.h>
++               ],[
++               #ifndef OPENSSL_EXTRA
++               exit(1);
++               #endif
++               ])], [have_wolfssl=yes])
++
++               if test "$have_wolfssl" = yes ; then
++                       ol_with_tls=wolfssl
++                       ol_link_tls=yes
++
++                       TLS_LIBS="-lwolfssl"
++
++                       AC_DEFINE(HAVE_WOLFSSL, 1,
++                               [define if you have wolfSSL])
++               else
++                       if test $ol_with_tls = wolfssl ; then
++                               AC_MSG_ERROR([wolfSSL not compiled with OpenSSL compatibility layer. Re-compile and install wolfSSL with OPENSSL_EXTRA defined.)])
++                       fi
++               fi
++       fi
++fi
++
+ WITH_TLS=no
+ if test $ol_link_tls = yes ; then
+ 	AC_DEFINE(HAVE_TLS, 1, [define if you have TLS])
+--- ./libraries/libldap/init.c.dist	2022-07-14 12:09:57.000000000 -0500
++++ ./libraries/libldap/init.c	2024-06-28 18:26:47.932111333 -0500
+@@ -133,7 +133,7 @@ static const struct ol_attribute {
+ 	{0, ATTR_TLS,	"TLS_PEERKEY_HASH",	NULL,	LDAP_OPT_X_TLS_PEERKEY_HASH},
+ 	{0, ATTR_TLS,	"TLS_ECNAME",		NULL,	LDAP_OPT_X_TLS_ECNAME},
+ 
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 	{0, ATTR_TLS,	"TLS_CRLCHECK",		NULL,	LDAP_OPT_X_TLS_CRLCHECK},
+ #endif
+ #ifdef HAVE_GNUTLS
+--- ./libraries/libldap/tls2.c.dist	2022-07-14 12:09:57.000000000 -0500
++++ ./libraries/libldap/tls2.c	2024-06-28 18:29:52.489078514 -0500
+@@ -538,6 +538,10 @@ ldap_pvt_tls_get_peer_dn( void *s, struc
+ 
+ 	rc = ldap_X509dn2bv( &bvdn, dn, 
+ 			    (LDAPDN_rewrite_func *)func, flags);
++#ifdef HAVE_WOLFSSL
++	/* see comment in tlso_session_peer_dn */
++	free(bvdn.bv_val);
++#endif
+ 	return rc;
+ }
+ 
+@@ -633,7 +637,7 @@ ldap_pvt_tls_config( LDAP *ld, int optio
+ 		}
+ 		return ldap_pvt_tls_set_option( ld, option, &i );
+ 		}
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 	case LDAP_OPT_X_TLS_CRLCHECK:	/* OpenSSL only */
+ 		i = -1;
+ 		if ( strcasecmp( arg, "none" ) == 0 ) {
+@@ -723,7 +727,7 @@ ldap_pvt_tls_get_option( LDAP *ld, int o
+ 	case LDAP_OPT_X_TLS_REQUIRE_SAN:
+ 		*(int *)arg = lo->ldo_tls_require_san;
+ 		break;
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 	case LDAP_OPT_X_TLS_CRLCHECK:	/* OpenSSL only */
+ 		*(int *)arg = lo->ldo_tls_crlcheck;
+ 		break;
+@@ -944,7 +948,7 @@ ldap_pvt_tls_set_option( LDAP *ld, int o
+ 			return 0;
+ 		}
+ 		return -1;
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 	case LDAP_OPT_X_TLS_CRLCHECK:	/* OpenSSL only */
+ 		if ( !arg ) return -1;
+ 		switch( *(int *) arg ) {
+@@ -1236,8 +1240,13 @@ ldap_pvt_tls_get_my_dn( void *s, struct
+ 	int rc;
+ 
+ 	rc = tls_imp->ti_session_my_dn( session, &der_dn );
+-	if ( rc == LDAP_SUCCESS )
++	if ( rc == LDAP_SUCCESS ) {
+ 		rc = ldap_X509dn2bv(&der_dn, dn, (LDAPDN_rewrite_func *)func, flags );
++#ifdef HAVE_WOLFSSL
++		/* see comment in tlso_session_peer_dn */
++		free(der_dn.bv_val);
++#endif
++	}
+ 	return rc;
+ }
+ 
+--- ./libraries/libldap/tls_o.c.dist	2022-07-14 12:09:57.000000000 -0500
++++ ./libraries/libldap/tls_o.c	2024-06-29 11:42:47.505895228 -0500
+@@ -18,7 +18,7 @@
+ 
+ #include "portable.h"
+ 
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 
+ #include "ldap_config.h"
+ 
+@@ -37,18 +37,23 @@
+ #include "ldap-int.h"
+ #include "ldap-tls.h"
+ 
+-#ifdef HAVE_OPENSSL_SSL_H
++#if defined(HAVE_OPENSSL_SSL_H) || defined(HAVE_WOLFSSL)
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/ssl.h>
+ #include <openssl/x509v3.h>
+ #include <openssl/err.h>
+ #include <openssl/rand.h>
++#ifndef HAVE_WOLFSSL
+ #include <openssl/safestack.h>
++#endif
+ #include <openssl/bn.h>
+ #include <openssl/rsa.h>
+ #include <openssl/dh.h>
+ #endif
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000
++#if OPENSSL_VERSION_NUMBER >= 0x10100000 && !defined(HAVE_WOLFSSL)
+ #define ASN1_STRING_data(x)	ASN1_STRING_get0_data(x)
+ #endif
+ 
+@@ -87,7 +92,7 @@ static void tlso_locking_cb( int mode, i
+ 	}
+ }
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x0909000
++#if OPENSSL_VERSION_NUMBER >= 0x0909000 && !defined(HAVE_WOLFSSL)
+ static void tlso_thread_self( CRYPTO_THREADID *id )
+ {
+ 	CRYPTO_THREADID_set_pointer( id, (void *)ldap_pvt_thread_self() );
+@@ -125,7 +130,7 @@ static void tlso_thr_init( void ) {}
+ #endif
+ #endif /* OpenSSL 1.1 */
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x10100000
++#if OPENSSL_VERSION_NUMBER < 0x10100000 && !defined(HAVE_WOLFSSL)
+ /*
+  * OpenSSL 1.1 API and later makes the BIO method concrete types internal.
+  */
+@@ -162,6 +167,7 @@ BIO_meth_free( BIO_METHOD *meth )
+ 
+ #endif /* OpenSSL 1.1 */
+ 
++#ifndef HAVE_WOLFSSL
+ static STACK_OF(X509_NAME) *
+ tlso_ca_list( char * bundle, char * dir, X509 *cert )
+ {
+@@ -195,6 +201,7 @@ tlso_ca_list( char * bundle, char * dir,
+ 	}
+ 	return ca_list;
+ }
++#endif
+ 
+ /*
+  * Initialize TLS subsystem. Should be called only once.
+@@ -222,8 +229,10 @@ tlso_init( void )
+ 	OPENSSL_init_ssl(0, NULL);
+ #endif
+ 
++#ifndef HAVE_WOLFSSL
+ 	/* FIXME: mod_ssl does this */
+ 	X509V3_add_standard_extensions();
++#endif
+ 
+ 	tlso_bio_method = tlso_bio_setup();
+ 
+@@ -262,7 +271,7 @@ static void
+ tlso_ctx_ref( tls_ctx *ctx )
+ {
+ 	tlso_ctx *c = (tlso_ctx *)ctx;
+-#if OPENSSL_VERSION_NUMBER < 0x10100000
++#if OPENSSL_VERSION_NUMBER < 0x10100000 && !defined(HAVE_WOLFSSL)
+ #define	SSL_CTX_up_ref(ctx)	CRYPTO_add( &(ctx->references), 1, CRYPTO_LOCK_SSL_CTX )
+ #endif
+ 	SSL_CTX_up_ref( c );
+@@ -458,8 +467,62 @@ tlso_ctx_init( struct ldapoptions *lo, s
+ 
+ 		if ( is_server ) {
+ 			STACK_OF(X509_NAME) *calist;
++/*
++ * tlso_ca_list calls SSL_add_dir_cert_subjects_to_stack, which wolfSSL hasn't
++ * implemented. However, since we've just added all the CA certs in
++ * lt->lt_cacertdir to the wolfSSL cert manager, we can just get them from
++ * there, which is what this #ifdef'd code does instead of tlso_ca_list.
++ */
++#ifdef HAVE_WOLFSSL
++			WOLFSSL_CERT_MANAGER* cert_manager = NULL;
++			STACK_OF(X509)* certs = NULL;
++			X509* x509;
++			X509_NAME* subj_name;
++			int i;
++
++			if ((calist = sk_X509_NAME_new_null()) == NULL) {
++				Debug0(LDAP_DEBUG_ANY, "TLS: could not create X509_NAME stack\n");
++				tlso_report_error();
++				return -1;
++			}
++			if ((cert_manager = wolfSSL_CTX_GetCertManager(ctx)) == NULL) {
++				Debug0(LDAP_DEBUG_ANY, "TLS: could not get cert manager\n");
++				sk_X509_NAME_pop_free(calist, NULL);
++				tlso_report_error();
++				return -1;
++			}
++
++			if ((certs = wolfSSL_CertManagerGetCerts(cert_manager)) == NULL) {
++				Debug0(LDAP_DEBUG_ANY, "TLS: could not load certs from cert "
++				      "manager\n");
++				sk_X509_NAME_pop_free(calist, NULL);
++				tlso_report_error();
++				return -1;
++			}
++
++			for (i = 0; i < sk_num(certs); ++i) {
++				x509 = sk_X509_value(certs, i);
++				if (X509_check_ca(x509)) {
++					subj_name = X509_NAME_dup(X509_get_subject_name(x509));
++					if (subj_name == NULL) {
++						Debug0(LDAP_DEBUG_ANY, "TLS: could not duplicate subject"
++						      " name\n");
++						sk_X509_NAME_pop_free(calist, NULL);
++						sk_X509_pop_free(certs, NULL);
++						tlso_report_error();
++						return -1;
++					}
++					else {
++						sk_X509_NAME_push(calist, subj_name);
++					}
++				}
++			}
++
++			sk_X509_pop_free(certs, NULL);
++#else
+ 			/* List of CA names to send to a client */
+ 			calist = tlso_ca_list( lt->lt_cacertfile, lt->lt_cacertdir, cert );
++#endif /* HAVE_WOLFSSL */
+ 			if ( !calist ) {
+ 				Debug2( LDAP_DEBUG_ANY, "TLS: "
+ 					"could not load client CA list (file:`%s',dir:`%s').\n",
+@@ -564,7 +627,7 @@ tlso_ctx_init( struct ldapoptions *lo, s
+ 	 * This is a NOP in OpenSSL 1.1.0 and later, where curves are always
+ 	 * auto-negotiated.
+ 	 */
+-#if OPENSSL_VERSION_NUMBER < 0x10100000UL
++#if OPENSSL_VERSION_NUMBER < 0x10100000UL && !defined(HAVE_WOLFSSL)
+ 		if ( SSL_CTX_set_ecdh_auto( ctx, 1 ) <= 0 ) {
+ 			Debug0( LDAP_DEBUG_ANY,
+ 				"TLS: could not enable automatic EC negotiation.\n" );
+@@ -689,13 +752,25 @@ tlso_session_my_dn( tls_session *sess, s
+ 	tlso_session *s = (tlso_session *)sess;
+ 	X509 *x;
+ 	X509_NAME *xn;
++#ifdef HAVE_WOLFSSL
++	int ret;
++	unsigned char *der_buf = NULL;
++#endif
+ 
+ 	x = SSL_get_certificate( s );
+ 
+ 	if (!x) return LDAP_INVALID_CREDENTIALS;
+ 	
+ 	xn = X509_get_subject_name(x);
+-#if OPENSSL_VERSION_NUMBER < 0x10100000
++#ifdef HAVE_WOLFSSL
++	/* der_buf is dynamically allocated, so callers of this function will need
++	   to free der_dn->bv_val. */
++	ret = i2d_X509_NAME(xn, &der_buf);
++	if (ret < 0)
++		return LDAP_INVALID_CREDENTIALS;
++	der_dn->bv_len = ret;
++	der_dn->bv_val = der_buf;
++#elif OPENSSL_VERSION_NUMBER < 0x10100000
+ 	der_dn->bv_len = i2d_X509_NAME( xn, NULL );
+ 	der_dn->bv_val = xn->bytes->data;
+ #else
+@@ -726,12 +801,24 @@ tlso_session_peer_dn( tls_session *sess,
+ 	tlso_session *s = (tlso_session *)sess;
+ 	X509 *x = tlso_get_cert( s );
+ 	X509_NAME *xn;
++#ifdef HAVE_WOLFSSL
++	unsigned char *der_buf = NULL;
++	int ret;
++#endif
+ 
+ 	if ( !x )
+ 		return LDAP_INVALID_CREDENTIALS;
+ 
+ 	xn = X509_get_subject_name(x);
+-#if OPENSSL_VERSION_NUMBER < 0x10100000
++#ifdef HAVE_WOLFSSL
++	/* der_buf is dynamically allocated, so callers of this function will need
++	   to free der_dn->bv_val. */
++	ret = i2d_X509_NAME(xn, &der_buf);
++	if (ret < 0)
++		return LDAP_INVALID_CREDENTIALS;
++	der_dn->bv_len = ret;
++	der_dn->bv_val = der_buf;
++#elif OPENSSL_VERSION_NUMBER < 0x10100000
+ 	der_dn->bv_len = i2d_X509_NAME( xn, NULL );
+ 	der_dn->bv_val = xn->bytes->data;
+ #else
+@@ -1021,18 +1108,23 @@ tlso_session_endpoint( tls_session *sess
+ #endif
+ 
+ 	/* See RFC 5929 */
+-	if ( md == NULL ||
+-	     md == EVP_md_null() ||
++	if ( md == NULL
++#ifndef HAVE_WOLFSSL
++	     || md == EVP_md_null()
+ #ifndef OPENSSL_NO_MD2
+-	     md == EVP_md2() ||
++	     || md == EVP_md2()
+ #endif
+-#ifndef OPENSSL_NO_MD4
+-	     md == EVP_md4() ||
++#endif /* HAVE_WOLFSSL */
++#if !defined(OPENSSL_NO_MD4) && !defined(NO_MD4)
++	     || md == EVP_md4()
+ #endif
+-#ifndef OPENSSL_NO_MD5
+-	     md == EVP_md5() ||
++#if !defined(OPENSSL_NO_MD5) && !defined(NO_MD5)
++	     || md == EVP_md5()
+ #endif
+-	     md == EVP_sha1() )
++#if !defined(NO_SHA)
++	     || md == EVP_sha1()
++#endif
++	   )
+ 		md = EVP_sha256();
+ 
+ 	if ( !X509_digest( cert, md, (unsigned char *) (buf->bv_val), &md_len ))
+@@ -1165,7 +1257,7 @@ struct tls_data {
+ 	Sockbuf_IO_Desc		*sbiod;
+ };
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x10100000
++#if OPENSSL_VERSION_NUMBER < 0x10100000 && !defined(HAVE_WOLFSSL)
+ #define BIO_set_init(b, x)	b->init = x
+ #define BIO_set_data(b, x)	b->ptr = x
+ #define BIO_clear_flags(b, x)	b->flags &= ~(x)
+@@ -1685,4 +1777,4 @@ tls_impl ldap_int_tls_impl = {
+ 	0
+ };
+ 
+-#endif /* HAVE_OPENSSL */
++#endif /* HAVE_OPENSSL || HAVE_WOLFSSL */
+--- ./servers/slapd/bconfig.c.dist	2022-07-14 12:09:57.000000000 -0500
++++ ./servers/slapd/bconfig.c	2024-06-28 23:22:31.922765023 -0500
+@@ -840,7 +840,7 @@ static ConfigTable config_back_cf_table[
+ 			"EQUALITY caseExactMatch "
+ 			"SYNTAX OMsDirectoryString SINGLE-VALUE )", NULL, NULL },
+ 	{ "TLSCRLCheck", NULL, 2, 2, 0,
+-#if defined(HAVE_TLS) && defined(HAVE_OPENSSL)
++#if defined(HAVE_TLS) && (defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL))
+ 		CFG_TLS_CRLCHECK|ARG_STRING|ARG_MAGIC, &config_tls_config,
+ #else
+ 		ARG_IGNORED, NULL,
+--- ./servers/slapd/config.c.dist	2022-07-14 12:09:57.000000000 -0500
++++ ./servers/slapd/config.c	2024-06-28 23:24:18.354732473 -0500
+@@ -1546,7 +1546,7 @@ static slap_cf_aux_table bindkey[] = {
+ 	{ BER_BVC("tls_cipher_suite="), offsetof(slap_bindconf, sb_tls_cipher_suite), 's', 0, NULL },
+ 	{ BER_BVC("tls_protocol_min="), offsetof(slap_bindconf, sb_tls_protocol_min), 's', 0, NULL },
+ 	{ BER_BVC("tls_ecname="), offsetof(slap_bindconf, sb_tls_ecname), 's', 0, NULL },
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 	{ BER_BVC("tls_crlcheck="), offsetof(slap_bindconf, sb_tls_crlcheck), 's', 0, NULL },
+ #endif
+ #endif
+@@ -1927,7 +1927,7 @@ void bindconf_free( slap_bindconf *bc )
+ 		ch_free( bc->sb_tls_ecname );
+ 		bc->sb_tls_ecname = NULL;
+ 	}
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 	if ( bc->sb_tls_crlcheck ) {
+ 		ch_free( bc->sb_tls_crlcheck );
+ 		bc->sb_tls_crlcheck = NULL;
+@@ -2049,7 +2049,7 @@ int bindconf_tls_set( slap_bindconf *bc,
+ 			} else
+ 				newctx = 1;
+ 		}
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 		if ( bc->sb_tls_crlcheck ) {
+ 			rc = ldap_pvt_tls_config( ld, LDAP_OPT_X_TLS_CRLCHECK,
+ 				bc->sb_tls_crlcheck );
+--- ./servers/slapd/slap.h.dist	2022-07-14 12:09:57.000000000 -0500
++++ ./servers/slapd/slap.h	2024-06-28 23:24:47.803285105 -0500
+@@ -1661,7 +1661,7 @@ typedef struct slap_bindconf {
+ 	char *sb_tls_cipher_suite;
+ 	char *sb_tls_protocol_min;
+ 	char *sb_tls_ecname;
+-#ifdef HAVE_OPENSSL
++#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
+ 	char *sb_tls_crlcheck;
+ #endif
+ 	int sb_tls_int_reqcert;
