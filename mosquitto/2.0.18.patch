@@ -1,6 +1,6 @@
-From 8a826473d2e0230ab706be2907befe5782f0a99a Mon Sep 17 00:00:00 2001
+From bb61558a454e55464469346727cdb7ac2d6db7c1 Mon Sep 17 00:00:00 2001
 From: Eric Blankenhorn <eric@wolfssl.com>
-Date: Fri, 28 Jun 2024 14:19:46 -0500
+Date: Mon, 15 Jul 2024 17:03:29 -0500
 Subject: [PATCH] Enable using wolfSSL for TLS
 
 Changes:
@@ -12,6 +12,7 @@ Changes:
 - Makefiles to use either OpenSSL or wolfSSL
 - Test scripts for non-passing tests (TODO fix tests)
 - `server.crt` created chain with CA since wolfSSL only sends a single cert
+- Tests to not specify invalid CA dir
 
 ---
 wolfSSL
@@ -38,21 +39,25 @@ make WITH_TLS=wolfssl ptest
 ```
 
 ---
- README.md                         |   1 +
- apps/mosquitto_ctrl/Makefile      |   4 +-
- apps/mosquitto_passwd/Makefile    |   4 +-
- config.mk                         |  20 ++++++
- lib/net_mosq.c                    |  15 ++++-
- lib/net_mosq.h                    |   2 +
- lib/net_mosq_ocsp.c               |   2 +
- plugins/dynamic-security/Makefile |   4 +-
- test/broker/Makefile              |   4 +-
- test/broker/test.py               |  36 +++++------
- test/lib/Makefile                 |   2 +-
- test/lib/c/Makefile               |   2 +-
- test/lib/test.py                  |   6 +-
- test/ssl/server.crt               | 102 ++++++++++++++++++++++++++++++
- 14 files changed, 170 insertions(+), 34 deletions(-)
+ README.md                                     |   1 +
+ apps/mosquitto_ctrl/Makefile                  |   4 +-
+ apps/mosquitto_passwd/Makefile                |   4 +-
+ config.mk                                     |  20 ++++
+ lib/net_mosq.c                                |  15 ++-
+ lib/net_mosq.h                                |   2 +
+ lib/net_mosq_ocsp.c                           |   2 +
+ plugins/dynamic-security/Makefile             |   4 +-
+ test/broker/Makefile                          |   4 +-
+ test/broker/test.py                           |  32 +++---
+ test/lib/Makefile                             |   2 +-
+ ...connect-cert-auth-custom-ssl-ctx-default.c |   2 +-
+ .../08-ssl-connect-cert-auth-custom-ssl-ctx.c |   2 +-
+ test/lib/c/08-ssl-connect-cert-auth-enc.c     |   2 +-
+ test/lib/c/08-ssl-connect-cert-auth.c         |   2 +-
+ test/lib/c/Makefile                           |   7 ++
+ test/lib/test.py                              |   6 +-
+ test/ssl/server.crt                           | 102 ++++++++++++++++++
+ 18 files changed, 178 insertions(+), 35 deletions(-)
 
 diff --git a/README.md b/README.md
 index c584394c..8107dd90 100644
@@ -277,15 +282,11 @@ index e66c7ffc..5e26fff5 100644
  	./14-dynsec-acl.py
  	./14-dynsec-anon-group.py
 diff --git a/test/broker/test.py b/test/broker/test.py
-index e8956408..fe6b687f 100755
+index e8956408..aa04b3a9 100755
 --- a/test/broker/test.py
 +++ b/test/broker/test.py
-@@ -122,10 +122,10 @@ tests = [
-     (1, './07-will-reconnect-1273.py'),
-     (1, './07-will-takeover.py'),
- 
--    (2, './08-ssl-bridge.py'),
-+#    (2, './08-ssl-bridge.py'),
+@@ -125,7 +125,7 @@ tests = [
+     (2, './08-ssl-bridge.py'),
      (2, './08-ssl-connect-cert-auth-crl.py'),
      (2, './08-ssl-connect-cert-auth-expired.py'),
 -    (2, './08-ssl-connect-cert-auth-revoked.py'),
@@ -293,15 +294,6 @@ index e8956408..fe6b687f 100755
      (2, './08-ssl-connect-cert-auth-without.py'),
      (2, './08-ssl-connect-cert-auth.py'),
      (2, './08-ssl-connect-identity.py'),
-@@ -134,7 +134,7 @@ tests = [
-     (2, './08-ssl-connect-no-identity.py'),
-     (1, './08-ssl-hup-disconnect.py'),
-     (2, './08-tls-psk-pub.py'),
--    (3, './08-tls-psk-bridge.py'),
-+#    (3, './08-tls-psk-bridge.py'),
- 
-     (1, './09-acl-access-variants.py'),
-     (1, './09-acl-change.py'),
 @@ -184,21 +184,21 @@ tests = [
      (1, './13-malformed-subscribe-v5.py'),
      (1, './13-malformed-unsubscribe-v5.py'),
@@ -352,19 +344,76 @@ index 6ade78d0..a9f9b937 100644
  	#./08-ssl-fake-cacert.py $@/08-ssl-fake-cacert.test
  	./08-ssl-bad-cacert.py $@/08-ssl-bad-cacert.test
  	./08-ssl-connect-cert-auth-enc.py $@/08-ssl-connect-cert-auth-enc.test
+diff --git a/test/lib/c/08-ssl-connect-cert-auth-custom-ssl-ctx-default.c b/test/lib/c/08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
+index f92fcb9c..3492b4fe 100644
+--- a/test/lib/c/08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
++++ b/test/lib/c/08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
+@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
+ 	mosquitto_int_option(mosq, MOSQ_OPT_SSL_CTX_WITH_DEFAULTS, 1);
+ 	mosquitto_void_option(mosq, MOSQ_OPT_SSL_CTX, ssl_ctx);
+ 
+-	mosquitto_tls_set(mosq, "../ssl/test-root-ca.crt", "../ssl/certs", "../ssl/client.crt", "../ssl/client.key", NULL);
++	mosquitto_tls_set(mosq, "../ssl/test-root-ca.crt", NULL, "../ssl/client.crt", "../ssl/client.key", NULL);
+ 	mosquitto_connect_callback_set(mosq, on_connect);
+ 	mosquitto_disconnect_callback_set(mosq, on_disconnect);
+ 
+diff --git a/test/lib/c/08-ssl-connect-cert-auth-custom-ssl-ctx.c b/test/lib/c/08-ssl-connect-cert-auth-custom-ssl-ctx.c
+index e0fe94ef..7dce5b46 100644
+--- a/test/lib/c/08-ssl-connect-cert-auth-custom-ssl-ctx.c
++++ b/test/lib/c/08-ssl-connect-cert-auth-custom-ssl-ctx.c
+@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
+ 	if(mosq == NULL){
+ 		return 1;
+ 	}
+-	mosquitto_tls_set(mosq, "../ssl/test-root-ca.crt", "../ssl/certs", "../ssl/client.crt", "../ssl/client.key", NULL);
++	mosquitto_tls_set(mosq, "../ssl/test-root-ca.crt", NULL, "../ssl/client.crt", "../ssl/client.key", NULL);
+ 	mosquitto_connect_callback_set(mosq, on_connect);
+ 	mosquitto_disconnect_callback_set(mosq, on_disconnect);
+ 
+diff --git a/test/lib/c/08-ssl-connect-cert-auth-enc.c b/test/lib/c/08-ssl-connect-cert-auth-enc.c
+index 6d72bb06..3fd40d14 100644
+--- a/test/lib/c/08-ssl-connect-cert-auth-enc.c
++++ b/test/lib/c/08-ssl-connect-cert-auth-enc.c
+@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
+ 	if(mosq == NULL){
+ 		return 1;
+ 	}
+-	mosquitto_tls_set(mosq, "../ssl/test-root-ca.crt", "../ssl/certs", "../ssl/client-encrypted.crt", "../ssl/client-encrypted.key", password_callback);
++	mosquitto_tls_set(mosq, "../ssl/test-root-ca.crt", NULL, "../ssl/client-encrypted.crt", "../ssl/client-encrypted.key", password_callback);
+ 	mosquitto_connect_callback_set(mosq, on_connect);
+ 	mosquitto_disconnect_callback_set(mosq, on_disconnect);
+ 
+diff --git a/test/lib/c/08-ssl-connect-cert-auth.c b/test/lib/c/08-ssl-connect-cert-auth.c
+index 6d5134be..1be50071 100644
+--- a/test/lib/c/08-ssl-connect-cert-auth.c
++++ b/test/lib/c/08-ssl-connect-cert-auth.c
+@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
+ 	if(mosq == NULL){
+ 		return 1;
+ 	}
+-	mosquitto_tls_set(mosq, "../ssl/test-root-ca.crt", "../ssl/certs", "../ssl/client.crt", "../ssl/client.key", NULL);
++	mosquitto_tls_set(mosq, "../ssl/test-root-ca.crt", NULL, "../ssl/client.crt", "../ssl/client.key", NULL);
+ 	mosquitto_connect_callback_set(mosq, on_connect);
+ 	mosquitto_disconnect_callback_set(mosq, on_disconnect);
+ 
 diff --git a/test/lib/c/Makefile b/test/lib/c/Makefile
-index 40cb7d15..13607d83 100644
+index 40cb7d15..85ad765c 100644
 --- a/test/lib/c/Makefile
 +++ b/test/lib/c/Makefile
-@@ -57,7 +57,7 @@ SRC = \
- 	11-prop-send-payload-format.c \
- 	11-prop-send-content-type.c
- 
--ifeq ($(WITH_TLS),yes)
-+ifneq ($(WITH_TLS),no)
- SRC += \
- 	08-ssl-connect-cert-auth-custom-ssl-ctx.c \
+@@ -63,6 +63,13 @@ SRC += \
  	08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
+ LIBS += -lssl -lcrypto
+ endif
++ifeq ($(WITH_TLS),wolfssl)
++SRC += \
++	08-ssl-connect-cert-auth-custom-ssl-ctx.c \
++	08-ssl-connect-cert-auth-custom-ssl-ctx-default.c
++CFLAGS += -DWITH_TLS -DOPENSSL_NO_ENGINE -I$(WOLFSSLDIR)/include -I$(WOLFSSLDIR)/include/wolfssl -DEXTERNAL_OPTS_OPENVPN -DUSE_WOLFSSL
++LIBS += -lwolfssl
++endif
+ 
+ TESTS = ${SRC:.c=.test}
+ 
 diff --git a/test/lib/test.py b/test/lib/test.py
 index 6f06c3f7..c3743fd6 100755
 --- a/test/lib/test.py
