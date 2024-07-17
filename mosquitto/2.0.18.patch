@@ -1,4 +1,4 @@
-From e7b8afdf618e6a7a6223015ef3f99de8014434f0 Mon Sep 17 00:00:00 2001
+From 66104b3d777ad4599aa5a7ac108e350c9f282508 Mon Sep 17 00:00:00 2001
 From: Eric Blankenhorn <eric@wolfssl.com>
 Date: Tue, 16 Jul 2024 11:37:22 -0500
 Subject: [PATCH] Enable using wolfSSL for TLS
@@ -49,6 +49,7 @@ make WITH_TLS=wolfssl ptest
  plugins/dynamic-security/Makefile             |   4 +-
  test/broker/Makefile                          |   4 +-
  test/broker/test.py                           |  32 +++---
+ test/lib/02-subscribe-qos1.py                 |   2 +-
  test/lib/02-subscribe-qos2.py                 |   2 +-
  test/lib/Makefile                             |   2 +-
  ...connect-cert-auth-custom-ssl-ctx-default.c |   2 +-
@@ -58,7 +59,7 @@ make WITH_TLS=wolfssl ptest
  test/lib/c/Makefile                           |   7 ++
  test/lib/test.py                              |   6 +-
  test/ssl/server.crt                           | 102 ++++++++++++++++++
- 19 files changed, 179 insertions(+), 36 deletions(-)
+ 20 files changed, 180 insertions(+), 37 deletions(-)
 
 diff --git a/README.md b/README.md
 index c584394c..8107dd90 100644
@@ -332,6 +333,19 @@ index e8956408..ab95753f 100755
      ]
  
  ptest.run_tests(tests)
+diff --git a/test/lib/02-subscribe-qos1.py b/test/lib/02-subscribe-qos1.py
+index 04be887f..5a8131c9 100755
+--- a/test/lib/02-subscribe-qos1.py
++++ b/test/lib/02-subscribe-qos1.py
+@@ -27,7 +27,7 @@ mid = 1
+ subscribe_packet = mosq_test.gen_subscribe(mid, "qos1/test", 1)
+ suback_packet = mosq_test.gen_suback(mid, 1)
+ 
+-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
++sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+ sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+ sock.settimeout(10)
+ sock.bind(('', port))
 diff --git a/test/lib/02-subscribe-qos2.py b/test/lib/02-subscribe-qos2.py
 index 14beb49b..9871d134 100755
 --- a/test/lib/02-subscribe-qos2.py
