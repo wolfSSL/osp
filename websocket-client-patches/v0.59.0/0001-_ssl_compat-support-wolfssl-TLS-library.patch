@@ -1,0 +1,207 @@
+From e082217d7004622a94227b0d39763f1abfc47683 Mon Sep 17 00:00:00 2001
+From: Marco Oliverio <marco@wolfssl.com>
+Date: Mon, 22 Jul 2024 14:42:25 +0000
+Subject: [PATCH] _ssl_compat: support wolfssl TLS library
+
+---
+ websocket/_core.py                |  2 +-
+ websocket/_http.py                | 12 ++++++------
+ websocket/_ssl_compat.py          | 19 ++++++++++++++++++-
+ websocket/_url.py                 |  2 +-
+ websocket/tests/test_websocket.py | 13 ++++++++++---
+ websocket/tests/test_wolfssl.py   |  9 +++++++++
+ 6 files changed, 45 insertions(+), 12 deletions(-)
+ create mode 100644 websocket/tests/test_wolfssl.py
+
+diff --git a/websocket/_core.py b/websocket/_core.py
+index 1ff80f0..1232455 100644
+--- a/websocket/_core.py
++++ b/websocket/_core.py
+@@ -197,7 +197,7 @@ class WebSocket(object):
+             return None
+ 
+     def is_ssl(self):
+-        return isinstance(self.sock, ssl.SSLSocket)
++        return isinstance(self.sock, get_ssl().SSLSocket)
+ 
+     headers = property(getheaders)
+ 
+diff --git a/websocket/_http.py b/websocket/_http.py
+index b0dad48..833d1ad 100644
+--- a/websocket/_http.py
++++ b/websocket/_http.py
+@@ -208,15 +208,15 @@ def _can_use_sni():
+ 
+ 
+ def _wrap_sni_socket(sock, sslopt, hostname, check_hostname):
+-    context = ssl.SSLContext(sslopt.get('ssl_version', ssl.PROTOCOL_SSLv23))
++    context = get_ssl().SSLContext(sslopt.get('ssl_version', get_ssl().PROTOCOL_SSLv23))
+ 
+-    if sslopt.get('cert_reqs', ssl.CERT_NONE) != ssl.CERT_NONE:
++    if sslopt.get('cert_reqs', get_ssl().CERT_NONE) != get_ssl().CERT_NONE:
+         cafile = sslopt.get('ca_certs', None)
+         capath = sslopt.get('ca_cert_path', None)
+         if cafile or capath:
+             context.load_verify_locations(cafile=cafile, capath=capath)
+         elif hasattr(context, 'load_default_certs'):
+-            context.load_default_certs(ssl.Purpose.SERVER_AUTH)
++            context.load_default_certs(get_ssl().Purpose.SERVER_AUTH)
+     if sslopt.get('certfile', None):
+         context.load_cert_chain(
+             sslopt['certfile'],
+@@ -245,7 +245,7 @@ def _wrap_sni_socket(sock, sslopt, hostname, check_hostname):
+ 
+ 
+ def _ssl_socket(sock, user_sslopt, hostname):
+-    sslopt = dict(cert_reqs=ssl.CERT_REQUIRED)
++    sslopt = dict(cert_reqs=get_ssl().CERT_REQUIRED)
+     sslopt.update(user_sslopt)
+ 
+     certPath = os.environ.get('WEBSOCKET_CLIENT_CA_BUNDLE')
+@@ -257,14 +257,14 @@ def _ssl_socket(sock, user_sslopt, hostname):
+             and user_sslopt.get('ca_cert_path', None) is None:
+         sslopt['ca_cert_path'] = certPath
+ 
+-    check_hostname = sslopt["cert_reqs"] != ssl.CERT_NONE and sslopt.pop(
++    check_hostname = sslopt["cert_reqs"] != get_ssl().CERT_NONE and sslopt.pop(
+         'check_hostname', True)
+ 
+     if _can_use_sni():
+         sock = _wrap_sni_socket(sock, sslopt, hostname, check_hostname)
+     else:
+         sslopt.pop('check_hostname', True)
+-        sock = ssl.wrap_socket(sock, **sslopt)
++        sock = get_ssl().wrap_socket(sock, **sslopt)
+ 
+     if not HAVE_CONTEXT_CHECK_HOSTNAME and check_hostname:
+         match_hostname(sock.getpeercert(), hostname)
+diff --git a/websocket/_ssl_compat.py b/websocket/_ssl_compat.py
+index 9e201dd..0fc9132 100644
+--- a/websocket/_ssl_compat.py
++++ b/websocket/_ssl_compat.py
+@@ -18,7 +18,9 @@ Copyright (C) 2010 Hiroki Ohtani(liris)
+     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ 
+ """
+-__all__ = ["HAVE_SSL", "ssl", "SSLError", "SSLWantReadError", "SSLWantWriteError"]
++__all__ = ["HAVE_SSL", "ssl", "SSLError", "SSLWantReadError", "SSLWantWriteError", "get_ssl", "inject_wolfssl", "extract_wolfssl"]
++
++SSL_MODULE=None
+ 
+ try:
+     import ssl
+@@ -37,6 +39,8 @@ try:
+     __all__.append("HAVE_CONTEXT_CHECK_HOSTNAME")
+ 
+     HAVE_SSL = True
++    SSL_MODULE = ssl
++
+ except ImportError:
+     # dummy class of SSLError for ssl none-support environment.
+     class SSLError(Exception):
+@@ -51,3 +55,16 @@ except ImportError:
+     ssl = None
+ 
+     HAVE_SSL = False
++
++def get_ssl():
++    return SSL_MODULE
++
++def inject_wolfssl():
++    import wolfssl
++    global SSL_MODULE
++    SSL_MODULE = wolfssl
++
++def extract_wolfssl():
++    global SSL_MODULE
++    SSL_MODULE = ssl
++
+diff --git a/websocket/_url.py b/websocket/_url.py
+index 92ff939..77f8f83 100644
+--- a/websocket/_url.py
++++ b/websocket/_url.py
+@@ -60,7 +60,7 @@ def parse_url(url):
+     if scheme == "ws":
+         if not port:
+             port = 80
+-    elif scheme == "wss":
++    elif scheme == "wss" or scheme == "https":
+         is_secure = True
+         if not port:
+             port = 443
+diff --git a/websocket/tests/test_websocket.py b/websocket/tests/test_websocket.py
+index 0d1d639..f1d0485 100644
+--- a/websocket/tests/test_websocket.py
++++ b/websocket/tests/test_websocket.py
+@@ -40,6 +40,7 @@ from websocket._handshake import _create_sec_websocket_key, \
+     _validate as _validate_header
+ from websocket._http import read_headers
+ from websocket._utils import validate_utf8
++from websocket._ssl_compat import get_ssl
+ 
+ if six.PY3:
+     from base64 import decodebytes as base64decode
+@@ -214,14 +215,16 @@ class WebSocketTest(unittest.TestCase):
+     @unittest.skipUnless(TEST_WITH_INTERNET, "Internet-requiring tests are disabled")
+     def testIter(self):
+         count = 2
+-        for _ in ws.create_connection('wss://stream.meetup.com/2/rsvps'):
++        s = ws.create_connection("wss://api.bitfinex.com/ws/2")
++        s.send('{"event": "subscribe", "channel": "ticker"}')
++        for _ in s:
+             count -= 1
+             if count == 0:
+                 break
+ 
+     @unittest.skipUnless(TEST_WITH_INTERNET, "Internet-requiring tests are disabled")
+     def testNext(self):
+-        sock = ws.create_connection('wss://stream.meetup.com/2/rsvps')
++        sock = ws.create_connection('wss://api.bitfinex.com/ws/2')
+         self.assertEqual(str, type(next(sock)))
+ 
+     def testInternalRecvStrict(self):
+@@ -362,6 +365,8 @@ class WebSocketTest(unittest.TestCase):
+     def testWebSocket(self):
+         s = ws.create_connection("ws://echo.websocket.org/")
+         self.assertNotEqual(s, None)
++        # consume Request served by line sent by the server
++        s.recv()
+         s.send("Hello, World")
+         result = s.recv()
+         self.assertEqual(result, "Hello, World")
+@@ -385,7 +390,7 @@ class WebSocketTest(unittest.TestCase):
+         import ssl
+         s = ws.create_connection("wss://api.bitfinex.com/ws/2")
+         self.assertNotEqual(s, None)
+-        self.assertTrue(isinstance(s.sock, ssl.SSLSocket))
++        self.assertTrue(isinstance(s.sock, get_ssl().SSLSocket))
+         self.assertEqual(s.getstatus(), 101)
+         self.assertNotEqual(s.getheaders(), None)
+         s.close()
+@@ -395,6 +400,8 @@ class WebSocketTest(unittest.TestCase):
+         s = ws.create_connection("ws://echo.websocket.org/",
+                                  headers={"User-Agent": "PythonWebsocketClient"})
+         self.assertNotEqual(s, None)
++        # consume Request served by line sent by the server
++        s.recv()
+         s.send("Hello, World")
+         result = s.recv()
+         self.assertEqual(result, "Hello, World")
+diff --git a/websocket/tests/test_wolfssl.py b/websocket/tests/test_wolfssl.py
+new file mode 100644
+index 0000000..15f707c
+--- /dev/null
++++ b/websocket/tests/test_wolfssl.py
+@@ -0,0 +1,9 @@
++import websocket._ssl_compat as _ssl_compat
++
++def setup_module():
++    _ssl_compat.inject_wolfssl()
++
++from websocket.tests.test_websocket import WebSocketTest
++
++def teardown_module():
++    _ssl_compat.extract_wolfssl()
+-- 
+2.45.2
+
