@@ -1,5 +1,7 @@
---- ./configure.ac.dist	2024-06-27 14:12:57.208730246 -0500
-+++ ./configure.ac	2024-06-28 18:25:48.098005947 -0500
+diff --git a/configure.ac b/configure.ac
+index 15bca89511..86598700c5 100644
+--- a/configure.ac
++++ b/configure.ac
 @@ -248,8 +248,8 @@ OL_ARG_WITH(threads,
  	[AS_HELP_STRING([--with-threads], [with threads library auto|nt|posix|pth|lwp|manual])],
  	auto, [auto nt posix pth lwp yes no manual] )
@@ -54,8 +56,10 @@
  WITH_TLS=no
  if test $ol_link_tls = yes ; then
  	AC_DEFINE(HAVE_TLS, 1, [define if you have TLS])
---- ./libraries/libldap/init.c.dist	2022-07-14 12:09:57.000000000 -0500
-+++ ./libraries/libldap/init.c	2024-06-28 18:26:47.932111333 -0500
+diff --git a/libraries/libldap/init.c b/libraries/libldap/init.c
+index a2409d743b..c3e8802be0 100644
+--- a/libraries/libldap/init.c
++++ b/libraries/libldap/init.c
 @@ -133,7 +133,7 @@ static const struct ol_attribute {
  	{0, ATTR_TLS,	"TLS_PEERKEY_HASH",	NULL,	LDAP_OPT_X_TLS_PEERKEY_HASH},
  	{0, ATTR_TLS,	"TLS_ECNAME",		NULL,	LDAP_OPT_X_TLS_ECNAME},
@@ -65,9 +69,11 @@
  	{0, ATTR_TLS,	"TLS_CRLCHECK",		NULL,	LDAP_OPT_X_TLS_CRLCHECK},
  #endif
  #ifdef HAVE_GNUTLS
---- ./libraries/libldap/tls2.c.dist	2022-07-14 12:09:57.000000000 -0500
-+++ ./libraries/libldap/tls2.c	2024-06-28 18:29:52.489078514 -0500
-@@ -538,6 +538,10 @@ ldap_pvt_tls_get_peer_dn( void *s, struc
+diff --git a/libraries/libldap/tls2.c b/libraries/libldap/tls2.c
+index 4a5d42b297..9bdde04a35 100644
+--- a/libraries/libldap/tls2.c
++++ b/libraries/libldap/tls2.c
+@@ -538,6 +538,10 @@ ldap_pvt_tls_get_peer_dn( void *s, struct berval *dn,
  
  	rc = ldap_X509dn2bv( &bvdn, dn, 
  			    (LDAPDN_rewrite_func *)func, flags);
@@ -78,7 +84,7 @@
  	return rc;
  }
  
-@@ -633,7 +637,7 @@ ldap_pvt_tls_config( LDAP *ld, int optio
+@@ -633,7 +637,7 @@ ldap_pvt_tls_config( LDAP *ld, int option, const char *arg )
  		}
  		return ldap_pvt_tls_set_option( ld, option, &i );
  		}
@@ -87,7 +93,7 @@
  	case LDAP_OPT_X_TLS_CRLCHECK:	/* OpenSSL only */
  		i = -1;
  		if ( strcasecmp( arg, "none" ) == 0 ) {
-@@ -723,7 +727,7 @@ ldap_pvt_tls_get_option( LDAP *ld, int o
+@@ -723,7 +727,7 @@ ldap_pvt_tls_get_option( LDAP *ld, int option, void *arg )
  	case LDAP_OPT_X_TLS_REQUIRE_SAN:
  		*(int *)arg = lo->ldo_tls_require_san;
  		break;
@@ -96,7 +102,7 @@
  	case LDAP_OPT_X_TLS_CRLCHECK:	/* OpenSSL only */
  		*(int *)arg = lo->ldo_tls_crlcheck;
  		break;
-@@ -944,7 +948,7 @@ ldap_pvt_tls_set_option( LDAP *ld, int o
+@@ -944,7 +948,7 @@ ldap_pvt_tls_set_option( LDAP *ld, int option, void *arg )
  			return 0;
  		}
  		return -1;
@@ -105,7 +111,7 @@
  	case LDAP_OPT_X_TLS_CRLCHECK:	/* OpenSSL only */
  		if ( !arg ) return -1;
  		switch( *(int *) arg ) {
-@@ -1236,8 +1240,13 @@ ldap_pvt_tls_get_my_dn( void *s, struct
+@@ -1236,8 +1240,13 @@ ldap_pvt_tls_get_my_dn( void *s, struct berval *dn, LDAPDN_rewrite_dummy *func,
  	int rc;
  
  	rc = tls_imp->ti_session_my_dn( session, &der_dn );
@@ -120,8 +126,10 @@
  	return rc;
  }
  
---- ./libraries/libldap/tls_o.c.dist	2022-07-14 12:09:57.000000000 -0500
-+++ ./libraries/libldap/tls_o.c	2024-06-29 11:42:47.505895228 -0500
+diff --git a/libraries/libldap/tls_o.c b/libraries/libldap/tls_o.c
+index 834d9867c0..8a38374803 100644
+--- a/libraries/libldap/tls_o.c
++++ b/libraries/libldap/tls_o.c
 @@ -18,7 +18,7 @@
  
  #include "portable.h"
@@ -157,7 +165,7 @@
  #define ASN1_STRING_data(x)	ASN1_STRING_get0_data(x)
  #endif
  
-@@ -87,7 +92,7 @@ static void tlso_locking_cb( int mode, i
+@@ -87,7 +92,7 @@ static void tlso_locking_cb( int mode, int type, const char *file, int line )
  	}
  }
  
@@ -183,7 +191,7 @@
  static STACK_OF(X509_NAME) *
  tlso_ca_list( char * bundle, char * dir, X509 *cert )
  {
-@@ -195,6 +201,7 @@ tlso_ca_list( char * bundle, char * dir,
+@@ -195,6 +201,7 @@ tlso_ca_list( char * bundle, char * dir, X509 *cert )
  	}
  	return ca_list;
  }
@@ -211,7 +219,7 @@
  #define	SSL_CTX_up_ref(ctx)	CRYPTO_add( &(ctx->references), 1, CRYPTO_LOCK_SSL_CTX )
  #endif
  	SSL_CTX_up_ref( c );
-@@ -458,8 +467,62 @@ tlso_ctx_init( struct ldapoptions *lo, s
+@@ -458,8 +467,62 @@ tlso_ctx_init( struct ldapoptions *lo, struct ldaptls *lt, int is_server )
  
  		if ( is_server ) {
  			STACK_OF(X509_NAME) *calist;
@@ -274,7 +282,7 @@
  			if ( !calist ) {
  				Debug2( LDAP_DEBUG_ANY, "TLS: "
  					"could not load client CA list (file:`%s',dir:`%s').\n",
-@@ -564,7 +627,7 @@ tlso_ctx_init( struct ldapoptions *lo, s
+@@ -564,7 +627,7 @@ tlso_ctx_init( struct ldapoptions *lo, struct ldaptls *lt, int is_server )
  	 * This is a NOP in OpenSSL 1.1.0 and later, where curves are always
  	 * auto-negotiated.
  	 */
@@ -283,7 +291,7 @@
  		if ( SSL_CTX_set_ecdh_auto( ctx, 1 ) <= 0 ) {
  			Debug0( LDAP_DEBUG_ANY,
  				"TLS: could not enable automatic EC negotiation.\n" );
-@@ -689,13 +752,25 @@ tlso_session_my_dn( tls_session *sess, s
+@@ -689,13 +752,25 @@ tlso_session_my_dn( tls_session *sess, struct berval *der_dn )
  	tlso_session *s = (tlso_session *)sess;
  	X509 *x;
  	X509_NAME *xn;
@@ -310,7 +318,7 @@
  	der_dn->bv_len = i2d_X509_NAME( xn, NULL );
  	der_dn->bv_val = xn->bytes->data;
  #else
-@@ -726,12 +801,24 @@ tlso_session_peer_dn( tls_session *sess,
+@@ -726,12 +801,24 @@ tlso_session_peer_dn( tls_session *sess, struct berval *der_dn )
  	tlso_session *s = (tlso_session *)sess;
  	X509 *x = tlso_get_cert( s );
  	X509_NAME *xn;
@@ -336,7 +344,15 @@
  	der_dn->bv_len = i2d_X509_NAME( xn, NULL );
  	der_dn->bv_val = xn->bytes->data;
  #else
-@@ -1021,18 +1108,23 @@ tlso_session_endpoint( tls_session *sess
+@@ -1014,25 +1101,30 @@ tlso_session_endpoint( tls_session *sess, struct berval *buf, int is_server )
+ 	if ( cert == NULL )
+ 		return 0;
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000
++#if OPENSSL_VERSION_NUMBER >= 0x10100000 || defined(HAVE_WOLFSSL)
+ 	md = EVP_get_digestbynid( X509_get_signature_nid( cert ));
+ #else
+ 	md = EVP_get_digestbynid(OBJ_obj2nid( cert->sig_alg->algorithm ));
  #endif
  
  	/* See RFC 5929 */
@@ -383,9 +399,11 @@
  
 -#endif /* HAVE_OPENSSL */
 +#endif /* HAVE_OPENSSL || HAVE_WOLFSSL */
---- ./servers/slapd/bconfig.c.dist	2022-07-14 12:09:57.000000000 -0500
-+++ ./servers/slapd/bconfig.c	2024-06-28 23:22:31.922765023 -0500
-@@ -840,7 +840,7 @@ static ConfigTable config_back_cf_table[
+diff --git a/servers/slapd/bconfig.c b/servers/slapd/bconfig.c
+index c5c69bab56..242633706e 100644
+--- a/servers/slapd/bconfig.c
++++ b/servers/slapd/bconfig.c
+@@ -840,7 +840,7 @@ static ConfigTable config_back_cf_table[] = {
  			"EQUALITY caseExactMatch "
  			"SYNTAX OMsDirectoryString SINGLE-VALUE )", NULL, NULL },
  	{ "TLSCRLCheck", NULL, 2, 2, 0,
@@ -394,8 +412,10 @@
  		CFG_TLS_CRLCHECK|ARG_STRING|ARG_MAGIC, &config_tls_config,
  #else
  		ARG_IGNORED, NULL,
---- ./servers/slapd/config.c.dist	2022-07-14 12:09:57.000000000 -0500
-+++ ./servers/slapd/config.c	2024-06-28 23:24:18.354732473 -0500
+diff --git a/servers/slapd/config.c b/servers/slapd/config.c
+index 8823c742c7..763c734289 100644
+--- a/servers/slapd/config.c
++++ b/servers/slapd/config.c
 @@ -1546,7 +1546,7 @@ static slap_cf_aux_table bindkey[] = {
  	{ BER_BVC("tls_cipher_suite="), offsetof(slap_bindconf, sb_tls_cipher_suite), 's', 0, NULL },
  	{ BER_BVC("tls_protocol_min="), offsetof(slap_bindconf, sb_tls_protocol_min), 's', 0, NULL },
@@ -405,7 +425,7 @@
  	{ BER_BVC("tls_crlcheck="), offsetof(slap_bindconf, sb_tls_crlcheck), 's', 0, NULL },
  #endif
  #endif
-@@ -1927,7 +1927,7 @@ void bindconf_free( slap_bindconf *bc )
+@@ -1927,7 +1927,7 @@ void bindconf_free( slap_bindconf *bc ) {
  		ch_free( bc->sb_tls_ecname );
  		bc->sb_tls_ecname = NULL;
  	}
@@ -414,7 +434,7 @@
  	if ( bc->sb_tls_crlcheck ) {
  		ch_free( bc->sb_tls_crlcheck );
  		bc->sb_tls_crlcheck = NULL;
-@@ -2049,7 +2049,7 @@ int bindconf_tls_set( slap_bindconf *bc,
+@@ -2049,7 +2049,7 @@ int bindconf_tls_set( slap_bindconf *bc, LDAP *ld )
  			} else
  				newctx = 1;
  		}
@@ -423,8 +443,10 @@
  		if ( bc->sb_tls_crlcheck ) {
  			rc = ldap_pvt_tls_config( ld, LDAP_OPT_X_TLS_CRLCHECK,
  				bc->sb_tls_crlcheck );
---- ./servers/slapd/slap.h.dist	2022-07-14 12:09:57.000000000 -0500
-+++ ./servers/slapd/slap.h	2024-06-28 23:24:47.803285105 -0500
+diff --git a/servers/slapd/slap.h b/servers/slapd/slap.h
+index 5cf2f4632d..f4afac3220 100644
+--- a/servers/slapd/slap.h
++++ b/servers/slapd/slap.h
 @@ -1661,7 +1661,7 @@ typedef struct slap_bindconf {
  	char *sb_tls_cipher_suite;
  	char *sb_tls_protocol_min;
@@ -434,3 +456,6 @@
  	char *sb_tls_crlcheck;
  #endif
  	int sb_tls_int_reqcert;
+-- 
+2.34.1
+

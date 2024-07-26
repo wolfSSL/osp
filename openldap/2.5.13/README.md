@@ -12,6 +12,9 @@
 + Compile everything else with `make`.
 + Install with `sudo make install`.
 
+# Testing
+The certificates used for testing in OpenLDAP have some issues (like using '0' for the serial number). To pass all the tests run with `make check` configure wolfSSL additionally with `CPPFLAGS=-DWOLFSSL_NO_ASN_STRICT`.
+
 # Example
 This example was built using information gathered from the following:
     + https://wiki.archlinux.org/index.php/OpenLDAP
