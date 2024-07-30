@@ -782,6 +782,10 @@ void tst_QSslWolfSSL::sessionCipher()
 
 void tst_QSslWolfSSL::peerCertificateChainToWWWpQTpIO()
 {
+    int n = 0;
+    QFile file(testDataDir + "www_qt_io_chain.info");
+    QList<QString> ch_cert_names;
+
     if (skip_peerCertificateChainToWWWpQTpIO)
         QSKIP("peerCertificateChainToWWWpQTpIO");
 
@@ -800,22 +804,32 @@ void tst_QSslWolfSSL::peerCertificateChainToWWWpQTpIO()
 
     QList<QSslCertificate> certChain = socket->peerCertificateChain();
     QCOMPARE(certChain.first(), socket->peerCertificate());
-    /* as of 2023.11.03. The server, which is "www.qt.io", returns 4 certs:
-    *  issuers : E1
-    *            ISRG Root X2
-    *            ISRG Root X1
-    *            DST Root CA X3
+
+    /* Expected certificate chain list is in the file, which is
+    *  www_qt_io_chain.info.
+    *  It needs to update the file if www.qt.io starts to give different
+    *  chain. It can be done by qt_website_chain.sh.
     */
-    QCOMPARE(certChain.count(), 4);
-    QCOMPARE(certChain.at(0).issuerDisplayName(), "E1");
-    QCOMPARE(certChain.at(1).issuerDisplayName(), "ISRG Root X2");
-    QCOMPARE(certChain.at(2).issuerDisplayName(), "ISRG Root X1");
-    QCOMPARE(certChain.at(3).issuerDisplayName(), "DST Root CA X3");
-    /*qDebug() << socket->peerCertificate().subjectDisplayName();
-    for (const QSslCertificate &cert : certChain){
-        qDebug() << cert.toText();
-        qDebug() << cert.subjectDisplayName() << " " << cert.serialNumber();
-    }*/
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "Failed to open www_qt_io_chain.info file." ;
+        return;
+    }
+    QTextStream in(&file);
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        qDebug() << n << " : " << line ;
+        ch_cert_names.append(line.trimmed());
+        n++;
+    }
+
+    QCOMPARE(certChain.count(), ch_cert_names.length());
+    n = 0;
+    for (const auto& cmn : ch_cert_names) {
+        QCOMPARE(certChain.at(n).
+            subjectInfo(QSslCertificate::CommonName).first(),
+                                                    cmn);
+        n++;
+    }
 
     socket->disconnectFromHost();
     QVERIFY(socket->waitForDisconnected());
