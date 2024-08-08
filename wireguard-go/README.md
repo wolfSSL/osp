@@ -10,7 +10,7 @@ First, build and install both wolfSSL and go-wolfssl following the instructions 
 ./configure --enable-blake2s --enable-xchacha --enable-curve25519
 ```
 
-If you're interested in the FIPS build, configure as shown below. Make sure that wolfCrypt tests pass, the normal flow for doing this can be seen below.
+If you're interested in the FIPS build, ensure that you're working with the wolfSSL FIPS bundle and configure as shown below. Make sure that wolfCrypt tests pass, the normal flow for doing this can be seen below.
 ```
 ./configure --enable-fips=v5 --enable-sp="yes, 256"
 make
