@@ -686,7 +686,7 @@ index c2f356b..1a1d4fc 100644
 +        wolfSSL.Wc_ecc_init(&key)
 +
 +        wolfSSL.Wc_ecc_import_private_key_ex(ask[:], askSz, nil, 0, &key, wolfSSL.ECC_SECP256R1)
-+        wolfSSL.Wc_ecc_make_pub(&key, nil)
++        wolfSSL.Wc_ecc_make_pub_in_priv(&key)
 +
 +        wolfSSL.PRIVATE_KEY_UNLOCK()
 +        wolfSSL.Wc_ecc_export_x963_ex(&key, apk[:], &apkSz, 0)
