@@ -1,4 +1,4 @@
-From 4b69c5759af7e9990a60771ec933ce18e990b1ec Mon Sep 17 00:00:00 2001
+From 2ee09766ea20b09ebf1dc1e73ec0b340803d3e34 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Wed, 17 Apr 2024 18:22:58 +0200
 Subject: [PATCH] grpc 1.60 patch for wolfSSL support
@@ -17,6 +17,10 @@ Compile grpc with:
   make
   make install
 
+To link grpc statically to wolfSSL:
+  Compile wolfSSL with the `--enable-static` option
+  Use `-DgRPC_SSL_PROVIDER=wolfssl-static` as the ssl provider target. `WOLFSSL_INSTALL_DIR` needs to be defined and pointing to the location that wolfSSL was installed (by default `/usr/local`).
+
 For a custom wolfSSL install directory use:
   cmake -DgRPC_SSL_PROVIDER=wolfssl -DWOLFSSL_INSTALL_DIR=<path/to/install/dir> ../..
 
@@ -31,17 +35,17 @@ The tests need to be run from the root directory
 To build grpc for debugging use:
   cmake -E env CXXFLAGS="-g3 -O0" cmake -DgRPC_BUILD_TESTS=ON -DgRPC_SSL_PROVIDER=wolfssl ../..
 ---
- cmake/ssl.cmake                               | 26 +++++++++++++++++++
- .../external/aws_request_signer.cc            | 12 ++++-----
- src/core/tsi/ssl_transport_security.cc        | 22 ++++++++++++++++
- test/core/tsi/ssl_transport_security_test.cc  | 20 +++++++++++++-
- 4 files changed, 73 insertions(+), 7 deletions(-)
+ cmake/ssl.cmake                               | 44 +++++++++++++++++++
+ .../external/aws_request_signer.cc            | 12 ++---
+ src/core/tsi/ssl_transport_security.cc        | 22 ++++++++++
+ test/core/tsi/ssl_transport_security_test.cc  | 20 ++++++++-
+ 4 files changed, 91 insertions(+), 7 deletions(-)
 
 diff --git a/cmake/ssl.cmake b/cmake/ssl.cmake
-index bf43e47588..af15860885 100644
+index bf43e47588..a715ef5719 100644
 --- a/cmake/ssl.cmake
 +++ b/cmake/ssl.cmake
-@@ -73,4 +73,30 @@ elseif(gRPC_SSL_PROVIDER STREQUAL "package")
+@@ -73,4 +73,48 @@ elseif(gRPC_SSL_PROVIDER STREQUAL "package")
    set(_gRPC_SSL_INCLUDE_DIR ${OPENSSL_INCLUDE_DIR})
    
    set(_gRPC_FIND_SSL "if(NOT OPENSSL_FOUND)\n  find_package(OpenSSL)\nendif()")
@@ -49,10 +53,10 @@ index bf43e47588..af15860885 100644
 +  find_package(PkgConfig REQUIRED)
 +
 +  if(EXISTS "${WOLFSSL_INSTALL_DIR}")
-+  	set(WOLFSSL_LIBRARIES "wolfssl")
-+  	set(WOLFSSL_INCLUDE_DIRS "${WOLFSSL_INSTALL_DIR}/include")
-+  	set(WOLFSSL_INCLUDEDIR "${WOLFSSL_INSTALL_DIR}/include")
-+  	find_library(WOLFSSL_FOUND NAMES wolfssl HINTS "${WOLFSSL_INSTALL_DIR}/lib")
++    set(WOLFSSL_LIBRARIES "wolfssl")
++    set(WOLFSSL_INCLUDE_DIRS "${WOLFSSL_INSTALL_DIR}/include")
++    set(WOLFSSL_INCLUDEDIR "${WOLFSSL_INSTALL_DIR}/include")
++    find_library(WOLFSSL_FOUND NAMES wolfssl HINTS "${WOLFSSL_INSTALL_DIR}/lib")
 +    if (NOT WOLFSSL_FOUND)
 +      message(FATAL_ERROR "wolfSSL not found")
 +    endif()
@@ -70,6 +74,24 @@ index bf43e47588..af15860885 100644
 +  set(_gRPC_FIND_SSL "\
 +  set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} -I${WOLFSSL_INCLUDE_DIRS} -I${WOLFSSL_INCLUDE_DIRS}/wolfssl -l${WOLFSSL_LIBRARIES} -DEXTERNAL_OPTS_OPENVPN\")\n\
 +  set(CMAKE_CXX_FLAGS \"${CMAKE_CXX_FLAGS} -I${WOLFSSL_INCLUDE_DIRS} -I${WOLFSSL_INCLUDE_DIRS}/wolfssl -l${WOLFSSL_LIBRARIES} -DEXTERNAL_OPTS_OPENVPN\")\n\
++  ")
++elseif(gRPC_SSL_PROVIDER STREQUAL "wolfssl-static")
++  if(EXISTS "${WOLFSSL_INSTALL_DIR}")
++    set(WOLFSSL_LIBRARIES "${WOLFSSL_INSTALL_DIR}/lib/libwolfssl.a")
++    set(WOLFSSL_INCLUDE_DIRS "${WOLFSSL_INSTALL_DIR}/include")
++    set(WOLFSSL_INCLUDEDIR "${WOLFSSL_INSTALL_DIR}/include")
++  else()
++    message(FATAL_ERROR "WOLFSSL_INSTALL_DIR not set")
++  endif()
++  set(_gRPC_SSL_LIBRARIES ${WOLFSSL_LIBRARIES})
++  set(_gRPC_SSL_INCLUDE_DIR "${WOLFSSL_INCLUDE_DIRS}" "${WOLFSSL_INCLUDEDIR}/wolfssl")
++
++  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DEXTERNAL_OPTS_OPENVPN")
++  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DEXTERNAL_OPTS_OPENVPN")
++
++  set(_gRPC_FIND_SSL "\
++  set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} -I${WOLFSSL_INCLUDE_DIRS} -I${WOLFSSL_INCLUDE_DIRS}/wolfssl ${WOLFSSL_LIBRARIES} -DEXTERNAL_OPTS_OPENVPN\")\n\
++  set(CMAKE_CXX_FLAGS \"${CMAKE_CXX_FLAGS} -I${WOLFSSL_INCLUDE_DIRS} -I${WOLFSSL_INCLUDE_DIRS}/wolfssl ${WOLFSSL_LIBRARIES} -DEXTERNAL_OPTS_OPENVPN\")\n\
 +  ")
  endif()
 diff --git a/src/core/lib/security/credentials/external/aws_request_signer.cc b/src/core/lib/security/credentials/external/aws_request_signer.cc
