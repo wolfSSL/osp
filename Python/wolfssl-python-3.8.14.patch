@@ -27752,3 +27752,27 @@ index 937a15a..a85dddc 100644
                  ('IP Address', '0:0:0:0:0:0:0:1'),
                  ('IP Address', '127.0.0.1'),
                  ('URI', 'https://www.python.org/'),
+diff --git a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
+index 7d4eeb10e80..cf200309628 100644
+--- a/Lib/test/test_ssl.py
++++ b/Lib/test/test_ssl.py
+@@ -555,8 +555,8 @@ class BasicSocketTests(unittest.TestCase):
+     def test_parse_all_sans(self):
+         p = ssl._ssl._test_decode_cert(ALLSANFILE)
+         if ssl.IS_WOLFSSL:
+-            # wolfSSL currently skips over othername and has
+-            # a slightly different order of how the entries are listed in struct
++            # wolfSSL currently had a slightly different order of how the
++            # entries are listed in struct
+             self.assertEqual(p['subjectAltName'],
+             (
+                 ('Registered ID', 'surname'),
+@@ -564,6 +564,8 @@ class BasicSocketTests(unittest.TestCase):
+                 ('IP Address', '127.0.0.1'),
+                 ('URI', 'https://www.python.org/'),
+                 ('DNS', 'www.example.org'),
++                ('othername', '<unsupported>'),
++                ('othername', '<unsupported>'),
+                 ('DNS', 'allsans'),
+                 ('email', 'user@example.org'),
+                 ('DirName',
