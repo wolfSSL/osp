@@ -1,0 +1,146 @@
+From 87c8da9d7e7b9092ba20fcabb33f8462eef26eca Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Thu, 18 Jul 2024 19:32:13 +0200
+Subject: [PATCH] Patch for wolfSSL
+
+This patch implements wolfSSL support in sssd.
+
+Compile wolfSSL with:
+  ./configure --enable-all CFLAGS=-DWOLFSSL_NO_ASN_STRICT
+  make
+  make install
+
+Compile sssd with:
+  patch -p1 < /path/to/this/patch
+  autoreconf -if
+  ./configure --without-samba --without-nfsv4-idmapd-plugin --with-oidc-child=no --without-manpages
+  make
+
+All tests should pass:
+  make check
+---
+ configure.ac                                 |  8 ++++++-
+ src/external/crypto.m4                       | 25 --------------------
+ src/lib/certmap/sss_cert_content_crypto.c    |  4 ++++
+ src/p11_child/p11_child_openssl.c            |  4 ++++
+ src/util/crypto/libcrypto/crypto_hmac_sha1.c |  1 +
+ 5 files changed, 16 insertions(+), 26 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 470c04949..f5491468e 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -426,7 +426,13 @@ AS_IF([test x$syslog = xjournald], [
+     AM_CHECK_JOURNALD
+ ])
+ 
+-AM_CHECK_LIBCRYPTO
++
++AS_IF([test -z $WOLFSSL_INSTALL_DIR || test ! -d $WOLFSSL_INSTALL_DIR ], [
++    WOLFSSL_INSTALL_DIR=/usr/local
++])
++CFLAGS="$CFLAGS -I$WOLFSSL_INSTALL_DIR/include -I$WOLFSSL_INSTALL_DIR/include/wolfssl -DEXTERNAL_OPTS_OPENVPN"
++LIBS="$LIBS -lwolfssl -L$WOLFSSL_INSTALL_DIR/lib"
++
+ m4_include([src/external/p11-kit.m4])
+ 
+ AM_CHECK_INOTIFY
+diff --git a/src/external/crypto.m4 b/src/external/crypto.m4
+index b21645d17..6cabf0b4d 100644
+--- a/src/external/crypto.m4
++++ b/src/external/crypto.m4
+@@ -3,28 +3,3 @@ AC_DEFUN([AM_CHECK_LIBCRYPTO],
+           PKG_CHECK_MODULES([SSL],[libssl])
+ ])
+ 
+-AC_MSG_CHECKING([whether OpenSSL's x400Address is ASN1_STRING])
+-SAVE_CFLAGS=$CFLAGS
+-CFLAGS="$CFLAGS -Werror -Wall -Wextra"
+-AC_COMPILE_IFELSE(
+-                  [AC_LANG_SOURCE([
+-                      #include <openssl/x509v3.h>
+-
+-                      int main(void)
+-                      {
+-                          GENERAL_NAME gn = { 0 };
+-
+-                          return ASN1_STRING_length(gn.d.x400Address);
+-                      }
+-                  ])],
+-                  [
+-                      AC_MSG_RESULT([yes])
+-                      AC_DEFINE([HAVE_X400ADDRESS_STRING],
+-                             [1],
+-                             [whether OpenSSL's x400Address is ASN1_STRING])],
+-                  [
+-                      AC_MSG_RESULT([no])
+-                      AC_MSG_WARN([OpenSSL's x400Address is not of ASN1_STRING type])
+-                  ])
+-
+-CFLAGS=$SAVE_CFLAGS
+diff --git a/src/lib/certmap/sss_cert_content_crypto.c b/src/lib/certmap/sss_cert_content_crypto.c
+index 6141aa7ba..dbbf124ac 100644
+--- a/src/lib/certmap/sss_cert_content_crypto.c
++++ b/src/lib/certmap/sss_cert_content_crypto.c
+@@ -234,12 +234,14 @@ done:
+     return ret;
+ }
+ 
++#ifndef LIBWOLFSSL_VERSION_HEX
+ void *ASN1_TYPE_unpack_sequence(const ASN1_ITEM *it, const ASN1_TYPE *t)
+ {
+     if (t == NULL || t->type != V_ASN1_SEQUENCE || t->value.sequence == NULL)
+         return NULL;
+     return ASN1_item_unpack(t->value.sequence, it);
+ }
++#endif
+ 
+ static int add_pkinit_princ_to_san_list(TALLOC_CTX *mem_ctx,
+                                         enum san_opt san_opt,
+@@ -704,6 +706,7 @@ static int get_san(TALLOC_CTX *mem_ctx, X509 *cert, struct san_list **san_list)
+             }
+             DLIST_ADD(list, item);
+             break;
++#ifndef LIBWOLFSSL_VERSION_HEX
+         case GEN_EDIPARTY:
+             len = i2d_EDIPARTYNAME(current->d.ediPartyName, NULL);
+             if (len <= 0) {
+@@ -731,6 +734,7 @@ static int get_san(TALLOC_CTX *mem_ctx, X509 *cert, struct san_list **san_list)
+             }
+             DLIST_ADD(list, item);
+             break;
++#endif
+         default:
+             ret = EINVAL;
+             goto done;
+diff --git a/src/p11_child/p11_child_openssl.c b/src/p11_child/p11_child_openssl.c
+index 45a4930ba..8cf802c12 100644
+--- a/src/p11_child/p11_child_openssl.c
++++ b/src/p11_child/p11_child_openssl.c
+@@ -820,7 +820,11 @@ bool do_verification(struct p11_ctx *p11_ctx, X509 *cert)
+             X509_VERIFY_PARAM_clear_flags(verify_param, (X509_V_FLAG_CRL_CHECK
+                                                    |X509_V_FLAG_CRL_CHECK_ALL));
+ 
++            /* Temporarily disable CRL checking. verify param won't disable. */
++            wolfSSL_X509_STORE_set_flags(p11_ctx->x509_store, 0);
+             ret = X509_verify_cert(ctx);
++            wolfSSL_X509_STORE_set_flags(p11_ctx->x509_store,
++                    X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+             if (ret != 1) {
+                 DEBUG(SSSDBG_OP_FAILURE,
+                       "X509_verify_cert failed [%d].\n", ret);
+diff --git a/src/util/crypto/libcrypto/crypto_hmac_sha1.c b/src/util/crypto/libcrypto/crypto_hmac_sha1.c
+index 9b072ad9b..580c27254 100644
+--- a/src/util/crypto/libcrypto/crypto_hmac_sha1.c
++++ b/src/util/crypto/libcrypto/crypto_hmac_sha1.c
+@@ -16,6 +16,7 @@
+ */
+ 
+ #include <string.h>
++#include <openssl/evp.h>
+ #include <openssl/hmac.h>
+ 
+ #include "util/util.h"
+-- 
+2.34.1
+
