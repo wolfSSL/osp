@@ -27776,3 +27776,51 @@ index 7d4eeb10e80..cf200309628 100644
                  ('DNS', 'allsans'),
                  ('email', 'user@example.org'),
                  ('DirName',
+
+diff --git a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
+index cf200309628..246635069fc 100644
+--- a/Lib/test/test_ssl.py
++++ b/Lib/test/test_ssl.py
+@@ -4481,10 +4481,7 @@ class ThreadedTests(unittest.TestCase):
+                                        chatty=False,
+                                        sni_name='supermessage')
+         if ssl.IS_WOLFSSL:
+-            # Depending on threading and socket shutdown when test is run,
+-            # reason may occasionally be None here
+-            if cm.exception.reason is not None:
+-                self.assertEqual(cm.exception.reason, 'fatal error')
++            self.assertEqual(cm.exception.reason, 'ALERT_FATAL_ERROR')
+         else:
+             self.assertEqual(cm.exception.reason, 'TLSV1_ALERT_ACCESS_DENIED')
+ 
+@@ -4503,8 +4500,7 @@ class ThreadedTests(unittest.TestCase):
+                                            chatty=False,
+                                            sni_name='supermessage')
+             if ssl.IS_WOLFSSL:
+-                self.assertEqual(cm.exception.reason,
+-                                'fatal error')
++                self.assertEqual(cm.exception.reason, 'ALERT_FATAL_ERROR')
+             else:
+                 self.assertEqual(cm.exception.reason,
+                                 'SSLV3_ALERT_HANDSHAKE_FAILURE')
+@@ -4527,7 +4523,7 @@ class ThreadedTests(unittest.TestCase):
+                                            sni_name='supermessage')
+ 
+             if ssl.IS_WOLFSSL:
+-                self.assertEqual(cm.exception.reason, 'fatal error')
++                self.assertEqual(cm.exception.reason, 'ALERT_FATAL_ERROR')
+             else:
+                 self.assertEqual(cm.exception.reason, 'TLSV1_ALERT_INTERNAL_ERROR')
+             self.assertEqual(catch.unraisable.exc_type, TypeError)
+diff --git a/Modules/_ssl_data.h b/Modules/_ssl_data.h
+index efb7a11dec2..664cf37ca36 100644
+--- a/Modules/_ssl_data.h
++++ b/Modules/_ssl_data.h
+@@ -6329,6 +6329,7 @@ static struct py_ssl_error_code error_codes[] = {
+       * negative when in wolfCrypt range. */
+     {"BUFFER_E", 0, BUFFER_E},
+     {"ASN_NO_SIGNER_E", 0, ASN_NO_SIGNER_E},
++    {"ALERT_FATAL_ERROR", 0, FATAL_ERROR},
+ 
+     /* wolfSSL-level error codes */
+     {"VERIFY_FINISHED_ERROR", 0, WOLFSSL_ERRORCODE(VERIFY_FINISHED_ERROR)},
