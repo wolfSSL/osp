@@ -147,7 +147,7 @@ cmake --build "$BUILD_DIR"
 
 # Step 7: Run the tests
 if [ -f "$TEST_EXECUTABLE" ]; then
-    echo "Running the test: $TEST_NAME"
+    echo "Running the test: $TEST_EXECUTABLE"
     "$TEST_EXECUTABLE"
 else
     echo "Test executable not found. Make sure the build was successful."
