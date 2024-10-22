@@ -7,13 +7,15 @@ sudo make install
 
 Configuring wolfSSL for local installation can be specified with `--prefix=/path/to/install`
 
-Downloading and applying the patch for realm-core v13.26.0.tar.gz or git commit a5e87a39:
+Downloading and applying the patch for realm-core git commit a5e87a39:
 
 ```
-curl -L -O https://github.com/realm/realm-core/archive/refs/tags/v13.26.0.tar.gz
-tar -xvf v13.26.0.tar.gz
-cd realm-core-13.26.0
-patch -p1 < ../realm-v13.26.0.patch
+git clone https://github.com/realm/realm-core.git
+cd realm-core
+git reset --hard HEAD
+git checkout a5e87a39
+git submodule update --init --recursive
+git apply ../realm-v13.26.0.patch
 ```
 
 Building realm-core:
@@ -26,3 +28,4 @@ cmake --build build
 ```
 
 You can also use the build_wolfssl_with_realm.sh script after adjusting the global variables as needed.
+

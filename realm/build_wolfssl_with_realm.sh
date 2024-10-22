@@ -2,6 +2,18 @@
 
 #bash -x ./build_wolfssl_with_realm.sh -g
 
+
+    # While the support to build from a tarball is included,
+    # Please note that to successfully build,
+    # you will need to manually download and set up Catch2 to match the Git
+    # repository structure when using the tarball. For example,
+        # mkdir -p test/external/generated/catch2
+        # curl -L -O
+        # https://github.com/catchorg/Catch2/archive/refs/tags/v2.13.9.tar.gz
+        # tar -xvf v2.13.9.tar.gz --strip-components=1 -C
+        # test/external/generated/catch2
+
+
 # Commit hashes for specific versions when using git
 WOLFSSL_COMMIT="e814d1ba"
 #REALM_CORE_COMMIT="c729fc80"
