@@ -37,7 +37,7 @@ index 558ca90..9f61031 100644
  MIIFfTCCBOagAwIBAgIKYFOB9QABAACIvTANBgkqhkiG9w0BAQUFADBGMQswCQYD
  VQQGEwJVUzETMBEGA1UEChMKR29vZ2xlIEluYzEiMCAGA1UEAxMZR29vZ2xlIElu
 diff --git a/tests/OpenSSLErrorTest.cpp b/tests/OpenSSLErrorTest.cpp
-index 45ada66..6325c55 100644
+index 45ada66..f582b0a 100644
 --- a/tests/OpenSSLErrorTest.cpp
 +++ b/tests/OpenSSLErrorTest.cpp
 @@ -51,9 +51,15 @@ static uint64_t fail_EVP_DigestVerifyFinal = 0;
@@ -265,11 +265,15 @@ index 45ada66..6325c55 100644
  	bool fail = fail_ECDSA_SIG_new & 1;
  	fail_ECDSA_SIG_new = fail_ECDSA_SIG_new >> 1;
  	if (fail)
-@@ -318,7 +327,7 @@ ECDSA_SIG* ECDSA_SIG_new(void) {
+@@ -316,9 +325,9 @@ ECDSA_SIG* ECDSA_SIG_new(void) {
+ 		return origMethod();
+ }
  
- struct rsa_st* EVP_PKEY_get1_RSA(EVP_PKEY* pkey) {
- 	static struct rsa_st* (*origMethod)(EVP_PKEY * pkey) = nullptr;
+-struct rsa_st* EVP_PKEY_get1_RSA(EVP_PKEY* pkey) {
+-	static struct rsa_st* (*origMethod)(EVP_PKEY * pkey) = nullptr;
 -	if (origMethod == nullptr) origMethod = (decltype(origMethod))dlsym(RTLD_NEXT, "EVP_PKEY_get1_RSA");
++RSA* EVP_PKEY_get1_RSA(EVP_PKEY* pkey) {
++	static RSA* (*origMethod)(EVP_PKEY * pkey) = nullptr;
 +	if (origMethod == nullptr) origMethod = (decltype(origMethod))dlsym(RTLD_NEXT, SYMBOL_NAME("EVP_PKEY_get1_RSA"));
  	bool fail = fail_EVP_PKEY_get1_RSA & 1;
  	fail_EVP_PKEY_get1_RSA = fail_EVP_PKEY_get1_RSA >> 1;
