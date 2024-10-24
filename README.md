@@ -48,6 +48,7 @@ Each project port included in this repository is contained in its own subdirecto
 | Python | Python language and interpreter | [Link](https://www.python.org/) | | [README](./Python/README.txt) |
 | qt | Qt | [Link](https://www.qt.io/) | [Link](https://www.wolfssl.com/building-qt-with-wolfssl/) | [README](./qt/README.md) |
 | rsyslog | rocket-fast Syslog Server | [Link](https://www.rsyslog.com/) | [Link](https://www.wolfssl.com/wolfssl-ported-rsyslog-8-2106-0/) | [README](./rsyslog/8.2106.0/README.md) |
+| realm-core | Database that runs on phones, tablets or wearables | [Link](https://github.com/realm/realm-core/) | | [README](./realm/README.md) |
 | sblim-sfcb | SBLIM Small-footprint CIM Broker | [Link](http://sblim.sourceforge.net/wiki/index.php/Sfcb) | | [README](./sblim-sfcb/1.4.9/README.md) |
 | socat | socat Multipurpose relay | [Link](http://www.dest-unreach.org/socat/) | [Link](https://www.wolfssl.com/open-source-project-ports-socat/) | 1.7.3.4 [README](./socat/1.7.3.4/README.md)<br/>1.7.4.1 [README](./socat/1.7.4.1/README.md) |
 | stunnel | stunnel Proxy | [Link](https://www.stunnel.org/) | [Link](https://www.wolfssl.com/securing-stunnel-tls-1-3/) | 5.57 Unix [README](./stunnel/5.57/README_UNIX.md)<br/>5.57 Windows [README](./stunnel/5.57/README_WIN.md) |
