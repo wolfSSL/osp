@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#bash -x ./build_wolfssl_with_realm.sh -g
+#bash -x ./build_wolfssl_with_realm.sh
 
 
     # While the support to build from a tarball is included,
@@ -33,16 +33,16 @@ BUILD_DIR="build"
 TEST_EXECUTABLE="$BUILD_DIR/test/realm-tests"
 WOLFSSL_INSTALL_DIR="$HOME/wolfssl-install-dir"
 USE_SYSTEM_INSTALL=true  # Change this to true if you want to use system-wide wolfSSL installation
-USE_GIT=false  # Default method is using curl, set this to true to use git
+USE_GIT=true  # Default method is using git, set this to false to use curl for tarball
 
 # Patch file based on REALM_CORE_COMMIT or REALM_CORE_VERSION
 PATCH_FILE=""
 
 # Check if user wants to use git
-while getopts ":g" opt; do
+while getopts ":t" opt; do
   case $opt in
-    g)
-      USE_GIT=true
+    t)
+      USE_GIT=false
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -136,9 +136,9 @@ else
 fi
 
 # Step 5: Apply patch if patch file exists for realm-core
-if [ -f "../$PATCH_FILE" ]; then
+if [ -f "$PATCH_FILE" ]; then
     echo "Applying patch to realm-core..."
-    git apply "../$PATCH_FILE"
+    git apply "$PATCH_FILE"
 fi
 
 # Step 6: Build realm-core
