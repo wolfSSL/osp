@@ -1152,6 +1152,19 @@ index 71cfdcd..937a15a 100644
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
  
+@@ -4017,7 +4217,11 @@ class ThreadedTests(unittest.TestCase):
+                 self.assertNotEqual(cb_data, new_cb_data)
+                 self.assertIsNotNone(cb_data)
+                 if s.version() == 'TLSv1.3':
+-                    self.assertEqual(len(cb_data), 48)
++                    if ssl.IS_WOLFSSL:
++                        # wolfSSL returns 32 length because TLS_AES_128_GCM_SHA256 is used
++                        self.assertEqual(len(cb_data), 32)
++                    else:
++                        self.assertEqual(len(cb_data), 48)
+                 else:
+                     self.assertEqual(len(cb_data), 12)  # True for TLSv1
+                 s.write(b"CB tls-unique\n")
 @@ -4051,13 +4255,20 @@ class ThreadedTests(unittest.TestCase):
          # test scenario needs TLS <= 1.2
          client_context.options |= ssl.OP_NO_TLSv1_3
