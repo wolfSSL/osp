@@ -110,3 +110,4 @@ openssh/regress/authorized_keys*
 stunnel/example/echoserver/echoserver*
 *.plist
 server_err.log
+/.vs
