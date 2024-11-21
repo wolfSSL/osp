@@ -93,7 +93,7 @@ test_nntplib:
 # 3.8.14 Patch
 
 This patch is for Python version 3.8.14. Follow these steps to download
-and build python 3.8.14 with wolfssl enbabled. This requires that wolfssl
+and build python 3.8.14 with wolfssl enabled. This requires that wolfssl
 has been built similarly as for the 3.8.5 patch instructions.
 
 Note, you may need to update your LD_LIBRARY_PATH first:
