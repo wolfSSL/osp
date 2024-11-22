@@ -385,7 +385,7 @@ index 7b1d854..e8ba7c8 100644
          resp = self.client.stls(context=ctx)
          self.assertEqual(resp, expected)
 diff --git a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
-index 71cfdcd..a9b8c9f 100644
+index 71cfdcd..c4a931a 100644
 --- a/Lib/test/test_ssl.py
 +++ b/Lib/test/test_ssl.py
 @@ -67,9 +67,17 @@ BYTES_ONLYKEY = os.fsencode(ONLYKEY)
@@ -1146,7 +1146,7 @@ index 71cfdcd..a9b8c9f 100644
                  if s.version() == 'TLSv1.3':
 -                    self.assertEqual(len(cb_data), 48)
 +                    cipher_suite = s.cipher()
-+                    if cipher_suite == 'TLS_AES_128_GCM_SHA256':
++                    if cipher_suite.__eq__("TLS_AES_128_GCM_SHA256"):
 +                        self.assertEqual(len(cb_data), 32)
 +                    else:
 +                        self.assertEqual(len(cb_data), 48)
@@ -1159,7 +1159,7 @@ index 71cfdcd..a9b8c9f 100644
                  if s.version() == 'TLSv1.3':
 -                    self.assertEqual(len(cb_data), 48)
 +                    cipher_suite = s.cipher()
-+                    if cipher_suite == 'TLS_AES_128_GCM_SHA256':
++                    if cipher_suite.__eq__("TLS_AES_128_GCM_SHA256"):
 +                        self.assertEqual(len(cb_data), 32)
 +                    else:
 +                        self.assertEqual(len(cb_data), 48)
