@@ -1,4 +1,4 @@
-From 9e155806031d17d38253c3080d6463ecc9219190 Mon Sep 17 00:00:00 2001
+From 90c6754567bac102483b327868a0e1e48b0479d6 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Tue, 30 Jul 2024 17:21:38 +0200
 Subject: [PATCH] wolfSSL patch
@@ -6,21 +6,20 @@ Subject: [PATCH] wolfSSL patch
 This patch implements wolfSSL support in libspdm.
 
 Compile wolfSSL with:
-  ./configure --enable-all --enable-static
+  ./configure --enable-all --enable-static CFLAGS='-DRSA_MIN_SIZE=512'
   make
   make install
 
 Compile libspdm with:
   mkdir build
   cd build
-  cmake -DARCH=x64 -DTOOLCHAIN=GCC -DCRYPTO=wolfssl -DENABLE_BINARY_BUILD=1 -DCOMPILED_LIBWOLFSSL_PATH=/usr/local/lib/libwolfssl.a -DWOLFSSL_INCDIR=/usr/local/include ..
+  cmake -DARCH=x64 -DTOOLCHAIN=GCC -DTARGET=Release -DCRYPTO=wolfssl -DENABLE_BINARY_BUILD=1 -DCOMPILED_LIBWOLFSSL_PATH=/usr/local/lib/libwolfssl.a -DWOLFSSL_INCDIR=/usr/local/include ..
   make
 
 Tests passed:
-- test_crypt
+- test_crypt (must be run in unit_test/sample_key)
 - test_spdm_secured_message
-- test_spdm_crypt
-- test_spdm_secured_message
+- test_spdm_crypt (must be run in unit_test/sample_key)
 
 When building for FIPS or with wolfSSL releases 5.7.2 and older add `CPPFLAGS=-DRSA_LOW_MEM` to the wolfSSL configuration:
   ./configure --enable-all CPPFLAGS=-DRSA_LOW_MEM
@@ -42,7 +41,7 @@ Co-authored-by: Daniel Pouzzner <douzzer@mega.nu>
  os_stub/cryptlib_wolfssl/hmac/hmac_sha.c      |  683 +++++
  os_stub/cryptlib_wolfssl/hmac/hmac_sha3.c     |  457 +++
  os_stub/cryptlib_wolfssl/hmac/hmac_sm3.c      |  163 +
- os_stub/cryptlib_wolfssl/internal_crypt_lib.h |  103 +
+ os_stub/cryptlib_wolfssl/internal_crypt_lib.h |   40 +
  os_stub/cryptlib_wolfssl/kdf/hkdf_sha.c       |  404 +++
  os_stub/cryptlib_wolfssl/kdf/hkdf_sha3.c      |  238 ++
  os_stub/cryptlib_wolfssl/kdf/hkdf_sm3.c       |   98 +
@@ -56,7 +55,7 @@ Co-authored-by: Daniel Pouzzner <douzzer@mega.nu>
  os_stub/cryptlib_wolfssl/pk/x509.c            | 2704 +++++++++++++++++
  os_stub/cryptlib_wolfssl/rand/rand.c          |   40 +
  .../sys_call/crt_wrapper_host.c               |  120 +
- 27 files changed, 11651 insertions(+), 60 deletions(-)
+ 27 files changed, 11588 insertions(+), 60 deletions(-)
  create mode 100644 os_stub/cryptlib_wolfssl/CMakeLists.txt
  create mode 100644 os_stub/cryptlib_wolfssl/cipher/aead_aes_gcm.c
  create mode 100644 os_stub/cryptlib_wolfssl/cipher/aead_chacha20_poly1305.c
@@ -3932,10 +3931,10 @@ index 0000000000..5e5896ce88
 +}
 diff --git a/os_stub/cryptlib_wolfssl/internal_crypt_lib.h b/os_stub/cryptlib_wolfssl/internal_crypt_lib.h
 new file mode 100644
-index 0000000000..872b879989
+index 0000000000..cd5806a870
 --- /dev/null
 +++ b/os_stub/cryptlib_wolfssl/internal_crypt_lib.h
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,40 @@
 +/**
 + *  Copyright Notice:
 + *  Copyright 2021-2024 DMTF. All rights reserved.
@@ -3974,69 +3973,6 @@ index 0000000000..872b879989
 +#include <wolfssl/ssl.h>
 +#include <openssl/ecdh.h>
 +
-+// missing from wolfssl
-+
-+RSA *d2i_RSA_PUBKEY_bio(BIO *bp, RSA **rsa);
-+// use wolfSSL_d2i_RSAPrivateKey_bio and wolfSSL_d2i_RSAPublicKey as basis
-+
-+EC_KEY *d2i_EC_PUBKEY_bio(BIO *bp, EC_KEY **eckey);
-+// use wolfSSL_d2i_RSAPrivateKey_bio, wolfSSL_d2i_RSAPublicKey, wolfSSL_ECDSA_do_verify, and wolfSSL_d2i_ECDSA_SIG, as guides
-+
-+int EVP_PKEY_is_a(const EVP_PKEY *pkey, const char *name);
-+// https://github.com/wolfSSL/wolfssl/pull/7804
-+
-+int DH_compute_key_padded(unsigned char *key,
-+                                                const BIGNUM *pub_key, DH *dh);
-+// may be impossible, or require fakery, due to FIPS requirement.
-+// see https://github.com/wolfSSL/wolfssl/pull/7802
-+/* "DH_compute_key() computes the shared secret from the private DH value in dh and the other party’s
-+       public value in pub_key and stores it in key. key must point to DH_size(dh) bytes of memory.  The
-+       padding style is RFC 5246 (8.1.2) that strips leading zero bytes.  It is not constant time due to
-+       the leading zero bytes being stripped.  The return value should be considered public."
-+
-+   "DH_compute_key_padded() is similar but stores a fixed number of bytes.  The padding style is NIST SP
-+       800-56A (C.1) that retains leading zero bytes.  It is constant time due to the leading zero bytes
-+       being retained.  The return value should be considered public."
-+ */
-+
-+/*
-+// not needed -- altered libspdm_rsa_check_key() to return false for any
-+// RSA_check_key() failure, rather than just these.
-+#define RSA_R_P_NOT_PRIME (-1)
-+#define RSA_R_Q_NOT_PRIME (-1)
-+#define RSA_R_N_DOES_NOT_EQUAL_P_Q (-1)
-+#define RSA_R_D_E_NOT_CONGRUENT_TO_1 (-1)
-+*/
-+
-+int ASN1_TIME_set_string_X509(ASN1_TIME *s, const char *str);
-+/* "ASN1_TIME_set_string_X509() sets ASN1_TIME structure s to the time represented by string str which
-+       must be in appropriate time format that RFC 5280 requires, which means it only allows YYMMDDHHMMSSZ
-+       and YYYYMMDDHHMMSSZ (leap second is rejected), all other ASN.1 time format are not allowed. If s is
-+       NULL this function performs a format check on str only."
-+*/
-+
-+struct X509_req_info_st {
-+//    ASN1_ENCODING enc;          /* cached encoding of signed part */
-+    ASN1_INTEGER *version;      /* version, defaults to v1(0) so can be NULL */
-+    X509_NAME *subject;         /* certificate request DN */
-+    X509_PUBKEY *pubkey;        /* public key of request */
-+    /*
-+     * Zero or more attributes.
-+     * NB: although attributes is a mandatory field some broken
-+     * encodings omit it so this may be NULL in that case.
-+     */
-+    STACK_OF(X509_ATTRIBUTE) *attributes;
-+};
-+typedef struct X509_req_info_st X509_REQ_INFO;
-+
-+X509_REQ_INFO *d2i_X509_REQ_INFO(X509_REQ_INFO **req_info, const unsigned char **ppin, long length);
-+// use d2i_X509orX509REQ as a guide
-+
-+void X509_REQ_INFO_free(X509_REQ_INFO *req_info);
-+// wrapper around wolfSSL_X509_free();
-+
-+void sk_X509_EXTENSION_free(STACK_OF(X509_EXTENSION) *exts);
-+// see wolfSSL_X509_EXTENSION_free and wolfSSL_sk_X509_INFO_free
 +
 +#endif
 diff --git a/os_stub/cryptlib_wolfssl/kdf/hkdf_sha.c b/os_stub/cryptlib_wolfssl/kdf/hkdf_sha.c
