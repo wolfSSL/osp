@@ -1,7 +1,7 @@
 From fb103ae04134dbc31c5617d076118a0dfe7c7a2b Mon Sep 17 00:00:00 2001
 From: Brett Nicholas <7547222+bigbrett@users.noreply.github.com>
 Date: Tue, 5 Nov 2024 15:58:33 -0700
-Subject: [PATCH] - add wolfSSL support to refactored sqlcipher - add patch
+Subject: [PATCH 1/2] - add wolfSSL support to refactored sqlcipher - add patch
  generation script
 
 ---
@@ -432,6 +432,3215 @@ index 5cfcd6f0..4542a58d 100644
  
     walker.c
     resolve.c
+-- 
+2.34.1
+
+
+From a3520d6709bb3777aba0939dc9f8d661d1687ec9 Mon Sep 17 00:00:00 2001
+From: Brett Nicholas <7547222+bigbrett@users.noreply.github.com>
+Date: Tue, 3 Dec 2024 14:28:40 -0700
+Subject: [PATCH 2/2] - add private key lock/unlock for FIPS 140-3 - change
+ FIPS version macros, added error prints for failure cases - Add new tests for
+ wolfSSL FIPS
+
+---
+ README.md                                     |   2 +-
+ src/crypto_wolfssl.c                          | 118 ++-
+ test/sqlcipher-backup-wolfssl-fips.test       | 162 +++
+ test/sqlcipher-codecerror-wolfssl-fips.test   | 177 ++++
+ test/sqlcipher-core-wolfssl-fips.test         | 985 ++++++++++++++++++
+ test/sqlcipher-integrity-wolfssl-fips.test    | 277 +++++
+ ...lcipher-plaintext-header-wolfssl-fips.test | 477 +++++++++
+ test/sqlcipher-pragmas-wolfssl-fips.test      | 504 +++++++++
+ test/sqlcipher-rekey-wolfssl-fips.test        | 280 +++++
+ test/sqlcipher-wolfssl-fips.test              |  66 ++
+ 10 files changed, 3022 insertions(+), 26 deletions(-)
+ create mode 100644 test/sqlcipher-backup-wolfssl-fips.test
+ create mode 100644 test/sqlcipher-codecerror-wolfssl-fips.test
+ create mode 100644 test/sqlcipher-core-wolfssl-fips.test
+ create mode 100644 test/sqlcipher-integrity-wolfssl-fips.test
+ create mode 100644 test/sqlcipher-plaintext-header-wolfssl-fips.test
+ create mode 100644 test/sqlcipher-pragmas-wolfssl-fips.test
+ create mode 100644 test/sqlcipher-rekey-wolfssl-fips.test
+ create mode 100644 test/sqlcipher-wolfssl-fips.test
+
+diff --git a/README.md b/README.md
+index 4d0282d7..69326aee 100644
+--- a/README.md
++++ b/README.md
+@@ -10,7 +10,7 @@ $ make testfixture
+ $ ./testfixture test/sqlcipher.test
+ ```
+ 
+-Note that if using a FIPS build, the sqlcipher tests will all fail as they use a password/key shorter than the minimum FIPS mandated length (14 bytes). There are some tests that are easy to change to accomodate that (`sqlcipher-backup.test`, for example). For these you can run `sed -i 's/testkey/testkey012345678/g'`. Other tests will take too long to fix as they use random keys ("foo", "0123", etc) and others like `sqlcipher-compatibility.test` operate on databases already encrypted with short keys.
++Note that if using a FIPS build, the normal sqlcipher tests will all fail as they use a password/key shorter than the minimum FIPS mandated length (14 bytes). wolfSSL has provided a modified suite of tests that can ve ran against a FIPS build. These tests use longer FIPS-compliant keys, and remove tests that operate on pre-encrypted databases with these keys. You can run the SQLCipher wolfSSL FIPS tests with `./testsuite sqlcipher-wolfssl-fips.test`. Non-FIPS wolfSSL builds can use the normal sqlcipher tests.
+ 
+ ### Troubleshooting
+ 
+diff --git a/src/crypto_wolfssl.c b/src/crypto_wolfssl.c
+index 40c3ffca..d53480f3 100644
+--- a/src/crypto_wolfssl.c
++++ b/src/crypto_wolfssl.c
+@@ -50,14 +50,13 @@ int sqlcipher_wolf_setup(sqlcipher_provider *p);
+ 
+ #ifdef HAVE_FIPS
+ #include <wolfssl/wolfcrypt/fips_test.h>
+-static void wcFipsCb(int ok, int err, const char* hash)
+-{
+-    sqlcipher_log(SQLCIPHER_LOG_ERROR, "wolfCrypt Fips error callback, ok = %d, err = %d\n", ok, err);
+-    sqlcipher_log(SQLCIPHER_LOG_ERROR, "message = %s\n", wc_GetErrorString(err));
+-    sqlcipher_log(SQLCIPHER_LOG_ERROR, "hash = %s\n", hash);
++static void wcFipsCb(int ok, int err, const char* hash) {
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER, "wolfCrypt Fips error callback, ok = %d, err = %d\n", ok, err);
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER, "message = %s\n", wc_GetErrorString(err));
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER, "hash = %s\n", hash);
+     if (err == IN_CORE_FIPS_E) {
+-        sqlcipher_log(SQLCIPHER_LOG_ERROR, "In core integrity hash check failure, copy above hash\n");
+-        sqlcipher_log(SQLCIPHER_LOG_ERROR, "into verifyCore[] in fips_test.c and rebuild\n");
++        sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER, "In core integrity hash check failure, copy above hash\n");
++        sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER, "into verifyCore[] in fips_test.c and rebuild\n");
+     }
+ }
+ #endif
+@@ -77,12 +76,21 @@ static int sqlcipher_wolf_random(void *ctx, void *buffer, int length) {
+   int ret = -1;
+   if (!gRngInit) {
+     ret = wc_InitRng(&gRng);
+-    if (ret == 0) {
+-      gRngInit = 1;
++    if (ret != 0) {
++      sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                    "wolfCrypt RNG init failed with code %d: %s\n",
++                    ret, wc_GetErrorString(ret));
++      return SQLITE_ERROR;
+     }
++    gRngInit = 1;
+   }
+   if (gRngInit) {
+-      ret = wc_RNG_GenerateBlock(&gRng, buffer, length);
++    ret = wc_RNG_GenerateBlock(&gRng, buffer, length);
++    if (ret != 0) {
++      sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                    "wolfCrypt RNG generation failed with code %d: %s\n",
++                    ret, wc_GetErrorString(ret));
++    }
+   }
+   return (ret == 0) ? SQLITE_OK : SQLITE_ERROR;
+ }
+@@ -98,9 +106,16 @@ static const char* sqlcipher_wolf_get_provider_version(void *ctx) {
+ static int sqlcipher_wolf_hmac(void *ctx, int algorithm, unsigned char *hmac_key,
+     int key_sz, unsigned char *in, int in_sz, unsigned char *in2, int in2_sz, unsigned char *out) {
+   int ret;
++
+   Hmac hmac_context;
+   if(in == NULL) return SQLITE_ERROR;
+-  if (wc_HmacInit(&hmac_context, NULL, INVALID_DEVID) != 0) return SQLITE_ERROR;
++
++  if (wc_HmacInit(&hmac_context, NULL, INVALID_DEVID) != 0) {
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                  "wolfCrypt HMAC init failed\n");
++    return SQLITE_ERROR;
++  }
++
+   switch(algorithm) {
+     case SQLCIPHER_HMAC_SHA1:
+       ret = wc_HmacSetKey(&hmac_context, WC_SHA, hmac_key, key_sz);
+@@ -114,12 +129,39 @@ static int sqlcipher_wolf_hmac(void *ctx, int algorithm, unsigned char *hmac_key
+     default:
+       ret = SQLITE_ERROR;
+   }
+-  if (ret == 0)
+-    ret = wc_HmacUpdate(&hmac_context, in, in_sz);
+-  if (ret == 0 && in2 != NULL)
+-    ret = wc_HmacUpdate(&hmac_context, in2, in2_sz);
+-  if (ret == 0)
+-    ret = wc_HmacFinal(&hmac_context, out);
++
++  if (ret != 0) {
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                  "wolfCrypt HMAC set key failed with code %d: %s\n",
++                  ret, wc_GetErrorString(ret));
++    wc_HmacFree(&hmac_context);
++    return SQLITE_ERROR;
++  }
++
++  if ((ret = wc_HmacUpdate(&hmac_context, in, in_sz)) != 0) {
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                  "wolfCrypt HMAC update failed with code %d: %s\n",
++                  ret, wc_GetErrorString(ret));
++    wc_HmacFree(&hmac_context);
++    return SQLITE_ERROR;
++  }
++
++  if (in2 != NULL) {
++    if ((ret = wc_HmacUpdate(&hmac_context, in2, in2_sz)) != 0) {
++      sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                    "wolfCrypt HMAC update (in2) failed with code %d: %s\n",
++                    ret, wc_GetErrorString(ret));
++      wc_HmacFree(&hmac_context);
++      return SQLITE_ERROR;
++    }
++  }
++
++  if ((ret = wc_HmacFinal(&hmac_context, out)) != 0) {
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                  "wolfCrypt HMAC final failed with code %d: %s\n",
++                  ret, wc_GetErrorString(ret));
++  }
++
+   wc_HmacFree(&hmac_context);
+   return (ret == 0) ? SQLITE_OK : SQLITE_ERROR;
+ }
+@@ -147,15 +189,37 @@ static int sqlcipher_wolf_cipher(void *ctx, int mode, unsigned char *key,
+     int key_sz, unsigned char *iv, unsigned char *in, int in_sz, unsigned char *out) {
+   int ret;
+   Aes aes;
+-  if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) return SQLITE_ERROR;
++
++  if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) {
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                  "wolfCrypt AES init failed\n");
++    return SQLITE_ERROR;
++  }
++
+   ret = wc_AesSetKey(&aes, key, key_sz, iv,
+     mode == CIPHER_ENCRYPT ? AES_ENCRYPTION : AES_DECRYPTION);
+-  if (ret == 0) {
+-      if (mode == CIPHER_ENCRYPT)
+-        ret = wc_AesCbcEncrypt(&aes, out, in, in_sz);
+-      else
+-        ret = wc_AesCbcDecrypt(&aes, out, in, in_sz);
++
++  if (ret != 0) {
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                  "wolfCrypt AES set key failed with code %d: %s\n",
++                  ret, wc_GetErrorString(ret));
++    wc_AesFree(&aes);
++    return SQLITE_ERROR;
+   }
++
++  if (mode == CIPHER_ENCRYPT) {
++    ret = wc_AesCbcEncrypt(&aes, out, in, in_sz);
++  } else {
++    ret = wc_AesCbcDecrypt(&aes, out, in, in_sz);
++  }
++
++  if (ret != 0) {
++    sqlcipher_log(SQLCIPHER_LOG_ERROR, SQLCIPHER_LOG_PROVIDER,
++                  "wolfCrypt AES %s failed with code %d: %s\n",
++                  mode == CIPHER_ENCRYPT ? "encryption" : "decryption",
++                  ret, wc_GetErrorString(ret));
++  }
++
+   wc_AesFree(&aes);
+   return (ret == 0) ? SQLITE_OK : SQLITE_ERROR;
+ }
+@@ -190,16 +254,17 @@ static int sqlcipher_wolf_get_hmac_sz(void *ctx, int algorithm) {
+ }
+ 
+ static int sqlcipher_wolf_ctx_init(void **ctx) {
+-
+   if (wolfCrypt_Init() != 0) {
+       return SQLITE_ERROR;
+   }
+ #ifdef HAVE_FIPS
+   wolfCrypt_SetCb_fips(wcFipsCb);
+-#if (FIPS_VERSION_GE(5,3))
++#if (FIPS_VERSION_GE(5,2))
+   wc_SetSeed_Cb(wc_GenerateSeed);
++  PRIVATE_KEY_UNLOCK();
+ #endif
+ #endif
++  sqlcipher_log(SQLCIPHER_LOG_INFO, SQLCIPHER_LOG_PROVIDER, "wolfSSL provider initialized\n");
+   return SQLITE_OK;
+ }
+ 
+@@ -208,6 +273,9 @@ static int sqlcipher_wolf_ctx_free(void **ctx) {
+       wc_FreeRng(&gRng);
+       gRngInit = 0;
+   }
++#if (defined(HAVE_FIPS) && FIPS_VERSION_GE(5,2))
++  PRIVATE_KEY_LOCK();
++#endif
+ 
+   wolfCrypt_Cleanup();
+   return SQLITE_OK;
+diff --git a/test/sqlcipher-backup-wolfssl-fips.test b/test/sqlcipher-backup-wolfssl-fips.test
+new file mode 100644
+index 00000000..9bc29378
+--- /dev/null
++++ b/test/sqlcipher-backup-wolfssl-fips.test
+@@ -0,0 +1,162 @@
++# SQLCipher
++# codec.test developed by Stephen Lombardo (Zetetic LLC)
++# sjlombardo at zetetic dot net
++# http://zetetic.net
++#
++# Copyright (c) 2018, ZETETIC LLC
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the ZETETIC LLC nor the
++#       names of its contributors may be used to endorse or promote products
++#       derived from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
++# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++#
++# This file implements regression tests for SQLite library.  The
++# focus of this script is testing code cipher features.
++#
++# NOTE: tester.tcl has overridden the definition of sqlite3 to
++# automatically pass in a key value. Thus tests in this file
++# should explicitly close and open db with sqlite_orig in order
++# to bypass default key assignment.
++
++# WOLFSSL NOTE: This test file is a modified version of sqlcipher-backup.test
++# that is used to test the wolfSSL provider with FIPS-enabled wolfSSL. The only
++# difference is that database keys are changed to be FIPS compliant (longer),
++# as the original keys are too short.
++
++set testdir [file dirname $argv0]
++source $testdir/tester.tcl
++source $testdir/sqlcipher.tcl
++
++# backup from plaintext to plaintext
++# is allowed
++do_test sqlcipher-backup-plain-plain {
++  sqlite_orig db test.db
++  set rc {}
++  execsql {
++   CREATE TABLE t1(a,b);
++   INSERT INTO t1 VALUES(1, randstr(16384,16384));
++  }
++  
++  set md5a [execsql {SELECT md5sum(a,b) FROM t1}]
++  sqlite_orig db2 backup.db
++  sqlite3_backup B db2 main db main
++  lappend rc [B step -1]
++  lappend rc [B finish]
++  
++  db close
++  db2 close
++
++  sqlite_orig db backup.db
++
++  set md5b [execsql {SELECT md5sum(a,b) FROM t1}]
++
++  lappend rc [ execsql {
++    PRAGMA integrity_check;
++  } ]
++  
++  lappend rc [string equal $md5a $md5b]
++} {SQLITE_DONE SQLITE_OK ok 1}
++db close
++file delete -force test.db
++file delete -force backup.db
++
++# backup from encrypted to encrypted
++# is allowed
++do_test sqlcipher-backup-encrypted-encrypted {
++  sqlite_orig db test.db
++  set rc {}
++  execsql {
++   PRAGMA key = 'FIPSTestingKey123!';
++   CREATE TABLE t1(a,b);
++   INSERT INTO t1 VALUES(1, randstr(16384,16384));
++  }
++  set md5a [execsql {SELECT md5sum(a,b) FROM t1}]
++
++  sqlite_orig db2 backup.db
++  execsql { PRAGMA key = 'FIPSTestingKey123!' } db2;
++
++  sqlite3_backup B db2 main db main
++  lappend rc [B step -1]
++  lappend rc [B finish]
++
++  db close
++  db2 close
++
++  sqlite_orig db backup.db
++  execsql { PRAGMA key = 'FIPSTestingKey123!' };
++
++  set md5b [execsql {SELECT md5sum(a,b) FROM t1}]
++ 
++  lappend rc [ execsql {
++    PRAGMA integrity_check;
++    PRAGMA cipher_integrity_check;
++  } ]
++
++  lappend rc [string equal $md5a $md5b]
++
++} {SQLITE_DONE SQLITE_OK ok 1}
++db close
++file delete -force test.db
++file delete -force backup.db
++
++# backup from plaintext to encrypted
++# is blocked
++do_test sqlcipher-backup-plain-encrypted {
++  sqlite_orig db test.db
++  set rc {}
++  execsql {
++   CREATE TABLE t1(a,b);
++   INSERT INTO t1 VALUES(1, randstr(16384,16384));
++  }
++
++  sqlite_orig db2 backup.db
++  execsql { PRAGMA key = 'FIPSTestingKey123!' } db2;
++
++  lappend rc [catch {sqlite3_backup B db2 main db main}]
++  lappend rc [sqlite3_errcode db2]
++  lappend rc [sqlite3_errmsg db2]
++} {1 SQLITE_ERROR {backup is not supported with encrypted databases}}
++db close
++db2 close
++file delete -force test.db
++file delete -force backup.db
++
++# backup from encrypted to plaintext
++# is blocked
++do_test sqlcipher-backup-encrypted-plain {
++  sqlite_orig db test.db
++  set rc {}
++  execsql {
++   PRAGMA key = 'FIPSTestingKey123!';
++   CREATE TABLE t1(a,b);
++   INSERT INTO t1 VALUES(1, randstr(16384,16384));
++  }
++
++  sqlite_orig db2 backup.db
++
++  lappend rc [catch {sqlite3_backup B db2 main db main}]
++  lappend rc [sqlite3_errcode db2]
++  lappend rc [sqlite3_errmsg db2]
++} {1 SQLITE_ERROR {backup is not supported with encrypted databases}}
++db close
++db2 close
++file delete -force test.db
++file delete -force backup.db
++
++finish_test
+diff --git a/test/sqlcipher-codecerror-wolfssl-fips.test b/test/sqlcipher-codecerror-wolfssl-fips.test
+new file mode 100644
+index 00000000..37dc022c
+--- /dev/null
++++ b/test/sqlcipher-codecerror-wolfssl-fips.test
+@@ -0,0 +1,177 @@
++# SQLCipher
++# codec.test developed by Stephen Lombardo (Zetetic LLC)
++# sjlombardo at zetetic dot net
++# http://zetetic.net
++#
++# Copyright (c) 2018, ZETETIC LLC
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the ZETETIC LLC nor the
++#       names of its contributors may be used to endorse or promote products
++#       derived from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
++# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++#
++# This file implements regression tests for SQLite library.  The
++# focus of this script is testing code cipher features.
++#
++# NOTE: tester.tcl has overridden the definition of sqlite3 to
++# automatically pass in a key value. Thus tests in this file
++# should explicitly close and open db with sqlite_orig in order
++# to bypass default key assignment.
++
++# WOLFSSL NOTE: This test file is a modified version of
++# sqlcipher-codecerror.test
++# that is used to test the wolfSSL provider with FIPS-enabled wolfSSL. The only
++# difference is that database keys are changed to be FIPS compliant (longer),
++# as the original keys are too short.
++
++set testdir [file dirname $argv0]
++source $testdir/tester.tcl
++source $testdir/sqlcipher.tcl
++
++proc codec-test-setup {} {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE table t1(a INTEGER PRIMARY KEY,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=10000} {incr i} {
++    execsql "INSERT INTO t1(a,b) VALUES($i,'value $i');"
++  }
++
++  execsql {
++    COMMIT;
++  }
++
++  db close
++}
++
++
++do_test codec-error-journal-delete {
++  codec-test-setup
++
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_test_on = fail_encrypt;
++    UPDATE t1 SET b = 'fail' WHERE a = 5000;
++  }
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA cipher_test_off = fail_encrypt;
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_integrity_check;
++    PRAGMA integrity_check;
++    SELECT b FROM t1 where a = 5000;
++  }
++
++} {ok ok {value 5000}}
++db close
++file delete -force test.db
++
++do_test codec-error-journal-wal {
++  codec-test-setup
++
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_test_on = fail_encrypt;
++    UPDATE t1 SET b = 'fail' WHERE a = 5000;
++  }
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA cipher_test_off = fail_encrypt;
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_integrity_check;
++    PRAGMA integrity_check;
++    SELECT b FROM t1 where a = 5000;
++  }
++
++} {ok ok {value 5000}}
++db close
++file delete -force test.db
++
++do_test codec-error-journal-wal-transaction {
++  codec-test-setup
++
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    BEGIN;
++    UPDATE t1 SET b = 'success' WHERE a = 1;
++    PRAGMA cipher_test_on = fail_encrypt;
++    UPDATE t1 SET b = 'fail' WHERE a = 5000;
++    COMMIT;
++  }
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA cipher_test_off = fail_encrypt;
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_integrity_check;
++    PRAGMA integrity_check;
++    SELECT b FROM t1 where a = 1;
++    SELECT b FROM t1 where a = 5000;
++  }
++
++} {ok ok {value 1} {value 5000}}
++db close
++file delete -force test.db
++
++do_test codec-error-journal-wal-read {
++  codec-test-setup
++
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM sqlite_schema;
++    PRAGMA cipher_test_on = fail_decrypt;
++    UPDATE t1 SET b = 'fail' WHERE a = 5000;
++  }
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA cipher_test_off = fail_decrypt;
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_integrity_check;
++    PRAGMA integrity_check;
++    SELECT b FROM t1 where a = 5000;
++  }
++
++} {ok ok {value 5000}}
++db close
++file delete -force test.db
++
++finish_test
+diff --git a/test/sqlcipher-core-wolfssl-fips.test b/test/sqlcipher-core-wolfssl-fips.test
+new file mode 100644
+index 00000000..6b01abd3
+--- /dev/null
++++ b/test/sqlcipher-core-wolfssl-fips.test
+@@ -0,0 +1,985 @@
++# SQLCipher
++# codec.test developed by Stephen Lombardo (Zetetic LLC)
++# sjlombardo at zetetic dot net
++# http://zetetic.net
++#
++# Copyright (c) 2018, ZETETIC LLC
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the ZETETIC LLC nor the
++#       names of its contributors may be used to endorse or promote products
++#       derived from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
++# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++#
++# This file implements regression tests for SQLite library.  The
++# focus of this script is testing code cipher features.
++#
++# NOTE: tester.tcl has overridden the definition of sqlite3 to
++# automatically pass in a key value. Thus tests in this file
++# should explicitly close and open db with sqlite_orig in order
++# to bypass default key assignment.
++
++set testdir [file dirname $argv0]
++source $testdir/tester.tcl
++source $testdir/sqlcipher.tcl
++
++# The database is initially empty.
++# set an hex key create some basic data
++# create table and insert operations should work
++# close database, open it again with the same
++# hex key. verify that the table is readable
++# and the data just inserted is visible
++setup test.db "\"x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C4836481'\""
++do_test will-open-with-correct-raw-key {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C4836481'";
++    SELECT name FROM sqlite_schema WHERE type='table';
++    SELECT * from t1;
++  }
++} {ok t1 test1 test2}
++db close
++file delete -force test.db
++
++# set an encryption key (non-hex) and create some basic data
++# create table and insert operations should work
++# close database, open it again with the same
++# key. verify that the table is readable
++# and the data just inserted is visible
++setup test.db "'wolfsslFIPStestkey'"
++do_test will-open-with-correct-derived-key {
++
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT name FROM sqlite_schema WHERE type='table';
++    SELECT * from t1;
++  }
++} {ok t1 test1 test2}
++db close
++file delete -force test.db
++
++# set an encryption key (non-hex) and create
++# temp tables, verify you can read from
++# sqlite_temp_master
++setup test.db "'wolfsslFIPStestkey'"
++do_test test-temp-master {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TEMPORARY TABLE temp_t1(a,b);
++    INSERT INTO temp_t1(a,b) VALUES ('test1', 'test2');
++    SELECT name FROM sqlite_temp_master WHERE type='table';
++    SELECT * from temp_t1;
++  }
++} {ok temp_t1 test1 test2}
++db close
++file delete -force test.db
++
++# verify that a when a standard database is encrypted the first
++# 16 bytes are not "SQLite format 3\0" 
++do_test test-sqlcipher-header-overwrite {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t1(a,b);
++  }
++  db close
++  set header [hexio_read test.db 0 16]
++  string equal $header "53514C69746520666F726D6174203300"
++} {0}
++file delete -force test.db
++
++# open the database and try to read from it without
++# providing a passphrase. verify that the 
++# an error is returned from the library
++setup test.db "'wolfsslFIPStestkey'"
++do_test wont-open-without-key {
++  sqlite_orig db test.db
++  catchsql {
++    SELECT name FROM sqlite_schema WHERE type='table';
++  }
++} {1 {file is not a database}}
++db close
++file delete -force test.db
++
++# open the database and try to set an invalid
++# passphrase. verify that an error is returned
++# and that data couldn't be read
++setup test.db "'wolfsslFIPStestkey'"
++do_test wont-open-with-invalid-derived-key {
++  sqlite_orig db test.db
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey2';
++    SELECT name FROM sqlite_schema WHERE type='table';
++  }
++} {1 {file is not a database}}
++db close
++file delete -force test.db
++
++# open the database and try to set an invalid
++# hex key. verify that an error is returned
++# and that data couldn't be read
++setup test.db "'wolfsslFIPStestkey'"
++do_test wont-open-with-invalid-raw-key {
++  sqlite_orig db test.db
++  catchsql {
++    PRAGMA key = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C4836480'";
++    SELECT name FROM sqlite_schema WHERE type='table';
++  }
++} {1 {file is not a database}}
++db close
++file delete -force test.db
++
++# test a large number of inserts in a transaction to a memory database 
++do_test memory-database {
++  sqlite_orig db :memory:
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey3';
++    BEGIN;
++    CREATE TABLE t2(a,b);
++  }
++  for {set i 1} {$i<=25000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t2 VALUES($i,$r);" 
++  }
++  execsql {
++    COMMIT;
++    SELECT count(*) FROM t2;
++    DELETE FROM t2;
++    SELECT count(*) FROM t2;
++  } 
++} {25000 0}
++db close
++
++# test a large number of inserts in a transaction for multiple pages
++do_test multi-page-database {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t2(a,b);
++    BEGIN;
++  }
++  for {set i 1} {$i<=25000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t2 VALUES($i,$r);" 
++  }
++  execsql {
++    COMMIT;
++    SELECT count(*) FROM t2;
++  } 
++} {25000}
++db close
++file delete -force test.db
++
++# attach an encrypted database
++# without specifying key, verify it fails
++# even if the source passwords are the same
++# because the kdf salts are different
++setup test.db "'wolfsslFIPStestkey'"
++do_test attach-database-with-default-key {
++  sqlite_orig db2 test2.db
++  set rc {}
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_add_random = "x'deadbaad'";
++    CREATE TABLE t2(a,b);
++    INSERT INTO t2 VALUES ('test1', 'test2'); 
++  } db2
++ 
++  lappend rc [catchsql {
++    ATTACH 'test.db' AS db;
++  } db2]
++
++  lappend rc [string equal [hexio_read test.db 0 16] [hexio_read test2.db 0 16]]
++
++} {{1 {file is not a database}} 0}
++db2 close
++file delete -force test.db
++file delete -force test2.db
++
++# attach an empty encrypted database
++# without specifying key, verify the database has the same
++# salt and as the original 
++setup test.db "'wolfsslFIPStestkey'"
++do_test attach-empty-database-with-default-key {
++  sqlite_orig db test.db
++  set rc {}
++
++  execsql {
++    PRAGMA  key='wolfsslFIPStestkey';
++    INSERT INTO t1(a,b) values (1,2);
++    ATTACH DATABASE 'test2.db' AS test;
++    CREATE TABLE test.t1(a,b);
++    INSERT INTO test.t1 SELECT * FROM t1;
++    DETACH DATABASE test;
++  }
++
++  sqlite_orig db2 test2.db
++
++  lappend rc [execsql {
++    PRAGMA  key='wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  } db2]
++  lappend rc [string equal [hexio_read test.db 0 16] [hexio_read test2.db 0 16]]
++} {{ok 2} 1}
++db close
++db2 close
++file delete -force test.db
++file delete -force test2.db
++
++# attach an empty encrypted database as the first operation on a keyed database. Verify
++# that the new database has the same salt as the original.
++#
++# HISTORICAL NOTE: The original behavior of SQLCipher under these conditions
++# was that the databases would have different salts but the same keys. This was because
++# derivation of the key spec would not have occurred yet. However, upstream check-in
++# https://sqlite.org/src/info/a02da71f3a80dd8e changed this behavior by
++# forcing a read of the main database schema during the attach operation.
++# This causes the main database to be opened and the key derivation logic to fire which
++# reads the salt. Thus the current behavior of this test should now be identical
++# to the previous attach-empty-database-with-default-key.
++
++setup test.db "'wolfsslFIPStestkey'"
++do_test attach-empty-database-with-default-key-first-op {
++  sqlite_orig db test.db
++  set rc {}
++
++  execsql {
++    PRAGMA  key='wolfsslFIPStestkey';
++    ATTACH DATABASE 'test2.db' AS test;
++    CREATE TABLE test.t1(a,b);
++    INSERT INTO test.t1 SELECT * FROM t1;
++    DETACH DATABASE test;
++  }
++
++  sqlite_orig db2 test2.db
++
++  lappend rc [execsql {
++    PRAGMA  key='wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  } db2]
++
++  lappend rc [string equal [hexio_read test.db 0 16] [hexio_read test2.db 0 16]]
++} {{ok 1} 1}
++db close
++db2 close
++file delete -force test.db
++file delete -force test2.db
++
++# attach an empty encrypted database 
++# on a keyed database when PRAGMA cipher_store_pass = 1
++# and verify different salts
++setup test.db "'wolfsslFIPStestkey'"
++do_test attach-empty-database-with-cipher-store-pass {
++  sqlite_orig db test.db
++  set rc {}
++
++  execsql {
++    PRAGMA  key='wolfsslFIPStestkey';
++    PRAGMA cipher_store_pass = 1;
++    INSERT INTO t1(a,b) VALUES (1,2);
++    ATTACH DATABASE 'test2.db' AS test;
++    CREATE TABLE test.t1(a,b);
++    INSERT INTO test.t1 SELECT * FROM t1;
++    DETACH DATABASE test;
++  }
++
++  sqlite_orig db2 test2.db
++
++  lappend rc [execsql {
++    PRAGMA  key='wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  } db2]
++  lappend rc [string equal [hexio_read test.db 0 16] [hexio_read test2.db 0 16]]
++} {{ok 2} 0}
++db close
++db2 close
++file delete -force test.db
++file delete -force test2.db
++
++# attach an encrypted database
++# without specifying key, verify it attaches
++# correctly when PRAGMA cipher_store_pass = 1
++# is set
++do_test attach-database-with-default-key-using-cipher-store-pass {
++    sqlite_orig db1 test.db  
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        CREATE TABLE t1(a,b);
++        INSERT INTO t1(a,b) VALUES('foo', 'bar');        
++    } db1
++    db1 close
++
++    sqlite_orig db2 test2.db
++    execsql {
++      PRAGMA key = 'wolfsslFIPStestkey';
++      CREATE TABLE t2(a,b);
++      INSERT INTO t2 VALUES ('test1', 'test2'); 
++    } db2
++    db2 close
++
++    sqlite_orig db1 test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_store_pass = 1;
++        ATTACH DATABASE 'test2.db' as db2;
++        SELECT sqlcipher_export('db2');
++        DETACH DATABASE db2;
++    } db1
++    db1 close
++
++    sqlite_orig db2 test2.db  
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        SELECT * FROM t1;
++    } db2
++
++} {ok foo bar}
++db2 close
++file delete -force test.db
++file delete -force test2.db
++
++# attach an encrypted database
++# where both database have the same
++# key explicitly and verify they have different
++# salt values
++setup test.db "'wolfsslFIPStestkey'"
++do_test attach-database-with-same-key {
++  sqlite_orig db2 test2.db
++  
++  set rc {}
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t2(a,b);
++    INSERT INTO t2 VALUES ('test1', 'test2'); 
++  } db2
++ 
++  lappend rc [execsql {
++    SELECT count(*) FROM t2;
++    ATTACH 'test.db' AS db KEY 'wolfsslFIPStestkey';
++    SELECT count(*) FROM db.t1;
++  } db2]
++  
++  lappend rc [string equal [hexio_read test.db 0 16] [hexio_read test2.db 0 16]]
++} {{1 1} 0}
++db2 close
++file delete -force test.db
++file delete -force test2.db
++
++# attach an encrypted database
++# where databases have different keys
++setup test.db "'wolfsslFIPStestkey'"
++do_test attach-database-with-different-keys {
++  sqlite_orig db2 test2.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey2';
++    CREATE TABLE t2(a,b);
++    INSERT INTO t2 VALUES ('test1', 'test2'); 
++  } db2
++  
++  execsql {
++    ATTACH 'test.db' AS db KEY 'wolfsslFIPStestkey';
++    SELECT count(*) FROM db.t1;
++    SELECT count(*) FROM t2;
++  } db2
++
++} {1 1}
++db2 close
++file delete -force test.db
++file delete -force test2.db
++
++# test locking across multiple handles
++setup test.db "'wolfsslFIPStestkey'"
++do_test locking-across-multiple-handles-start {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    BEGIN EXCLUSIVE;
++    INSERT INTO t1 VALUES(1,2);
++  } 
++  
++  sqlite_orig dba test.db
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++      SELECT count(*) FROM t1;
++  } dba
++
++ } {1 {database is locked}} 
++
++do_test locking-accross-multiple-handles-finish {
++ execsql {
++    COMMIT;
++  }
++
++  execsql {
++    SELECT count(*) FROM t1;
++  } dba
++} {2}
++db close
++dba close
++file delete -force test.db
++
++# alter schema
++setup test.db "'wolfsslFIPStestkey'"
++do_test alter-schema {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    ALTER TABLE t1 ADD COLUMN c;
++    INSERT INTO t1 VALUES (1,2,3);
++    INSERT INTO t1 VALUES (1,2,4);
++    CREATE TABLE t1a (a);
++    INSERT INTO t1a VALUES ('teststring');
++  }
++  db close
++
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1 WHERE a IS NOT NULL;
++    SELECT count(*) FROM t1 WHERE c IS NOT NULL;
++    SELECT * FROM t1a;
++  } 
++
++} {ok 3 2 teststring}
++db close
++file delete -force test.db
++
++# test alterations of KDF iterations and ciphers
++# rekey then add
++setup test.db "'wolfsslFIPStestkey'"
++do_test verify-errors-for-rekey-kdf-and-cipher-changes {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA rekey_kdf_iter = 1000;
++    PRAGMA rekey_cipher = 'aes-256-ecb';
++  } 
++} {ok {PRAGMA rekey_kdf_iter is no longer supported.} {PRAGMA rekey_cipher is no longer supported.}}
++db close
++file delete -force test.db
++
++
++setup test.db "'wolfsslFIPStestkey'"
++do_test verify-errors-for-cipher-change {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher = 'aes-256-ecb';
++  } 
++} {ok {PRAGMA cipher is no longer supported.}}
++db close
++file delete -force test.db
++
++
++# 1. create a database with a custom page size, 
++# 2. create table and insert operations should work
++# 3. close database, open it again with the same
++#    key and page size
++# 4. verify that the table is readable
++#    and the data just inserted is visible
++do_test custom-pagesize-pragma-cipher-page-size {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_page_size = 8192;
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');" 
++  }
++
++  execsql {
++    COMMIT;
++  } 
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_page_size = 8192;
++    SELECT count(*) FROM t1;
++  }
++
++} {ok 1000}
++db close
++file delete -force test.db
++
++# run the same logic as previous test but use
++# pragma page_size instead
++do_test custom-pagesize-pragma-pagesize {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA page_size = 8192;
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');"
++  }
++
++  execsql {
++    COMMIT;
++  }
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA page_size = 8192;
++    SELECT count(*) FROM t1;
++  }
++
++} {ok 1000}
++db close
++file delete -force test.db
++
++# open the database with the default page size
++## and verfiy that it is not readable 
++do_test custom-pagesize-must-match {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_page_size = 8192;
++    CREATE table t1(a,b);
++  }
++
++  db close
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT name FROM sqlite_schema WHERE type='table';
++  }
++} {1 {file is not a database}}
++db close
++file delete -force test.db
++
++
++# 1. create a database with WAL journal mode
++# 2. create table and insert operations should work
++# 3. close database, open it again
++# 4. verify that the table is present, readable, and that
++#    the journal mode is WAL
++do_test journal-mode-wal {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA journal_mode = WAL;
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');" 
++  }
++
++  execsql {
++    COMMIT;
++  } 
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++    PRAGMA journal_mode;
++  }
++
++} {ok 1000 wal}
++db close
++file delete -force test.db
++
++# open a database and try to use an invalid
++# passphrase. verify that an error is returned
++# and that data couldn't be read. without closing the databsae
++# set the correct key and verify it is working.
++setup test.db "'wolfsslFIPStestkey'"
++do_test multiple-key-calls-safe-wrong-key-first {
++  sqlite_orig db test.db
++  set rc {}
++
++  lappend rc [catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey2';
++    SELECT count(*) FROM sqlite_schema;
++  }]
++
++  lappend rc [execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM sqlite_schema;
++  }]
++} {{1 {file is not a database}} {ok 1}}
++db close
++file delete -force test.db
++
++# open a databse and use the valid key. Then
++# use pragma key to try to set an invalid key
++# without closing the database. It should not do anything
++
++setup test.db "'wolfsslFIPStestkey'"
++do_test multiple-key-calls-safe {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cache_size = 0; 
++    SELECT name FROM sqlite_schema WHERE type='table';
++    PRAGMA key = 'wrong wolfsslFIPStestkey'; 
++    SELECT name FROM sqlite_schema WHERE type='table';
++    PRAGMA key = 'wolfsslFIPStestkey'; 
++    SELECT name FROM sqlite_schema WHERE type='table';
++  }
++} {ok t1 ok t1 ok t1}
++
++db close
++file delete -force test.db
++
++# 1. create a database with a custom hmac kdf iteration count, 
++# 2. create table and insert operations should work
++# 3. close database, open it again with the same
++#    key and  hmac kdf iteration count
++# 4. verify that the table is readable
++#    and the data just inserted is visible
++do_test custom-hmac-kdf-iter {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA kdf_iter = 10;
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');" 
++  }
++
++  execsql {
++    COMMIT;
++  } 
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA kdf_iter = 10;
++    SELECT count(*) FROM t1;
++  }
++
++} {ok 1000}
++db close
++
++# open the database with the default hmac
++# kdf iteration count
++# to verify that it is not readable 
++do_test custom-hmac-kdf-iter-must-match {
++  sqlite_orig db test.db
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT name FROM sqlite_schema WHERE type='table';
++  }
++} {1 {file is not a database}}
++db close
++file delete -force test.db
++
++# open the database and turn on auto_vacuum
++# then insert a bunch of data, delete it 
++# and verify that the file has become smaller
++# but can still be opened with the proper
++# key
++do_test auto-vacuum {
++  sqlite_orig db test.db
++  set rc {}
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA auto_vacuum=FULL;
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=10000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');" 
++  }
++
++  lappend rc [execsql {
++    COMMIT;
++    SELECT count(*) FROM t1;
++  }]
++
++  # grab current size of file
++  set sz [file size test.db]
++  
++  # delete some records, and verify
++  # autovacuum removes them
++  execsql {
++    DELETE FROM t1 WHERE rowid > 5000;
++  } 
++
++  db close
++
++  # grab new file size, post
++  # autovacuum
++  set sz2 [file size test.db]
++
++  # verify that the new size is 
++  # smaller than the old size
++  if {$sz > $sz2} { lappend rc true }
++
++  sqlite_orig db test.db
++
++  lappend rc [execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }]
++
++} {10000 true {ok 5000}}
++db close
++file delete -force test.db
++
++# test kdf_iter and other pragmas 
++# before a key is set. Verify that they
++# are no-ops
++do_test cipher-options-before-keys {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA kdf_iter = 1000;
++    PRAGMA cipher_page_size = 8192;
++    PRAGMA cipher_use_hmac = OFF;
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE table t1(a,b);
++    INSERT INTO t1 VALUES(1,2);
++  }
++  db close
++
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++
++} {ok 1}
++db close
++file delete -force test.db
++
++# verify memory security behavior
++# initially should report OFF
++# then enable, check that it is ON
++# try to turn if off, but verify that it
++# can't be unset.
++do_test verify-memory-security {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_memory_security;
++        PRAGMA cipher_memory_security = ON;
++        PRAGMA cipher_memory_security;
++        PRAGMA cipher_memory_security = OFF;
++        PRAGMA cipher_memory_security;
++    }
++} {0 1 1}
++db close
++file delete -force test.db
++
++# create two new database files, write to each
++# and verify that they have different (i.e. random)
++# salt values
++do_test test-random-salt {
++  sqlite_orig db test.db
++  sqlite_orig db2 test2.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  }
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  } db2
++  db close
++  db2 close
++  string equal [hexio_read test.db 0 16] [hexio_read test2.db 0 16]
++} {0}
++file delete -force test.db
++file delete -force test2.db
++
++# test scenario where multiple handles are opened
++# to a file that does not exist, where both handles
++# use the same key
++do_test multiple-handles-same-key-and-salt {
++  sqlite_orig db test.db
++  sqlite_orig dba test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++  }
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++  } dba
++
++  execsql {
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1 VALUES(1,2);
++  }
++
++  execsql {
++    SELECT count(*) FROM t1;
++  }
++  execsql {
++    SELECT count(*) FROM t1;
++  } dba
++
++} {1}
++db close
++dba close
++file delete -force test.db
++
++do_test test_flags_fail_encrypt {
++  sqlite_orig db :memory:
++  execsql {
++    PRAGMA cipher_test;
++    PRAGMA cipher_test_on = fail_encrypt;
++    PRAGMA cipher_test;
++    PRAGMA cipher_test_off = fail_encrypt;
++    PRAGMA cipher_test;
++  }
++} {0 1 0}
++db close
++
++do_test test_flags_fail_decrypt {
++  sqlite_orig db :memory:
++  execsql {
++    PRAGMA cipher_test;
++    PRAGMA cipher_test_on = fail_decrypt;
++    PRAGMA cipher_test;
++    PRAGMA cipher_test_off = fail_decrypt;
++    PRAGMA cipher_test;
++  }
++} {0 2 0}
++db close
++
++do_test test_flags_fail_migrate {
++  sqlite_orig db :memory:
++  execsql {
++    PRAGMA cipher_test;
++    PRAGMA cipher_test_on = fail_migrate;
++    PRAGMA cipher_test;
++    PRAGMA cipher_test_off = fail_migrate;
++    PRAGMA cipher_test;
++  }
++} {0 4 0}
++db close
++
++do_test test_flags_combo {
++  sqlite_orig db :memory:
++  execsql {
++    PRAGMA cipher_test;
++    PRAGMA cipher_test_on = fail_encrypt;
++    PRAGMA cipher_test_on = fail_migrate;
++    PRAGMA cipher_test;
++    PRAGMA cipher_test_off = fail_encrypt;
++    PRAGMA cipher_test_off = fail_migrate;
++    PRAGMA cipher_test;
++  }
++} {0 5 0}
++db close
++
++# test empty key
++# it should raise an error
++do_test empty-key {
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = '';
++  }
++
++} {1 {An error occurred with PRAGMA key or rekey. PRAGMA key requires a key of one or more characters. PRAGMA rekey can only be run on an existing encrypted database. Use sqlcipher_export() and ATTACH to convert encrypted/plaintext databases.}}
++db close
++file delete -force test.db
++
++# configure URI filename support
++# create a new encrypted database with the key via parameter
++# close database
++# open normally providing key via pragma verify
++# correct key works
++sqlite3_shutdown
++sqlite3_config_uri 1
++do_test uri-key {
++  sqlite_orig db file:test.db?a=a&key=wolfsslFIPStestkey&c=c
++
++  execsql {
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1 VALUES(1,2);
++  }
++
++  db close
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++
++  db close
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++
++} {ok 1}
++db close
++
++# verify wrong key fails
++do_test uri-key-2 {
++  sqlite_orig db test.db
++  catchsql {
++    PRAGMA key = 'wrong wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++} {1 {file is not a database}}
++db close
++file delete -force test.db
++sqlite3_shutdown
++sqlite3_config_uri 0
++
++finish_test
++
+diff --git a/test/sqlcipher-integrity-wolfssl-fips.test b/test/sqlcipher-integrity-wolfssl-fips.test
+new file mode 100644
+index 00000000..4bbe627f
+--- /dev/null
++++ b/test/sqlcipher-integrity-wolfssl-fips.test
+@@ -0,0 +1,277 @@
++# SQLCipher
++# codec.test developed by Stephen Lombardo (Zetetic LLC)
++# sjlombardo at zetetic dot net
++# http://zetetic.net
++#
++# Copyright (c) 2018, ZETETIC LLC
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the ZETETIC LLC nor the
++#       names of its contributors may be used to endorse or promote products
++#       derived from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
++# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++#
++# This file implements regression tests for SQLite library.  The
++# focus of this script is testing code cipher features.
++#
++# NOTE: tester.tcl has overridden the definition of sqlite3 to
++# automatically pass in a key value. Thus tests in this file
++# should explicitly close and open db with sqlite_orig in order
++# to bypass default key assignment.
++
++# WOLFSSL NOTE: This test file is a modified version of sqlcipher-integrity.test
++# that is used to test the wolfSSL provider with FIPS-enabled wolfSSL. The only
++# difference is that database keys are changed to be FIPS compliant (longer),
++# as the original keys are too short.
++
++set testdir [file dirname $argv0]
++source $testdir/tester.tcl
++source $testdir/sqlcipher.tcl
++
++# 1. create a database and insert a bunch of data, close the database
++# 2. seek to the middle of the first database page and write some junk
++# 3. Open the database and verify that the database is no longer readable
++do_test hmac-tamper-resistence-first-page {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');" 
++  }
++
++  execsql {
++    COMMIT;
++  } 
++
++  db close
++
++  # write some junk into the hmac segment, leaving
++  # the page data valid but with an invalid signature
++  hexio_write test.db 1000 000000
++
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++
++} {1 {file is not a database}}
++db close
++file delete -force test.db
++
++# 1. create a database and insert a bunch of data, close the database
++# 2. seek to the middle of a database page and write some junk
++# 3. Open the database and verify that the database is still readable
++do_test nohmac-not-tamper-resistent {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_use_hmac = OFF;
++    PRAGMA cipher_page_size = 1024;
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');" 
++  }
++
++  execsql {
++    COMMIT;
++  } 
++
++  db close
++
++  # write some junk into the middle of the page
++  hexio_write test.db 2560 000000
++
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_use_hmac = OFF;
++    PRAGMA cipher_page_size = 1024;
++    SELECT count(*) FROM t1;
++  }
++
++} {ok 1000}
++db close
++file delete -force test.db
++
++# 1. create a database and insert a bunch of data, close the database
++# 2. seek to the middle of a database page (not the first page) and write bad data
++# 3. Open the database and verify that the database is no longer readable
++do_test hmac-tamper-resistence {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');"
++  }
++
++  execsql {
++    COMMIT;
++  }
++
++  db close
++
++  # write some junk into the hmac segment, leaving
++  # the page data valid but with an invalid signature
++  hexio_write test.db 16500 000000
++
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++
++} {1 {database disk image is malformed}}
++db close
++file delete -force test.db
++
++# test that integrity checks work on a pristine
++# newly created database
++do_test integrity-check-clean-database {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE table t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=10000} {incr i} {
++    execsql "INSERT INTO t1 VALUES($i,'value $i');"
++  }
++
++  execsql {
++    COMMIT;
++  }
++
++  db close
++
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_integrity_check;
++    PRAGMA integrity_check;
++    SELECT count(*) FROM t1;
++  }
++
++} {ok ok 10000}
++db close
++file delete -force test.db
++
++# try cipher_integrity_check on an in-memory database
++# which should fail because the file doesn't exist
++do_test memory-integrity-check-should-fail {
++  sqlite_orig db :memory:
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) values (1,2);
++    PRAGMA cipher_integrity_check;
++  } 
++} {ok {database file is undefined}}
++db close
++
++# wolfSSL note: we removed all tests involving decrypting existing databases
++# as the keys are too short for FIPS
++
++# verify cipher_integrity_check works on a plaintext header db
++do_test integrity-check-plaintext-header {
++  sqlite_orig db test.db
++  set rc {}
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_plaintext_header_size = 32;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  }
++
++  lappend rc [execsql {
++    PRAGMA cipher_integrity_check;
++  }]
++
++  lappend rc [string equal [hexio_read test.db 16 5] "1000010150"]
++  
++  hexio_write test.db 120 000000
++  hexio_write test.db 5120 000000
++
++  lappend rc [execsql {
++    PRAGMA cipher_integrity_check;
++  }]
++} {{} 1 {{HMAC verification failed for page 1} {HMAC verification failed for page 2}}}
++file delete -force test.db
++
++# test that changing the key in the middle of database operations does
++# not cause a corruption
++do_test change-key-middle {
++  sqlite_orig db test.db
++
++  set rc {}
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE table t1(a,b);
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    execsql "INSERT INTO t1 VALUES($i,'value $i');"
++  }
++
++  execsql {
++    PRAGMA key = 'diffwolfsslFIPStestkey';
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    execsql "INSERT INTO t1 VALUES($i,'value $i');"
++  }
++
++  db close
++
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT name FROM sqlite_schema;
++    PRAGMA cipher_integrity_check;
++    PRAGMA integrity_check;
++    SELECT count(*) FROM t1;
++  }
++} {ok t1 ok 2000}
++db close
++file delete -force test.db
++
++finish_test
+diff --git a/test/sqlcipher-plaintext-header-wolfssl-fips.test b/test/sqlcipher-plaintext-header-wolfssl-fips.test
+new file mode 100644
+index 00000000..ea4f36d0
+--- /dev/null
++++ b/test/sqlcipher-plaintext-header-wolfssl-fips.test
+@@ -0,0 +1,477 @@
++# SQLCipher
++# codec.test developed by Stephen Lombardo (Zetetic LLC)
++# sjlombardo at zetetic dot net
++# http://zetetic.net
++#
++# Copyright (c) 2018, ZETETIC LLC
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the ZETETIC LLC nor the
++#       names of its contributors may be used to endorse or promote products
++#       derived from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
++# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++#
++# This file implements regression tests for SQLite library.  The
++# focus of this script is testing code cipher features.
++#
++# NOTE: tester.tcl has overridden the definition of sqlite3 to
++# automatically pass in a key value. Thus tests in this file
++# should explicitly close and open db with sqlite_orig in order
++# to bypass default key assignment.
++
++# WOLFSSL NOTE: This test file is a modified version of
++# sqlcipher-plaintext-header.test
++# that is used to test the wolfSSL provider with FIPS-enabled wolfSSL. The only
++# difference is that database keys are changed to be FIPS compliant (longer),
++# as the original keys are too short.
++
++set testdir [file dirname $argv0]
++source $testdir/tester.tcl
++source $testdir/sqlcipher.tcl
++
++set hexkeyspec "\"x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'\""
++
++# verify default plaintext header size is 0
++do_test test-default-plaintext-header-size {
++  sqlite_orig db :memory:
++  execsql {
++    PRAGMA cipher_default_plaintext_header_size;
++  }
++} {0}
++
++# verify pragma cipher_salt returns the first 16 bytes 
++# of an existing database
++do_test test-pragma-salt-get {
++  sqlite_orig db test.db
++  execsql { PRAGMA key = 'wolfsslFIPStestkey'; } 
++  set salt [execsql {
++    CREATE TABLE t1(a,b);
++    PRAGMA cipher_salt;
++  }]
++  set header [string tolower [hexio_read test.db 0 16]]
++  string equal $header $salt
++} {1}
++file delete -force test.db
++
++# explicitly set the salt of a new database 
++do_test test-pragma-salt-set {
++  set rc {}
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_salt = "x'01010101010101010101010101010101'";
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  }
++  db close
++  
++  lappend rc [hexio_read test.db 0 16]
++
++  sqlite_orig db test.db
++  lappend rc [execsql "
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++    PRAGMA cipher_salt;
++  "]
++
++} {01010101010101010101010101010101 {ok 1 01010101010101010101010101010101}}
++file delete -force test.db
++
++
++# verify that a raw key with a fixed salt will work
++# the first 16 bytes of database should be equal to the specified salt
++# which is the last 32 characters of the hex key spec.
++# also verify return value of cipher_salt
++do_test test-raw-key-with-salt-spec {
++  set rc {}
++  sqlite_orig db test.db
++  execsql " 
++    PRAGMA key = $hexkeyspec;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  " 
++  db close
++
++  lappend rc [hexio_read test.db 0 16]
++
++  sqlite_orig db test.db
++  lappend rc [execsql "
++    PRAGMA key = $hexkeyspec;
++    SELECT count(*) FROM t1;
++    PRAGMA cipher_salt;
++  "]
++} {01010101010101010101010101010101 {ok 1 01010101010101010101010101010101}}
++db close
++file delete -force test.db
++
++# verify that a raw key with an invalid salt will not work to
++# open an existing database.
++# should cause hmac failure due to invalid generated HMAC key
++do_test test-raw-key-with-invalid-salt-spec {
++  sqlite_orig db test.db
++  execsql "
++    PRAGMA key = $hexkeyspec;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  "
++  db close
++
++  sqlite_orig db test.db
++  catchsql {
++    PRAGMA key="x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648100000000000000000000000000000001'";
++    SELECT count(*) FROM t1;
++  } 
++} {1 {file is not a database}}
++db close
++file delete -force test.db
++
++# verify that a raw key with a bad salt *will* work if page HMAC is disabled
++# in this case the salt will not actually be used for anything
++# because the encryption key is provided explicitly
++do_test test-raw-key-with-invalid-salt-spec-no-hmac {
++  sqlite_orig db test.db
++  execsql "
++    PRAGMA key = $hexkeyspec;
++    PRAGMA cipher_use_hmac = OFF;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  "
++  db close
++
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key="x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648100000000000000000000000000000001'";
++    PRAGMA cipher_use_hmac = OFF;
++    SELECT count(*) FROM t1;
++  }
++} {ok 1}
++db close
++file delete -force test.db
++
++# verify that invalid cipher_plaintext_header_sizes don't work
++# 1. less than zero
++# 2. Larger than available page size
++# 2. Not a multiple of block size
++do_test test-invalid-plaintext-header-sizes {
++  set rc {}
++  sqlite_orig db test.db
++  lappend rc [catchsql "
++    PRAGMA key = $hexkeyspec;
++    PRAGMA cipher_plaintext_header_size = -1;
++    CREATE TABLE t1(a,b);
++  "]
++  db close
++  sqlite_orig db test.db
++  lappend rc [catchsql "
++    PRAGMA key = $hexkeyspec;
++    PRAGMA cipher_plaintext_header_size = 4096;
++    CREATE TABLE t1(a,b);
++  "]
++  db close
++  sqlite_orig db test.db
++  lappend rc [catchsql "
++    PRAGMA key = $hexkeyspec;
++    PRAGMA cipher_plaintext_header_size = 24; 
++    CREATE TABLE t1(a,b);
++  "]
++} {{1 {out of memory}} {1 {out of memory}} {1 {out of memory}}}
++db close
++file delete -force test.db
++
++# verify that a valid cipher_plaintext_header_size leaves the
++# start of the database unencrypted, i.e. "SQLite format 3\0"
++do_test test-valid-plaintext-header-size {
++  set rc {}
++  sqlite_orig db test.db
++  execsql "
++    PRAGMA key = $hexkeyspec;
++    PRAGMA cipher_plaintext_header_size = 16;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  "
++  db close
++
++  lappend rc [hexio_read test.db 0 16]
++
++  sqlite_orig db test.db
++  lappend rc [execsql "
++    PRAGMA key = $hexkeyspec;
++    PRAGMA cipher_plaintext_header_size = 16;
++    SELECT count(*) FROM t1;
++    PRAGMA cipher_plaintext_header_size;
++  "]
++} {53514C69746520666F726D6174203300 {ok 1 16}}
++db close
++file delete -force test.db
++
++# when using a standard mode database and 32 byte
++# plaintext header, ensure that bytes 16 - 19
++# corresponding to the page size and file versions, and reserve size
++# are readable and equal to 1024, 1, 1, and 80 respectively
++do_test test-plaintext-header-journal-delete-mode-readable {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_plaintext_header_size = 32;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  }
++  db close
++  string equal [hexio_read test.db 16 5] "1000010150"
++} {1}
++file delete -force test.db
++
++
++# when using a WAL mode database and 32 byte
++# plaintext header, ensure that bytes 16 - 19
++# corresponding to the page size and file versions, and reserve size
++# are readable and equal to 1024, 2, 2 and 80 respectively
++do_test test-plaintext-header-journal-wal-mode-readable {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_plaintext_header_size = 32;
++    PRAGMA journal_mode = WAL;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  }
++  db close
++  string equal [hexio_read test.db 16 5] "1000020250"
++} {1}
++file delete -force test.db
++
++# verify that a valid default_cipher_plaintext_header_size leaves the
++# start of the database unencrypted right from the start
++# , i.e. "SQLite format 3\0"
++do_test test-valid-default-plaintext-header-size {
++  set rc {}
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA cipher_default_plaintext_header_size = 16;
++    PRAGMA key = 'wolfsslFIPStestkey';
++  }
++
++  set salt [execsql {
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++    PRAGMA cipher_salt;
++  }]
++  db close
++
++  lappend rc [hexio_read test.db 0 16]
++
++  sqlite_orig db test.db
++  execsql { PRAGMA key = 'wolfsslFIPStestkey'; } 
++  lappend rc [execsql "
++    PRAGMA cipher_salt = \"x'$salt'\";
++    SELECT count(*) FROM t1;
++    PRAGMA cipher_plaintext_header_size;
++  "]
++
++  # reset the default back to 0 or subsequent tests will fail
++  execsql "PRAGMA cipher_default_plaintext_header_size = 0;"
++
++  lappend rc [string equal $salt "53514c69746520666f726d6174203300"]
++} {53514C69746520666F726D6174203300 {1 16} 0}
++db close
++file delete -force test.db
++
++# verify that a valid default_cipher_plaintext_header_size 
++# operates properly on an attached database, and that the 
++# salt pragma operates on the attached database as well
++do_test test-valid-default-plaintext-header-size-attach {
++  set rc {}
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA cipher_default_plaintext_header_size = 16;
++    PRAGMA key = 'wolfsslFIPStestkey';
++  }
++  set salt [execsql {
++    CREATE TABLE temp(a);
++    ATTACH DATABASE 'test2.db' as db2;
++    CREATE TABLE db2.t2(a,b);
++    INSERT INTO db2.t2(a,b) VALUES (1,2);
++    PRAGMA db2.cipher_salt;
++    DETACH DATABASE db2;
++  }]
++  db close
++  lappend rc [hexio_read test2.db 0 16]
++
++  sqlite_orig db test2.db
++  execsql { PRAGMA key = 'wolfsslFIPStestkey'; } 
++  lappend rc [execsql "
++    PRAGMA cipher_salt = \"x'$salt'\";
++    SELECT count(*) FROM t2;
++    PRAGMA cipher_plaintext_header_size;
++  "]
++
++  # reset the default back to 0 or subsequent tests will fail
++  execsql "PRAGMA cipher_default_plaintext_header_size = 0;"
++
++  lappend rc [string equal $salt "53514c69746520666f726d6174203300"]
++} {53514C69746520666F726D6174203300 {1 16} 0}
++db close
++file delete -force test.db
++file delete -force test2.db
++
++
++# migrate a standard database in place to use a 
++# plaintext header offset by opening it, adjusting
++# the pragma, and rewriting the first page
++do_test test-plaintext-header-migrate-journal-delete {
++  set rc {}
++  sqlite_orig db test.db
++  execsql " 
++    PRAGMA key = $hexkeyspec;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  " 
++  db close
++
++  lappend rc [hexio_read test.db 0 16]
++
++  sqlite_orig db test.db
++  execsql "
++    PRAGMA key = $hexkeyspec;
++    SELECT count(*) FROM t1;
++    PRAGMA cipher_plaintext_header_size = 32;
++    PRAGMA user_version = 1;
++  "
++  db close
++  lappend rc [hexio_read test.db 0 21]
++
++  sqlite_orig db test.db
++  lappend rc [execsql "
++    PRAGMA key = $hexkeyspec;
++    PRAGMA cipher_plaintext_header_size = 32;
++    SELECT count(*) FROM t1;
++  "]
++
++} {01010101010101010101010101010101 53514C69746520666F726D61742033001000010150 {ok 1}}
++db close
++file delete -force test.db
++
++# migrate a wal mode database in place to use a 
++# plaintext header offset by opening it, adjusting
++# the pragma, and rewriting the first page
++do_test test-plaintext-header-migrate-journal-wal {
++  set rc {}
++  sqlite_orig db test.db
++  execsql " 
++    PRAGMA key = $hexkeyspec;
++    PRAGMA journal_mode = WAL;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  " 
++  db close
++
++  lappend rc [hexio_read test.db 0 16]
++
++  sqlite_orig db test.db
++  lappend rc [execsql "
++    PRAGMA key = $hexkeyspec;
++    SELECT count(*) FROM t1;
++    PRAGMA journal_mode;
++    PRAGMA cipher_plaintext_header_size = 32;
++    PRAGMA user_version = 1;
++    PRAGMA wal_checkpoint(FULL);
++  "]
++  db close
++  lappend rc [hexio_read test.db 0 21]
++
++  sqlite_orig db test.db
++  lappend rc [execsql "
++    PRAGMA key = $hexkeyspec;
++    PRAGMA cipher_plaintext_header_size = 32;
++    SELECT count(*) FROM t1;
++    PRAGMA journal_mode;
++  "]
++
++} {01010101010101010101010101010101 {ok 1 wal 0 1 1} 53514C69746520666F726D61742033001000020250 {ok 1 wal}}
++db close
++file delete -force test.db
++
++# migrate a wal mode database in place to use a plaintext header
++# but instead of using a raw key syntax, use a derived key
++# but explicitly set the salt using cipher_salt
++do_test test-plaintext-header-migrate-journal-wal-string-key-random-salt {
++  set rc {}
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA journal_mode = WAL;
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++  }
++  db close
++
++  set salt [hexio_read test.db 0 16]
++
++  sqlite_orig db test.db
++  lappend rc [execsql "
++    PRAGMA key = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++    PRAGMA journal_mode;
++    PRAGMA cipher_plaintext_header_size = 32;
++    PRAGMA user_version = 1;
++    PRAGMA wal_checkpoint(FULL);
++  "]
++  db close
++
++  lappend rc [hexio_read test.db 0 21]
++
++  sqlite_orig db test.db
++  lappend rc [execsql "
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA cipher_salt = \"x'$salt'\";
++    PRAGMA cipher_plaintext_header_size = 32;
++    SELECT count(*) FROM t1;
++    PRAGMA journal_mode;
++  "]
++
++
++} {{ok 1 wal 0 1 1} 53514C69746520666F726D61742033001000020250 {ok 1 wal}}
++db close
++file delete -force test.db
++
++# when cipher_salt is the first statement a new salt should be generated
++# and it should match the salt after key derviation occurs. At no point
++# should the salt be zero
++do_test plaintext-header-size-salt-first-op {
++  set rc {}
++  sqlite_orig db test.db
++  execsql { PRAGMA key = 'wolfsslFIPStestkey'; } 
++  set salt1 [execsql {
++    PRAGMA cipher_plaintext_header_size = 16;
++    PRAGMA cipher_salt;
++  }]
++
++  set salt2 [execsql {
++    CREATE TABLE t1(a,b);
++    INSERT INTO t1(a,b) VALUES (1,2);
++    PRAGMA cipher_salt;
++  }]
++
++  lappend rc [string equal $salt1 "00000000000000000000000000000000"] 
++  lappend rc [string equal $salt2 "00000000000000000000000000000000"] 
++  lappend rc [string equal $salt1 $salt2]
++} {0 0 1}
++db close
++file delete -force test.db
++
++finish_test
+diff --git a/test/sqlcipher-pragmas-wolfssl-fips.test b/test/sqlcipher-pragmas-wolfssl-fips.test
+new file mode 100644
+index 00000000..4e769316
+--- /dev/null
++++ b/test/sqlcipher-pragmas-wolfssl-fips.test
+@@ -0,0 +1,504 @@
++# SQLCipher
++# codec.test developed by Stephen Lombardo (Zetetic LLC)
++# sjlombardo at zetetic dot net
++# http://zetetic.net
++#
++# Copyright (c) 2018, ZETETIC LLC
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the ZETETIC LLC nor the
++#       names of its contributors may be used to endorse or promote products
++#       derived from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
++# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++#
++# This file implements regression tests for SQLite library.  The
++# focus of this script is testing code cipher features.
++#
++# NOTE: tester.tcl has overridden the definition of sqlite3 to
++# automatically pass in a key value. Thus tests in this file
++# should explicitly close and open db with sqlite_orig in order
++# to bypass default key assignment.
++
++# WOLFSSL NOTE: This test file is a modified version of sqlcipher-pragmas.test
++# that is used to test the wolfSSL provider with FIPS-enabled wolfSSL. The only
++# difference is that database keys are changed to be FIPS compliant (longer),
++# as the original keys are too short.
++
++set testdir [file dirname $argv0]
++source $testdir/tester.tcl
++source $testdir/sqlcipher.tcl
++
++# verify the pragma cipher_version
++# returns the currently configured
++# sqlcipher version
++do_test verify-pragma-cipher-version {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_version;
++    }
++} {{4.6.1 community}}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_use_hmac
++# is set to true be default
++do_test verify-pragma-cipher-use-hmac-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_use_hmac;
++    }
++} {ok 1}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_use_hmac
++# reports the flag turned off
++do_test verify-pragma-cipher-use-hmac-off {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_use_hmac = off;
++        PRAGMA cipher_use_hmac;
++    }
++} {ok 0}
++db close
++file delete -force test.db
++
++# verify the pragma default_cipher_use_hmac
++# is set to true by default
++do_test verify-pragma-cipher-default-use-hmac-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_default_use_hmac;
++    }
++} {1}
++db close
++file delete -force test.db
++
++# verify the pragma default_cipher_use_hmac
++# reports the flag turned off
++do_test verify-pragma-cipher-default-use-hmac-off {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_default_use_hmac = off;
++        PRAGMA cipher_default_use_hmac;
++        -- Be sure to turn cipher_default_use_hmac
++        -- back on or it will break later tests 
++        -- (it's a global flag)
++        PRAGMA cipher_default_use_hmac = ON;
++    }
++} {0}
++db close
++file delete -force test.db
++
++# verify the pragma default_cipher_kdf_iter
++# is set to 256000 by default
++do_test verify-pragma-cipher-default-kdf-iter-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_default_kdf_iter;
++    }
++} {256000}
++db close
++file delete -force test.db
++
++
++# verify the pragma default_cipher_kdf_ter
++# reports changes
++do_test verify-pragma-cipher-default-use-hmac-off {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_default_kdf_iter = 1000;
++        PRAGMA cipher_default_kdf_iter;
++        PRAGMA cipher_default_kdf_iter = 256000;
++    }
++} {1000}
++db close
++file delete -force test.db
++
++# verify the pragma kdf_iter
++# reports the default value
++do_test verify-pragma-kdf-iter-reports-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA kdf_iter;
++    }
++} {ok 256000}
++db close
++file delete -force test.db
++
++# verify the pragma kdf_iter
++# reports value changed
++do_test verify-pragma-kdf-iter-reports-value-changed {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA kdf_iter = 8000;
++        PRAGMA kdf_iter;
++    }
++ } {ok 8000}
++db close
++file delete -force test.db
++
++# verify the pragma fast_kdf_iter
++# reports the default value
++do_test verify-pragma-fast-kdf-iter-reports-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA fast_kdf_iter;
++    }
++} {ok 2}
++db close
++file delete -force test.db
++
++# verify the pragma fast_kdf_iter
++# reports value changed
++do_test verify-pragma-kdf-iter-reports-value-changed {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA fast_kdf_iter = 4000;
++        PRAGMA fast_kdf_iter;
++    }
++} {ok {PRAGMA fast_kdf_iter is deprecated, please remove from use} 4000}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_page_size
++# reports default value
++do_test verify-pragma-cipher-page-size-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_page_size;
++    }
++} {ok 4096}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_page_size
++# reports change in value
++do_test verify-pragma-cipher-page-size-changed {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_page_size = 8192;
++        PRAGMA cipher_page_size;
++    }
++} {ok 8192}
++db close
++file delete -force test.db
++
++# verify that a call to pragma page_size
++# will report change via both page_size and cipher_page_size
++# when there is an attached codec
++do_test verify-pragma-page-size-encrypted {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA page_size = 8192;
++        PRAGMA page_size;
++        PRAGMA cipher_page_size;
++    }
++} {ok 8192 8192}
++db close
++file delete -force test.db
++
++# verify that a call to pragma page_size
++# will not report a change to cipher_page_size for an
++# unencrypted database
++do_test verify-pragma-page-size-plaintext {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA page_size = 8192;
++        PRAGMA page_size;
++        PRAGMA cipher_page_size;
++    }
++} {8192}
++db close
++file delete -force test.db
++
++# verify setting cipher_store_pass before key
++# does not cause segfault
++do_test verify-cipher-store-pass-before-key-does-not-segfault {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_store_pass = 1;
++        PRAGMA key = 'wolfsslFIPStestkey';
++    }
++} {ok}
++db close
++file delete -force test.db
++
++# verify setting cipher_store_pass results in deprecation warning
++do_test verify-cipher-store-pass-deprecated {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_store_pass = 1;
++    }
++} {ok {PRAGMA cipher_store_pass is deprecated, please remove from use}}
++db close
++file delete -force test.db
++
++# verify the pragma cipher
++# reports the default value
++if_built_with_openssl verify-pragma-cipher-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher;
++    }
++} {ok AES-256-CBC}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_hmac_salt_mask reports default
++do_test verify-pragma-hmac-salt-mask-reports-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_hmac_salt_mask;
++    }
++} {ok 3a}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_hmac_salt_mask reports
++# reports value changed
++do_test verify-pragma-hmac-salt-mask-reports-value-changed {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_hmac_salt_mask = "x'11'";
++        PRAGMA cipher_hmac_salt_mask;
++        PRAGMA cipher_hmac_salt_mask = "x'3a'";
++    }
++} {ok {PRAGMA cipher_hmac_salt_mask is deprecated, please remove from use} 11 {PRAGMA cipher_hmac_salt_mask is deprecated, please remove from use}}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_hmac_pgno reports default
++do_test verify-pragma-hmac-pgno-reports-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_hmac_pgno;
++    }
++} {ok le}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_hmac_pgno 
++# reports value changed
++do_test verify-pragma-hmac-pgno-reports-value-changed {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_hmac_pgno = be;
++        PRAGMA cipher_hmac_pgno;
++        PRAGMA cipher_hmac_pgno = native;
++        PRAGMA cipher_hmac_pgno;
++        PRAGMA cipher_hmac_pgno = le;
++        PRAGMA cipher_hmac_pgno;
++    }
++} {ok {PRAGMA cipher_hmac_pgno is deprecated, please remove from use} be {PRAGMA cipher_hmac_pgno is deprecated, please remove from use} native {PRAGMA cipher_hmac_pgno is deprecated, please remove from use} le}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_hmac_algorithm works properly
++do_test verify-pragma-cipher-hmac-algorithm-reports-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_hmac_algorithm;
++    }
++} {ok HMAC_SHA512}
++db close
++file delete -force test.db
++
++do_test verify-pragma-cipher-hmac-algorithm-reports-value-changed {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_hmac_algorithm = HMAC_SHA1;
++        PRAGMA cipher_hmac_algorithm;
++    }
++} {ok HMAC_SHA1}
++db close
++file delete -force test.db
++
++do_test verify-pragma-cipher-default-hmac-algorithm {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_default_hmac_algorithm;
++        PRAGMA cipher_default_hmac_algorithm = HMAC_SHA1;
++        PRAGMA cipher_default_hmac_algorithm;
++        PRAGMA cipher_default_hmac_algorithm = HMAC_SHA512;
++    }
++} {HMAC_SHA512 HMAC_SHA1}
++db close
++file delete -force test.db
++
++# verify the pragma cipher_kdf_algorithm works properly
++do_test verify-pragma-cipher-kdf-algorithm-reports-default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_kdf_algorithm;
++    }
++} {ok PBKDF2_HMAC_SHA512}
++db close
++file delete -force test.db
++
++do_test verify-pragma-cipher-kdf-algorithm-reports-value-changed {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_kdf_algorithm = PBKDF2_HMAC_SHA1;
++        PRAGMA cipher_kdf_algorithm;
++    }
++} {ok PBKDF2_HMAC_SHA1}
++db close
++file delete -force test.db
++
++do_test verify-pragma-cipher-default-kdf-algorithm {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_default_kdf_algorithm;
++        PRAGMA cipher_default_kdf_algorithm = PBKDF2_HMAC_SHA1;
++        PRAGMA cipher_default_kdf_algorithm;
++        PRAGMA cipher_default_kdf_algorithm = PBKDF2_HMAC_SHA512;
++    }
++} {PBKDF2_HMAC_SHA512 PBKDF2_HMAC_SHA1}
++db close
++file delete -force test.db
++
++if_built_with_openssl verify-default-cipher {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key='wolfsslFIPStestkey';
++        PRAGMA cipher;
++    }
++} {ok AES-256-CBC}
++db close
++file delete -force test.db
++
++if_built_with_libtomcrypt verify-default-cipher {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key='wolfsslFIPStestkey';
++        PRAGMA cipher;
++    }
++} {ok aes-256-cbc}
++db close
++file delete -force test.db
++
++if_built_with_commoncrypto verify-default-cipher {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key='wolfsslFIPStestkey';
++        PRAGMA cipher;
++    }
++} {ok aes-256-cbc}
++db close
++file delete -force test.db
++
++if_built_with_nss verify-default-cipher {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key='wolfsslFIPStestkey';
++        PRAGMA cipher;
++    }
++} {ok aes-256-cbc}
++db close
++file delete -force test.db
++
++do_test verify-cipher_settings_default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_settings;
++    }
++} {ok {PRAGMA kdf_iter = 256000;} {PRAGMA cipher_page_size = 4096;} {PRAGMA cipher_use_hmac = 1;} {PRAGMA cipher_plaintext_header_size = 0;} {PRAGMA cipher_hmac_algorithm = HMAC_SHA512;} {PRAGMA cipher_kdf_algorithm = PBKDF2_HMAC_SHA512;}}
++db close
++file delete -force test.db
++
++do_test verify-cipher_settings_v1 {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA key = 'wolfsslFIPStestkey';
++        PRAGMA cipher_compatibility = 1;
++        PRAGMA cipher_settings;
++    }
++} {ok {PRAGMA kdf_iter = 4000;} {PRAGMA cipher_page_size = 1024;} {PRAGMA cipher_use_hmac = 0;} {PRAGMA cipher_plaintext_header_size = 0;} {PRAGMA cipher_hmac_algorithm = HMAC_SHA1;} {PRAGMA cipher_kdf_algorithm = PBKDF2_HMAC_SHA1;}} 
++db close
++file delete -force test.db
++
++do_test verify-cipher_default_settings_v1 {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_default_compatibility = 1;
++        PRAGMA cipher_default_settings;
++        PRAGMA cipher_default_compatibility = 4;
++    }
++} {{PRAGMA cipher_default_kdf_iter = 4000;} {PRAGMA cipher_default_page_size = 1024;} {PRAGMA cipher_default_use_hmac = 0;} {PRAGMA cipher_default_plaintext_header_size = 0;} {PRAGMA cipher_default_hmac_algorithm = HMAC_SHA1;} {PRAGMA cipher_default_kdf_algorithm = PBKDF2_HMAC_SHA1;}} 
++db close
++file delete -force test.db
++
++do_test verify-cipher_default_settings_default {
++    sqlite_orig db test.db
++    execsql {
++        PRAGMA cipher_default_settings;
++    }
++} {{PRAGMA cipher_default_kdf_iter = 256000;} {PRAGMA cipher_default_page_size = 4096;} {PRAGMA cipher_default_use_hmac = 1;} {PRAGMA cipher_default_plaintext_header_size = 0;} {PRAGMA cipher_default_hmac_algorithm = HMAC_SHA512;} {PRAGMA cipher_default_kdf_algorithm = PBKDF2_HMAC_SHA512;}}
++db close
++file delete -force test.db
++
++do_test verify-cipher_log_source {
++    sqlite_orig db :memory:
++    execsql {
++        PRAGMA cipher_log_source; -- default should be ANY
++        PRAGMA cipher_log_source = NONE; --reset to NONE
++        PRAGMA cipher_log_source = PROVIDER; -- add PROVIDER to log source
++        PRAGMA cipher_log_source = CORE; -- add CORE to log source
++        PRAGMA cipher_log_source = MEMORY; -- add MEMORY to log source
++        PRAGMA cipher_log_source = NOTASOURCE; -- stay the same
++        PRAGMA cipher_log_source = ANY; -- reset to ANY
++    }
++} {ANY NONE PROVIDER {CORE PROVIDER} {CORE MEMORY PROVIDER} {CORE MEMORY PROVIDER} ANY}
++db close
++
++do_test verify-cipher_log_level {
++    sqlite_orig db :memory:
++    execsql {
++        PRAGMA cipher_log_level; -- default should be WARN
++        PRAGMA cipher_log_level = TRACE;
++        PRAGMA cipher_log_level = DEBUG;
++        PRAGMA cipher_log_level = INFO;
++        PRAGMA cipher_log_level = WARN;
++        PRAGMA cipher_log_level = ERROR;
++        PRAGMA cipher_log_level = NOTALEVEL; -- an unknown level should set back to none
++    }
++} {WARN TRACE DEBUG INFO WARN ERROR NONE}
++db close
++
++finish_test
+diff --git a/test/sqlcipher-rekey-wolfssl-fips.test b/test/sqlcipher-rekey-wolfssl-fips.test
+new file mode 100644
+index 00000000..b4975132
+--- /dev/null
++++ b/test/sqlcipher-rekey-wolfssl-fips.test
+@@ -0,0 +1,280 @@
++# SQLCipher
++# codec.test developed by Stephen Lombardo (Zetetic LLC)
++# sjlombardo at zetetic dot net
++# http://zetetic.net
++#
++# Copyright (c) 2018, ZETETIC LLC
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the ZETETIC LLC nor the
++#       names of its contributors may be used to endorse or promote products
++#       derived from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
++# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++#
++# This file implements regression tests for SQLite library.  The
++# focus of this script is testing code cipher features.
++#
++# NOTE: tester.tcl has overridden the definition of sqlite3 to
++# automatically pass in a key value. Thus tests in this file
++# should explicitly close and open db with sqlite_orig in order
++# to bypass default key assignment.
++
++# WOLFSSL NOTE: This test file is a modified version of sqlcipher-rekey.test
++# that is used to test the wolfSSL provider with FIPS-enabled wolfSSL. The only
++# difference is that database keys are changed to be FIPS compliant (longer),
++# as the original keys are too short.
++
++set testdir [file dirname $argv0]
++source $testdir/tester.tcl
++source $testdir/sqlcipher.tcl
++
++# Test rekey as first operation on an empty database
++# it should raise an error
++do_test rekey-as-first-op-on-empty {
++  sqlite_orig db test.db
++
++  catchsql {
++    PRAGMA rekey = 'wolfsslFIPSwolfsslFIPStestkey';
++  }
++
++} {1 {An error occurred with PRAGMA key or rekey. PRAGMA key requires a key of one or more characters. PRAGMA rekey can only be run on an existing encrypted database. Use sqlcipher_export() and ATTACH to convert encrypted/plaintext databases.}}
++db close
++file delete -force test.db
++
++# test a rekey operation as the first op on an existing database
++# then test that now the new key opens the database
++# now close database re-open with new key
++setup test.db "'wolfsslFIPStestkey'"
++do_test rekey-as-first-operation {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA rekey = 'wolfsslFIPStestkeynew';
++  }
++  db close
++
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkeynew';
++    SELECT name FROM sqlite_schema WHERE type='table';
++  }
++} {ok t1}
++db close
++file delete -force test.db
++
++# create a new database, insert some data
++# then rekey it with the same password
++do_test rekey-same-passkey {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');"
++  }
++
++  execsql {
++    COMMIT;
++    SELECT count(*) FROM t1;
++    PRAGMA rekey = 'wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++} {1000 ok 1000}
++db close
++file delete -force test.db
++
++# create a new database, insert some data
++# then rekey it. Make sure it is immediately
++# readable. Then close it and make sure it can be
++# read back 
++do_test rekey-and-query-1 {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t1(a,b);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<=1000} {incr i} {
++    set r [expr {int(rand()*500000)}]
++    execsql "INSERT INTO t1 VALUES($i,'value $r');"
++  }
++
++  execsql {
++    COMMIT;
++    SELECT count(*) FROM t1;
++    PRAGMA rekey = 'new wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++} {1000 ok 1000}
++
++db close
++
++do_test rekey-and-query-2 {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'new wolfsslFIPStestkey';
++    SELECT count(*) FROM t1;
++  }
++} {ok 1000}
++db close
++file delete -force test.db
++
++# create a new database, insert some data
++# delete about 50% of the data
++# write some new data
++# delete another 50%
++# then rekey it. Make sure it is immediately
++# readable. Then close it and make sure it can be
++# read back. This test will ensure that Secure Delete
++# is enabled and all pages are being written and are not
++# being optimized out by sqlite3PagerDontWrite
++do_test rekey-delete-and-query-1 {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    CREATE TABLE t1(a,b);
++    CREATE INDEX ta_a ON t1(a);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<1000} {incr i} {
++    set r1 [expr {int(rand()*32767)}]
++    execsql "INSERT INTO t1 VALUES($i,$r1);"
++  }
++
++  execsql "DELETE FROM t1 WHERE a < 500;"
++
++  set r1 [expr {int(rand()*32767)}]
++  execsql "UPDATE t1 SET b = $r1 WHERE a < 750;"
++
++  execsql "DELETE FROM t1 WHERE a > 750;"
++
++  execsql {
++    COMMIT;
++    SELECT (count(*) > 0) FROM t1;
++  }
++} {1}
++db close
++
++do_test rekey-delete-and-query-2 {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA rekey = 'new wolfsslFIPStestkey';
++    SELECT count(*) > 1 FROM t1;
++    PRAGMA integrity_check;
++  }
++} {ok ok 1 ok}
++db close
++
++do_test rekey-delete-and-query-3 {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'new wolfsslFIPStestkey';
++    SELECT count(*) > 1 FROM t1;
++  }
++} {ok 1}
++db close
++file delete -force test.db
++
++
++# same as previous test, but use WAL
++do_test rekey-delete-and-query-wal-1 {
++  sqlite_orig db test.db
++
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA journal_mode = WAL;
++    CREATE TABLE t1(a,b);
++    CREATE INDEX ta_a ON t1(a);
++    BEGIN;
++  }
++
++  for {set i 1} {$i<1000} {incr i} {
++    set r1 [expr {int(rand()*32767)}]
++    execsql "INSERT INTO t1 VALUES($i,$r1);"
++  }
++
++  execsql "DELETE FROM t1 WHERE a < 500;"
++
++  set r1 [expr {int(rand()*32767)}]
++  execsql "UPDATE t1 SET b = $r1 WHERE a < 750;"
++
++  execsql "DELETE FROM t1 WHERE a > 750;"
++
++  execsql {
++    COMMIT;
++    SELECT (count(*) > 0) FROM t1;
++  }
++} {1}
++db close
++
++do_test rekey-delete-and-query-wal-2 {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'wolfsslFIPStestkey';
++    PRAGMA journal_mode = WAL;
++    PRAGMA rekey = 'new wolfsslFIPStestkey';
++    SELECT count(*) > 1 FROM t1;
++    PRAGMA integrity_check;
++  }
++} {ok wal ok 1 ok}
++db close
++
++do_test rekey-delete-and-query-wal-3 {
++  sqlite_orig db test.db
++  execsql {
++    PRAGMA key = 'new wolfsslFIPStestkey';
++    PRAGMA journal_mode = WAL;
++    SELECT count(*) > 1 FROM t1;
++  }
++} {ok wal 1}
++db close
++file delete -force test.db
++
++do_test rekey-database-by-name {
++    sqlite_orig db test.db
++    execsql {
++        attach database 'new.db' as new;
++        pragma new.key = 'wolfsslFIPStestkey';
++        create table new.t1(a,b);
++        insert into new.t1(a,b) values('foo', 'bar');
++        pragma new.rekey = 'new wolfsslFIPStestkey';
++        detach database new;
++    }
++    db close
++
++    sqlite_orig db new.db
++    execsql {
++        pragma key = 'new wolfsslFIPStestkey';
++        select * from t1;
++    }
++} {ok foo bar}
++db close
++file delete -force test.db
++file delete -force new.db
++
++finish_test
+diff --git a/test/sqlcipher-wolfssl-fips.test b/test/sqlcipher-wolfssl-fips.test
+new file mode 100644
+index 00000000..888c9415
+--- /dev/null
++++ b/test/sqlcipher-wolfssl-fips.test
+@@ -0,0 +1,66 @@
++# codec.test developed by Stephen Lombardo (Zetetic LLC) 
++# sjlombardo at zetetic dot net
++# http://zetetic.net
++# 
++# Copyright (c) 2018, ZETETIC LLC
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the ZETETIC LLC nor the
++#       names of its contributors may be used to endorse or promote products
++#       derived from this software without specific prior written permission.
++# 
++# THIS SOFTWARE IS PROVIDED BY ZETETIC LLC ''AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL ZETETIC LLC BE LIABLE FOR ANY
++# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++#
++# This file implements regression tests for SQLite library.  The
++# focus of this script is testing code cipher features.
++#
++# NOTE: tester.tcl has overridden the definition of sqlite3 to 
++# automatically pass in a key value. Thus tests in this file
++# should explicitly close and open db with sqlite_orig in order
++# to bypass default key assignment.
++
++# WOLFSSL NOTE: This test file is a modified version of sqlcipher.test
++# that is used to test the wolfSSL provider with FIPS-enabled wolfSSL. The only
++# difference is that it calls the wolfSSL FIPS versions of the enabled tests.
++
++set testdir [file dirname $argv0]
++source $testdir/tester.tcl
++source $testdir/sqlcipher.tcl
++source $testdir/permutations.test
++
++set pretests ""
++
++sqlite_orig db :memory:
++execsql {
++  PRAGMA cipher_log = 'sqlcipher-wolfssl-fips-test.log';
++}
++db close
++
++test_suite "sqlcipher" -prefix "" -description {
++  Runs SQLCipher tests
++} -files [
++  test_set $pretests \
++           sqlcipher-core-wolfssl-fips.test \
++           sqlcipher-rekey-wolfssl-fips.test \
++           sqlcipher-plaintext-header-wolfssl-fips.test \
++           sqlcipher-pragmas-wolfssl-fips.test \
++           sqlcipher-integrity-wolfssl-fips.test \
++           sqlcipher-codecerror-wolfssl-fips.test \
++           sqlcipher-backup-wolfssl-fips.test
++]
++run_test_suite sqlcipher
++finish_test
 -- 
 2.34.1
 
