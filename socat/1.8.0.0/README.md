@@ -29,6 +29,7 @@ does not support DSA cipher suites.
 - Test 309 and 310 fail even before for the port when linked with OpenSSL.
 - Test 402 "i2v function not yet implemented for Subject Alternative Name"
 - Test 459 and 460 "socat[292771] E parseopts_table(): unknown option "ispeed""
+- Test 475 wolfSSL handles DTLS timeouts internally. Setting so-rcvtimeo on the socket does not affect the timeout.
 
 
 The configure.ac was updated to have `[ ]` instead of `[]` because of autoconf's expected format with AC_DEFINE.
