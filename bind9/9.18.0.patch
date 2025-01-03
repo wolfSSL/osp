@@ -1,6 +1,6 @@
-From 11d9dc9384d984a97eddf6ae485181243b25be6a Mon Sep 17 00:00:00 2001
+From 9efa572db725ed74cbcc89e3e8295a521f973e63 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
-Date: Fri, 11 Mar 2022 19:11:38 +0100
+Date: Fri, 3 Jan 2025 20:42:25 +0100
 Subject: [PATCH] Patch for wolfSSL
 
 This patch was implemented and tested on commit 8db45afa1affcb823e68afdeddedf93e136f5d3e of the master bind9 branch.
@@ -61,7 +61,7 @@ The system tests could not be successfully run (even when compiling with OpenSSL
  lib/dns/rbtdb.c             |  2 +-
  lib/dns/rpz.c               |  2 +-
  lib/isc/entropy.c           |  2 +-
- lib/isc/include/isc/tls.h   |  6 ++++
+ lib/isc/include/isc/tls.h   |  5 +++
  lib/isc/include/isc/util.h  |  7 +++-
  lib/isc/lex.c               |  2 +-
  lib/isc/lib.c               |  5 ---
@@ -69,7 +69,7 @@ The system tests could not be successfully run (even when compiling with OpenSSL
  lib/isc/tests/isctest.c     |  2 ++
  lib/isc/tests/timer_test.c  |  4 +--
  lib/isc/tls.c               |  2 +-
- 20 files changed, 160 insertions(+), 24 deletions(-)
+ 20 files changed, 159 insertions(+), 24 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
 index c4ada3050b4..421ca5ba355 100644
@@ -543,10 +543,10 @@ index ce79ba21c3b..e7a97ccab58 100644
  	}
  }
 diff --git a/lib/isc/include/isc/tls.h b/lib/isc/include/isc/tls.h
-index fd57042f304..0006d543d81 100644
+index fd57042f304..a2cad2f6bf5 100644
 --- a/lib/isc/include/isc/tls.h
 +++ b/lib/isc/include/isc/tls.h
-@@ -18,8 +18,14 @@
+@@ -18,8 +18,13 @@
  #include <isc/result.h>
  #include <isc/types.h>
  
@@ -554,9 +554,8 @@ index fd57042f304..0006d543d81 100644
  typedef struct ssl_ctx_st isc_tlsctx_t;
  typedef struct ssl_st	  isc_tls_t;
 +#else
-+#include <wolfssl/ssl.h>
-+typedef WOLFSSL_CTX       isc_tlsctx_t;
-+typedef WOLFSSL           isc_tls_t;
++typedef struct WOLFSSL_CTX isc_tlsctx_t;
++typedef struct WOLFSSL     isc_tls_t;
 +#endif
  
  void
@@ -692,5 +691,5 @@ index 35b8a1277e5..b495052b1e5 100644
  			    "cannot be initialized (see the `PRNG not "
  			    "seeded' message in the OpenSSL FAQ)");
 -- 
-2.25.1
+2.34.1
 
