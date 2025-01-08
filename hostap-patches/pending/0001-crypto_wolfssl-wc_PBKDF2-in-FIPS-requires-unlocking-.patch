@@ -1,0 +1,29 @@
+From 65a7550717df5b5d76cad6965de68966bd5f371e Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Wed, 8 Jan 2025 19:33:46 +0100
+Subject: [PATCH] crypto_wolfssl: wc_PBKDF2 in FIPS requires unlocking the
+ private key
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/crypto_wolfssl.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/crypto/crypto_wolfssl.c b/src/crypto/crypto_wolfssl.c
+index 269174321b..b9c8e8a83b 100644
+--- a/src/crypto/crypto_wolfssl.c
++++ b/src/crypto/crypto_wolfssl.c
+@@ -514,8 +514,10 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len,
+ {
+ 	int ret;
+ 
++	PRIVATE_KEY_UNLOCK();
+ 	ret = wc_PBKDF2(buf, (const byte *) passphrase, os_strlen(passphrase),
+ 			ssid, ssid_len, iterations, buflen, WC_SHA);
++	PRIVATE_KEY_LOCK();
+ 	if (ret != 0) {
+ 		if (ret == HMAC_MIN_KEYLEN_E) {
+ 			LOG_WOLF_ERROR_VA("wolfSSL: Password is too short. Make sure your password is at least %d characters long. This is a requirement for FIPS builds.",
+-- 
+2.34.1
+
