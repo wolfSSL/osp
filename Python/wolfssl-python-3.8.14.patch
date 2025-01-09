@@ -1459,7 +1459,7 @@ index 93bf25f..70e5b34 100644
          name ="sha512_224";
          break;
 diff --git a/Modules/_ssl.c b/Modules/_ssl.c
-index 35d9d65..2ca78c5 100644
+index 35d9d65..c1130d5 100644
 --- a/Modules/_ssl.c
 +++ b/Modules/_ssl.c
 @@ -53,6 +53,10 @@ static PySocketModule_APIObject PySocketModule;
@@ -1558,15 +1558,22 @@ index 35d9d65..2ca78c5 100644
  #define TLS_method SSLv23_method
  #define TLS_client_method SSLv23_client_method
  #define TLS_server_method SSLv23_server_method
-@@ -228,6 +263,7 @@ extern const SSL_METHOD *TLSv1_2_method(void);
+@@ -228,11 +263,14 @@ extern const SSL_METHOD *TLSv1_2_method(void);
  #define OpenSSL_version_num SSLeay
  #define OpenSSL_version SSLeay_version
  #define OPENSSL_VERSION SSLEAY_VERSION
 +#endif
  
++#ifndef X509_NAME_ENTRY_set
  static int X509_NAME_ENTRY_set(const X509_NAME_ENTRY *ne)
  {
-@@ -243,6 +279,7 @@ static int COMP_get_type(const COMP_METHOD *meth)
+     return ne->set;
+ }
++#endif
+ 
+ #ifndef OPENSSL_NO_COMP
+ /* LCOV_EXCL_START */
+@@ -243,6 +281,7 @@ static int COMP_get_type(const COMP_METHOD *meth)
  /* LCOV_EXCL_STOP */
  #endif
  
@@ -1574,7 +1581,7 @@ index 35d9d65..2ca78c5 100644
  static pem_password_cb *SSL_CTX_get_default_passwd_cb(SSL_CTX *ctx)
  {
      return ctx->default_passwd_callback;
-@@ -284,6 +321,7 @@ SSL_SESSION_get_ticket_lifetime_hint(const SSL_SESSION *s)
+@@ -284,6 +323,7 @@ SSL_SESSION_get_ticket_lifetime_hint(const SSL_SESSION *s)
  {
      return s->tlsext_tick_lifetime_hint;
  }
@@ -1582,7 +1589,7 @@ index 35d9d65..2ca78c5 100644
  
  #endif /* OpenSSL < 1.1.0 or LibreSSL < 2.7.0 */
  
-@@ -504,7 +542,11 @@ static inline _PySSLError _PySSL_errno(int failed, const SSL *ssl, int retcode)
+@@ -504,7 +544,11 @@ static inline _PySSLError _PySSL_errno(int failed, const SSL *ssl, int retcode)
          _PySSL_FIX_ERRNO;
  #endif
          err.c = errno;
@@ -1594,7 +1601,7 @@ index 35d9d65..2ca78c5 100644
      }
      return err;
  }
-@@ -671,6 +713,13 @@ fill_and_set_sslerror(PySSLSocket *sslsock, PyObject *type, int ssl_errno,
+@@ -671,6 +715,13 @@ fill_and_set_sslerror(PySSLSocket *sslsock, PyObject *type, int ssl_errno,
                  sslsock->server_hostname
              );
              break;
@@ -1608,7 +1615,7 @@ index 35d9d65..2ca78c5 100644
  #endif
          default:
              verify_str = X509_verify_cert_error_string(verify_code);
-@@ -789,13 +838,28 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
+@@ -789,13 +840,28 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
              errstr = "The operation did not complete (connect)";
              break;
          case SSL_ERROR_SYSCALL:
@@ -1637,7 +1644,7 @@ index 35d9d65..2ca78c5 100644
                  } else if (s && ret == -1) {
                      /* underlying BIO reported an I/O error */
                      ERR_clear_error();
-@@ -836,6 +900,49 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
+@@ -836,6 +902,49 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
              }
              break;
          }
@@ -1687,7 +1694,7 @@ index 35d9d65..2ca78c5 100644
          default:
              p = PY_SSL_ERROR_INVALID_ERROR_CODE;
              errstr = "Invalid error code";
-@@ -1230,7 +1337,9 @@ _create_tuple_for_X509_NAME (X509_NAME *xname)
+@@ -1230,7 +1339,9 @@ _create_tuple_for_X509_NAME (X509_NAME *xname)
  
          /* check to see if we've gotten to a new RDN */
          if (rdn_level >= 0) {
@@ -1697,7 +1704,7 @@ index 35d9d65..2ca78c5 100644
                  /* yes, new RDN */
                  /* add old RDN to DN */
                  rdnt = PyList_AsTuple(rdn);
-@@ -1245,7 +1354,9 @@ _create_tuple_for_X509_NAME (X509_NAME *xname)
+@@ -1245,7 +1356,9 @@ _create_tuple_for_X509_NAME (X509_NAME *xname)
                  rdn = PyList_New(0);
                  if (rdn == NULL)
                      goto fail0;
@@ -1707,7 +1714,7 @@ index 35d9d65..2ca78c5 100644
          }
          rdn_level = X509_NAME_ENTRY_set(entry);
  
-@@ -1449,14 +1560,14 @@ _get_peer_alt_names (X509 *certificate) {
+@@ -1449,14 +1562,14 @@ _get_peer_alt_names (X509 *certificate) {
                  PyTuple_SET_ITEM(t, 0, v);
  
                  if (name->d.ip->length == 4) {
@@ -1724,7 +1731,7 @@ index 35d9d65..2ca78c5 100644
                      len = sprintf(
                          buf,
                          "%X:%X:%X:%X:%X:%X:%X:%X",
-@@ -1567,8 +1678,21 @@ _get_aia_uri(X509 *certificate, int nid) {
+@@ -1567,8 +1680,21 @@ _get_aia_uri(X509 *certificate, int nid) {
      PyObject *lst = NULL, *ostr = NULL;
      int i, result;
      AUTHORITY_INFO_ACCESS *info;
@@ -1747,7 +1754,7 @@ index 35d9d65..2ca78c5 100644
      if (info == NULL)
          return Py_None;
      if (sk_ACCESS_DESCRIPTION_num(info) == 0) {
-@@ -2162,7 +2286,11 @@ _ssl__SSLSocket_selected_alpn_protocol_impl(PySSLSocket *self)
+@@ -2162,7 +2288,11 @@ _ssl__SSLSocket_selected_alpn_protocol_impl(PySSLSocket *self)
  
      SSL_get0_alpn_selected(self->ssl, &out, &outlen);
  
@@ -1759,7 +1766,7 @@ index 35d9d65..2ca78c5 100644
          Py_RETURN_NONE;
      return PyUnicode_FromStringAndSize((char *)out, outlen);
  }
-@@ -2841,7 +2969,7 @@ _ssl__SSLSocket_verify_client_post_handshake_impl(PySSLSocket *self)
+@@ -2841,7 +2971,7 @@ _ssl__SSLSocket_verify_client_post_handshake_impl(PySSLSocket *self)
  #endif
  }
  
@@ -1768,7 +1775,7 @@ index 35d9d65..2ca78c5 100644
  
  static SSL_SESSION*
  _ssl_session_dup(SSL_SESSION *session) {
-@@ -2892,7 +3020,7 @@ PySSL_get_session(PySSLSocket *self, void *closure) {
+@@ -2892,7 +3022,7 @@ PySSL_get_session(PySSLSocket *self, void *closure) {
      PySSLSession *pysess;
      SSL_SESSION *session;
  
@@ -1777,7 +1784,7 @@ index 35d9d65..2ca78c5 100644
      /* duplicate session as workaround for session bug in OpenSSL 1.1.0,
       * https://github.com/openssl/openssl/issues/1550 */
      session = SSL_get0_session(self->ssl);  /* borrowed reference */
-@@ -2926,7 +3054,7 @@ static int PySSL_set_session(PySSLSocket *self, PyObject *value,
+@@ -2926,7 +3056,7 @@ static int PySSL_set_session(PySSLSocket *self, PyObject *value,
                               void *closure)
                                {
      PySSLSession *pysess;
@@ -1786,7 +1793,7 @@ index 35d9d65..2ca78c5 100644
      SSL_SESSION *session;
  #endif
      int result;
-@@ -2952,7 +3080,7 @@ static int PySSL_set_session(PySSLSocket *self, PyObject *value,
+@@ -2952,7 +3082,7 @@ static int PySSL_set_session(PySSLSocket *self, PyObject *value,
                          "Cannot set session after handshake.");
          return -1;
      }
@@ -1795,7 +1802,7 @@ index 35d9d65..2ca78c5 100644
      /* duplicate session */
      if ((session = _ssl_session_dup(pysess->session)) == NULL) {
          return -1;
-@@ -3113,11 +3241,13 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
+@@ -3113,11 +3243,13 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
  
      PySSL_BEGIN_ALLOW_THREADS
      switch(proto_version) {
@@ -1810,7 +1817,7 @@ index 35d9d65..2ca78c5 100644
  #if (defined(TLS1_VERSION) && \
          !defined(OPENSSL_NO_TLS1) && \
          !defined(OPENSSL_NO_TLS1_METHOD))
-@@ -3218,7 +3348,7 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
+@@ -3218,7 +3350,7 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
  #ifdef SSL_OP_SINGLE_DH_USE
      options |= SSL_OP_SINGLE_DH_USE;
  #endif
@@ -1819,7 +1826,7 @@ index 35d9d65..2ca78c5 100644
      options |= SSL_OP_SINGLE_ECDH_USE;
  #endif
  #ifdef SSL_OP_IGNORE_UNEXPECTED_EOF
-@@ -5355,9 +5485,12 @@ PySSL_RAND(int len, int pseudo)
+@@ -5355,9 +5487,12 @@ PySSL_RAND(int len, int pseudo)
      if (bytes == NULL)
          return NULL;
      if (pseudo) {
@@ -1833,7 +1840,7 @@ index 35d9d65..2ca78c5 100644
          ok = RAND_pseudo_bytes((unsigned char*)PyBytes_AS_STRING(bytes), len);
  #endif
          if (ok == 0 || ok == 1)
-@@ -6066,6 +6199,9 @@ PyInit__ssl(void)
+@@ -6066,6 +6201,9 @@ PyInit__ssl(void)
          return NULL;
      PySocketModule = *socket_api;
  
@@ -1843,7 +1850,7 @@ index 35d9d65..2ca78c5 100644
  #ifndef OPENSSL_VERSION_1_1
      /* Load all algorithms and initialize cpuid */
      OPENSSL_add_all_algorithms_noconf();
-@@ -6079,7 +6215,7 @@ PyInit__ssl(void)
+@@ -6079,7 +6217,7 @@ PyInit__ssl(void)
      if (!_setup_ssl_threads()) {
          return NULL;
      }
@@ -1852,7 +1859,7 @@ index 35d9d65..2ca78c5 100644
      /* OpenSSL 1.1.0 builtin thread support is enabled */
      _ssl_locks_count++;
  #endif
-@@ -6178,8 +6314,10 @@ PyInit__ssl(void)
+@@ -6178,8 +6316,10 @@ PyInit__ssl(void)
                              X509_V_FLAG_CRL_CHECK);
      PyModule_AddIntConstant(m, "VERIFY_CRL_CHECK_CHAIN",
                              X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
@@ -1863,7 +1870,7 @@ index 35d9d65..2ca78c5 100644
  #ifdef X509_V_FLAG_TRUSTED_FIRST
      PyModule_AddIntConstant(m, "VERIFY_X509_TRUSTED_FIRST",
                              X509_V_FLAG_TRUSTED_FIRST);
-@@ -6470,5 +6608,11 @@ PyInit__ssl(void)
+@@ -6470,5 +6610,11 @@ PyInit__ssl(void)
      if (r == NULL || PyModule_AddObject(m, "_OPENSSL_API_VERSION", r))
          return NULL;
  
