@@ -1,0 +1,120 @@
+diff --git a/src/OpenSSL/SSL.py b/src/OpenSSL/SSL.py
+index 4db5240..bfc6979 100644
+--- a/src/OpenSSL/SSL.py
++++ b/src/OpenSSL/SSL.py
+@@ -24,6 +24,8 @@ from OpenSSL._util import (
+ )
+ from OpenSSL._util import (
+     no_zero_allocator as _no_zero_allocator,
++    wolfssl as _wolfssl,
++    wolfssl_debug as _wolfssl_debug
+ )
+ from OpenSSL._util import (
+     path_bytes as _path_bytes,
+@@ -468,8 +470,22 @@ class _VerifyHelper(_CallbackExceptionHelper):
+         @wraps(callback)
+         def wrapper(ok, store_ctx):
+             x509 = _lib.X509_STORE_CTX_get_current_cert(store_ctx)
+-            _lib.X509_up_ref(x509)
+-            cert = X509._from_raw_x509_ptr(x509)
++            if _wolfssl:
++                # _from_raw_x509_ptr has code to call X509_free on the X509
++                # object when it's time to do garbage collection. With wolfSSL,
++                # when that X509_free call happens, it's possible that the X509
++                # object has already been freed by FreeX509 (an internal
++                # function). That function doesn't care what the reference count
++                # is and does the free unconditionally. This causes problems
++                # when the garbage collector comes along and tries to free the
++                # already freed X509. The solution for the wolfSSL case is to
++                # duplicate the object rather than fiddling with the ref count.
++                x509_copy = _lib.X509_dup(x509)
++                cert = X509._from_raw_x509_ptr(x509_copy)
++            else:
++                _lib.X509_up_ref(x509)
++                cert = X509._from_raw_x509_ptr(x509)
++
+             error_number = _lib.X509_STORE_CTX_get_error(store_ctx)
+             error_depth = _lib.X509_STORE_CTX_get_error_depth(store_ctx)
+ 
+@@ -785,8 +801,9 @@ def _make_requires(flag, error):
+     return _requires_decorator
+ 
+ 
++alpn_criteria = True if _wolfssl else _lib.Cryptography_HAS_ALPN
+ _requires_alpn = _make_requires(
+-    _lib.Cryptography_HAS_ALPN, "ALPN not available"
++    alpn_criteria, "ALPN not available"
+ )
+ 
+ 
+@@ -1810,7 +1827,7 @@ class Connection:
+             raise WantReadError()
+         elif error == _lib.SSL_ERROR_WANT_WRITE:
+             raise WantWriteError()
+-        elif error == _lib.SSL_ERROR_ZERO_RETURN:
++        elif error == _lib.SSL_ERROR_ZERO_RETURN or (_wolfssl and error == _lib.SOCKET_PEER_CLOSED_E):
+             raise ZeroReturnError()
+         elif error == _lib.SSL_ERROR_WANT_X509_LOOKUP:
+             # TODO: This is untested.
+diff --git a/src/OpenSSL/_util.py b/src/OpenSSL/_util.py
+index 7a102e6..90c9c12 100644
+--- a/src/OpenSSL/_util.py
++++ b/src/OpenSSL/_util.py
+@@ -3,13 +3,21 @@ import sys
+ import warnings
+ from typing import Any, Callable, NoReturn, Type, Union
+ 
+-from cryptography.hazmat.bindings.openssl.binding import Binding
++wolfssl = True
++wolfssl_debug = False
+ 
+-StrOrBytesPath = Union[str, bytes, os.PathLike]
++if wolfssl:
++    from wolfssl._ffi import ffi, lib
++    if wolfssl_debug:
++        lib.wolfSSL_Debugging_ON()
++else:
++    from cryptography.hazmat.bindings.openssl.binding import Binding
++
++    binding = Binding()
++    ffi = binding.ffi
++    lib = binding.lib
+ 
+-binding = Binding()
+-ffi = binding.ffi
+-lib = binding.lib
++StrOrBytesPath = Union[str, bytes, os.PathLike]
+ 
+ 
+ # This is a special CFFI allocator that does not bother to zero its memory
+diff --git a/src/OpenSSL/crypto.py b/src/OpenSSL/crypto.py
+index 1707488..22e9926 100644
+--- a/src/OpenSSL/crypto.py
++++ b/src/OpenSSL/crypto.py
+@@ -45,6 +45,7 @@ from OpenSSL._util import (
+ )
+ from OpenSSL._util import (
+     make_assert as _make_assert,
++    wolfssl as _wolfssl
+ )
+ from OpenSSL._util import (
+     path_bytes as _path_bytes,
+@@ -225,9 +226,15 @@ def _get_asn1_time(timestamp: Any) -> Optional[bytes]:
+     ):
+         return _ffi.string(_lib.ASN1_STRING_get0_data(string_timestamp))
+     else:
+-        generalized_timestamp = _ffi.new("ASN1_GENERALIZEDTIME**")
+-        _lib.ASN1_TIME_to_generalizedtime(timestamp, generalized_timestamp)
+-        if generalized_timestamp[0] == _ffi.NULL:
++        if not _wolfssl:
++            generalized_timestamp = _ffi.new("ASN1_GENERALIZEDTIME**")
++            _lib.ASN1_TIME_to_generalizedtime(timestamp, generalized_timestamp)
++            null_error = generalized_timestamp[0] == _ffi.NULL
++        else:
++            generalized_timestamp = _lib.ASN1_TIME_to_generalizedtime(timestamp, _ffi.NULL)
++            null_error = generalized_timestamp == _ffi.NULL
++
++        if null_error:
+             # This may happen:
+             #   - if timestamp was not an ASN1_TIME
+             #   - if allocating memory for the ASN1_GENERALIZEDTIME failed
