@@ -1,107 +1,815 @@
-From 3ece43c30f46b56993867577ccec7c578e7f2356 Mon Sep 17 00:00:00 2001
-From: Tesfa Mael <tesfa@wolfssl.com>
-Date: Tue, 8 Oct 2024 18:15:57 -0700
-Subject: [PATCH] Add support for wolfSSL
-
----
- src/realm/CMakeLists.txt                      | 10 +++-
- src/realm/sync/CMakeLists.txt                 |  2 +
- src/realm/sync/network/network_ssl.cpp        | 48 ++++++++++++---
- src/realm/sync/network/network_ssl.hpp        | 60 ++++++++++++++++++-
- src/realm/sync/noinst/server/CMakeLists.txt   |  2 +-
- .../noinst/server/crypto_server_openssl.cpp   | 11 ++++
- src/realm/util/aes_cryptor.hpp                | 11 ++++
- src/realm/util/config.h.in                    |  1 +
- src/realm/util/sha_crypto.cpp                 | 11 ++++
- 9 files changed, 142 insertions(+), 14 deletions(-)
-
+diff --git a/.gitignore b/.gitignore
+index 8fd4a65df..7818e41f3 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -38,7 +38,7 @@ CMakeScripts
+ Thumbs.db
+ 
+ # Ignore files build by Visual Studio
+-/.vs
++**/.vs
+ /Visual\ Studio
+ 
+ # Ignore user-local configuration for Visual Studio Code
+@@ -107,3 +107,12 @@ tsconfig.tsbuildinfo
+ # Baas remote host artifacts
+ baas-work-dir/
+ ssh_agent_commands.sh
++
++# Ignore output build
++**/out/build/**
++
++# Ignore backup files
++*.bak
++
++# Ignore breadcrumb / semaphore files
++/REALM_CORE_COMMIT_COMPLETE.log
+diff --git a/Android.bp b/Android.bp
+index e64e47d51..0dab87ca9 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -147,7 +147,8 @@ cc_defaults {
+     cflags: [
+         "-fPIC",
+         "-DREALM_NO_CONFIG",
+-        "-DREALM_HAVE_OPENSSL=1",
++        "-DREALM_HAVE_OPENSSL=0",
++        "-DREALM_HAVE_WOLFSSL=1",
+         "-DREALM_INCLUDE_CERTS=1",
+         "-DREALM_ENABLE_ENCRYPTION=1",
+         "-DREALM_ENABLE_SYNC=1",
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1b67258ab..317496b0a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,6 +1,160 @@
+ cmake_minimum_required(VERSION 3.15)
+-message(STATUS "CMake version: ${CMAKE_VERSION}")
++if(REALM_HAVE_WOLFSSL AND REALM_HAVE_OPENSSL)
++    message(FATAL_ERROR "Found both REALM_HAVE_WOLFSSL and REALM_HAVE_OPENSSL. Pick one")
++else()
++    # Optionally force wolfSSL
++    # set(REALM_HAVE_WOLFSSL 1)
++    message(STATUS "REALM_HAVE_WOLFSSL: ${REALM_HAVE_WOLFSSL}")
++    message(STATUS "REALM_HAVE_OPENSSL: ${REALM_HAVE_OPENSSL}")
++endif()
++message(STATUS "\n\n=======================================================\nCurrent CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++
++set(THIS_OUTPUT_DIRECTORY "../VS2022/Debug/x64")
++get_filename_component(THIS_ABSOLUTE_PATH "${THIS_OUTPUT_DIRECTORY}" ABSOLUTE)
++
++message(STATUS "THIS_ABSOLUTE_PATH:    ${THIS_ABSOLUTE_PATH}")
++message(STATUS "THIS_OUTPUT_DIRECTORY: ${THIS_OUTPUT_DIRECTORY}")
++
++# e.g C:\workspace\osp-$USER\realm\VS2022\Debug\x64\wolfssl.lib
++set(REALM_WOLFSSL_ROOT_DIR "${THIS_OUTPUT_DIRECTORY}" CACHE PATH "Path to the wolfSSL root directory")
++
++# Optionally have a hard-coded WOLFSSL_ROOT here
++if (0)
++    set(WOLFSSL_ROOT "/mnt/c/workspace/wolfssl")
++endif()
++
++# REALM_WOLFSSL_ROOT_DIR typically passed as a cmake parameter in bash : -DREALM_WOLFSSL_ROOT_DIR="/home/$USER/wolfssl-install-dir"
++message(STATUS "REALM_WOLFSSL_ROOT_DIR:          '${REALM_WOLFSSL_ROOT_DIR}'")
++message(STATUS "WOLFSSL_ROOT:                    '${WOLFSSL_ROOT}'")
++message(STATUS "WOLFSSL_USER_SETTINGS_DIRECTORY: '${WOLFSSL_USER_SETTINGS_DIRECTORY}'")
++
++
++# root realm cmake file
++# set(VS_ROOT "xyzzy" CACHE STRING "Custom variable for VS_ROOT")
++# message(STATUS "")
++# message(STATUS "hi there!")
++
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "Detected main project as Visual Studio build")
++    if("${WOLFSSL_ROOT}")
++        message(STATUS "Using WOLFSSL_ROOT=${WOLFSSL_ROOT}")
++    else()
++        message(STATUS "WOLFSSL_ROOT not set, looking in environment variable.")
++        if(DEFINED ENV{WOLFSSL_ROOT})
++            if(EXISTS "$ENV{WOLFSSL_ROOT}")
++                set(WOLFSSL_ROOT "$ENV{WOLFSSL_ROOT}")
++                message(STATUS "Using WOLFSSL from environment variable: WOLFSSL_ROOT=${WOLFSSL_ROOT}")
++            else()
++                message(FATAL_ERROR "Environment variable directory does not exist: WOLFSSL_ROOT=$ENV{WOLFSSL_ROOT}")
++            endif()
++        else()
++            message(STATUS "WARNING: WOLFSSL_ROOT value not found.")
++            set(WOLFSSL_ROOT "/workspace/wolfssl")
++            message(STATUS "Set default WOLFSSL_ROOT=${WOLFSSL_ROOT}")
++        endif()
++    endif()
++    set(WOLFSSL_BREADCRUMB ON)
++    message(STATUS "File version 0019")
++    if(WOLFSSL_BREADCRUMB)
++        message(STATUS "Found WOLFSSL_BREADCRUMB! in ${CMAKE_CURRENT_LIST_FILE}")
++        message(STATUS "REALM_HAVE_WOLFSSL:${REALM_HAVE_WOLFSSL}")
++        if(REALM_HAVE_WOLFSSL)
++            message(STATUS "Proper have wolfSSL")
++        else()
++            message(STATUS "NO have wolfSSL")
++        endif()
++        message(STATUS "REALM_HAVE_OPENSSL:${REALM_HAVE_OPENSSL}")
++        if(REALM_HAVE_OPENSSL)
++            message(STATUS "Proper have OpenSSL")
++        else()
++            message(STATUS "NO have OpenSSL")
++        endif()
++    else()
++        message(STATUS "NOT Found WOLFSSL_BREADCRUMB! in ${CMAKE_CURRENT_LIST_FILE}")
++    endif()
++
++    add_compile_definitions(WOLFSSL_LIB)
++    add_compile_definitions(WOLFSSL_USER_SETTINGS)
++
++    if(1)
++        # Optionally adjust some known settings
++        option(REALM_INCLUDE_CERTS     "Include certs in Realm"     ON)
++        option(REALM_ENABLE_ENCRYPTION "Enable encryption in Realm" ON)
++        option(REALM_ENABLE_SYNC       "Enable sync in Realm"       ON)
++        option(REALM_HAVE_OPENSSL      "Disable OpenSSL in Realm"   OFF)
++        option(REALM_HAVE_WOLFSSL      "Enable wolfSSL in Realm"    ON)
++    endif()
++    message(STATUS "new paths:")
++
++    # This line will adjust project file Additional Include Files contents with VS variable, not cmake!:
++    set(THIS_PARENT_DIRECTORY_WRK ${CMAKE_CURRENT_SOURCE_DIR}/../)
++    get_filename_component(THIS_PARENT_DIRECTORY "${THIS_PARENT_DIRECTORY_WRK}" ABSOLUTE)
++    message(STATUS "THIS_PARENT_DIRECTORY=${THIS_PARENT_DIRECTORY}")
++
++    # Visual Studio project file variables cannot be "seen" here, so we need to manually assemble the ones we need:
++    # "${THIS_PARENT_DIRECTORY}/VS2022/include" here is equivalent to
++    #                  "$(SolutionDir)/include" in the Visual Studio project file.
++    include_directories("${THIS_PARENT_DIRECTORY}/VS2022/include" "${WOLFSSL_ROOT}/wolfssl" "${WOLFSSL_ROOT}")
++
++    link_directories("${THIS_OUTPUT_DIRECTORY}")
++
++    # If Visual Studio, we'll point to woSSL source code, each up to 3 directories up in the relative D[n] path:
++    set(REALM_WOLFSSL_LIB             "${THIS_OUTPUT_DIRECTORY}/wolfssl" CACHE PATH "Path to the wolfSSL root directory")
++    set(REALM_WOLFSSL_LIB_D1       "../${THIS_OUTPUT_DIRECTORY}/wolfssl" CACHE PATH "Path to the wolfSSL root directory in parent")
++    set(REALM_WOLFSSL_LIB_D2    "../../${THIS_OUTPUT_DIRECTORY}/wolfssl" CACHE PATH "Path to the wolfSSL root directory 2 parents up")
++    set(REALM_WOLFSSL_LIB_D3 "../../../${THIS_OUTPUT_DIRECTORY}/wolfssl" CACHE PATH "Path to the wolfSSL root directory 3 parents up")
++
++    # optional find_package
++    if(0)
++        find_package(wolfssl REQUIRED)
++    endif()
++
++    if(NOT TARGET wolfssl)
++        message(STATUS ">>> add library wolfSSL! (root realm cmake file)")
++        add_library(wolfssl STATIC IMPORTED)
++    else()
++        message(STATUS ">>> Skip library wolfSSL! already found.")
++    endif()
+ 
++    link_directories("${THIS_OUTPUT_DIRECTORY}")
++
++    # Import wolfSSL Visual Studio project.
++    # Project is assumed to have defined WOLFSSL_USER_SETTINGS WOLFSSL_LIB, etc.
++    include(ExternalProject)
++    set(WOLFSSL_MACROS "/DWOLFSSL_USER_SETTINGS" "/DMY_WOLFSSL_BREADCRUMB=1")
++    include_external_msproject(wolfssl  "./wolfssl-VS2022-cmake.vcxproj" )
++
++    # Optional pre-build project steps could go here
++    if(0)
++        add_custom_target(wolfssl_prepare ALL
++            COMMAND ${CMAKE_COMMAND} -E echo "Updating environment..."
++            # Additional steps here
++        )
++    endif()
++
++    set_target_properties(wolfssl PROPERTIES IMPORTED_LOCATION "${THIS_OUTPUT_DIRECTORY}/wolfssl.Lib")
++else()
++    add_library(wolfssl STATIC IMPORTED)
++    message(STATUS "Found CMAKE_GENERATOR that is NOT Visual Studio: ${CMAKE_GENERATOR}")
++    if (0)
++        # Optional include source code similar to Visual Studio build, rather than pre-compiled
++        #  link_directories("${THIS_OUTPUT_DIRECTORY}")
++        #  message(STATUS "Setting REALM_WOLFSSL_LIB_D[depth] values...")
++        #  set(REALM_WOLFSSL_LIB             "${THIS_OUTPUT_DIRECTORY}/wolfssl" CACHE PATH "Path to the wolfSSL root directory")
++        #  set(REALM_WOLFSSL_LIB_D1       "../${THIS_OUTPUT_DIRECTORY}/wolfssl" CACHE PATH "Path to the wolfSSL root directory")
++        #  set(REALM_WOLFSSL_LIB_D2    "../../${THIS_OUTPUT_DIRECTORY}/wolfssl" CACHE PATH "Path to the wolfSSL root directory")
++        #  set(REALM_WOLFSSL_LIB_D3 "../../../${THIS_OUTPUT_DIRECTORY}/wolfssl" CACHE PATH "Path to the wolfSSL root directory")
++    else()
++        # when using an alternate preinstalled directory, not relative to current path, all the LIB_D[n] point to the same directory:
++        set(REALM_WOLFSSL_LIB    "${REALM_WOLFSSL_ROOT_DIR}/lib/libwolfssl.so" CACHE PATH "Path to the wolfSSL root directory")
++        set(REALM_WOLFSSL_LIB_D1 "${REALM_WOLFSSL_ROOT_DIR}/lib/libwolfssl.so" CACHE PATH "Path to the wolfSSL root directory")
++        set(REALM_WOLFSSL_LIB_D2 "${REALM_WOLFSSL_ROOT_DIR}/lib/libwolfssl.so" CACHE PATH "Path to the wolfSSL root directory")
++        set(REALM_WOLFSSL_LIB_D3 "${REALM_WOLFSSL_ROOT_DIR}/lib/libwolfssl.so" CACHE PATH "Path to the wolfSSL root directory")
++    endif()
++endif()
++
++message(STATUS "CMake version: ${CMAKE_VERSION}")
++#set(CMAKE_SYSTEM_VERSION 10.0.22621.0)
+ set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
+ project(RealmCore)
+ 
+@@ -302,25 +456,55 @@ if(REALM_ENABLE_SYNC)
+         option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for OpenSSL certificate verification" ON)
+     endif()
+ elseif(REALM_ENABLE_ENCRYPTION AND CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
+-    set(REALM_NEEDS_OPENSSL TRUE)
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "Found REALM_ENABLE_SYNC with REALM_HAVE_WOLFSSL")
++    else()
++        set(REALM_NEEDS_OPENSSL TRUE)
++    endif()
+ endif()
+ 
+-if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
+-    if(NOT REALM_USE_SYSTEM_OPENSSL AND (ANDROID OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+-        # Use our own prebuilt OpenSSL
+-        realm_acquire_dependency(openssl ${DEP_OPENSSL_VERSION} OPENSSL_CMAKE_INCLUDE_FILE)
+-
+-        include(${OPENSSL_CMAKE_INCLUDE_FILE})
++if(REALM_HAVE_WOLFSSL)
++    if(REALM_INCLUDE_CERTS)
++        message(STATUS "Found REALM_INCLUDE_CERTS")
+     endif()
++    if(REALM_ENABLE_SYNC)
++        message(STATUS "Found REALM_ENABLE_SYNC")
++        option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for OpenSSL certificate verification" ON)
++    endif()
++    # Allow users to specify their wolfSSL installation directory
++    message(STATUS "Main cmake: REALM_WOLFSSL_ROOT_DIR=${REALM_WOLFSSL_ROOT_DIR}")
++    if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++        find_library(REALM_WOLFSSL_LIB NAMES wolfssl PATHS "${REALM_WOLFSSL_ROOT_DIR}")
++    else()
++        find_library(REALM_WOLFSSL_LIB NAMES wolfssl PATHS "${REALM_WOLFSSL_ROOT_DIR}/lib")
++    endif()
++    message(STATUS "REALM_WOLFSSL_LIB=${REALM_WOLFSSL_LIB}")
++    if(EXISTS "${REALM_WOLFSSL_LIB}")
++        message(STATUS "Found wolfssl lib file: ${REALM_WOLFSSL_LIB}")
++    else()
++        message(WARNING "File does not exist: ${REALM_WOLFSSL_LIB}")
++    endif()
++else()
++    set(REALM_WOLFSSL_LIB "" CACHE PATH "wolfSSL is not used when REALM_HAVE_WOLFSSL is not set.")
++    message(STATUS "Main cmake: Not using wolfSSL! (REALM_HAVE_WOLFSSL not enabled); REALM_WOLFSSL_ROOT_DIR=${REALM_WOLFSSL_ROOT_DIR}")
++    if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
++        if(NOT REALM_USE_SYSTEM_OPENSSL AND (ANDROID OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
++            # Use our own prebuilt OpenSSL
++            realm_acquire_dependency(openssl ${DEP_OPENSSL_VERSION} OPENSSL_CMAKE_INCLUDE_FILE)
+ 
+-    if(NOT DEFINED OPENSSL_USE_STATIC_LIBS)
+-        set(OPENSSL_USE_STATIC_LIBS ON)
++            include(${OPENSSL_CMAKE_INCLUDE_FILE})
++        endif()
++
++        if(NOT DEFINED OPENSSL_USE_STATIC_LIBS)
++            set(OPENSSL_USE_STATIC_LIBS ON)
++        endif()
++        find_package(OpenSSL REQUIRED)
++        message(ERROR "REALM_HAVE_OPENSSL ON")
++        set(REALM_HAVE_OPENSSL ON)
++        string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR "${OPENSSL_VERSION}")
++    elseif(APPLE)
++        set(REALM_HAVE_SECURE_TRANSPORT "1")
+     endif()
+-    find_package(OpenSSL REQUIRED)
+-    set(REALM_HAVE_OPENSSL ON)
+-    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR "${OPENSSL_VERSION}")
+-elseif(APPLE)
+-    set(REALM_HAVE_SECURE_TRANSPORT "1")
+ endif()
+ 
+ # Use Zlib for Sync, but allow integrators to override it
+@@ -347,6 +531,8 @@ if(NOT APPLE AND NOT EMSCRIPTEN AND NOT TARGET ZLIB::ZLIB)
+ endif()
+ 
+ # Store configuration in header file
++set(REALM_HAVE_OPENSSL 0)
++set(REALM_HAVE_WOLFSSL 1)
+ configure_file(src/realm/util/config.h.in src/realm/util/config.h)
+ 
+ # Configure source code to use right version number
+@@ -363,10 +549,20 @@ set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json)
+ include_directories(src)
+ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
+ 
++if (REALM_HAVE_WOLFSSL)
++    message(STATUS "Found REALM_HAVE_WOLFSSL")
++    message(STATUS "This REALM_WOLFSSL_ROOT_DIR=${REALM_WOLFSSL_ROOT_DIR}")
++    message(STATUS "This RealmCore_SOURCE_DIR=${RealmCore_SOURCE_DIR}")
++
++endif()
++
++# TODO fix hard coded paths
++# include_directories("${RealmCore_SOURCE_DIR}/src/realm/object-store/c_api")
++
+ add_subdirectory(src)
+ add_subdirectory(bindgen)
+ 
+-# Install the licence and changelog files
++# Install the license and changelog files
+ install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
+ 
+ # Only prepare test/install/package targets if we're not a submodule
+diff --git a/CMakeSettings.json b/CMakeSettings.json
+index 9ba4f52c9..fd8d823a2 100644
+--- a/CMakeSettings.json
++++ b/CMakeSettings.json
+@@ -2,7 +2,7 @@
+   "configurations": [
+     {
+       "name": "x64-Debug",
+-      "generator": "Visual Studio 16 2019 Win64",
++      "generator": "Visual Studio 17 2022 Win64",
+       "configurationType": "Debug",
+       "inheritEnvironments": [ "msvc_x64_x64" ],
+       "buildRoot": "${projectDir}\\out\\build\\${name}",
+diff --git a/Visual Studio/uwp_demo/App1.vcxproj b/Visual Studio/uwp_demo/App1.vcxproj
+index e9cb9256f..5a1f99617 100644
+--- a/Visual Studio/uwp_demo/App1.vcxproj	
++++ b/Visual Studio/uwp_demo/App1.vcxproj	
+@@ -7,8 +7,8 @@
+     <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
+     <AppContainerApplication>true</AppContainerApplication>
+     <ApplicationType>Windows Store</ApplicationType>
+-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
+-    <WindowsTargetPlatformMinVersion>10.0.10240.0</WindowsTargetPlatformMinVersion>
++    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
++    <WindowsTargetPlatformMinVersion>10.0.22621.0</WindowsTargetPlatformMinVersion>
+     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+   </PropertyGroup>
+   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+@@ -41,32 +41,32 @@
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+     <ConfigurationType>Application</ConfigurationType>
+     <UseDebugLibraries>true</UseDebugLibraries>
+-    <PlatformToolset>v141</PlatformToolset>
++    <PlatformToolset>v143</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="Configuration">
+     <ConfigurationType>Application</ConfigurationType>
+     <UseDebugLibraries>true</UseDebugLibraries>
+-    <PlatformToolset>v141</PlatformToolset>
++    <PlatformToolset>v143</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+     <ConfigurationType>Application</ConfigurationType>
+     <UseDebugLibraries>true</UseDebugLibraries>
+-    <PlatformToolset>v141</PlatformToolset>
++    <PlatformToolset>v143</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+     <ConfigurationType>Application</ConfigurationType>
+     <UseDebugLibraries>false</UseDebugLibraries>
+-    <PlatformToolset>v141</PlatformToolset>
++    <PlatformToolset>v143</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="Configuration">
+     <ConfigurationType>Application</ConfigurationType>
+     <UseDebugLibraries>false</UseDebugLibraries>
+-    <PlatformToolset>v141</PlatformToolset>
++    <PlatformToolset>v143</PlatformToolset>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+     <ConfigurationType>Application</ConfigurationType>
+     <UseDebugLibraries>false</UseDebugLibraries>
+-    <PlatformToolset>v141</PlatformToolset>
++    <PlatformToolset>v143</PlatformToolset>
+   </PropertyGroup>
+   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+   <ImportGroup Label="ExtensionSettings">
+diff --git a/dependencies.list b/dependencies.list
+index bacf07065..efc188c1b 100644
+--- a/dependencies.list
++++ b/dependencies.list
+@@ -1,7 +1,7 @@
+ PACKAGE_NAME=realm-core
+ VERSION=13.26.0
+ OPENSSL_VERSION=3.0.8
+-ZLIB_VERSION=1.2.13
++ZLIB_VERSION=1.2.11
+ # https://github.com/10gen/baas/commits
+ # 5087f is 2024 Jan 13
+ BAAS_VERSION=5087ffd5a0e4975e625f0fbcceed23107f611055
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 097524d4a..e6abc7623 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -1,3 +1,5 @@
++message(STATUS "Current CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++
+ add_subdirectory(realm)
+ add_subdirectory(external/IntelRDFPMathLib20U2)
+ 
 diff --git a/src/realm/CMakeLists.txt b/src/realm/CMakeLists.txt
-index c991e8dfe..12c981ab7 100644
+index c991e8dfe..a6ada7b30 100644
 --- a/src/realm/CMakeLists.txt
 +++ b/src/realm/CMakeLists.txt
-@@ -337,7 +337,7 @@ target_include_directories(Storage INTERFACE
+@@ -1,3 +1,10 @@
++message(STATUS "\n\n=======================================================\nCurrent CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++message(STATUS "wow!")
++if(REALM_HAVE_WOLFSSL)
++    message(STATUS "realm cmake: REALM_WOLFSSL_ROOT_DIR=${REALM_WOLFSSL_ROOT_DIR}")
++else()
++    message(STATUS "realm cmake: REALM_HAVE_WOLFSSL not set!")
++endif()
+ set(REALM_SOURCES
+     # slowest to compile first
+     query.cpp
+@@ -298,6 +305,14 @@ if (REALM_ENABLE_GEOSPATIAL)
+     list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:s2geometry>)
+ endif()
+ 
++message(STATUS "REALM_SOURCES ${REALM_SOURCES}")
++message(STATUS "UTIL_SOURCES ${UTIL_SOURCES}")
++message(STATUS "REALM_INSTALL_HEADERS ${REALM_INSTALL_HEADERS}")
++message(STATUS "REALM_WOLFSSL_LIB ${REALM_WOLFSSL_LIB}")
++message(STATUS " ${}")
++message(STATUS " ${}")
++message(STATUS " ${}")
++
+ add_library(Storage STATIC
+     ${REALM_SOURCES}
+     ${UTIL_SOURCES}
+@@ -305,6 +320,7 @@ add_library(Storage STATIC
+     ${REALM_NOINST_HEADERS}
+     ${REALM_OBJECT_FILES}
+     $<TARGET_OBJECTS:Bid>
++
+ )
+ 
+ add_library(Realm::Storage ALIAS Storage)
+@@ -337,7 +353,8 @@ target_include_directories(Storage INTERFACE
  
  # On systems without a built-in SHA-1 implementation (or one provided by a dependency)
  # we need to bundle the public domain implementation.
 -if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_HAVE_OPENSSL)
 +if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_HAVE_OPENSSL AND NOT REALM_HAVE_WOLFSSL)
++    message(STATUS "realm cmake sha: REALM_HAVE_WOLFSSL not set!")
      add_library(sha1 OBJECT ../external/sha-1/sha1.c)
      target_include_directories(Storage PRIVATE ../external/sha-1)
      target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha1>)
-@@ -346,7 +346,7 @@ endif()
+@@ -346,7 +363,8 @@ endif()
  # On systems without a built-in SHA-2 implementation (or one provided by a dependency)
  # we need to bundle the public domain implementation.
  # Note: This is also used on Windows because Windows lacks a native SHA224 hash needed for realm encryption
 -if(NOT APPLE AND NOT REALM_HAVE_OPENSSL OR WIN32)
-+if(NOT APPLE AND NOT REALM_HAVE_OPENSSL AND NOT REALM_HAVE_WOLFSSL OR WIN32)
++if((NOT APPLE AND NOT REALM_HAVE_OPENSSL AND NOT REALM_HAVE_WOLFSSL) OR (WIN32 AND NOT REALM_HAVE_WOLFSSL))
++    message(STATUS "Warning: using external/sha-2 library")
      add_library(sha2 OBJECT ../external/sha-2/sha224.cpp ../external/sha-2/sha256.cpp)
      target_include_directories(Storage PRIVATE ../external/sha-2)
      target_sources(Storage PRIVATE $<TARGET_OBJECTS:sha2>)
-@@ -376,7 +376,11 @@ if(TARGET Backtrace::Backtrace)
+@@ -375,8 +393,26 @@ if(TARGET Backtrace::Backtrace)
+     target_link_libraries(Storage PUBLIC Backtrace::Backtrace)
  endif()
  
- if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
+-if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND REALM_HAVE_OPENSSL)
 -    target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
++if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE AND (REALM_HAVE_OPENSSL OR REALM_HAVE_WOLFSSL))
++    message(STATUS "REALM_ENABLE_ENCRYPTION UNIX enabled")
 +    if (REALM_HAVE_WOLFSSL)
-+        target_link_libraries(Storage PUBLIC WolfSSL)
++        message(STATUS "REALM_ENABLE_ENCRYPTION UNIX target_link_libraries '${REALM_WOLFSSL_LIB}'")
++        target_link_libraries(Storage PUBLIC "${REALM_WOLFSSL_LIB}")
++        message(STATUS "REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(Storage PUBLIC ${REALM_WOLFSSL_ROOT_DIR}/include)
 +    elseif (REALM_HAVE_OPENSSL)
++        message(STATUS "REALM_ENABLE_ENCRYPTION UNIX target_link_libraries OpenSSL::Crypto")
 +        target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
++    else()
++        message(STATUS "REALM_ENABLE_ENCRYPTION UNKNOWN Environment")
++    endif()
++else()
++    message(STATUS "NOT REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE ")
++    if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++        message(STATUS "Storage target_include_directories not used for Visual Studio project. (see project properties)")
++    else()
++        message(STATUS "NOT Visual Studio")
 +    endif()
  endif()
  
  # Use Zlib if the imported target is defined, otherise use -lz on Apple platforms
+@@ -421,3 +457,6 @@ if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
+     add_subdirectory(exec)
+     set_macos_only(exec)
+ endif()
++message(STATUS "${CMAKE_CURRENT_LIST_DIR}")
++message(STATUS "${CMAKE_CURRENT_LIST_FILE}")
++message(STATUS "src/ream/cmake done!")
+diff --git a/src/realm/exec/CMakeLists.txt b/src/realm/exec/CMakeLists.txt
+index 16bb966d8..d773be8cb 100644
+--- a/src/realm/exec/CMakeLists.txt
++++ b/src/realm/exec/CMakeLists.txt
+@@ -1,16 +1,28 @@
++message(STATUS "\n\n=======================================================\nCurrent CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++
++
+ add_executable(RealmImporter importer_tool.cpp importer.cpp importer.hpp)
+ set_target_properties(RealmImporter PROPERTIES
+     OUTPUT_NAME "realm-importer"
+     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+ )
+-target_link_libraries(RealmImporter Storage)
++
++# include_directories("/mnt/c/workspace/wolfssl/wolfssl" "/mnt/c/workspace/wolfssl")
++
++
++ #   target_include_directories(RealmImporter PRIVATE
++ #       /mnt/c/workspace/wolfssl
++ #   )
++
++message(STATUS "RealmImporter wolfssl: ${REALM_WOLFSSL_LIB_D3}")
++target_link_libraries(RealmImporter Storage "${REALM_WOLFSSL_LIB_D3}")
+ 
+ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
+     add_executable(RealmDaemon realmd.cpp)
+     set_target_properties(RealmDaemon PROPERTIES
+         OUTPUT_NAME "realmd"
+         DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
+-    target_link_libraries(RealmDaemon Storage)
++    target_link_libraries(RealmDaemon Storage "${REALM_WOLFSSL_LIB_D3}")
+     list(APPEND ExecTargetsToInstall RealmDaemon)
+ endif()
+ 
+@@ -19,7 +31,7 @@ set_target_properties(RealmTrawler PROPERTIES
+     OUTPUT_NAME "realm-trawler"
+     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+ )
+-target_link_libraries(RealmTrawler Storage)
++target_link_libraries(RealmTrawler Storage "${REALM_WOLFSSL_LIB_D3}")
+ if (EMSCRIPTEN)
+     set_target_properties(RealmTrawler PROPERTIES EXCLUDE_FROM_ALL TRUE)
+ endif()
+@@ -29,7 +41,7 @@ set_target_properties(RealmEnumerate PROPERTIES
+     OUTPUT_NAME "realm-enumerate"
+     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+ )
+-target_link_libraries(RealmEnumerate ObjectStore)
++target_link_libraries(RealmEnumerate ObjectStore "${REALM_WOLFSSL_LIB_D3}")
+ # FIXME can be fixed for others, but requires link and install fixes for libuv target
+ if (NOT APPLE)
+     set_target_properties(RealmEnumerate PROPERTIES EXCLUDE_FROM_ALL TRUE)
+@@ -40,7 +52,7 @@ set_target_properties(RealmDecrypt PROPERTIES
+     OUTPUT_NAME "realm-decrypt"
+     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+ )
+-target_link_libraries(RealmDecrypt Storage)
++target_link_libraries(RealmDecrypt Storage "${REALM_WOLFSSL_LIB_D3}")
+ if (NOT REALM_ENABLE_ENCRYPTION)
+     set_target_properties(RealmDecrypt PROPERTIES EXCLUDE_FROM_ALL TRUE)
+ endif()
+@@ -50,14 +62,14 @@ set_target_properties(RealmEncrypt PROPERTIES
+     OUTPUT_NAME "realm-encrypt"
+     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+ )
+-target_link_libraries(RealmEncrypt Storage)
++target_link_libraries(RealmEncrypt Storage "${REALM_WOLFSSL_LIB_D3}")
+ 
+ add_executable(RealmBrowser realm_browser.cpp)
+ set_target_properties(RealmBrowser PROPERTIES
+     OUTPUT_NAME "realm-browser-10"
+     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+ )
+-target_link_libraries(RealmBrowser Storage)
++target_link_libraries(RealmBrowser Storage "${REALM_WOLFSSL_LIB_D3}")
+ 
+ if(REALM_ENABLE_SYNC)
+ add_executable(Realm2JSON realm2json.cpp )
+@@ -65,10 +77,29 @@ set_target_properties(Realm2JSON PROPERTIES
+     OUTPUT_NAME "realm2json"
+     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+ )
+-target_link_libraries(Realm2JSON Storage QueryParser Sync)
++target_link_libraries(Realm2JSON Storage QueryParser Sync "${REALM_WOLFSSL_LIB_D3}")
+ list(APPEND ExecTargetsToInstall Realm2JSON)
+ endif()
+ 
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "Realm[lib] target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "Realm[lib] target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(RealmImporter  PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        #target_include_directories(RealmDaemon    PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(RealmEnumerate PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(RealmTrawler   PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(RealmDecrypt   PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(RealmEncrypt   PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(RealmBrowser   PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(Realm2JSON     PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        message(STATUS "")
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for Realm execs.")
++    endif()
++endif()
++
+ add_executable(RealmDump realm_dump.c)
+ set_target_properties(RealmDump PROPERTIES
+     OUTPUT_NAME "realm-dump"
+diff --git a/src/realm/object-store/CMakeLists.txt b/src/realm/object-store/CMakeLists.txt
+index 083e8a10a..c312963c1 100644
+--- a/src/realm/object-store/CMakeLists.txt
++++ b/src/realm/object-store/CMakeLists.txt
+@@ -184,6 +184,25 @@ endif()
+ 
+ target_link_libraries(ObjectStore PUBLIC Storage QueryParser)
+ 
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    if(REALM_HAVE_WOLFSSL)
++        target_link_libraries(ObjectStore PUBLIC "${REALM_WOLFSSL_LIB_D3}")
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for Visual Studio projects.")
++    endif()
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "")
++        message(STATUS "ObjectStore REALM_ENABLE_ENCRYPTION UNIX target_link_libraries '${REALM_WOLFSSL_LIB}'")
++        target_link_libraries(ObjectStore PUBLIC "${REALM_WOLFSSL_LIB}")
++        message(STATUS "ObjectStore REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(ObjectStore PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        message(STATUS "")
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for ObjectStore.")
++    endif()
++endif()
++
+ if(REALM_ENABLE_SYNC)
+     target_link_libraries(ObjectStore PUBLIC Sync)
+     target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
+diff --git a/src/realm/object-store/c_api/CMakeLists.txt b/src/realm/object-store/c_api/CMakeLists.txt
+index 2f6028d01..aa1319d25 100644
+--- a/src/realm/object-store/c_api/CMakeLists.txt
++++ b/src/realm/object-store/c_api/CMakeLists.txt
+@@ -1,3 +1,6 @@
++message(STATUS "\n\n=======================================================\nCurrent CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++
++message(STATUS "REALM_WOLFSSL_LIB wolfssl: ${REALM_WOLFSSL_LIB_D4}")
+ set(REALM_FFI_SOURCES
+     ../../../realm.h
+ 
+@@ -40,8 +43,25 @@ add_library(RealmFFIStatic STATIC ${REALM_FFI_SOURCES})
+ target_compile_definitions(RealmFFI PRIVATE -DRealm_EXPORTS)
+ target_compile_definitions(RealmFFIStatic PUBLIC -DRLM_NO_DLLIMPORT)
+ 
+-target_link_libraries(RealmFFI PRIVATE Storage ObjectStore QueryParser)
+-target_link_libraries(RealmFFIStatic PRIVATE Storage ObjectStore QueryParser)
++target_link_libraries(RealmFFI PRIVATE Storage ObjectStore QueryParser "${REALM_WOLFSSL_LIB_D4}")
++target_link_libraries(RealmFFIStatic PRIVATE Storage ObjectStore QueryParser "${REALM_WOLFSSL_LIB_D4}")
++
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    target_link_libraries(RealmFFI PUBLIC "${REALM_WOLFSSL_LIB_D3}")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "RealmFFI REALM_ENABLE_ENCRYPTION UNIX target_link_libraries '${REALM_WOLFSSL_LIB}'")
++        target_link_libraries(RealmFFI PUBLIC "${REALM_WOLFSSL_LIB}")
++        message(STATUS "RealmFFI REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(RealmFFI PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        message(STATUS "RealmFFIStatic REALM_ENABLE_ENCRYPTION UNIX target_link_libraries '${REALM_WOLFSSL_LIB}'")
++        target_link_libraries(RealmFFIStatic PUBLIC "${REALM_WOLFSSL_LIB}")
++        message(STATUS "RealmFFIStatic REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(RealmFFIStatic PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for RealmFFI.")
++    endif()
++endif()
+ 
+ if (${REALM_ENABLE_SYNC})
+     target_link_libraries(RealmFFI PRIVATE Sync)
+diff --git a/src/realm/parser/CMakeLists.txt b/src/realm/parser/CMakeLists.txt
+index 12dda0ada..7fd83b5ba 100644
+--- a/src/realm/parser/CMakeLists.txt
++++ b/src/realm/parser/CMakeLists.txt
+@@ -75,6 +75,19 @@ add_library(Realm::QueryParser ALIAS QueryParser)
+ target_link_libraries(QueryParser PUBLIC Storage)
+ set_target_properties(QueryParser PROPERTIES OUTPUT_NAME "realm-parser")
+ 
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "Parser for Visual Studio")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "Parser REALM_ENABLE_ENCRYPTION UNIX target_link_libraries '${REALM_WOLFSSL_LIB}'")
++        target_link_libraries(QueryParser PUBLIC "${REALM_WOLFSSL_LIB}")
++        message(STATUS "Parser REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(QueryParser PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for Parser.")
++    endif()
++endif()
++
+ install(TARGETS QueryParser EXPORT realm
+         ARCHIVE DESTINATION lib
+         COMPONENT devel)
 diff --git a/src/realm/sync/CMakeLists.txt b/src/realm/sync/CMakeLists.txt
-index afa711d9e..abf682ef5 100644
+index afa711d9e..2756ddf7c 100644
 --- a/src/realm/sync/CMakeLists.txt
 +++ b/src/realm/sync/CMakeLists.txt
-@@ -103,6 +103,8 @@ target_link_libraries(Sync PUBLIC Storage)
+@@ -1,3 +1,10 @@
++if(REALM_HAVE_WOLFSSL)
++    message(STATUS "sync cmake: REALM_WOLFSSL_ROOT_DIR=${REALM_WOLFSSL_ROOT_DIR}")
++else()
++    set(REALM_WOLFSSL_LIB "")
++    message(STATUS "WARNING: REALM_HAVE_WOLFSSL not set")
++endif()
++
+ set(SYNC_SOURCES
+     config.cpp
+     noinst/changeset_index.cpp
+@@ -99,11 +106,28 @@ if(NOT REALM_SYNC_MULTIPLEXING)
+     target_compile_definitions(Sync PUBLIC REALM_DISABLE_SYNC_MULTIPLEXING=1)
+ endif()
+ 
+-target_link_libraries(Sync PUBLIC Storage)
++target_link_libraries(Sync PUBLIC Storage "${REALM_WOLFSSL_LIB_D3}")
  
  if(APPLE AND NOT REALM_FORCE_OPENSSL)
      target_link_options(Sync INTERFACE "SHELL:-framework Security")
 +elseif(REALM_HAVE_WOLFSSL)
-+    target_link_libraries(Sync PUBLIC WolfSSL)
++    message(STATUS "Sync found REALM_HAVE_WOLFSSL")
++
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    target_link_libraries(Sync PUBLIC "${REALM_WOLFSSL_LIB_D3}")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "Sync REALM_ENABLE_ENCRYPTION UNIX target_link_libraries '${REALM_WOLFSSL_LIB}'")
++        target_link_libraries(Sync PUBLIC "${REALM_WOLFSSL_LIB}")
++        message(STATUS "Sync REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(Sync PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for Sync.")
++    endif()
++endif()
++
  elseif(REALM_HAVE_OPENSSL)
++    message(STATUS "Sync found REALM_HAVE_OPENSSL")
      target_link_libraries(Sync PUBLIC OpenSSL::SSL)
  endif()
+ 
+@@ -111,7 +135,7 @@ if(WIN32 AND NOT WINDOWS_STORE)
+     target_link_libraries(Sync INTERFACE Version.lib)
+     if(CMAKE_VERSION VERSION_LESS "3.21")
+         # This is needed for OpenSSL, but CMake's FindOpenSSL didn't declare it
+-        # on the OpenSSL::Crypto target until CMake 3.21.0. 
++        # on the OpenSSL::Crypto target until CMake 3.21.0.
+         target_link_libraries(Sync INTERFACE Crypt32.lib)
+     endif()
+ endif()
 diff --git a/src/realm/sync/network/network_ssl.cpp b/src/realm/sync/network/network_ssl.cpp
-index 58c2fcd96..86e989b57 100644
+index 58c2fcd96..67d270565 100644
 --- a/src/realm/sync/network/network_ssl.cpp
 +++ b/src/realm/sync/network/network_ssl.cpp
-@@ -6,7 +6,7 @@
+@@ -6,17 +6,30 @@
  #include <realm/util/features.h>
  #include <realm/sync/network/network_ssl.hpp>
  
 -#if REALM_HAVE_OPENSSL
-+#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
- #ifdef _WIN32
- #include <Windows.h>
- #else
-@@ -14,6 +14,9 @@
+-#ifdef _WIN32
+-#include <Windows.h>
+-#else
+-#include <pthread.h>
++#if REALM_HAVE_OPENSSL && REALM_HAVE_WOLFSSL
++    #error "Both OpenSSL and wolfSSL enabled. Pick one."
  #endif
- #include <openssl/conf.h>
- #include <openssl/x509v3.h>
-+#if REALM_HAVE_WOLFSSL
-+    #include <openssl/ssl.h>
-+#endif
+-#include <openssl/conf.h>
+-#include <openssl/x509v3.h>
++
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
++    #ifdef _WIN32
++        #include <Windows.h>
++    #else
++        #include <pthread.h>
++    #endif
++
++    #if REALM_HAVE_OPENSSL
++        #include <openssl/ssl.h>
++        #include <openssl/conf.h>
++        #include <openssl/x509v3.h>
++    #elif REALM_HAVE_WOLFSSL
++        // #pragma message "network_ssl.cpp found REALM_HAVE_WOLFSSL"
++        #include <wolfssl/openssl/ssl.h>
++        #include <wolfssl/openssl/conf.h>
++        #include <wolfssl/openssl/x509v3.h>
++    #endif
  #elif REALM_HAVE_SECURE_TRANSPORT
- #include <fstream>
- #include <vector>
-@@ -65,7 +68,8 @@ void populate_cert_store_with_included_certs(X509_STORE* store, std::error_code&
+-#include <fstream>
+-#include <vector>
++    #include <fstream>
++    #include <vector>
+ #endif
+ 
+ using namespace realm;
+@@ -65,7 +78,7 @@ void populate_cert_store_with_included_certs(X509_STORE* store, std::error_code&
  #endif // REALM_INCLUDE_CERTS
  
  
 -#if REALM_HAVE_OPENSSL && (OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER))
-+#if REALM_HAVE_WOLFSSL || \
-+    (REALM_HAVE_OPENSSL && (OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)))
++#if REALM_HAVE_WOLFSSL || (REALM_HAVE_OPENSSL && (OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)))
  
  // These must be made to execute before main() is called, i.e., before there is
  // any chance of threads being spawned.
-@@ -122,9 +126,13 @@ OpensslInit::~OpensslInit()
+@@ -122,9 +135,18 @@ OpensslInit::~OpensslInit()
      EVP_cleanup();
      CRYPTO_cleanup_all_ex_data();
      CONF_modules_unload(1);
 +#if REALM_HAVE_WOLFSSL
++    // TODO remove breadcrumb
++    printf("Calling wolfSSL_Cleanup");
 +    wolfSSL_Cleanup();
++#else
++    // TODO remove breadcrumb
++    printf("REALM_HAVE_WOLFSSL not defined");
 +#endif
  }
  
@@ -111,7 +819,34 @@ index 58c2fcd96..86e989b57 100644
  
  } // unnamed namespace
  
-@@ -276,6 +284,11 @@ void Context::ssl_init()
+@@ -158,7 +180,7 @@ bool ErrorCategory::equivalent(const std::error_code& ec, int condition) const n
+ {
+     switch (Errors(condition)) {
+         case Errors::tls_handshake_failed:
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+             return ec.category() == openssl_error_category;
+ #elif REALM_HAVE_SECURE_TRANSPORT
+             return ec.category() == secure_transport_error_category;
+@@ -185,7 +207,7 @@ const char* OpensslErrorCategory::name() const noexcept
+ std::string OpensslErrorCategory::message(int value) const
+ {
+     const char* message = "Unknown error";
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+     if (const char* s = ERR_reason_error_string(value))
+         message = s;
+ #endif
+@@ -251,7 +273,7 @@ std::error_code Stream::shutdown(std::error_code& ec)
+ }
+ 
+ 
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+ 
+ void Context::ssl_init()
+ {
+@@ -276,6 +298,11 @@ void Context::ssl_init()
      options |= SSL_OP_NO_COMPRESSION;
      SSL_CTX_set_options(ssl_ctx, options);
  
@@ -123,7 +858,25 @@ index 58c2fcd96..86e989b57 100644
      m_ssl_ctx = ssl_ctx;
  }
  
-@@ -390,6 +403,16 @@ public:
+@@ -349,6 +376,7 @@ void Context::ssl_use_verify_file(const std::string& path, std::error_code& ec)
+ }
+ 
+ #if REALM_INCLUDE_CERTS
++// #pragma message "ssl_use_included_certificate_roots"
+ void Context::ssl_use_included_certificate_roots(std::error_code& ec)
+ {
+     X509_STORE* store = SSL_CTX_get_cert_store(m_ssl_ctx);
+@@ -356,7 +384,8 @@ void Context::ssl_use_included_certificate_roots(std::error_code& ec)
+ }
+ #endif
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER) && !defined(OPENSSL_IS_BORINGSSL)
++#if !defined(REALM_HAVE_WOLFSSL) && (OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER) &&       \
++                                 !defined(OPENSSL_IS_BORINGSSL))
+ class Stream::BioMethod {
+ public:
+     BIO_METHOD* bio_method;
+@@ -390,6 +419,16 @@ public:
  
      BioMethod()
      {
@@ -140,7 +893,7 @@ index 58c2fcd96..86e989b57 100644
          bio_method = new BIO_METHOD{
              BIO_TYPE_SOCKET,      // int type
              nullptr,              // const char* name
-@@ -402,6 +425,7 @@ public:
+@@ -402,6 +441,7 @@ public:
              &Stream::bio_destroy, // int (*destroy)(BIO*)
              nullptr               // long (*callback_ctrl)(BIO*, int, bio_info_cb*)
          };
@@ -148,7 +901,16 @@ index 58c2fcd96..86e989b57 100644
      }
  
      ~BioMethod()
-@@ -475,7 +499,7 @@ bool check_san(X509* server_cert, const std::string& host_name)
+@@ -415,7 +455,7 @@ public:
+ Stream::BioMethod Stream::s_bio_method;
+ 
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x10002000L || defined(LIBRESSL_VERSION_NUMBER)
++#if  REALM_HAVE_WOLFSSL || (OPENSSL_VERSION_NUMBER < 0x10002000L || defined(LIBRESSL_VERSION_NUMBER))
+ 
+ namespace {
+ 
+@@ -475,7 +515,7 @@ bool check_san(X509* server_cert, const std::string& host_name)
  
          if (current_name->type == GEN_DNS) {
              // Current name is a DNS name
@@ -157,7 +919,7 @@ index 58c2fcd96..86e989b57 100644
  
              // Make sure there isn't an embedded NUL character in the DNS name
              if (static_cast<std::size_t>(ASN1_STRING_length(current_name->d.dNSName)) != std::strlen(dns_name))
-@@ -682,7 +706,9 @@ void Stream::ssl_init()
+@@ -682,7 +722,9 @@ void Stream::ssl_init()
          throw std::system_error(ec);
      }
  
@@ -168,7 +930,7 @@ index 58c2fcd96..86e989b57 100644
      BIO_set_data(bio, this);
  #else
      bio->ptr = this;
-@@ -701,7 +727,9 @@ void Stream::ssl_destroy() noexcept
+@@ -701,7 +743,9 @@ void Stream::ssl_destroy() noexcept
  
  int Stream::bio_write(BIO* bio, const char* data, int size) noexcept
  {
@@ -179,7 +941,7 @@ index 58c2fcd96..86e989b57 100644
      Stream& stream = *static_cast<Stream*>(BIO_get_data(bio));
  #else
      Stream& stream = *static_cast<Stream*>(bio->ptr);
-@@ -725,7 +753,9 @@ int Stream::bio_write(BIO* bio, const char* data, int size) noexcept
+@@ -725,7 +769,9 @@ int Stream::bio_write(BIO* bio, const char* data, int size) noexcept
  
  int Stream::bio_read(BIO* bio, char* buffer, int size) noexcept
  {
@@ -190,7 +952,7 @@ index 58c2fcd96..86e989b57 100644
      Stream& stream = *static_cast<Stream*>(BIO_get_data(bio));
  #else
      Stream& stream = *static_cast<Stream*>(bio->ptr);
-@@ -784,7 +814,9 @@ long Stream::bio_ctrl(BIO*, int cmd, long, void*) noexcept
+@@ -784,7 +830,9 @@ long Stream::bio_ctrl(BIO*, int cmd, long, void*) noexcept
  
  int Stream::bio_create(BIO* bio) noexcept
  {
@@ -201,15 +963,38 @@ index 58c2fcd96..86e989b57 100644
      BIO_set_init(bio, 1);
      BIO_set_data(bio, nullptr);
      BIO_clear_flags(bio, 0);
+@@ -1418,6 +1466,9 @@ void Context::ssl_use_default_verify(std::error_code&) {}
+ void Context::ssl_use_verify_file(const std::string&, std::error_code&) {}
+ 
+ 
++void Context::ssl_use_included_certificate_roots(std::error_code& ec) {}
++
++
+ void Stream::ssl_set_verify_mode(VerifyMode, std::error_code&) {}
+ 
+ 
 diff --git a/src/realm/sync/network/network_ssl.hpp b/src/realm/sync/network/network_ssl.hpp
-index abdd84311..d5f115357 100644
+index abdd84311..51ef1d971 100644
 --- a/src/realm/sync/network/network_ssl.hpp
 +++ b/src/realm/sync/network/network_ssl.hpp
-@@ -15,6 +15,17 @@
+@@ -15,16 +15,31 @@
  #include <realm/util/optional.hpp>
  #include <realm/util/logger.hpp>
  
-+#if REALM_HAVE_WOLFSSL
++#if REALM_HAVE_OPENSSL && REALM_HAVE_WOLFSSL
++    #error "Both OpenSSL and wolfSSL enabled. Pick one."
++#endif
++
+ #if REALM_HAVE_OPENSSL
+-#include <openssl/ssl.h>
+-#include <openssl/err.h>
+-#elif REALM_HAVE_SECURE_TRANSPORT
+-#include <realm/util/cf_ptr.hpp>
+-#include <Security/Security.h>
+-#include <Security/SecureTransport.h>
++    #include <openssl/ssl.h>
++    #include <openssl/err.h>
++#elif REALM_HAVE_WOLFSSL
 +    #ifdef HAVE_CONFIG_H
 +        #include <config.h>
 +    #endif
@@ -218,12 +1003,38 @@ index abdd84311..d5f115357 100644
 +    #else
 +        #include <wolfssl/wolfcrypt/settings.h>
 +    #endif
-+#endif /* REALM_HAVE_WOLFSSL */
-+
- #if REALM_HAVE_OPENSSL
- #include <openssl/ssl.h>
- #include <openssl/err.h>
-@@ -479,6 +490,10 @@ private:
++    #include <wolfssl/openssl/ssl.h>
++    #include <wolfssl/error-ssl.h>
+ 
+-#define REALM_HAVE_KEYCHAIN_APIS (TARGET_OS_MAC && !TARGET_OS_IPHONE)
++#elif REALM_HAVE_SECURE_TRANSPORT
++    #include <realm/util/cf_ptr.hpp>
++    #include <Security/Security.h>
++    #include <Security/SecureTransport.h>
+ 
++    #define REALM_HAVE_KEYCHAIN_APIS (TARGET_OS_MAC && !TARGET_OS_IPHONE)
+ #endif
+ 
+ // FIXME: Add necessary support for customizing the SSL server and client
+@@ -154,7 +169,7 @@ private:
+     void ssl_use_verify_file(const std::string& path, std::error_code&);
+     void ssl_use_included_certificate_roots(std::error_code&);
+ 
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+     SSL_CTX* m_ssl_ctx = nullptr;
+ 
+ #elif REALM_HAVE_SECURE_TRANSPORT
+@@ -468,7 +483,7 @@ private:
+     std::size_t ssl_read(char* buffer, std::size_t size, std::error_code&, Want& want) noexcept;
+     std::size_t ssl_write(const char* data, std::size_t size, std::error_code&, Want& want) noexcept;
+ 
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+     class BioMethod;
+     static BioMethod s_bio_method;
+     SSL* m_ssl = nullptr;
+@@ -479,6 +494,10 @@ private:
      template <class Oper>
      std::size_t ssl_perform(Oper oper, std::error_code& ec, Want& want) noexcept;
  
@@ -234,7 +1045,16 @@ index abdd84311..d5f115357 100644
      int do_ssl_accept() noexcept;
      int do_ssl_connect() noexcept;
      int do_ssl_shutdown() noexcept;
-@@ -1141,11 +1156,15 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
+@@ -995,7 +1014,7 @@ inline Socket& Stream::lowest_layer() noexcept
+     return m_tcp_socket;
+ }
+ 
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+ 
+ inline void Stream::ssl_handshake(std::error_code& ec, Want& want) noexcept
+ {
+@@ -1141,11 +1160,15 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
      int ssl_error = SSL_get_error(m_ssl, ret);
      int sys_error = int(ERR_peek_last_error());
  
@@ -252,7 +1072,7 @@ index abdd84311..d5f115357 100644
      // Judging from various comments in the man pages, and from experience with
      // the API, it seems that,
      //
-@@ -1233,6 +1252,43 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
+@@ -1233,6 +1256,43 @@ std::size_t Stream::ssl_perform(Oper oper, std::error_code& ec, Want& want) noex
      return 0;
  }
  
@@ -297,26 +1117,58 @@ index abdd84311..d5f115357 100644
  {
      int ret = SSL_accept(m_ssl);
 diff --git a/src/realm/sync/noinst/server/CMakeLists.txt b/src/realm/sync/noinst/server/CMakeLists.txt
-index a650c4840..f0fc05eaa 100644
+index a650c4840..26a437355 100644
 --- a/src/realm/sync/noinst/server/CMakeLists.txt
 +++ b/src/realm/sync/noinst/server/CMakeLists.txt
-@@ -31,7 +31,7 @@ target_link_libraries(SyncServer PUBLIC Sync QueryParser)
- 
- if(APPLE AND NOT REALM_FORCE_OPENSSL)
+@@ -33,6 +33,20 @@ if(APPLE AND NOT REALM_FORCE_OPENSSL)
      target_sources(SyncServer PRIVATE crypto_server_apple.mm)
--elseif(REALM_HAVE_OPENSSL)
-+elseif(REALM_HAVE_OPENSSL OR REALM_HAVE_WOLFSSL)
+ elseif(REALM_HAVE_OPENSSL)
      target_sources(SyncServer PRIVATE crypto_server_openssl.cpp)
++elseif(REALM_HAVE_WOLFSSL)
++    target_sources(SyncServer PRIVATE crypto_server_openssl.cpp)
++
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "SyncServer target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "SyncServer target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(SyncServer PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "SyncServer REALM_HAVE_WOLFSSL is not enabled for SyncServer.")
++    endif()
++endif()
++
  else()
      target_sources(SyncServer PRIVATE crypto_server_stub.cpp)
+ endif()
 diff --git a/src/realm/sync/noinst/server/crypto_server_openssl.cpp b/src/realm/sync/noinst/server/crypto_server_openssl.cpp
-index 559e11cbe..efb802608 100644
+index 559e11cbe..4b0c76f9c 100644
 --- a/src/realm/sync/noinst/server/crypto_server_openssl.cpp
 +++ b/src/realm/sync/noinst/server/crypto_server_openssl.cpp
-@@ -1,5 +1,16 @@
+@@ -1,14 +1,36 @@
  #include <realm/sync/noinst/server/crypto_server.hpp>
  
-+#if REALM_HAVE_WOLFSSL
+-#include <openssl/bio.h>
+-#include <openssl/pem.h>
+-#include <openssl/evp.h>
++#if REALM_HAVE_OPENSSL && REALM_HAVE_WOLFSSL
++    #error "Both OpenSSL and wolfSSL enabled. Pick one."
++#endif
+ 
+-#if OPENSSL_VERSION_MAJOR >= 3
+-#include <openssl/decoder.h>
++#if REALM_HAVE_OPENSSL
++    #include <openssl/bio.h>
++    #include <openssl/pem.h>
++    #include <openssl/evp.h>
++
++    #if OPENSSL_VERSION_MAJOR >= 3
++        #include <openssl/decoder.h>
++    #else
++        #include <openssl/rsa.h>
++    #endif
++
++#elif REALM_HAVE_WOLFSSL
 +    #ifdef HAVE_CONFIG_H
 +        #include <config.h>
 +    #endif
@@ -325,20 +1177,117 @@ index 559e11cbe..efb802608 100644
 +    #else
 +        #include <wolfssl/wolfcrypt/settings.h>
 +    #endif
-+#endif /* REALM_HAVE_WOLFSSL */
++    #include <wolfssl/openssl/bio.h>
++    #include <wolfssl/openssl/pem.h>
++    #include <wolfssl/openssl/evp.h>
+ #else
+-#include <openssl/rsa.h>
+-#endif
++    #error "Neiher REALM_HAVE_WOLFSSL nor REALM_HAVE_OPENSSL defined. Pick one."
 +
- #include <openssl/bio.h>
- #include <openssl/pem.h>
- #include <openssl/evp.h>
++#endif /* REALM_HAVE_WOLFSSL */
+ 
+ using namespace realm;
+ using namespace realm::sync;
+diff --git a/src/realm/sync/tools/CMakeLists.txt b/src/realm/sync/tools/CMakeLists.txt
+index 2740c2885..41fd0be6f 100644
+--- a/src/realm/sync/tools/CMakeLists.txt
++++ b/src/realm/sync/tools/CMakeLists.txt
+@@ -1,27 +1,54 @@
++if(REALM_HAVE_WOLFSSL)
++    message(STATUS "tools cmake: REALM_WOLFSSL_ROOT_DIR=${REALM_WOLFSSL_ROOT_DIR}")
++    message(STATUS "Found REALM_HAVE_WOLFSSL")
++
++    link_directories("${REALM_WOLFSSL_ROOT_DIR}/")
++    link_directories("${REALM_WOLFSSL_ROOT_DIR}/lib")
++
++    #include_directories("${REALM_WOLFSSL_ROOT_DIR}/include")
++else()
++    message(STATUS "WARNING: REALM_HAVE_WOLFSSL not set")
++    set(REALM_WOLFSSL_LIB "")
++endif()
+ 
+ add_executable(InspectorInspectClientRealm "inspect_client_realm.cpp")
+ set_target_properties(InspectorInspectClientRealm PROPERTIES
+                       OUTPUT_NAME "realm-inspect-client-realm"
+                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+-target_link_libraries(InspectorInspectClientRealm Sync Storage)
++target_link_libraries(InspectorInspectClientRealm Sync Storage "${REALM_WOLFSSL_LIB}")
+ 
+ add_executable(InspectorPrintChangeset "print_changeset.cpp")
+ set_target_properties(InspectorPrintChangeset PROPERTIES
+                       OUTPUT_NAME "realm-print-changeset"
+                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+-target_link_libraries(InspectorPrintChangeset Sync Storage)
++target_link_libraries(InspectorPrintChangeset Sync Storage "${REALM_WOLFSSL_LIB}")
+ 
+ add_executable(ApplyToStateCommand apply_to_state_command.cpp)
+ set_target_properties(ApplyToStateCommand PROPERTIES
+                       OUTPUT_NAME "realm-apply-to-state"
+                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+-target_link_libraries(ApplyToStateCommand Sync Storage)
++target_link_libraries(ApplyToStateCommand Sync Storage "${REALM_WOLFSSL_LIB}")
+ 
+ add_executable(HistCommand hist_command.cpp)
+ set_target_properties(HistCommand PROPERTIES
+                       OUTPUT_NAME "realm-hist"
+                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+-target_link_libraries(HistCommand Sync Storage)
++target_link_libraries(HistCommand Sync Storage "${REALM_WOLFSSL_LIB}")
++
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++      message(STATUS "RealmFFIStatic target_include_directories not used for Visual Studio project. (see project properties)")
++ else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "RealmFFIStatic target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(InspectorInspectClientRealm PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(InspectorPrintChangeset PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(ApplyToStateCommand PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(HistCommand PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        message(STATUS "")
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled.")
++    endif()
++endif()
+ 
+ install(TARGETS
+     HistCommand
+diff --git a/src/realm/tokenizer.cpp b/src/realm/tokenizer.cpp
+index f6bc42604..1328703bd 100644
+--- a/src/realm/tokenizer.cpp
++++ b/src/realm/tokenizer.cpp
+@@ -61,7 +61,7 @@ std::pair<std::set<std::string>, std::set<std::string>> Tokenizer::get_search_to
+         }
+     };
+     for (; m_cur_pos != m_end_pos; m_cur_pos++) {
+-        if (isspace(*m_cur_pos)) {
++        if (isspace(static_cast<unsigned char>(* m_cur_pos))) {
+             add_token();
+         }
+         else {
 diff --git a/src/realm/util/aes_cryptor.hpp b/src/realm/util/aes_cryptor.hpp
-index d9f8da87f..0a1231669 100644
+index d9f8da87f..663d7d5b0 100644
 --- a/src/realm/util/aes_cryptor.hpp
 +++ b/src/realm/util/aes_cryptor.hpp
-@@ -54,6 +54,17 @@ public:
- #include <bcrypt.h>
- #pragma comment(lib, "bcrypt.lib")
- #else
-+#if REALM_HAVE_WOLFSSL
+@@ -46,16 +46,39 @@ public:
+ 
+ #if REALM_ENABLE_ENCRYPTION
+ 
++#if REALM_HAVE_OPENSSL && REALM_HAVE_WOLFSSL
++    #error "Both OpenSSL and wolfSSL enabled. Pick one."
++#endif
++
++// #pragma message ("aes_cryptor file")
+ #if REALM_PLATFORM_APPLE
+-#include <CommonCrypto/CommonCrypto.h>
++    #include <CommonCrypto/CommonCrypto.h>
++    #pragma message ("aes_cryptor apple")
++#elif REALM_HAVE_OPENSSL
++    #include <openssl/sha.h>
++    #include <openssl/evp.h>
++    #pragma message ("aes_cryptor OpenSSL")
++#elif REALM_HAVE_WOLFSSL
++//    #pragma message("aes_cryptor wolfSSL")
 +    #ifdef HAVE_CONFIG_H
 +        #include <config.h>
 +    #endif
@@ -347,32 +1296,100 @@ index d9f8da87f..0a1231669 100644
 +    #else
 +        #include <wolfssl/wolfcrypt/settings.h>
 +    #endif
-+#endif /* REALM_HAVE_WOLFSSL */
++    #include <wolfssl/openssl/evp.h>
++    #include <wolfssl/openssl/sha.h>
+ #elif defined(_WIN32)
+-#include <windows.h>
+-#include <stdio.h>
+-#include <bcrypt.h>
+-#pragma comment(lib, "bcrypt.lib")
++    #pragma message ("aes_cryptor _WIN32")
++    #include <windows.h>
++    #include <stdio.h>
++    #include <bcrypt.h>
++    #pragma comment(lib, "bcrypt.lib")
+ #else
+-#include <openssl/sha.h>
+-#include <openssl/evp.h>
++    #error "No AES cryptographic provider found"
 +
- #include <openssl/sha.h>
- #include <openssl/evp.h>
- #endif
-diff --git a/src/realm/util/config.h.in b/src/realm/util/config.h.in
-index 36a7e0990..a1dd8d44d 100644
---- a/src/realm/util/config.h.in
-+++ b/src/realm/util/config.h.in
-@@ -5,6 +5,7 @@
- #cmakedefine01 REALM_HAVE_READDIR64
- #cmakedefine01 REALM_HAVE_POSIX_FALLOCATE
- #cmakedefine01 REALM_HAVE_OPENSSL
-+#cmakedefine01 REALM_HAVE_WOLFSSL
- #cmakedefine01 REALM_HAVE_SECURE_TRANSPORT
- #cmakedefine01 REALM_HAVE_PTHREAD_GETNAME
- #cmakedefine01 REALM_HAVE_PTHREAD_SETNAME
-diff --git a/src/realm/util/sha_crypto.cpp b/src/realm/util/sha_crypto.cpp
-index e73fcad98..51530ebe9 100644
---- a/src/realm/util/sha_crypto.cpp
-+++ b/src/realm/util/sha_crypto.cpp
-@@ -37,6 +37,17 @@
- #define REALM_USE_BUNDLED_SHA2 1
  #endif
  
-+#if REALM_HAVE_WOLFSSL
+ namespace realm::util {
+@@ -99,7 +122,7 @@ private:
+ #if REALM_PLATFORM_APPLE
+     CCCryptorRef m_encr;
+     CCCryptorRef m_decr;
+-#elif defined(_WIN32)
++#elif defined(_WIN32) && !defined(REALM_HAVE_WOLFSSL)
+     BCRYPT_KEY_HANDLE m_aes_key_handle;
+ #else
+     EVP_CIPHER_CTX* m_ctx;
+diff --git a/src/realm/util/config.h.in b/src/realm/util/config.h.in
+index 36a7e0990..5f19d6226 100644
+--- a/src/realm/util/config.h.in
++++ b/src/realm/util/config.h.in
+@@ -4,6 +4,7 @@
+ // Feature detection
+ #cmakedefine01 REALM_HAVE_READDIR64
+ #cmakedefine01 REALM_HAVE_POSIX_FALLOCATE
++#cmakedefine01 REALM_HAVE_WOLFSSL
+ #cmakedefine01 REALM_HAVE_OPENSSL
+ #cmakedefine01 REALM_HAVE_SECURE_TRANSPORT
+ #cmakedefine01 REALM_HAVE_PTHREAD_GETNAME
+diff --git a/src/realm/util/encrypted_file_mapping.cpp b/src/realm/util/encrypted_file_mapping.cpp
+index c219af909..adaf0795f 100644
+--- a/src/realm/util/encrypted_file_mapping.cpp
++++ b/src/realm/util/encrypted_file_mapping.cpp
+@@ -168,7 +168,7 @@ AESCryptor::AESCryptor(const uint8_t* key)
+     void* iv = u_iv;
+     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_encr);
+     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_decr);
+-#elif defined(_WIN32)
++#elif defined(_WIN32) && !defined(REALM_HAVE_WOLFSSL)
+     BCRYPT_ALG_HANDLE hAesAlg = NULL;
+     int ret;
+     ret = BCryptOpenAlgorithmProvider(&hAesAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
+@@ -528,7 +528,7 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
+     CCCryptorStatus err = CCCryptorUpdate(cryptor, src, block_size, dst, block_size, &bytesEncrypted);
+     REALM_ASSERT(err == kCCSuccess);
+     REALM_ASSERT(bytesEncrypted == block_size);
+-#elif defined(_WIN32)
++#elif defined(_WIN32) && !defined(REALM_HAVE_WOLFSSL)
+     ULONG cbData;
+     int i;
+ 
+diff --git a/src/realm/util/sha_crypto.cpp b/src/realm/util/sha_crypto.cpp
+index e73fcad98..f6854a4ec 100644
+--- a/src/realm/util/sha_crypto.cpp
++++ b/src/realm/util/sha_crypto.cpp
+@@ -21,20 +21,38 @@
+ #include <realm/util/assert.hpp>
+ 
+ #if REALM_PLATFORM_APPLE
+-#include <CommonCrypto/CommonCrypto.h>
+-#elif defined(_WIN32)
+-#include <windows.h>
+-#include <stdio.h>
+-#include <bcrypt.h>
+-#pragma comment(lib, "bcrypt.lib")
+-#define REALM_USE_BUNDLED_SHA2 1
++    #include <CommonCrypto/CommonCrypto.h>
++#elif defined(_WIN32) && !defined(REALM_HAVE_WOLFSSL)
++    #include <windows.h>
++    #include <stdio.h>
++    #include <bcrypt.h>
++    #pragma comment(lib, "bcrypt.lib")
++    #define REALM_USE_BUNDLED_SHA2 1
+ #elif REALM_HAVE_OPENSSL
+-#include <openssl/sha.h>
+-#include <openssl/evp.h>
+-#include <openssl/hmac.h>
++    #include <openssl/sha.h>
++    #include <openssl/evp.h>
++    #include <openssl/hmac.h>
++#elif REALM_HAVE_WOLFSSL
++    // #pragma message "REALM_HAVE_WOLFSSL in sha_crypto"
 +    #ifdef HAVE_CONFIG_H
 +        #include <config.h>
 +    #endif
@@ -381,11 +1398,542 @@ index e73fcad98..51530ebe9 100644
 +    #else
 +        #include <wolfssl/wolfcrypt/settings.h>
 +    #endif
-+#endif /* REALM_HAVE_WOLFSSL */
-+
++    #ifndef WOLFSSL_EVP_INCLUDED
++    //    #error "WOLFSSL_EVP_INCLUDED needed"
++    #else
++       // #pragma message "sha_crypto WOLFSSL_EVP_INCLUDED"
++    #endif
++    #include <wolfssl/openssl/sha.h>
++    #include <wolfssl/openssl/evp.h>
++    #include <wolfssl/openssl/hmac.h>
+ #else
+-#include <sha1.h>
+-#define REALM_USE_BUNDLED_SHA2 1
++    #include <sha1.h>
++    #define REALM_USE_BUNDLED_SHA2 1
+ #endif
+ 
  #ifdef REALM_USE_BUNDLED_SHA2
- #include <sha224.hpp>
- #include <sha256.hpp>
--- 
-2.34.1
-
+@@ -50,7 +68,8 @@ namespace {
+ // guarantees that out_buffer is large enough, which is always possible for
+ // message digests with a maximum output size.
+ #if REALM_PLATFORM_APPLE
+-#elif defined(_WIN32)
++    /* nothing ? */
++#elif defined(_WIN32) && !defined(REALM_HAVE_WOLFSSL)
+ struct Algorithm {
+     Algorithm(LPCWSTR alg_id)
+     {
+@@ -111,7 +130,7 @@ struct Hash {
+     UCHAR hash_object_buffer[512];
+     DWORD hash_size;
+ };
+-#elif REALM_HAVE_OPENSSL
++#elif REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+ void message_digest(const EVP_MD* digest_type, const char* in_buffer, size_t in_buffer_size,
+                     unsigned char* out_buffer, unsigned int* output_size)
+ {
+@@ -175,7 +194,7 @@ void sha1(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buffe
+ {
+ #if REALM_PLATFORM_APPLE
+     CC_SHA1(in_buffer, CC_LONG(in_buffer_size), out_buffer);
+-#elif defined(_WIN32)
++#elif defined(_WIN32) && !defined(REALM_HAVE_WOLFSSL)
+     Algorithm alg(BCRYPT_SHA1_ALGORITHM);
+     Hash hash(alg, 20);
+     hash.get_hash(reinterpret_cast<PUCHAR>(const_cast<char*>(in_buffer)), DWORD(in_buffer_size), out_buffer);
+@@ -184,6 +203,11 @@ void sha1(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buffe
+     unsigned int output_size;
+     message_digest(digest_type, in_buffer, in_buffer_size, out_buffer, &output_size);
+     REALM_ASSERT(output_size == 20);
++#elif REALM_HAVE_WOLFSSL
++    const EVP_MD* digest_type = EVP_sha1();
++    unsigned int output_size;
++    message_digest(digest_type, in_buffer, in_buffer_size, out_buffer, &output_size);
++    REALM_ASSERT(output_size == 20);
+ #else
+     SHA1(reinterpret_cast<char*>(out_buffer), in_buffer, in_buffer_size);
+ #endif
+@@ -193,7 +217,7 @@ void sha256(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buf
+ {
+ #if REALM_PLATFORM_APPLE
+     CC_SHA256(in_buffer, CC_LONG(in_buffer_size), out_buffer);
+-#elif defined(_WIN32)
++#elif defined(_WIN32) && !defined(REALM_HAVE_WOLFSSL)
+     Algorithm alg(BCRYPT_SHA256_ALGORITHM);
+     Hash hash(alg, 32);
+     hash.get_hash(reinterpret_cast<PUCHAR>(const_cast<char*>(in_buffer)), DWORD(in_buffer_size), out_buffer);
+@@ -202,6 +226,11 @@ void sha256(const char* in_buffer, size_t in_buffer_size, unsigned char* out_buf
+     unsigned int output_size;
+     message_digest(digest_type, in_buffer, in_buffer_size, out_buffer, &output_size);
+     REALM_ASSERT(output_size == 32);
++#elif REALM_HAVE_WOLFSSL
++    const EVP_MD* digest_type = EVP_sha256();
++    unsigned int output_size;
++    message_digest(digest_type, in_buffer, in_buffer_size, out_buffer, &output_size);
++    REALM_ASSERT(output_size == 32);
+ #else
+     sha256_state s;
+     sha_init(s);
+@@ -224,8 +253,14 @@ void hmac_sha224(Span<const uint8_t> in_buffer, Span<uint8_t, 28> out_buffer, Sp
+     HMAC(EVP_sha224(), key.data(), static_cast<int>(key.size()), in_buffer.data(), in_buffer.size(),
+          out_buffer.data(), &hashLen);
+     REALM_ASSERT_DEBUG(hashLen == out_buffer.size());
++#elif REALM_HAVE_WOLFSSL
++    static_assert(SHA224_DIGEST_LENGTH == out_buffer.size());
++    unsigned int hashLen;
++    HMAC(EVP_sha224(), key.data(), static_cast<int>(key.size()), in_buffer.data(), in_buffer.size(),
++         out_buffer.data(), &hashLen);
++    REALM_ASSERT_DEBUG(hashLen == out_buffer.size());
+ #else
+-#error "No SHA224 digest implementation on this platform."
++    #error "No SHA224 digest implementation on this platform."
+ #endif
+ }
+ 
+@@ -243,8 +278,14 @@ void hmac_sha256(Span<const uint8_t> in_buffer, Span<uint8_t, 32> out_buffer, Sp
+     HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()), in_buffer.data(), in_buffer.size(),
+          out_buffer.data(), &hashLen);
+     REALM_ASSERT_DEBUG(hashLen == out_buffer.size());
++#elif REALM_HAVE_WOLFSSL
++    static_assert(SHA256_DIGEST_LENGTH == out_buffer.size());
++    unsigned int hashLen;
++    HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()), in_buffer.data(), in_buffer.size(),
++         out_buffer.data(), &hashLen);
++    REALM_ASSERT_DEBUG(hashLen == out_buffer.size());
+ #else
+-#error "No SHA56 digest implementation on this platform."
++    #error "No SHA56 digest implementation on this platform."
+ #endif
+ }
+ 
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 97df6f482..2b4ed2668 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -1,3 +1,6 @@
++message(STATUS "\n\n=======================================================\nCurrent CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++message(STATUS "REALM_WOLFSSL_LIB wolfssl: ${REALM_WOLFSSL_LIB_D2}")
++
+ add_subdirectory(util)
+ add_custom_target(benchmarks)
+ add_subdirectory(object-store)
+@@ -140,10 +143,11 @@ file(GLOB REQUIRED_TEST_FILES
+ 
+ add_library(CoreTestLib OBJECT ${CORE_TESTS} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+ enable_stdfilesystem(CoreTestLib)
+-target_link_libraries(CoreTestLib QueryParser)
++message(STATUS "CoreTestLib REALM_WOLFSSL_LIB=${REALM_WOLFSSL_LIB_D2}")
++target_link_libraries(CoreTestLib QueryParser "${REALM_WOLFSSL_LIB_D2}")
+ 
+ add_executable(CoreTests main.cpp test_all.cpp ${REQUIRED_TEST_FILES})
+-target_link_libraries(CoreTests CoreTestLib TestUtil)
++target_link_libraries(CoreTests CoreTestLib TestUtil "${REALM_WOLFSSL_LIB_D2}")
+ set_target_resources(CoreTests "${REQUIRED_TEST_FILES}")
+ set_target_properties(CoreTests PROPERTIES
+     OUTPUT_NAME "realm-tests"
+@@ -173,7 +177,7 @@ enable_stdfilesystem(CoreTests)
+ 
+ if(UNIX AND NOT APPLE)
+     # This enables symbols in backtraces
+-    target_link_libraries(CoreTests "-rdynamic")
++    target_link_libraries(CoreTests "-rdynamic" "${REALM_WOLFSSL_LIB_D2}")
+ endif()
+ 
+ target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+@@ -234,18 +238,29 @@ if(REALM_ENABLE_SYNC)
+ 
+     add_library(SyncTestLib OBJECT ${SYNC_TESTS} ${SYNC_TEST_HEADERS} ${SYNC_TEST_RESOURCES})
+     enable_stdfilesystem(SyncTestLib)
+-    target_link_libraries(SyncTestLib Sync SyncServer Storage)
+-
++    target_link_libraries(SyncTestLib Sync SyncServer Storage "${REALM_WOLFSSL_LIB_D2}")
++    message(STATUS "SyncTestLib REALM_WOLFSSL_LIB=${REALM_WOLFSSL_LIB_D2}")
+     add_executable(SyncTests main.cpp test_all.cpp ${SYNC_TEST_RESOURCES})
+     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
+     set_target_resources(SyncTests "${SYNC_TEST_RESOURCES}")
+     enable_stdfilesystem(SyncTests)
+-    target_link_libraries(SyncTests SyncTestLib TestUtil)
++    target_link_libraries(SyncTests SyncTestLib TestUtil "${REALM_WOLFSSL_LIB_D2}")
+     add_bundled_test(SyncTests)
++    if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++        message(STATUS "SyncTests target_include_directories not used for Visual Studio project. (see project properties)")
++    else()
++        if(REALM_HAVE_WOLFSSL)
++            message(STATUS "SyncTestLib target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++            target_include_directories(SyncTestLib PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++            target_include_directories(SyncTests PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        else()
++            message(STATUS "REALM_HAVE_WOLFSSL is not enabled for SyncTests.")
++        endif()
++    endif()
+ 
+     if(UNIX AND NOT APPLE)
+         # This enables symbols in backtraces
+-        target_link_libraries(SyncTests "-rdynamic")
++        target_link_libraries(SyncTests "-rdynamic" "${REALM_WOLFSSL_LIB_D2}")
+     endif()
+ endif()
+ 
+@@ -261,20 +276,43 @@ set_target_properties(CombinedTests PROPERTIES
+ )
+ target_include_directories(CombinedTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "object-store")
+ 
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "CoreTests target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "test target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(CoreTests PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        target_include_directories(CoreTestLib PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for CoreTests.")
++    endif()
++endif()
++
+ if(WINDOWS_STORE)
+     target_sources(CombinedTests PRIVATE ${UWP_SOURCES})
+ endif()
+ 
+ if(REALM_ENABLE_SYNC)
+-    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib SyncTestLib TestUtil)
++    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib SyncTestLib TestUtil "${REALM_WOLFSSL_LIB_D2}")
+ else()
+-    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib TestUtil)
++    target_link_libraries(CombinedTests ObjectStoreTestLib CoreTestLib             TestUtil "${REALM_WOLFSSL_LIB_D2}")
++endif()
++
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "CoreTests target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "CombinedTests REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(CombinedTests PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for CombinedTests.")
++    endif()
+ endif()
+ 
+ enable_stdfilesystem(CombinedTests)
+ 
+ if(UNIX AND NOT APPLE)
+     # This enables symbols in backtraces
+-    target_link_libraries(CombinedTests "-rdynamic")
++    target_link_libraries(CombinedTests "-rdynamic" "${REALM_WOLFSSL_LIB_D2}")
+ endif()
+ 
+diff --git a/test/benchmark-common-tasks/CMakeLists.txt b/test/benchmark-common-tasks/CMakeLists.txt
+index 9d7d9fa7c..3a8bd3cbc 100644
+--- a/test/benchmark-common-tasks/CMakeLists.txt
++++ b/test/benchmark-common-tasks/CMakeLists.txt
+@@ -1,4 +1,27 @@
++message(STATUS "\n\n=======================================================\nCurrent CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++
++message(STATUS "REALM_WOLFSSL_LIB wolfssl: ${REALM_WOLFSSL_LIB}")
++
+ add_executable(realm-benchmark-common-tasks main.cpp)
+-target_link_libraries(realm-benchmark-common-tasks TestUtil QueryParser)
+-add_dependencies(benchmarks realm-benchmark-common-tasks)
+ 
++if(REALM_HAVE_WOLFSSL)
++	message(STATUS "benchmark common tasks cmake: ")
++	# set in parent cmake:
++	message(STATUS "Found REALM_WOLFSSL_ROOT_DIR=${REALM_WOLFSSL_ROOT_DIR}")
++	message(STATUS "Found REALM_WOLFSSL_LIB=${REALM_WOLFSSL_LIB}")
++else()
++    message(STATUS "WARNING: REALM_HAVE_WOLFSSL not set")
++endif()
++
++target_link_libraries(realm-benchmark-common-tasks TestUtil QueryParser ${REALM_WOLFSSL_LIB_D3})
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "realm-benchmark-common-task target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "realm-benchmark-common-task target_link_libraries '${REALM_WOLFSSL_LIB}'")
++        target_include_directories(realm-benchmark-common-tasks PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for realm-benchmark-common-tas.")
++    endif()
++endif()
++add_dependencies(benchmarks realm-benchmark-common-tasks)
+diff --git a/test/benchmark-crud/CMakeLists.txt b/test/benchmark-crud/CMakeLists.txt
+index 8a28e1714..2f98b6570 100644
+--- a/test/benchmark-crud/CMakeLists.txt
++++ b/test/benchmark-crud/CMakeLists.txt
+@@ -1,3 +1,23 @@
++message(STATUS "\n\n=======================================================\nCurrent CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++# benchmark crud
++message(STATUS "CMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}")
++message(STATUS "wolfSSL_DIR=${wolfSSL_DIR}")
++
++message(STATUS "REALM_WOLFSSL_LIB wolfssl: ${REALM_WOLFSSL_LIB}")
++message(STATUS "REALM_WOLFSSL_LIB_D1 wolfssl: ${REALM_WOLFSSL_LIB_D1}")
++message(STATUS "REALM_WOLFSSL_LIB_D2 wolfssl: ${REALM_WOLFSSL_LIB_D2}")
++message(STATUS "REALM_WOLFSSL_LIB_D3 wolfssl  ${REALM_WOLFSSL_LIB_D3}")
++# find_package(wolfSSL REQUIRED)
+ add_executable(realm-benchmark-crud main.cpp)
+ add_dependencies(benchmarks realm-benchmark-crud)
+-target_link_libraries(realm-benchmark-crud TestUtil)
++target_link_libraries(realm-benchmark-crud TestUtil ${REALM_WOLFSSL_LIB_D2})
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "realm-benchmark-crud target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "realm-benchmark-crud REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(realm-benchmark-crud PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for realm-benchmark-crud.")
++    endif()
++endif()
+diff --git a/test/benchmark-larger/CMakeLists.txt b/test/benchmark-larger/CMakeLists.txt
+index 6f013ff10..48f316f29 100644
+--- a/test/benchmark-larger/CMakeLists.txt
++++ b/test/benchmark-larger/CMakeLists.txt
+@@ -1,3 +1,7 @@
++message(STATUS "\n\n=======================================================\nCurrent CMake file: ${CMAKE_CURRENT_LIST_FILE}")
++message(STATUS "REALM_WOLFSSL_LIB wolfssl: ${REALM_WOLFSSL_LIB}")
++message(STATUS "REALM_WOLFSSL_LIB_D2 wolfssl: ${REALM_WOLFSSL_LIB_D2}")
++
+ add_executable(realm-benchmark-larger EXCLUDE_FROM_ALL main.cpp)
+ add_dependencies(benchmarks realm-benchmark-larger)
+-target_link_libraries(realm-benchmark-larger TestUtil)
++target_link_libraries(realm-benchmark-larger TestUtil ${REALM_WOLFSSL_LIB_D2})
+diff --git a/test/benchmark-sync/CMakeLists.txt b/test/benchmark-sync/CMakeLists.txt
+index 1408f11c6..cb27c6f84 100644
+--- a/test/benchmark-sync/CMakeLists.txt
++++ b/test/benchmark-sync/CMakeLists.txt
+@@ -3,4 +3,14 @@ if(REALM_ENABLE_SYNC)
+     add_dependencies(benchmarks realm-benchmark-sync)
+     # Sync lib is included with SyncServer
+     target_link_libraries(realm-benchmark-sync TestUtil SyncServer)
++    if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++        message(STATUS "realm-benchmark-sync target_include_directories not used for Visual Studio project. (see project properties)")
++    else()
++        if(REALM_HAVE_WOLFSSL)
++            message(STATUS "realm-benchmark-sync REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++            target_include_directories(realm-benchmark-sync PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        else()
++            message(STATUS "REALM_HAVE_WOLFSSL is not enabled for realm-benchmark-sync.")
++        endif()
++    endif()
+ endif()
+\ No newline at end of file
+diff --git a/test/fuzzy/CMakeLists.txt b/test/fuzzy/CMakeLists.txt
+index b444140e8..7eee27bbd 100644
+--- a/test/fuzzy/CMakeLists.txt
++++ b/test/fuzzy/CMakeLists.txt
+@@ -25,6 +25,17 @@ file(COPY ${AFL_SEEDS}
+ add_executable(fuzz-group ${TEST_AFL_SOURCES})
+ target_link_libraries(fuzz-group TestUtil Storage)
+ 
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "fuzz-group target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "ObjectStore REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(fuzz-group  PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for fuzz-group.")
++    endif()
++endif()
++
+ if(REALM_LIBFUZZER)
+     add_executable(realm-libfuzzer ${TEST_LIBFUZZER_SOURCES})
+     target_link_libraries(realm-libfuzzer TestUtil Storage)
+diff --git a/test/object-store/CMakeLists.txt b/test/object-store/CMakeLists.txt
+index aac511f74..aaf2e0c9f 100644
+--- a/test/object-store/CMakeLists.txt
++++ b/test/object-store/CMakeLists.txt
+@@ -181,6 +181,7 @@ target_include_directories(ObjectStoreTestLib PRIVATE
+     ${CMAKE_CURRENT_SOURCE_DIR}
+     ${CMAKE_CURRENT_SOURCE_DIR}/..)
+ 
++
+ # on Apple platforms we use the built-in CFRunLoop
+ # on WebAssembly we use an Emscripten-specific Scheduler and runloop
+ # everywhere else it's libuv, except UWP where it doesn't build
+@@ -226,3 +227,14 @@ add_subdirectory(notifications-fuzzer)
+ if(NOT EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT ANDROID)
+     add_subdirectory(benchmarks)
+ endif()
++
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "ObjectStoreTestLib target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "ObjectStoreTestLib REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(ObjectStoreTestLib PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for ObjectStoreTestLib.")
++    endif()
++endif()
+diff --git a/test/object-store/benchmarks/CMakeLists.txt b/test/object-store/benchmarks/CMakeLists.txt
+index 28f24771c..71465066f 100644
+--- a/test/object-store/benchmarks/CMakeLists.txt
++++ b/test/object-store/benchmarks/CMakeLists.txt
+@@ -29,7 +29,7 @@ endif()
+ 
+ add_executable(object-store-benchmarks ${SOURCES} ${HEADERS})
+ 
+-target_include_directories(object-store-benchmarks PRIVATE 
++target_include_directories(object-store-benchmarks PRIVATE
+     ..
+ )
+ 
+@@ -41,6 +41,17 @@ target_link_libraries(object-store-benchmarks ObjectStore TestUtil Catch2::Catch
+ 
+ add_dependencies(benchmarks object-store-benchmarks)
+ 
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "benchmarks target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "benchmarks REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(object-store-benchmarks PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for benchmarks.")
++    endif()
++endif()
++
+ # on Apple platforms we use the built-in CFRunLoop
+ # everywhere else it's libuv, except UWP where it doesn't build
+ if(NOT APPLE AND NOT WINDOWS_STORE AND NOT EMSCRIPTEN AND NOT ANDROID)
+diff --git a/test/realm-fuzzer/CMakeLists.txt b/test/realm-fuzzer/CMakeLists.txt
+index 7f5441bea..d8afa0a48 100644
+--- a/test/realm-fuzzer/CMakeLists.txt
++++ b/test/realm-fuzzer/CMakeLists.txt
+@@ -26,6 +26,19 @@ file(COPY ${AFL_SEEDS}
+ add_executable(realm-afl++ ${TEST_AFL_SOURCES})
+ target_link_libraries(realm-afl++ TestUtil ObjectStore)
+ 
++if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++    message(STATUS "realm-afl++ target_include_directories not used for Visual Studio project. (see project properties)")
++else()
++    if(REALM_HAVE_WOLFSSL)
++        message(STATUS "")
++        message(STATUS "realm-afl++ REALM_ENABLE_ENCRYPTION UNIX target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++        target_include_directories(realm-afl++ PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++        message(STATUS "")
++    else()
++        message(STATUS "REALM_HAVE_WOLFSSL is not enabled for realm-afl++.")
++    endif()
++endif()
++
+ if(REALM_LIBFUZZER)
+     if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+         add_executable(realm-libfuzz ${TEST_LIBFUZZER_SOURCES})
+diff --git a/test/test_sync.cpp b/test/test_sync.cpp
+index 38f4aee58..3a307bdb7 100644
+--- a/test/test_sync.cpp
++++ b/test/test_sync.cpp
+@@ -2778,7 +2778,8 @@ TEST(Sync_SSL_Certificate_DER)
+ #endif // REALM_HAVE_SECURE_TRANSPORT
+ 
+ 
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
++
+ 
+ // This test checks that the SSL connection is accepted if the verify callback
+ // always returns true.
+diff --git a/test/test_util_network_ssl.cpp b/test/test_util_network_ssl.cpp
+index 9d2605273..8184c5465 100644
+--- a/test/test_util_network_ssl.cpp
++++ b/test/test_util_network_ssl.cpp
+@@ -426,7 +426,7 @@ TEST(Util_Network_SSL_PrematureEndOfInputOnHandshakeRead)
+ 
+     std::thread thread(std::move(consumer));
+ 
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+     CHECK_SYSTEM_ERROR(ssl_stream_2.handshake(), MiscExtErrors::premature_end_of_input);
+ #elif REALM_HAVE_SECURE_TRANSPORT
+     // We replace the CHECK_SYSTEM_ERROR check for "premature end of input"
+@@ -1070,7 +1070,7 @@ TEST(Util_Network_SSL_Certificate_SAN)
+ 
+ // FIXME: Verification of peer against Common Name is no longer supported in
+ // Catalina (macOS).
+-#if REALM_HAVE_OPENSSL || !REALM_HAVE_SECURE_TRANSPORT
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL || !REALM_HAVE_SECURE_TRANSPORT
+ 
+ // The host name www.example.com is contained in Common Name but not in SAN.
+ TEST(Util_Network_SSL_Certificate_CN)
+@@ -1114,7 +1114,7 @@ TEST(Util_Network_SSL_Certificate_CN)
+     thread_2.join();
+ }
+ 
+-#endif // REALM_HAVE_OPENSSL || !REALM_HAVE_SECURE_TRANSPORT
++#endif // REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL || !REALM_HAVE_SECURE_TRANSPORT
+ 
+ // The ip address is contained in the IP SAN section
+ // of the certificate. For OpenSSL, we expect failure because we only
+@@ -1148,7 +1148,7 @@ TEST(Util_Network_SSL_Certificate_IP)
+     auto connector = [&] {
+         std::error_code ec;
+         ssl_stream_2.handshake(ec);
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+         CHECK_NOT_EQUAL(std::error_code(), ec);
+ #elif REALM_HAVE_SECURE_TRANSPORT
+         CHECK_EQUAL(std::error_code(), ec);
+@@ -1157,7 +1157,7 @@ TEST(Util_Network_SSL_Certificate_IP)
+     auto acceptor = [&] {
+         std::error_code ec;
+         ssl_stream_1.handshake(ec);
+-#if REALM_HAVE_OPENSSL
++#if REALM_HAVE_OPENSSL || REALM_HAVE_WOLFSSL
+         CHECK_NOT_EQUAL(std::error_code(), ec);
+ #elif REALM_HAVE_SECURE_TRANSPORT
+         CHECK_EQUAL(std::error_code(), ec);
+diff --git a/test/util/CMakeLists.txt b/test/util/CMakeLists.txt
+index 4f652f1d6..93762434d 100644
+--- a/test/util/CMakeLists.txt
++++ b/test/util/CMakeLists.txt
+@@ -1,3 +1,10 @@
++if(REALM_HAVE_WOLFSSL)
++    message(STATUS "util cmake: REALM_WOLFSSL_ROOT_DIR=${REALM_WOLFSSL_ROOT_DIR}")
++else()
++    set(REALM_WOLFSSL_LIB "")
++    message(STATUS "WARNING: REALM_HAVE_WOLFSSL not set")
++endif()
++
+ set(TEST_UTIL_SOURCES
+     benchmark_results.cpp
+     crypt_key.cpp
+@@ -57,7 +64,18 @@ target_link_libraries(TestUtil Storage)
+ if(UNIX AND NOT APPLE)
+     find_library(LIBRT rt)
+     if(LIBRT)
+-        target_link_libraries(TestUtil ${LIBRT})
++        target_link_libraries(TestUtil ${LIBRT} "${REALM_WOLFSSL_LIB}")
++        if("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
++            message(STATUS "TestUtil target_include_directories not used for Visual Studio project. (see project properties)")
++        else()
++            if(REALM_HAVE_WOLFSSL)
++                message(STATUS "")
++                message(STATUS "TestUtil target_include_directories '${REALM_WOLFSSL_ROOT_DIR}/include'")
++                target_include_directories(TestUtil PRIVATE ${REALM_WOLFSSL_ROOT_DIR}/include)
++            else()
++                message(STATUS "REALM_HAVE_WOLFSSL is not enabled for TestUtil.")
++            endif()
++        endif()
+     # Android has librt included in libc
+     elseif(NOT ANDROID)
+         message(WARNING "librt was not found. This means that the benchmarks will not be able to link properly.")
+diff --git a/tools/cross_compile.sh b/tools/cross_compile.sh
+index 2ef594067..7186e7b98 100755
+--- a/tools/cross_compile.sh
++++ b/tools/cross_compile.sh
+@@ -77,6 +77,12 @@ if [ "${OS}" == "android" ]; then
+           -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/android.toolchain.cmake" \
+           -D REALM_ENABLE_ENCRYPTION=1 \
+           -D REALM_VERSION="${VERSION}" \
++          -D WOLFSSL_USE_OPTIONS_H=1 \
++          -D REALM_INCLUDE_CERTS=1 \
++          -D REALM_ENABLE_ENCRYPTION=1 \
++          -D REALM_ENABLE_SYNC=1 \
++          -D REALM_HAVE_WOLFSSL=1 \
++          -D REALM_WOLFSSL_ROOT_DIR="/home/john/Documents/realm_space/libwolfssl-android" \
+           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
+           -D CMAKE_MAKE_PROGRAM=ninja \
+           -G Ninja \
