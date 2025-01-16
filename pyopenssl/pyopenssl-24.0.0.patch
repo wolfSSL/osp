@@ -1,5 +1,5 @@
 diff --git a/src/OpenSSL/SSL.py b/src/OpenSSL/SSL.py
-index 4db5240..bfc6979 100644
+index 4db5240..246181a 100644
 --- a/src/OpenSSL/SSL.py
 +++ b/src/OpenSSL/SSL.py
 @@ -24,6 +24,8 @@ from OpenSSL._util import (
@@ -11,7 +11,219 @@ index 4db5240..bfc6979 100644
  )
  from OpenSSL._util import (
      path_bytes as _path_bytes,
-@@ -468,8 +470,22 @@ class _VerifyHelper(_CallbackExceptionHelper):
+@@ -142,12 +144,13 @@ __all__ = [
+ ]
+ 
+ 
+-OPENSSL_VERSION_NUMBER = _lib.OPENSSL_VERSION_NUMBER
+-OPENSSL_VERSION = SSLEAY_VERSION = _lib.OPENSSL_VERSION
+-OPENSSL_CFLAGS = SSLEAY_CFLAGS = _lib.OPENSSL_CFLAGS
+-OPENSSL_PLATFORM = SSLEAY_PLATFORM = _lib.OPENSSL_PLATFORM
+-OPENSSL_DIR = SSLEAY_DIR = _lib.OPENSSL_DIR
+-OPENSSL_BUILT_ON = SSLEAY_BUILT_ON = _lib.OPENSSL_BUILT_ON
++if not _wolfssl:
++    OPENSSL_VERSION_NUMBER = _lib.OPENSSL_VERSION_NUMBER
++    OPENSSL_VERSION = SSLEAY_VERSION = _lib.OPENSSL_VERSION
++    OPENSSL_CFLAGS = SSLEAY_CFLAGS = _lib.OPENSSL_CFLAGS
++    OPENSSL_PLATFORM = SSLEAY_PLATFORM = _lib.OPENSSL_PLATFORM
++    OPENSSL_DIR = SSLEAY_DIR = _lib.OPENSSL_DIR
++    OPENSSL_BUILT_ON = SSLEAY_BUILT_ON = _lib.OPENSSL_BUILT_ON
+ 
+ SENT_SHUTDOWN = _lib.SSL_SENT_SHUTDOWN
+ RECEIVED_SHUTDOWN = _lib.SSL_RECEIVED_SHUTDOWN
+@@ -285,98 +288,99 @@ class X509VerificationCodes:
+     """
+ 
+     OK = _lib.X509_V_OK
+-    ERR_UNABLE_TO_GET_ISSUER_CERT = _lib.X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT
+-    ERR_UNABLE_TO_GET_CRL = _lib.X509_V_ERR_UNABLE_TO_GET_CRL
+-    ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE = (
+-        _lib.X509_V_ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE
+-    )
+-    ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE = (
+-        _lib.X509_V_ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE
+-    )
+-    ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY = (
+-        _lib.X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY
+-    )
+-    ERR_CERT_SIGNATURE_FAILURE = _lib.X509_V_ERR_CERT_SIGNATURE_FAILURE
+-    ERR_CRL_SIGNATURE_FAILURE = _lib.X509_V_ERR_CRL_SIGNATURE_FAILURE
+-    ERR_CERT_NOT_YET_VALID = _lib.X509_V_ERR_CERT_NOT_YET_VALID
+-    ERR_CERT_HAS_EXPIRED = _lib.X509_V_ERR_CERT_HAS_EXPIRED
+-    ERR_CRL_NOT_YET_VALID = _lib.X509_V_ERR_CRL_NOT_YET_VALID
+-    ERR_CRL_HAS_EXPIRED = _lib.X509_V_ERR_CRL_HAS_EXPIRED
+-    ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD = (
+-        _lib.X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD
+-    )
+-    ERR_ERROR_IN_CERT_NOT_AFTER_FIELD = (
+-        _lib.X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD
+-    )
+-    ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD = (
+-        _lib.X509_V_ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD
+-    )
+-    ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD = (
+-        _lib.X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD
+-    )
+-    ERR_OUT_OF_MEM = _lib.X509_V_ERR_OUT_OF_MEM
+-    ERR_DEPTH_ZERO_SELF_SIGNED_CERT = (
+-        _lib.X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT
+-    )
+-    ERR_SELF_SIGNED_CERT_IN_CHAIN = _lib.X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN
+-    ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY = (
+-        _lib.X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY
+-    )
+-    ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE = (
+-        _lib.X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE
+-    )
+-    ERR_CERT_CHAIN_TOO_LONG = _lib.X509_V_ERR_CERT_CHAIN_TOO_LONG
+-    ERR_CERT_REVOKED = _lib.X509_V_ERR_CERT_REVOKED
+-    ERR_INVALID_CA = _lib.X509_V_ERR_INVALID_CA
+-    ERR_PATH_LENGTH_EXCEEDED = _lib.X509_V_ERR_PATH_LENGTH_EXCEEDED
+-    ERR_INVALID_PURPOSE = _lib.X509_V_ERR_INVALID_PURPOSE
+-    ERR_CERT_UNTRUSTED = _lib.X509_V_ERR_CERT_UNTRUSTED
+-    ERR_CERT_REJECTED = _lib.X509_V_ERR_CERT_REJECTED
+-    ERR_SUBJECT_ISSUER_MISMATCH = _lib.X509_V_ERR_SUBJECT_ISSUER_MISMATCH
+-    ERR_AKID_SKID_MISMATCH = _lib.X509_V_ERR_AKID_SKID_MISMATCH
+-    ERR_AKID_ISSUER_SERIAL_MISMATCH = (
+-        _lib.X509_V_ERR_AKID_ISSUER_SERIAL_MISMATCH
+-    )
+-    ERR_KEYUSAGE_NO_CERTSIGN = _lib.X509_V_ERR_KEYUSAGE_NO_CERTSIGN
+-    ERR_UNABLE_TO_GET_CRL_ISSUER = _lib.X509_V_ERR_UNABLE_TO_GET_CRL_ISSUER
+-    ERR_UNHANDLED_CRITICAL_EXTENSION = (
+-        _lib.X509_V_ERR_UNHANDLED_CRITICAL_EXTENSION
+-    )
+-    ERR_KEYUSAGE_NO_CRL_SIGN = _lib.X509_V_ERR_KEYUSAGE_NO_CRL_SIGN
+-    ERR_UNHANDLED_CRITICAL_CRL_EXTENSION = (
+-        _lib.X509_V_ERR_UNHANDLED_CRITICAL_CRL_EXTENSION
+-    )
+-    ERR_INVALID_NON_CA = _lib.X509_V_ERR_INVALID_NON_CA
+-    ERR_PROXY_PATH_LENGTH_EXCEEDED = _lib.X509_V_ERR_PROXY_PATH_LENGTH_EXCEEDED
+-    ERR_KEYUSAGE_NO_DIGITAL_SIGNATURE = (
+-        _lib.X509_V_ERR_KEYUSAGE_NO_DIGITAL_SIGNATURE
+-    )
+-    ERR_PROXY_CERTIFICATES_NOT_ALLOWED = (
+-        _lib.X509_V_ERR_PROXY_CERTIFICATES_NOT_ALLOWED
+-    )
+-    ERR_INVALID_EXTENSION = _lib.X509_V_ERR_INVALID_EXTENSION
+-    ERR_INVALID_POLICY_EXTENSION = _lib.X509_V_ERR_INVALID_POLICY_EXTENSION
+-    ERR_NO_EXPLICIT_POLICY = _lib.X509_V_ERR_NO_EXPLICIT_POLICY
+-    ERR_DIFFERENT_CRL_SCOPE = _lib.X509_V_ERR_DIFFERENT_CRL_SCOPE
+-    ERR_UNSUPPORTED_EXTENSION_FEATURE = (
+-        _lib.X509_V_ERR_UNSUPPORTED_EXTENSION_FEATURE
+-    )
+-    ERR_UNNESTED_RESOURCE = _lib.X509_V_ERR_UNNESTED_RESOURCE
+-    ERR_PERMITTED_VIOLATION = _lib.X509_V_ERR_PERMITTED_VIOLATION
+-    ERR_EXCLUDED_VIOLATION = _lib.X509_V_ERR_EXCLUDED_VIOLATION
+-    ERR_SUBTREE_MINMAX = _lib.X509_V_ERR_SUBTREE_MINMAX
+-    ERR_UNSUPPORTED_CONSTRAINT_TYPE = (
+-        _lib.X509_V_ERR_UNSUPPORTED_CONSTRAINT_TYPE
+-    )
+-    ERR_UNSUPPORTED_CONSTRAINT_SYNTAX = (
+-        _lib.X509_V_ERR_UNSUPPORTED_CONSTRAINT_SYNTAX
+-    )
+-    ERR_UNSUPPORTED_NAME_SYNTAX = _lib.X509_V_ERR_UNSUPPORTED_NAME_SYNTAX
+-    ERR_CRL_PATH_VALIDATION_ERROR = _lib.X509_V_ERR_CRL_PATH_VALIDATION_ERROR
+-    ERR_HOSTNAME_MISMATCH = _lib.X509_V_ERR_HOSTNAME_MISMATCH
+-    ERR_EMAIL_MISMATCH = _lib.X509_V_ERR_EMAIL_MISMATCH
+-    ERR_IP_ADDRESS_MISMATCH = _lib.X509_V_ERR_IP_ADDRESS_MISMATCH
+-    ERR_APPLICATION_VERIFICATION = _lib.X509_V_ERR_APPLICATION_VERIFICATION
++    if not _wolfssl:
++        ERR_UNABLE_TO_GET_ISSUER_CERT = _lib.X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT
++        ERR_UNABLE_TO_GET_CRL = _lib.X509_V_ERR_UNABLE_TO_GET_CRL
++        ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE = (
++            _lib.X509_V_ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE
++        )
++        ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE = (
++            _lib.X509_V_ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE
++        )
++        ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY = (
++            _lib.X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY
++        )
++        ERR_CERT_SIGNATURE_FAILURE = _lib.X509_V_ERR_CERT_SIGNATURE_FAILURE
++        ERR_CRL_SIGNATURE_FAILURE = _lib.X509_V_ERR_CRL_SIGNATURE_FAILURE
++        ERR_CERT_NOT_YET_VALID = _lib.X509_V_ERR_CERT_NOT_YET_VALID
++        ERR_CERT_HAS_EXPIRED = _lib.X509_V_ERR_CERT_HAS_EXPIRED
++        ERR_CRL_NOT_YET_VALID = _lib.X509_V_ERR_CRL_NOT_YET_VALID
++        ERR_CRL_HAS_EXPIRED = _lib.X509_V_ERR_CRL_HAS_EXPIRED
++        ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD = (
++            _lib.X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD
++        )
++        ERR_ERROR_IN_CERT_NOT_AFTER_FIELD = (
++            _lib.X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD
++        )
++        ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD = (
++            _lib.X509_V_ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD
++        )
++        ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD = (
++            _lib.X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD
++        )
++        ERR_OUT_OF_MEM = _lib.X509_V_ERR_OUT_OF_MEM
++        ERR_DEPTH_ZERO_SELF_SIGNED_CERT = (
++            _lib.X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT
++        )
++        ERR_SELF_SIGNED_CERT_IN_CHAIN = _lib.X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN
++        ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY = (
++            _lib.X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY
++        )
++        ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE = (
++            _lib.X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE
++        )
++        ERR_CERT_CHAIN_TOO_LONG = _lib.X509_V_ERR_CERT_CHAIN_TOO_LONG
++        ERR_CERT_REVOKED = _lib.X509_V_ERR_CERT_REVOKED
++        ERR_INVALID_CA = _lib.X509_V_ERR_INVALID_CA
++        ERR_PATH_LENGTH_EXCEEDED = _lib.X509_V_ERR_PATH_LENGTH_EXCEEDED
++        ERR_INVALID_PURPOSE = _lib.X509_V_ERR_INVALID_PURPOSE
++        ERR_CERT_UNTRUSTED = _lib.X509_V_ERR_CERT_UNTRUSTED
++        ERR_CERT_REJECTED = _lib.X509_V_ERR_CERT_REJECTED
++        ERR_SUBJECT_ISSUER_MISMATCH = _lib.X509_V_ERR_SUBJECT_ISSUER_MISMATCH
++        ERR_AKID_SKID_MISMATCH = _lib.X509_V_ERR_AKID_SKID_MISMATCH
++        ERR_AKID_ISSUER_SERIAL_MISMATCH = (
++            _lib.X509_V_ERR_AKID_ISSUER_SERIAL_MISMATCH
++        )
++        ERR_KEYUSAGE_NO_CERTSIGN = _lib.X509_V_ERR_KEYUSAGE_NO_CERTSIGN
++        ERR_UNABLE_TO_GET_CRL_ISSUER = _lib.X509_V_ERR_UNABLE_TO_GET_CRL_ISSUER
++        ERR_UNHANDLED_CRITICAL_EXTENSION = (
++            _lib.X509_V_ERR_UNHANDLED_CRITICAL_EXTENSION
++        )
++        ERR_KEYUSAGE_NO_CRL_SIGN = _lib.X509_V_ERR_KEYUSAGE_NO_CRL_SIGN
++        ERR_UNHANDLED_CRITICAL_CRL_EXTENSION = (
++            _lib.X509_V_ERR_UNHANDLED_CRITICAL_CRL_EXTENSION
++        )
++        ERR_INVALID_NON_CA = _lib.X509_V_ERR_INVALID_NON_CA
++        ERR_PROXY_PATH_LENGTH_EXCEEDED = _lib.X509_V_ERR_PROXY_PATH_LENGTH_EXCEEDED
++        ERR_KEYUSAGE_NO_DIGITAL_SIGNATURE = (
++            _lib.X509_V_ERR_KEYUSAGE_NO_DIGITAL_SIGNATURE
++        )
++        ERR_PROXY_CERTIFICATES_NOT_ALLOWED = (
++            _lib.X509_V_ERR_PROXY_CERTIFICATES_NOT_ALLOWED
++        )
++        ERR_INVALID_EXTENSION = _lib.X509_V_ERR_INVALID_EXTENSION
++        ERR_INVALID_POLICY_EXTENSION = _lib.X509_V_ERR_INVALID_POLICY_EXTENSION
++        ERR_NO_EXPLICIT_POLICY = _lib.X509_V_ERR_NO_EXPLICIT_POLICY
++        ERR_DIFFERENT_CRL_SCOPE = _lib.X509_V_ERR_DIFFERENT_CRL_SCOPE
++        ERR_UNSUPPORTED_EXTENSION_FEATURE = (
++            _lib.X509_V_ERR_UNSUPPORTED_EXTENSION_FEATURE
++        )
++        ERR_UNNESTED_RESOURCE = _lib.X509_V_ERR_UNNESTED_RESOURCE
++        ERR_PERMITTED_VIOLATION = _lib.X509_V_ERR_PERMITTED_VIOLATION
++        ERR_EXCLUDED_VIOLATION = _lib.X509_V_ERR_EXCLUDED_VIOLATION
++        ERR_SUBTREE_MINMAX = _lib.X509_V_ERR_SUBTREE_MINMAX
++        ERR_UNSUPPORTED_CONSTRAINT_TYPE = (
++            _lib.X509_V_ERR_UNSUPPORTED_CONSTRAINT_TYPE
++        )
++        ERR_UNSUPPORTED_CONSTRAINT_SYNTAX = (
++            _lib.X509_V_ERR_UNSUPPORTED_CONSTRAINT_SYNTAX
++        )
++        ERR_UNSUPPORTED_NAME_SYNTAX = _lib.X509_V_ERR_UNSUPPORTED_NAME_SYNTAX
++        ERR_CRL_PATH_VALIDATION_ERROR = _lib.X509_V_ERR_CRL_PATH_VALIDATION_ERROR
++        ERR_HOSTNAME_MISMATCH = _lib.X509_V_ERR_HOSTNAME_MISMATCH
++        ERR_EMAIL_MISMATCH = _lib.X509_V_ERR_EMAIL_MISMATCH
++        ERR_IP_ADDRESS_MISMATCH = _lib.X509_V_ERR_IP_ADDRESS_MISMATCH
++        ERR_APPLICATION_VERIFICATION = _lib.X509_V_ERR_APPLICATION_VERIFICATION
+ 
+ 
+ # Taken from https://golang.org/src/crypto/x509/root_linux.go
+@@ -468,8 +472,22 @@ class _VerifyHelper(_CallbackExceptionHelper):
          @wraps(callback)
          def wrapper(ok, store_ctx):
              x509 = _lib.X509_STORE_CTX_get_current_cert(store_ctx)
@@ -36,7 +248,7 @@ index 4db5240..bfc6979 100644
              error_number = _lib.X509_STORE_CTX_get_error(store_ctx)
              error_depth = _lib.X509_STORE_CTX_get_error_depth(store_ctx)
  
-@@ -785,8 +801,9 @@ def _make_requires(flag, error):
+@@ -785,8 +803,9 @@ def _make_requires(flag, error):
      return _requires_decorator
  
  
@@ -47,7 +259,84 @@ index 4db5240..bfc6979 100644
  )
  
  
-@@ -1810,7 +1827,7 @@ class Connection:
+@@ -818,18 +837,26 @@ class Context:
+                    not be used.
+     """
+ 
+-    _methods: typing.ClassVar[typing.Dict] = {
+-        SSLv23_METHOD: (_lib.TLS_method, None),
+-        TLSv1_METHOD: (_lib.TLS_method, TLS1_VERSION),
+-        TLSv1_1_METHOD: (_lib.TLS_method, TLS1_1_VERSION),
+-        TLSv1_2_METHOD: (_lib.TLS_method, TLS1_2_VERSION),
+-        TLS_METHOD: (_lib.TLS_method, None),
+-        TLS_SERVER_METHOD: (_lib.TLS_server_method, None),
+-        TLS_CLIENT_METHOD: (_lib.TLS_client_method, None),
+-        DTLS_METHOD: (_lib.DTLS_method, None),
+-        DTLS_SERVER_METHOD: (_lib.DTLS_server_method, None),
+-        DTLS_CLIENT_METHOD: (_lib.DTLS_client_method, None),
+-    }
++    if not _wolfssl:
++        _methods: typing.ClassVar[typing.Dict] = {
++            SSLv23_METHOD: (_lib.TLS_method, None),
++            TLSv1_METHOD: (_lib.TLS_method, TLS1_VERSION),
++            TLSv1_1_METHOD: (_lib.TLS_method, TLS1_1_VERSION),
++            TLSv1_2_METHOD: (_lib.TLS_method, TLS1_2_VERSION),
++            TLS_METHOD: (_lib.TLS_method, None),
++            TLS_SERVER_METHOD: (_lib.TLS_server_method, None),
++            TLS_CLIENT_METHOD: (_lib.TLS_client_method, None),
++            DTLS_METHOD: (_lib.DTLS_method, None),
++            DTLS_SERVER_METHOD: (_lib.DTLS_server_method, None),
++            DTLS_CLIENT_METHOD: (_lib.DTLS_client_method, None),
++        }
++    else:
++        _methods: typing.ClassVar[typing.Dict] = {
++            TLSv1_1_METHOD: (_lib.TLSv1_1_method, TLS1_1_VERSION),
++            TLSv1_2_METHOD: (_lib.TLSv1_2_method, TLS1_2_VERSION),
++            TLS_SERVER_METHOD: (_lib.TLSv1_2_server_method, None),
++            TLS_CLIENT_METHOD: (_lib.TLSv1_2_client_method, None),
++        }
+ 
+     def __init__(self, method):
+         if not isinstance(method, int):
+@@ -865,6 +892,9 @@ class Context:
+         self._cookie_generate_helper = None
+         self._cookie_verify_helper = None
+ 
++        # OpenSSL expects default context to have VERIFY_NONE set
++        self.set_verify(VERIFY_NONE, None)
++
+         self.set_mode(_lib.SSL_MODE_ENABLE_PARTIAL_WRITE)
+         if version is not None:
+             self.set_min_proto_version(version)
+@@ -879,9 +909,10 @@ class Context:
+         If the underlying OpenSSL build is missing support for the selected
+         version, this method will raise an exception.
+         """
+-        _openssl_assert(
+-            _lib.SSL_CTX_set_min_proto_version(self._context, version) == 1
+-        )
++        if not _wolfssl:
++            _openssl_assert(
++                _lib.SSL_CTX_set_min_proto_version(self._context, version) == 1
++            )
+ 
+     def set_max_proto_version(self, version):
+         """
+@@ -892,9 +923,10 @@ class Context:
+         If the underlying OpenSSL build is missing support for the selected
+         version, this method will raise an exception.
+         """
+-        _openssl_assert(
+-            _lib.SSL_CTX_set_max_proto_version(self._context, version) == 1
+-        )
++        if not _wolfssl:
++            _openssl_assert(
++                _lib.SSL_CTX_set_max_proto_version(self._context, version) == 1
++            )
+ 
+     def load_verify_locations(self, cafile, capath=None):
+         """
+@@ -1810,7 +1842,7 @@ class Connection:
              raise WantReadError()
          elif error == _lib.SSL_ERROR_WANT_WRITE:
              raise WantWriteError()
@@ -56,17 +345,27 @@ index 4db5240..bfc6979 100644
              raise ZeroReturnError()
          elif error == _lib.SSL_ERROR_WANT_X509_LOOKUP:
              # TODO: This is untested.
+@@ -1829,7 +1861,7 @@ class Connection:
+             else:
+                 # TODO: This is untested.
+                 _raise_current_error()
+-        elif error == _lib.SSL_ERROR_SSL and _lib.ERR_peek_error() != 0:
++        elif error == 1 and _lib.ERR_peek_error() != 0:
+             # In 3.0.x an unexpected EOF no longer triggers syscall error
+             # but we want to maintain compatibility so we check here and
+             # raise syscall if it is an EOF. Since we're not actually sure
 diff --git a/src/OpenSSL/_util.py b/src/OpenSSL/_util.py
-index 7a102e6..90c9c12 100644
+index 7a102e6..0d99729 100644
 --- a/src/OpenSSL/_util.py
 +++ b/src/OpenSSL/_util.py
-@@ -3,13 +3,21 @@ import sys
+@@ -3,13 +3,22 @@ import sys
  import warnings
  from typing import Any, Callable, NoReturn, Type, Union
  
 -from cryptography.hazmat.bindings.openssl.binding import Binding
 +wolfssl = True
-+wolfssl_debug = False
++#wolfssl_debug = False
++wolfssl_debug = True
  
 -StrOrBytesPath = Union[str, bytes, os.PathLike]
 +if wolfssl:
@@ -88,7 +387,7 @@ index 7a102e6..90c9c12 100644
  
  # This is a special CFFI allocator that does not bother to zero its memory
 diff --git a/src/OpenSSL/crypto.py b/src/OpenSSL/crypto.py
-index 1707488..22e9926 100644
+index 1707488..da27986 100644
 --- a/src/OpenSSL/crypto.py
 +++ b/src/OpenSSL/crypto.py
 @@ -45,6 +45,7 @@ from OpenSSL._util import (
@@ -99,22 +398,186 @@ index 1707488..22e9926 100644
  )
  from OpenSSL._util import (
      path_bytes as _path_bytes,
-@@ -225,9 +226,15 @@ def _get_asn1_time(timestamp: Any) -> Optional[bytes]:
+@@ -217,17 +218,29 @@ def _get_asn1_time(timestamp: Any) -> Optional[bytes]:
+     @return: The time value from C{timestamp} as a L{bytes} string in a certain
+         format.  Or C{None} if the object contains no time value.
+     """
+-    string_timestamp = _ffi.cast("ASN1_STRING*", timestamp)
+-    if _lib.ASN1_STRING_length(string_timestamp) == 0:
+-        return None
+-    elif (
++    print("_get_asn1_time call")
++    print("timestamp = " % timestamp);
++    if _wolfssl:
++        asn1_timestamp = _ffi.cast("WOLFSSL_ASN1_TIME*", timestamp)
++        if _lib.wolfSSL_ASN1_TIME_get_length(asn1_timestamp) == 0:
++            print("string length of asn1 was 0")
++            return None
++    else:
++        string_timestamp = _ffi.cast("ASN1_STRING*", timestamp)
++        if _lib.ASN1_STRING_length(string_timestamp) == 0:
++            print("string length of asn1 was 0")
++            return None
++
++    if not _wolfssl and (
+         _lib.ASN1_STRING_type(string_timestamp) == _lib.V_ASN1_GENERALIZEDTIME
      ):
-         return _ffi.string(_lib.ASN1_STRING_get0_data(string_timestamp))
+-        return _ffi.string(_lib.ASN1_STRING_get0_data(string_timestamp))
++        return _ffi.string(_lib.ASN1_STRING_data(string_timestamp))
      else:
--        generalized_timestamp = _ffi.new("ASN1_GENERALIZEDTIME**")
--        _lib.ASN1_TIME_to_generalizedtime(timestamp, generalized_timestamp)
+         generalized_timestamp = _ffi.new("ASN1_GENERALIZEDTIME**")
+         _lib.ASN1_TIME_to_generalizedtime(timestamp, generalized_timestamp)
 -        if generalized_timestamp[0] == _ffi.NULL:
-+        if not _wolfssl:
-+            generalized_timestamp = _ffi.new("ASN1_GENERALIZEDTIME**")
-+            _lib.ASN1_TIME_to_generalizedtime(timestamp, generalized_timestamp)
-+            null_error = generalized_timestamp[0] == _ffi.NULL
-+        else:
-+            generalized_timestamp = _lib.ASN1_TIME_to_generalizedtime(timestamp, _ffi.NULL)
-+            null_error = generalized_timestamp == _ffi.NULL
++        null_error = generalized_timestamp[0] == _ffi.NULL
 +
 +        if null_error:
              # This may happen:
              #   - if timestamp was not an ASN1_TIME
              #   - if allocating memory for the ASN1_GENERALIZEDTIME failed
+@@ -239,10 +252,14 @@ def _get_asn1_time(timestamp: Any) -> Optional[bytes]:
+             # deterministically.
+             _untested_error("ASN1_TIME_to_generalizedtime")
+         else:
+-            string_timestamp = _ffi.cast(
+-                "ASN1_STRING*", generalized_timestamp[0]
+-            )
+-            string_data = _lib.ASN1_STRING_get0_data(string_timestamp)
++            if not _wolfssl:
++                string_timestamp = _ffi.cast(
++                    "ASN1_STRING*", generalized_timestamp[0])
++                string_data = _lib.ASN1_STRING_get0_data(string_timestamp)
++            else:
++                string_timestamp = _ffi.cast(
++                    "WOLFSSL_ASN1_TIME*", generalized_timestamp[0])
++                string_data = _lib.wolfSSL_ASN1_TIME_get_data(string_timestamp)
+             string_result = _ffi.string(string_data)
+             _lib.ASN1_GENERALIZEDTIME_free(generalized_timestamp[0])
+             return string_result
+@@ -766,10 +783,15 @@ class X509Name:
+ 
+             # ffi.string does not handle strings containing NULL bytes
+             # (which may have been generated by old, broken software)
+-            value = _ffi.buffer(
+-                _lib.ASN1_STRING_get0_data(fval), _lib.ASN1_STRING_length(fval)
+-            )[:]
+-            result.append((_ffi.string(name), value))
++            if not _wolfssl:
++                value = _ffi.buffer(
++                    _lib.ASN1_STRING_get0_data(fval), _lib.ASN1_STRING_length(fval)
++                )[:]
++                result.append((_ffi.string(name), value))
++            else:
++                value = _ffi.buffer(_lib.ASN1_STRING_data(fval),
++                                _lib.ASN1_STRING_length(fval))[:]
++                result.append((_ffi.string(name), value))
+ 
+         return result
+ 
+@@ -1440,9 +1462,13 @@ class X509:
+         if not isinstance(amount, int):
+             raise TypeError("amount must be an integer")
+ 
+-        notAfter = _lib.X509_getm_notAfter(self._x509)
++        if not _wolfssl:
++            notAfter = _lib.X509_getm_notAfter(self._x509)
++        else:
++            notAfter = _lib.X509_get_notAfter(self._x509)
+         _lib.X509_gmtime_adj(notAfter, amount)
+ 
++
+     def gmtime_adj_notBefore(self, amount: int) -> None:
+         """
+         Adjust the timestamp on which the certificate starts being valid.
+@@ -1453,7 +1479,10 @@ class X509:
+         if not isinstance(amount, int):
+             raise TypeError("amount must be an integer")
+ 
+-        notBefore = _lib.X509_getm_notBefore(self._x509)
++        if not _wolfssl:
++            notBefore = _lib.X509_getm_notBefore(self._x509)
++        else:
++            notBefore = _lib.X509_get_notBefore(self._x509)
+         _lib.X509_gmtime_adj(notBefore, amount)
+ 
+     def has_expired(self) -> bool:
+@@ -1487,7 +1516,10 @@ class X509:
+         :return: A timestamp string, or ``None`` if there is none.
+         :rtype: bytes or NoneType
+         """
+-        return self._get_boundary_time(_lib.X509_getm_notBefore)
++        if not _wolfssl:
++            return self._get_boundary_time(_lib.X509_getm_notBefore)
++        else:
++            return self._get_boundary_time(_lib.X509_get_notBefore)
+ 
+     def _set_boundary_time(
+         self, which: Callable[..., Any], when: bytes
+@@ -1505,7 +1537,10 @@ class X509:
+         :param bytes when: A timestamp string.
+         :return: ``None``
+         """
+-        return self._set_boundary_time(_lib.X509_getm_notBefore, when)
++        if not _wolfssl:
++            return self._set_boundary_time(_lib.X509_getm_notBefore, when)
++        else:
++            return self._set_boundary_time(_lib.X509_get_notBefore, when)
+ 
+     def get_notAfter(self) -> Optional[bytes]:
+         """
+@@ -1518,7 +1553,10 @@ class X509:
+         :return: A timestamp string, or ``None`` if there is none.
+         :rtype: bytes or NoneType
+         """
+-        return self._get_boundary_time(_lib.X509_getm_notAfter)
++        if not _wolfssl:
++            return self._get_boundary_time(_lib.X509_getm_notAfter)
++        else:
++            return self._get_boundary_time(_lib.X509_get_notAfter)
+ 
+     def set_notAfter(self, when: bytes) -> None:
+         """
+@@ -1531,7 +1569,10 @@ class X509:
+         :param bytes when: A timestamp string.
+         :return: ``None``
+         """
+-        return self._set_boundary_time(_lib.X509_getm_notAfter, when)
++        if not _wolfssl:
++            return self._set_boundary_time(_lib.X509_getm_notAfter, when)
++        else:
++            return self._set_boundary_time(_lib.X509_get_notAfter, when)
+ 
+     def _get_name(self, which: Any) -> X509Name:
+         name = X509Name.__new__(X509Name)
+@@ -1672,14 +1713,24 @@ class X509StoreFlags:
+ 
+     CRL_CHECK: int = _lib.X509_V_FLAG_CRL_CHECK
+     CRL_CHECK_ALL: int = _lib.X509_V_FLAG_CRL_CHECK_ALL
+-    IGNORE_CRITICAL: int = _lib.X509_V_FLAG_IGNORE_CRITICAL
+-    X509_STRICT: int = _lib.X509_V_FLAG_X509_STRICT
+-    ALLOW_PROXY_CERTS: int = _lib.X509_V_FLAG_ALLOW_PROXY_CERTS
+-    POLICY_CHECK: int = _lib.X509_V_FLAG_POLICY_CHECK
+-    EXPLICIT_POLICY: int = _lib.X509_V_FLAG_EXPLICIT_POLICY
+-    INHIBIT_MAP: int = _lib.X509_V_FLAG_INHIBIT_MAP
+-    CHECK_SS_SIGNATURE: int = _lib.X509_V_FLAG_CHECK_SS_SIGNATURE
+-    PARTIAL_CHAIN: int = _lib.X509_V_FLAG_PARTIAL_CHAIN
++    if not _wolfssl:
++        IGNORE_CRITICAL: int = _lib.X509_V_FLAG_IGNORE_CRITICAL
++        X509_STRICT: int = _lib.X509_V_FLAG_X509_STRICT
++        ALLOW_PROXY_CERTS: int = _lib.X509_V_FLAG_ALLOW_PROXY_CERTS
++        POLICY_CHECK: int = _lib.X509_V_FLAG_POLICY_CHECK
++        EXPLICIT_POLICY: int = _lib.X509_V_FLAG_EXPLICIT_POLICY
++        INHIBIT_MAP: int = _lib.X509_V_FLAG_INHIBIT_MAP
++        CHECK_SS_SIGNATURE: int = _lib.X509_V_FLAG_CHECK_SS_SIGNATURE
++        PARTIAL_CHAIN: int = _lib.X509_V_FLAG_PARTIAL_CHAIN
++    else:
++        IGNORE_CRITICAL: int = 0
++        X509_STRICT: int = 0
++        ALLOW_PROXY_CERTS: int = 0
++        POLICY_CHECK: int = 0
++        EXPLICIT_POLICY: int = 0
++        INHIBIT_MAP: int = 0
++        CHECK_SS_SIGNATURE: int = 0
++        PARTIAL_CHAIN: int = 0
+ 
+ 
+ class X509Store:
