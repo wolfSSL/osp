@@ -1,5 +1,12 @@
 # Python OSP Patches
 
+# Known Limitations / Differences
+
+- Can not load DER certificates with ctx.load_verify_locations, as seen in test test_load_verify_cadata
+- set cipher lists does not handle AES256/AES128/AESGCM string types for a generic way to add all AES suites
+- WOLFSSL_CTX session stats such as number of accept's or hits is not incremented and returns 0
+- wolfSSL by default has TLS 1.1 and 1.0 off (seen with test test_options)
+
 # 3.8.5 Patch
 
 This patch is for Python version 3.8.5 which can be downloaded from Python's
