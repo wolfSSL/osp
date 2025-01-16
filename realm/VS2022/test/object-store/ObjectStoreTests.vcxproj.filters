@@ -1,0 +1,195 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="../../realm-core-GlobalProperties.props" />
+  <ItemGroup>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(REALM_CORE_ROOT)\test\object-store\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(REALM_CORE_ROOT)\test\stitch_private.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\stitch_public.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_pubkey.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_pubkey2.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_sync_ca.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_sync_key.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_util_network_ssl_ca.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_util_network_ssl_key.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\object-store\sync-metadata-v4.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\object-store\sync-metadata-v5.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\object-store\sync-metadata-v6.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\object-store\test_backup-olden-and-golden.realm">
+      <Filter>Resources</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\set.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\backup.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\collection_change_indices.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\dictionary.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\frozen_objects.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\index_set.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\list.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\migrations.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\object.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\object_store.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\primitive_list.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\realm.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\results.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\schema.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\sectioned_results.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\test_runner.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\thread_safe_reference.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\transaction_log_parsing.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\uuid.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\c_api.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\c_api_file_tests.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\event_loop.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\test_file.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\test_utils.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\geospatial.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\bson.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\app.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\client_reset.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\file.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\flx_migration.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\flx_schema_migration.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\flx_sync.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\metadata.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\migration_store_test.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\remote_mongo_tests.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\connection_change_notifications.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\progress_notifications.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\session.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\wait_for_completion.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\sync_manager.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\user.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\sync_test_utils.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\object-store\ObjectStoreTestLib.dir\$(Configuration)\unit_test_transport.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Object Libraries">
+      <UniqueIdentifier>{6396662F-3960-300F-B316-D4B56D45F36A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{A0A7793A-0A93-34E4-865C-F07151D61ECC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{40E47C88-ED84-3184-A68A-28B0B3C66756}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

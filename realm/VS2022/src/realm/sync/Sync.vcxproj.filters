@@ -1,0 +1,220 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="../../../realm-core-GlobalProperties.props" />
+  <ItemGroup>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\changeset_index.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_history_impl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_impl_base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_reset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_reset_operation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_reset_recovery.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\compact_changesets.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\migration_store.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\pending_bootstrap_store.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\protocol_codec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\sync_metadata_schema.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\sync_schema_migration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\changeset_encoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\changeset_parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\changeset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\client.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\history.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\instruction_applier.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\instruction_replication.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\instructions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\object_id.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\protocol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\subscriptions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\transform.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\network\default_socket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\network\http.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\network\network.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\network\network_ssl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sync\network\websocket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\binding_callback_thread_observer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\config.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\changeset_encoder.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\changeset_parser.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\changeset.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\client.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\client_base.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\socket_provider.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\history.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\instruction_applier.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\instruction_replication.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\instructions.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\object_id.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\protocol.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\subscriptions.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\transform.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\network\default_socket.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\network\http.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\network\network.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\network\network_ssl.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\network\websocket.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\network\websocket_error.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\trigger.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\changeset_index.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_history_impl.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_impl_base.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_reset.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_reset_operation.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\client_reset_recovery.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\compact_changesets.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\integer_codec.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\migration_store.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\pending_bootstrap_store.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\protocol_codec.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\root_certs.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\sync_metadata_schema.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sync\noinst\sync_schema_migration.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(REALM_CORE_ROOT)\src\realm\sync\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{020EF7E9-D766-3BFD-9F90-448849F20D38}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{40E47C88-ED84-3184-A68A-28B0B3C66756}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

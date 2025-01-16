@@ -1,0 +1,567 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="../realm-core-GlobalProperties.props" />
+  <ItemGroup>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_query.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_query2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_query_big.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_table.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_lang_bind_helper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_alloc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array_blob.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array_blobs_big.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array_blobs_small.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array_float.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array_integer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array_mixed.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array_string_short.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_binary_data.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_bplus_tree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_column.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_column_float.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_column_string.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_column_timestamp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_compaction.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_db.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_decimal128.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_destroy_guard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_dictionary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_file_locks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_global_key.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_group.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_impl_simulated_failure.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_index_string.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_json.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_link_query_view.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_links.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_mixed_null_assertions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_object_id.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_optional.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_priority_queue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_replication.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_safe_int_ops.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_self.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_set.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_shared.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_status.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_string_data.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_table_view.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_thread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_transactions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_transactions_lasse.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_typed_links.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_unresolved_links.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_upgrade_database.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_utf8.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_any.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_backtrace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_base64.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_chunked_binary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_cli_args.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_compression.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_error.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_fixed_size_buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_flat_map.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_from_chars.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_functional.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_future.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_memory_stream.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_overload.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_scope_exit.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_to_string.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_uuid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_encrypted_file_mapping.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_query_geo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\large_tests\test_column_large.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\large_tests\test_strings.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\fuzz_group.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\fuzz_group.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\pthread_test.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\test.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\test_all.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\test_string_types.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\test_table_helper.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\test_types_helper.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\testsettings.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(REALM_CORE_ROOT)\test\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(REALM_CORE_ROOT)\test\downgrade_asymmetric.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_json.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_string.txt">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_test_upgrade_database_9_to_10.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_xjson.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_xjson_plus.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_embeddeddict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles3.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles4.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles5.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linkdict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linkdict2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_3.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_4.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_5.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_6.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle4.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle5.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle6.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long3.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_mixed1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_mixed2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_nulls.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_embeddeddict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_link.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkdict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkdict2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linklist1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linklist2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkset1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkset2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_mixed1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_embeddeddict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_link.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkdict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkdict2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linklist1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linklist2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkset1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkset2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_mixed1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_flx_metadata_tables_v1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_shared_decrypt_4k_page.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_shared_decrypt_64k_page.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_null.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_specified.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_unspecified.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_for_path.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_readonly.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_sync_label_custom.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_sync_label_default.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_colkey_error.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_10_to_11.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_2.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_22.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_3.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_4.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_4_to_5_datetime1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_5_to_6_stringindex.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_6_to_7.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_7_to_8.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_8_to_9.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_9_to_10.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_11.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_20.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_10_to_11.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_2.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_22.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_3.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_4.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_4_to_5_datetime1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_6_to_7.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_7_to_8.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_8_to_9.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_9_to_10.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_6.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_9_to_10_pk_table.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_2.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_3.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_4.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_5.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_6.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_7.realm">
+      <Filter>Resources</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{020EF7E9-D766-3BFD-9F90-448849F20D38}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{A0A7793A-0A93-34E4-865C-F07151D61ECC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{40E47C88-ED84-3184-A68A-28B0B3C66756}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

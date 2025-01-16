@@ -1,0 +1,222 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="../../realm-core-GlobalProperties.props" />
+  <ItemGroup>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\set.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\backup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\collection_change_indices.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\dictionary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\frozen_objects.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\index_set.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\list.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\migrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\object.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\object_store.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\primitive_list.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\realm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\results.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\schema.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sectioned_results.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\test_runner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\thread_safe_reference.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\transaction_log_parsing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\uuid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\c_api\c_api.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\c_api\c_api_file_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\util\event_loop.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\util\test_file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\util\test_utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\geospatial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\bson.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\app.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\client_reset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\flx_migration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\flx_schema_migration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\flx_sync.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\metadata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\migration_store_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\remote_mongo_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\session\connection_change_notifications.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\session\progress_notifications.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\session\session.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\session\wait_for_completion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\sync_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\sync\user.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\util\sync\sync_test_utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\object-store\util\unit_test_transport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\event_loop.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\index_helpers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\test_file.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\test_utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\collection_fixtures.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\sync\baas_admin_api.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\sync\flx_sync_harness.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\sync\session_util.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\sync\sync_test_utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\object-store\util\unit_test_transport.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(REALM_CORE_ROOT)\test\object-store\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(REALM_CORE_ROOT)\test\stitch_private.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\stitch_public.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_pubkey.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_pubkey2.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_sync_ca.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_sync_key.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_util_network_ssl_ca.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_util_network_ssl_key.pem">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\object-store\sync-metadata-v4.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\object-store\sync-metadata-v5.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\object-store\sync-metadata-v6.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\object-store\test_backup-olden-and-golden.realm">
+      <Filter>Resources</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{020EF7E9-D766-3BFD-9F90-448849F20D38}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{A0A7793A-0A93-34E4-865C-F07151D61ECC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{40E47C88-ED84-3184-A68A-28B0B3C66756}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,18 @@
+# CMake backup files
+*.old
+*.bak
+
+# auto-downloaded & generated tar files
+*.tar.gz
+
+# temp files
+CTestCostData.txt
+
+# Log files
+LastTest.log
+LastTestsFailed.log
+
+# Build-time downloads and auto-generated files
+_CPack_Packages/**
+/install_manifest_runtime.txt
+/install_manifest_Unspecified.txt

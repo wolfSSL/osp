@@ -1,0 +1,532 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="../realm-core-GlobalProperties.props" />
+  <Import Project="../wolfssl-GlobalProperties.props" />
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{DF937D4C-1477-3CA0-8856-A53F0EF835ED}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>SyncTestLib</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">SyncTestLib.dir\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">SyncTestLib.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">SyncTestLib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SyncTestLib.dir\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SyncTestLib.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SyncTestLib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">SyncTestLib.dir\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">SyncTestLib.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">SyncTestLib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">SyncTestLib.dir\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">SyncTestLib.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">SyncTestLib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(REALM_VS2022_ROOT)/zlib/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4146</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;REALM_DEBUG=1;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;REALM_DEBUG=1;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(REALM_VS2022_ROOT)/zlib/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DisableSpecificWarnings>4146</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(REALM_VS2022_ROOT)/zlib/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DisableSpecificWarnings>4146</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(REALM_VS2022_ROOT)/zlib/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4146</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(REALM_CORE_ROOT)\test\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule $(REALM_CORE_ROOT)/test/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"$(CurrentVsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S$(REALM_CORE_ROOT) -B$(REALM_VS2022_ROOT) --check-stamp-file $(REALM_VS2022_ROOT)/test/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(REALM_VS2022_ROOT)\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(REALM_VS2022_ROOT)\test\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule $(REALM_CORE_ROOT)/test/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"$(CurrentVsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S$(REALM_CORE_ROOT) -B$(REALM_VS2022_ROOT) --check-stamp-file $(REALM_VS2022_ROOT)/test/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(REALM_VS2022_ROOT)\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(REALM_VS2022_ROOT)\test\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule $(REALM_CORE_ROOT)/test/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"$(CurrentVsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S$(REALM_CORE_ROOT) -B$(REALM_VS2022_ROOT) --check-stamp-file $(REALM_VS2022_ROOT)/test/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(REALM_VS2022_ROOT)\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(REALM_VS2022_ROOT)\test\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule $(REALM_CORE_ROOT)/test/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"$(CurrentVsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S$(REALM_CORE_ROOT) -B$(REALM_VS2022_ROOT) --check-stamp-file $(REALM_VS2022_ROOT)/test/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(REALM_VS2022_ROOT)\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(REALM_VS2022_ROOT)\test\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_array_sync.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_changeset_encoding.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_client_reset.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_compact_changesets.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_crypto.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_embedded_objects.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_instruction_replication.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_lang_bind_helper_sync.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_noinst_server_dir.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_stable_ids.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_sync.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_sync_auth.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_sync_history_migration.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_sync_protocol_codec.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_sync_subscriptions.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_sync_pending_bootstraps.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_sync_error_backoff.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_transform.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_buffer_stream.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_circular_buffer.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_http.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_json_parser.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_network.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_network_ssl.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_uri.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_util_websocket.cpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\test.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\test_all.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\fuzz_tester.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\peer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\test\sync_fixtures.hpp" />
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\dns-chain.crt.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\dns-checked-server.crt.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\dns-checked-server.csr.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\dns-checked-server.key.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\ip-chain.crt.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\ip-server.crt.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\ip-server.csr.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\ip-server.key.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\localhost-chain.crt.cer">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\localhost-chain.crt.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\localhost-server.crt.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\localhost-server.csr.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\certs\localhost-server.key.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\root-ca\crt.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\root-ca\csr.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\certificate-authority\root-ca\key.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_json.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_test_upgrade_database_9_to_10.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_xjson.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_xjson_plus.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_embeddeddict1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles3.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles4.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles5.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linkdict1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linkdict2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_3.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_4.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_5.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_6.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle4.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle5.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle6.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long3.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_mixed1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_mixed2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_nulls.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_embeddeddict1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_link.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkdict1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkdict2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linklist1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linklist2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkset1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkset2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_mixed1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_embeddeddict1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_link.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkdict1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkdict2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linklist1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linklist2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkset1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkset2.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_mixed1.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\resources\admin_realm_issue_1794.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\resources\client_file_migration_core6.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\resources\consistency_full_0.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\resources\consistency_full_1.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\resources\history_migration\client_schema_version_011.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\resources\history_migration\client_schema_version_012.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\resources\history_migration\server_schema_version_020.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\resources\vacuum_no_history_type.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\stitch_private.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\stitch_public.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_flx_metadata_tables_v1.realm">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_pubkey.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_pubkey2.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_sync_ca.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_sync_key.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_null.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_specified.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_unspecified.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_for_path.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_readonly.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_sync_label_custom.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_sync_label_default.json">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_util_network_ssl_ca.pem">
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_util_network_ssl_key.pem">
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(REALM_VS2022_ROOT)\ZERO_CHECK.vcxproj">
+      <Project>{2C88391C-B836-3F71-A9FC-1A8E3EFD9661}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="$(REALM_VS2022_ROOT)\src\realm\parser\QueryParser.vcxproj">
+      <Project>{E679C3B0-ADCC-323A-BA5D-D55D894BF4D8}</Project>
+      <Name>QueryParser</Name>
+    </ProjectReference>
+    <ProjectReference Include="$(REALM_VS2022_ROOT)\src\realm\Storage.vcxproj">
+      <Project>{294B6277-5BE5-3100-BF9A-CEA035037813}</Project>
+      <Name>Storage</Name>
+    </ProjectReference>
+    <ProjectReference Include="$(REALM_VS2022_ROOT)\src\realm\sync\Sync.vcxproj">
+      <Project>{1C09954E-ECC3-3454-BA4D-9D6D3F9326BE}</Project>
+      <Name>Sync</Name>
+    </ProjectReference>
+    <ProjectReference Include="$(REALM_VS2022_ROOT)\src\realm\sync\noinst\server\SyncServer.vcxproj">
+      <Project>{9F1946D1-8BE9-3760-9CA0-9DEA52ADF2B6}</Project>
+      <Name>SyncServer</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

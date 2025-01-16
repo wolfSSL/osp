@@ -1,0 +1,62 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="../../../realm-core-GlobalProperties.props" />
+  <ItemGroup>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_compare.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_mul.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_div.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_add.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_fma.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_string.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_2_str_tables.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid64_to_bid128.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_to_int64.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid128_quantize.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid_convert_data.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid_decimal_data.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid_decimal_globals.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid_from_int.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\LIBRARY\src\bid_round.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(REALM_CORE_ROOT)\src\external\IntelRDFPMathLib20U2\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{40E47C88-ED84-3184-A68A-28B0B3C66756}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

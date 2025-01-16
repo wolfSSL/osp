@@ -4,7 +4,7 @@
 
 # parameters:
 #   -t use tarball, not git
-#   -u use $USER name suffix for repository
+#   -u use $USER name suffix for repository (automatically sets upstream configuration values)
 
     # While the support to build from a tarball is included,
     # Please note that to successfully build,
@@ -21,14 +21,33 @@ MY_SHELLCHECK="shellcheck"
 
 # Check if the executable is available in the PATH
 if command -v "$MY_SHELLCHECK" >/dev/null 2>&1; then
-    # Run your command here
     $MY_SHELLCHECK "$0" || exit 1
 else
-    echo "$MY_SHELLCHECK is not installed. Please install it if changes to this script have been made."
+    echo "ERROR: $MY_SHELLCHECK is not installed. Please install it if changes to this script have been made."
+    exit 1
+fi
+
+# Check if the autoconf executable is available in the PATH
+
+# if command -v "$MY_SHELLCHECK" >/dev/null 2>&1; then
+if command -v "autoconf" > /dev/null 2>&1; then
+    echo "Confirmed autoconf is installed"
+else
+    echo "ERROR: autoconf is not installed.."
+    exit 1
+fi
+
+# Check if the libtool executable is available in the PATH
+if dpkg -L libtool | grep -q '/bin/libtool'; then
+    # Run your command here
+    echo "Confirmed libtool is installed"
+else
+    echo "ERROR: libtool is not installed.."
     exit 1
 fi
 
 # Command-line parameters
+USE_REALM_CORE_DEV=1
 
 # Default method is using git, -t to disable; set this to false to use curl for tarball
 USE_GIT=true
@@ -36,31 +55,75 @@ USE_GIT=true
 # Default repo names is not to use user name suffix. -u to enable.
 USER_REPO_NAME=false
 
+# default is to use out and build prior builds
+FORCE_CLEAN=false
+
+# Use -i to enable wolfssl config/build/install
+CONFIGURE_WOLFSSL=false
+BUILD_WOLFSSL=false
+INSTALL_WOLFSSL=false
+
+# Choose to skip parts of realm-core build:
+FETCH_REALM_CORE=false
+
+
 # Check if user wants to use git
-while getopts ":tu" opt; do
-  case $opt in
-    # Specify -t to use tarball, not git
+while getopts ":hictur" opt; do
+    case $opt in
+        # Specify -t to use tarball, not git
+    # help
+    h)
+        echo "-c clean: delete ./out and ./build directories."
+        echo "-h this help."
+        echo "-i install wolfssl"
+        echo "-r fetch realm"
+        echo "-t use tarball, not git."
+        echo "-u  user username suffixes in directories."
+        ;;
+
+    # specify -i to install wolfssl to
+    i)
+        CONFIGURE_WOLFSSL=true
+        BUILD_WOLFSSL=true
+        INSTALL_WOLFSSL=true
+        ;;
+
+    # -c for brute-force clean (deletes `out` and `build` directories)
+    c)
+        FORCE_CLEAN=true
+        ;;
+
     t)
-      USE_GIT=false
-      ;;
+        USE_GIT=false
+        ;;
+
+    r)
+        FETCH_REALM_CORE=true
+        ;;
 
     # specify -u to use $USER repository fork and file suffix
     u)
-      USER_REPO_NAME=true
-      ;;
+        USER_REPO_NAME=true
+        ;;
+
+    # everything else is an error
     \?)
-      echo "Invalid option: -$OPTARG" >&2
-      exit 1
-      ;;
-  esac
-done
+        echo "Invalid option: -$OPTARG, try -h for help" >&2
+        exit 1
+        ;;
+    esac
+done # getopts
 
 # Commit hashes for specific versions when using git
 WOLFSSL_COMMIT="e814d1ba"
 
 # Adjust if necessary:
-#REALM_CORE_COMMIT="c729fc80"
-REALM_CORE_COMMIT="a5e87a39"
+# REALM_CORE_COMMIT="c729fc80"
+# REALM_CORE_COMMIT="a5e87a39"
+REALM_CORE_COMMIT="5533505d1"
+
+# Patch file based on REALM_CORE_COMMIT or REALM_CORE_VERSION
+PATCH_FILE="realm-commit-$REALM_CORE_COMMIT.patch"
 
 # Variables
 
@@ -69,6 +132,21 @@ REALM_HAVE_WOLFSSL=1
 
 WOLFSSL_UPSTREAM=""
 REALM_CORE_UPSTREAM=""
+
+#Optionally perform brute force clean
+if [ "$FORCE_CLEAN" = true ]; then
+    if [ "$USER_REPO_NAME" = true ]; then
+        echo "clean ./realm-core-$USER/out"
+        rm -rf "./realm-core-$USER/out"
+        echo "clean ./realm-core-$USER/build"
+        rm -rf "./realm-core-$USER/build"
+    else
+        echo "clean ./realm-core/out"
+        rm -rf "./realm-core/out"
+        echo "clean ./realm-core/build"
+        rm -rf "./realm-core/build"
+    fi
+fi
 
 if [ "$USER_REPO_NAME" = true ]; then
     echo "Found user-suffix for repository clones: -$USER"
@@ -88,6 +166,10 @@ else
     REALM_CORE_DIR="realm-core"
 fi
 
+# WOLFSSL_DIR="/home/gojimmypi/wolfssl-install-dir"
+
+# WOLFSSL_DIR="/mnt/c/workspace/wolfssl-gojimmypi-master"
+
 WOLFSSL_VERSION="v5.7.2-stable"
 REALM_CORE_VERSION="v13.26.0"
 WOLFSSL_TAR="${WOLFSSL_VERSION}.tar.gz"
@@ -106,16 +188,11 @@ USE_SYSTEM_INSTALL=false
 
 # Choose to skip parts of wolfSSL build:
 FETCH_WOLFSSL=false
-CONFIGURE_WOLFSSL=false
-BUILD_WOLFSSL=false
-INSTALL_WOLFSSL=false
-
-# Choose to skip parts of realm-core build:
-FETCH_REALM_CORE=true
 
 # Show summary of key config settings:
 echo "USE_GIT:             $USE_GIT"
 
+echo "WOLFSSL_ROOT:        $WOLFSSL_ROOT"
 echo "WOLFSSL_REPO:        $WOLFSSL_REPO"
 echo "WOLFSSL_DIR:         $WOLFSSL_DIR"
 echo "FETCH_WOLFSSL:       $FETCH_WOLFSSL"
@@ -125,10 +202,7 @@ echo "WOLFSSL_INSTALL_DIR: $WOLFSSL_INSTALL_DIR"
 
 echo "REALM_CORE_REPO:     $REALM_CORE_REPO"
 echo "REALM_CORE_DIR:      $REALM_CORE_DIR"
-
-
-# Patch file based on REALM_CORE_COMMIT or REALM_CORE_VERSION
-PATCH_FILE=""
+echo "REALM_HAVE_WOLFSSL:  $REALM_HAVE_WOLFSSL"
 
 if [ "$FETCH_WOLFSSL" = true ]; then
     # Step 2: Download or clone wolfSSL
@@ -148,6 +222,8 @@ if [ "$FETCH_WOLFSSL" = true ]; then
             if [ -n "$WSL_DISTRO_NAME" ]; then
                 # Ignore file permissions changes in WSL
                 git config core.fileMode false
+                # never convert line endings
+                git config core.autocrlf false
             fi
 
             echo "Checking out commit $WOLFSSL_COMMIT..."
@@ -178,10 +254,21 @@ if [ "$FETCH_WOLFSSL" = true ]; then
 else
     echo "Skipping wolfSSL source fetch"
     if [ ! -d "$WOLFSSL_DIR" ]; then
+        echo "Current directory: $(pwd)"
         echo "Warning: wolfSSL fetch skipped, but directory not found: $WOLFSSL_DIR"
+        echo "Checking parent..."
+        ls ..
+        if [ -d "../$WOLFSSL_DIR" ]; then
+            WOLFSSL_DIR="../$WOLFSSL_DIR"
+            echo "Found woulfSSL in parent directory: '$WOLFSSL_DIR'"
+        fi
+        if [ -d "../../$WOLFSSL_DIR" ]; then
+            WOLFSSL_DIR="../../$WOLFSSL_DIR"
+            echo "Found woulfSSL in parent directory: '$WOLFSSL_DIR'"
+        fi
     fi
-    if [ ! -d "$WOLFSSL_INSTALL_DIR" ]; then
-        echo "Error: wolfSSL fetch skipped and install directory not found: $WOLFSSL_INSTALL_DIR"
+    if [[ (! -d "$WOLFSSL_INSTALL_DIR") && (! "$CONFIGURE_WOLFSSL" == true || ! "$BUILD_WOLFSSL" == true || ! "$INSTALL_WOLFSSL" == true) ]]; then
+        echo "Error: wolfSSL fetch skipped and install directory not found: '$WOLFSSL_INSTALL_DIR'. Try using '-i'"
         exit 1
     else
         echo "Warning: wolfSSL fetch skipped, using prior install found in: $WOLFSSL_INSTALL_DIR"
@@ -189,35 +276,36 @@ else
 fi
 
 if [ "$CONFIGURE_WOLFSSL" = true ]; then
-    cd "$WOLFSSL_DIR" || exit 1
+    echo "$WOLFSSL_DIR"
+    pushd "$WOLFSSL_DIR" || exit 1
     # Step 3: Build and install wolfSSL
+    echo "Running wolfSSL autogen.sh ..."
+    ./autogen.sh
     if [ "$USE_SYSTEM_INSTALL" = true ]; then
         echo "Configuring wolfSSL for system-wide installation..."
-        ./autogen.sh
-        ./configure --enable-static --enable-opensslall --enable-enckeys --enable-certgen --enable-context-extra-user-data
+        ./configure --enable-static                       --enable-opensslall --enable-enckeys --enable-certgen --enable-context-extra-user-data
     else
-        ./autogen.sh
         echo "Configuring wolfSSL for local installation at $WOLFSSL_INSTALL_DIR..."
-        ./configure --enable-static --enable-opensslall --enable-enckeys --enable-certgen --enable-context-extra-user-data --prefix="$WOLFSSL_INSTALL_DIR"
+        ./configure --enable-static --enable-opensslextra --enable-opensslall --enable-enckeys --enable-certgen --enable-context-extra-user-data --prefix="$WOLFSSL_INSTALL_DIR"
     fi
-    cd ..
+    popd || exit 1
 else
     echo "Skipping wolfSSL configure"
 fi
 
 if [ "$BUILD_WOLFSSL" = true ]; then
-    cd "$WOLFSSL_DIR" || exit 1
+    pushd "$WOLFSSL_DIR" || exit 1
     echo "Building and installing wolfSSL..."
     make -j"$(nproc)"
-    cd ..
+    popd || exit 1
 else
     echo "Skipping wolfSSL build"
 fi
 
 if [ "$INSTALL_WOLFSSL" = true ]; then
-    cd "$WOLFSSL_DIR" || exit
+    pushd "$WOLFSSL_DIR" || exit
     make install
-    cd ..
+    popd || exit 1
 else
     echo "Skipping wolfSSL install"
 fi
@@ -251,6 +339,8 @@ if [ "$FETCH_REALM_CORE" = true ]; then
             echo "Found WSL distro, setting core.fileMode"
             # Ignore file permissions changes in WSL
             git config core.fileMode false
+            # never convert line endings
+            git config core.autocrlf false
         else
             echo "Not a WSL distro, not setting core.fileMode"
         fi
@@ -302,20 +392,24 @@ cd "$REALM_CORE_DIR" || { echo "Cannot find $REALM_CORE_DIR"; exit 1; }
 if [ -f "REALM_CORE_COMMIT_COMPLETE.log" ]; then
     echo "Found REALM_CORE_COMMIT_COMPLETE.log, skipping patch."
 else
-    echo "Current directory to apply $PATCH_FILE patch: $(pwd)"
-    # Step 5: Apply patch if patch file exists for realm-core
-    echo "Looking for path file $PATCH_FILE in $(pwd)"
-    if [ -f "../$PATCH_FILE" ]; then
-        echo "Applying patch to realm-core: ../$PATCH_FILE"
-
-        git apply "../$PATCH_FILE" || { echo "Failed to apply patch: ../$PATCH_FILE"; git status; exit 1; }
-
-        echo "breadcrumb" > "REALM_CORE_COMMIT_COMPLETE.log"
+    if [ "$USE_REALM_CORE_DEV" == 1 ]; then
+        echo "USE_REALM_CORE_DEV==1 skips patch"
     else
-        # The current build systems expect no upstream support. Patch is required.
-        # See also: https://github.com/realm/realm-core/pull/6535
-        echo "No patch applied, abort"
-        exit 1
+        echo "Current directory to apply $PATCH_FILE patch: $(pwd)"
+        # Step 5: Apply patch if patch file exists for realm-core
+        echo "Looking for patch file $PATCH_FILE in $(pwd)"
+        if [ -f "../$PATCH_FILE" ]; then
+            echo "Applying patch to realm-core: ../$PATCH_FILE"
+
+            git apply "../$PATCH_FILE" || { echo "Failed to apply patch: ../$PATCH_FILE"; git status; exit 1; }
+
+            echo "breadcrumb" > "REALM_CORE_COMMIT_COMPLETE.log"
+        else
+            # The current build systems expect no upstream support. Patch is required.
+            # See also: https://github.com/realm/realm-core/pull/6535
+            echo "No patch applied, abort"
+            exit 1
+        fi
     fi
 fi
 
@@ -331,11 +425,16 @@ if [ "$USE_SYSTEM_INSTALL" = true ]; then
     cmake -B "$BUILD_DIR"                         -DREALM_ENABLE_ENCRYPTION=1 -DREALM_ENABLE_SYNC=1 -DREALM_HAVE_WOLFSSL="$REALM_HAVE_WOLFSSL" -DREALM_WOLFSSL_ROOT_DIR="/usr/local/lib"        || { echo "cmake failed"; exit 1; }
 else
     echo "Configuring realm-core to use local wolfSSL installation from $WOLFSSL_INSTALL_DIR"
-    cmake -B "$BUILD_DIR" -DREALM_INCLUDE_CERTS=1 -DREALM_ENABLE_ENCRYPTION=1 -DREALM_ENABLE_SYNC=1 -DREALM_HAVE_WOLFSSL="$REALM_HAVE_WOLFSSL" -DREALM_WOLFSSL_ROOT_DIR="$WOLFSSL_INSTALL_DIR"  || { echo "cmake failed"; exit 1; }
+    echo "Current directory: $(pwd)"
+    echo ""
+    echo "cmake -B \"$BUILD_DIR\"                          -DREALM_INCLUDE_CERTS=1 -DREALM_ENABLE_ENCRYPTION=1 -DREALM_ENABLE_SYNC=1 -DREALM_HAVE_WOLFSSL=\"$REALM_HAVE_WOLFSSL\" -DREALM_WOLFSSL_ROOT_DIR=\"$WOLFSSL_INSTALL_DIR\""
+          cmake -B  "$BUILD_DIR" -DWOLFSSL_USE_OPTIONS_H=1 -DREALM_INCLUDE_CERTS=1 -DREALM_ENABLE_ENCRYPTION=1 -DREALM_ENABLE_SYNC=1 -DREALM_HAVE_WOLFSSL="$REALM_HAVE_WOLFSSL"   -DREALM_WOLFSSL_ROOT_DIR="$WOLFSSL_INSTALL_DIR"  || { echo "cmake failed"; exit 1; }
 fi
 
 echo "realm-core configuration complete."
+echo "==============================================================================================="
 echo "Building realm-core..."
+echo "==============================================================================================="
 cmake --build "$BUILD_DIR" || { echo "Build failed"; exit 1; }
 #2>&1 | tee -a output.log
 
