@@ -385,7 +385,7 @@ index 7b1d854..e8ba7c8 100644
          resp = self.client.stls(context=ctx)
          self.assertEqual(resp, expected)
 diff --git a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
-index 71cfdcd..3499334 100644
+index 71cfdcd..302f040 100644
 --- a/Lib/test/test_ssl.py
 +++ b/Lib/test/test_ssl.py
 @@ -67,9 +67,17 @@ BYTES_ONLYKEY = os.fsencode(ONLYKEY)
@@ -663,7 +663,7 @@ index 71cfdcd..3499334 100644
          with self.assertRaises(TypeError):
              ctx.verify_flags = None
  
-@@ -1338,25 +1416,50 @@ class ContextTests(unittest.TestCase):
+@@ -1338,24 +1416,45 @@ class ContextTests(unittest.TestCase):
          with self.assertRaises(OSError) as cm:
              ctx.load_cert_chain(NONEXISTINGCERT)
          self.assertEqual(cm.exception.errno, errno.ENOENT)
@@ -716,17 +716,11 @@ index 71cfdcd..3499334 100644
          # Mismatching key and cert
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 -        with self.assertRaisesRegex(ssl.SSLError, "key values mismatch"):
--            ctx.load_cert_chain(CAFILE_CACERT, ONLYKEY)
-+        if ssl.IS_WOLFSSL:
-+            with self.assertRaisesRegex(ssl.SSLError, "unknow"):
-+                ctx.load_cert_chain(CAFILE_CACERT, ONLYKEY)
-+        else:
-+            with self.assertRaisesRegex(ssl.SSLError, "key values mismatch"):
-+                ctx.load_cert_chain(CAFILE_CACERT, ONLYKEY)
++        with self.assertRaisesRegex(ssl.SSLError, "unknown|key values mismatch"):
+             ctx.load_cert_chain(CAFILE_CACERT, ONLYKEY)
          # Password protected key and cert
          ctx.load_cert_chain(CERTFILE_PROTECTED, password=KEY_PASSWORD)
-         ctx.load_cert_chain(CERTFILE_PROTECTED, password=KEY_PASSWORD.encode())
-@@ -1423,8 +1526,13 @@ class ContextTests(unittest.TestCase):
+@@ -1423,8 +1522,13 @@ class ContextTests(unittest.TestCase):
          with self.assertRaises(OSError) as cm:
              ctx.load_verify_locations(NONEXISTINGCERT)
          self.assertEqual(cm.exception.errno, errno.ENOENT)
@@ -742,7 +736,7 @@ index 71cfdcd..3499334 100644
          ctx.load_verify_locations(CERTFILE, CAPATH)
          ctx.load_verify_locations(CERTFILE, capath=BYTES_CAPATH)
  
-@@ -1465,19 +1573,21 @@ class ContextTests(unittest.TestCase):
+@@ -1465,19 +1569,21 @@ class ContextTests(unittest.TestCase):
          self.assertEqual(ctx.cert_store_stats()["x509_ca"], 2)
  
          # test DER
@@ -777,7 +771,7 @@ index 71cfdcd..3499334 100644
  
          # error cases
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-@@ -1627,6 +1737,7 @@ class ContextTests(unittest.TestCase):
+@@ -1627,6 +1733,7 @@ class ContextTests(unittest.TestCase):
  
      @unittest.skipIf(sys.platform == "win32", "not-Windows specific")
      @unittest.skipIf(IS_LIBRESSL, "LibreSSL doesn't support env vars")
@@ -785,7 +779,7 @@ index 71cfdcd..3499334 100644
      def test_load_default_certs_env(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          with support.EnvironmentVarGuard() as env:
-@@ -1775,6 +1886,10 @@ class ContextTests(unittest.TestCase):
+@@ -1775,6 +1882,10 @@ class ContextTests(unittest.TestCase):
              pass
  
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -796,7 +790,7 @@ index 71cfdcd..3499334 100644
          ctx.sslsocket_class = MySSLSocket
          ctx.sslobject_class = MySSLObject
  
-@@ -1786,7 +1901,11 @@ class ContextTests(unittest.TestCase):
+@@ -1786,7 +1897,11 @@ class ContextTests(unittest.TestCase):
      @unittest.skipUnless(IS_OPENSSL_1_1_1, "Test requires OpenSSL 1.1.1")
      def test_num_tickest(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -809,7 +803,7 @@ index 71cfdcd..3499334 100644
          ctx.num_tickets = 1
          self.assertEqual(ctx.num_tickets, 1)
          ctx.num_tickets = 0
-@@ -1797,7 +1916,10 @@ class ContextTests(unittest.TestCase):
+@@ -1797,7 +1912,10 @@ class ContextTests(unittest.TestCase):
              ctx.num_tickets = None
  
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -821,7 +815,7 @@ index 71cfdcd..3499334 100644
          with self.assertRaises(ValueError):
              ctx.num_tickets = 1
  
-@@ -1822,7 +1944,10 @@ class SSLErrorTests(unittest.TestCase):
+@@ -1822,7 +1940,10 @@ class SSLErrorTests(unittest.TestCase):
          self.assertEqual(cm.exception.library, 'PEM')
          self.assertEqual(cm.exception.reason, 'NO_START_LINE')
          s = str(cm.exception)
@@ -833,7 +827,7 @@ index 71cfdcd..3499334 100644
  
      def test_subclass(self):
          # Check that the appropriate SSLError subclass is raised
-@@ -1924,6 +2049,7 @@ class SSLObjectTests(unittest.TestCase):
+@@ -1924,6 +2045,7 @@ class SSLObjectTests(unittest.TestCase):
          with self.assertRaisesRegex(TypeError, "public constructor"):
              ssl.SSLObject(bio, bio)
  
@@ -841,7 +835,7 @@ index 71cfdcd..3499334 100644
      def test_unwrap(self):
          client_ctx, server_ctx, hostname = testing_context()
          c_in = ssl.MemoryBIO()
-@@ -1998,7 +2124,7 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -1998,7 +2120,7 @@ class SimpleBackgroundTests(unittest.TestCase):
                              cert_reqs=ssl.CERT_REQUIRED)
          self.addCleanup(s.close)
          self.assertRaisesRegex(ssl.SSLError, "certificate verify failed",
@@ -850,7 +844,7 @@ index 71cfdcd..3499334 100644
  
      def test_connect_ex(self):
          # Issue #11326: check connect_ex() implementation
-@@ -2174,13 +2300,22 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -2174,13 +2296,22 @@ class SimpleBackgroundTests(unittest.TestCase):
          # capath certs are loaded on request
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          ctx.load_verify_locations(capath=CAPATH)
@@ -875,7 +869,7 @@ index 71cfdcd..3499334 100644
  
      @needs_sni
      def test_context_setget(self):
-@@ -2248,8 +2383,12 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -2248,8 +2379,12 @@ class SimpleBackgroundTests(unittest.TestCase):
          sslobj = ctx.wrap_bio(incoming, outgoing, False,
                                SIGNED_CERTFILE_HOSTNAME)
          self.assertIs(sslobj._sslobj.owner, sslobj)
@@ -890,7 +884,7 @@ index 71cfdcd..3499334 100644
          self.assertIsNotNone(sslobj.shared_ciphers())
          self.assertRaises(ValueError, sslobj.getpeercert)
          if 'tls-unique' in ssl.CHANNEL_BINDING_TYPES:
-@@ -2267,7 +2406,10 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -2267,7 +2402,10 @@ class SimpleBackgroundTests(unittest.TestCase):
              # If the server shuts down the TCP connection without sending a
              # secure shutdown message, this is reported as SSL_ERROR_SYSCALL
              pass
@@ -902,7 +896,7 @@ index 71cfdcd..3499334 100644
  
      def test_bio_read_write_data(self):
          sock = socket.socket(socket.AF_INET)
-@@ -2891,23 +3033,30 @@ class ThreadedTests(unittest.TestCase):
+@@ -2891,23 +3029,30 @@ class ThreadedTests(unittest.TestCase):
                                     server_context=client_context,
                                     chatty=True, connectionchatty=True,
                                     sni_name=hostname)
@@ -943,7 +937,7 @@ index 71cfdcd..3499334 100644
                            str(e.exception))
  
      def test_getpeercert(self):
-@@ -2948,6 +3097,7 @@ class ThreadedTests(unittest.TestCase):
+@@ -2948,6 +3093,7 @@ class ThreadedTests(unittest.TestCase):
  
      @unittest.skipUnless(have_verify_flags(),
                          "verify_flags need OpenSSL > 0.9.8")
@@ -951,7 +945,7 @@ index 71cfdcd..3499334 100644
      def test_crl_check(self):
          if support.verbose:
              sys.stdout.write("\n")
-@@ -3008,10 +3158,16 @@ class ThreadedTests(unittest.TestCase):
+@@ -3008,10 +3154,16 @@ class ThreadedTests(unittest.TestCase):
          with server:
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname="invalid") as s:
@@ -972,7 +966,7 @@ index 71cfdcd..3499334 100644
  
          # missing server_hostname arg should cause an exception, too
          server = ThreadedEchoServer(context=server_context, chatty=True)
-@@ -3048,7 +3204,9 @@ class ThreadedTests(unittest.TestCase):
+@@ -3048,7 +3200,9 @@ class ThreadedTests(unittest.TestCase):
      def test_ecc_cert(self):
          client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          client_context.load_verify_locations(SIGNING_CA)
@@ -983,7 +977,7 @@ index 71cfdcd..3499334 100644
          hostname = SIGNED_CERTFILE_ECC_HOSTNAME
  
          server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-@@ -3073,13 +3231,19 @@ class ThreadedTests(unittest.TestCase):
+@@ -3073,13 +3227,19 @@ class ThreadedTests(unittest.TestCase):
          #       algorithms.
          client_context.options |= ssl.OP_NO_TLSv1_3
          # only ECDSA certs
@@ -1005,7 +999,7 @@ index 71cfdcd..3499334 100644
  
          # correct hostname should verify
          server = ThreadedEchoServer(context=server_context, chatty=True)
-@@ -3200,21 +3364,40 @@ class ThreadedTests(unittest.TestCase):
+@@ -3200,21 +3360,40 @@ class ThreadedTests(unittest.TestCase):
          with server, \
               client_context.wrap_socket(socket.socket(),
                                          server_hostname=hostname) as s:
@@ -1060,7 +1054,7 @@ index 71cfdcd..3499334 100644
  
      def test_rude_shutdown(self):
          """A brutal shutdown of an SSL server should raise an OSError
-@@ -3275,10 +3458,16 @@ class ThreadedTests(unittest.TestCase):
+@@ -3275,10 +3454,16 @@ class ThreadedTests(unittest.TestCase):
                  except ssl.SSLError as e:
                      msg = 'unable to get local issuer certificate'
                      self.assertIsInstance(e, ssl.SSLCertVerificationError)
@@ -1081,7 +1075,7 @@ index 71cfdcd..3499334 100644
  
      @requires_tls_version('SSLv2')
      def test_protocol_sslv2(self):
-@@ -3827,14 +4016,23 @@ class ThreadedTests(unittest.TestCase):
+@@ -3827,14 +4012,23 @@ class ThreadedTests(unittest.TestCase):
          # OpenSSL enables all TLS 1.3 ciphers, enforce TLS 1.2 for test
          client_context.options |= ssl.OP_NO_TLSv1_3
          # Force different suites on client and server
@@ -1108,7 +1102,7 @@ index 71cfdcd..3499334 100644
  
      def test_version_basic(self):
          """
-@@ -3853,6 +4051,8 @@ class ThreadedTests(unittest.TestCase):
+@@ -3853,6 +4047,8 @@ class ThreadedTests(unittest.TestCase):
                  s.connect((HOST, server.port))
                  if IS_OPENSSL_1_1_1 and has_tls_version('TLSv1_3'):
                      self.assertEqual(s.version(), 'TLSv1.3')
@@ -1117,7 +1111,7 @@ index 71cfdcd..3499334 100644
                  elif ssl.OPENSSL_VERSION_INFO >= (1, 0, 2):
                      self.assertEqual(s.version(), 'TLSv1.2')
                  else:  # 0.9.8 to 1.0.1
-@@ -3928,7 +4128,10 @@ class ThreadedTests(unittest.TestCase):
+@@ -3928,7 +4124,10 @@ class ThreadedTests(unittest.TestCase):
                                              server_hostname=hostname) as s:
                  with self.assertRaises(ssl.SSLError) as e:
                      s.connect((HOST, server.port))
@@ -1129,7 +1123,7 @@ index 71cfdcd..3499334 100644
  
      @requires_minimum_version
      @requires_tls_version('SSLv3')
-@@ -3960,6 +4163,10 @@ class ThreadedTests(unittest.TestCase):
+@@ -3960,6 +4159,10 @@ class ThreadedTests(unittest.TestCase):
          # automatically.
          if ssl.OPENSSL_VERSION_INFO < (1, 0, 0):
              context.set_ciphers("ECCdraft:ECDH")
@@ -1140,7 +1134,7 @@ index 71cfdcd..3499334 100644
          with ThreadedEchoServer(context=context) as server:
              with context.wrap_socket(socket.socket()) as s:
                  s.connect((HOST, server.port))
-@@ -3992,7 +4199,11 @@ class ThreadedTests(unittest.TestCase):
+@@ -3992,7 +4195,11 @@ class ThreadedTests(unittest.TestCase):
                  # check if it is sane
                  self.assertIsNotNone(cb_data)
                  if s.version() == 'TLSv1.3':
@@ -1153,7 +1147,7 @@ index 71cfdcd..3499334 100644
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
  
-@@ -4017,7 +4228,11 @@ class ThreadedTests(unittest.TestCase):
+@@ -4017,7 +4224,11 @@ class ThreadedTests(unittest.TestCase):
                  self.assertNotEqual(cb_data, new_cb_data)
                  self.assertIsNotNone(cb_data)
                  if s.version() == 'TLSv1.3':
@@ -1166,7 +1160,7 @@ index 71cfdcd..3499334 100644
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
                  s.write(b"CB tls-unique\n")
-@@ -4051,13 +4266,20 @@ class ThreadedTests(unittest.TestCase):
+@@ -4051,13 +4262,20 @@ class ThreadedTests(unittest.TestCase):
          # test scenario needs TLS <= 1.2
          client_context.options |= ssl.OP_NO_TLSv1_3
          server_context.load_dh_params(DHFILE)
@@ -1189,7 +1183,7 @@ index 71cfdcd..3499334 100644
          if "ADH" not in parts and "EDH" not in parts and "DHE" not in parts:
              self.fail("Non-DH cipher: " + cipher[0])
  
-@@ -4258,7 +4480,10 @@ class ThreadedTests(unittest.TestCase):
+@@ -4258,7 +4476,10 @@ class ThreadedTests(unittest.TestCase):
              stats = server_params_test(client_context, server_context,
                                         chatty=False,
                                         sni_name='supermessage')
@@ -1201,7 +1195,7 @@ index 71cfdcd..3499334 100644
  
      @needs_sni
      def test_sni_callback_raising(self):
-@@ -4274,9 +4499,11 @@ class ThreadedTests(unittest.TestCase):
+@@ -4274,9 +4495,11 @@ class ThreadedTests(unittest.TestCase):
                  stats = server_params_test(client_context, server_context,
                                             chatty=False,
                                             sni_name='supermessage')
@@ -1216,7 +1210,7 @@ index 71cfdcd..3499334 100644
              self.assertEqual(catch.unraisable.exc_type, ZeroDivisionError)
  
      @needs_sni
-@@ -4295,20 +4522,30 @@ class ThreadedTests(unittest.TestCase):
+@@ -4295,20 +4518,30 @@ class ThreadedTests(unittest.TestCase):
                                             chatty=False,
                                             sni_name='supermessage')
  
@@ -1251,7 +1245,7 @@ index 71cfdcd..3499334 100644
          stats = server_params_test(client_context, server_context,
                                     sni_name=hostname)
          ciphers = stats['server_shared_ciphers'][0]
-@@ -4359,20 +4596,26 @@ class ThreadedTests(unittest.TestCase):
+@@ -4359,20 +4592,26 @@ class ThreadedTests(unittest.TestCase):
          self.assertTrue(session.id)
          self.assertGreater(session.time, 0)
          self.assertGreater(session.timeout, 0)
@@ -1283,7 +1277,7 @@ index 71cfdcd..3499334 100644
          self.assertTrue(stats['session_reused'])
          session2 = stats['session']
          self.assertEqual(session2.id, session.id)
-@@ -4389,8 +4632,10 @@ class ThreadedTests(unittest.TestCase):
+@@ -4389,8 +4628,10 @@ class ThreadedTests(unittest.TestCase):
          self.assertNotEqual(session3.id, session.id)
          self.assertNotEqual(session3, session)
          sess_stat = server_context.session_stats()
@@ -1296,7 +1290,7 @@ index 71cfdcd..3499334 100644
  
          # reuse session again
          stats = server_params_test(client_context, server_context,
-@@ -4402,8 +4647,10 @@ class ThreadedTests(unittest.TestCase):
+@@ -4402,8 +4643,10 @@ class ThreadedTests(unittest.TestCase):
          self.assertGreaterEqual(session4.time, session.time)
          self.assertGreaterEqual(session4.timeout, session.timeout)
          sess_stat = server_context.session_stats()
@@ -1309,7 +1303,7 @@ index 71cfdcd..3499334 100644
  
      def test_session_handling(self):
          client_context, server_context, hostname = testing_context()
-@@ -4525,12 +4772,25 @@ class TestPostHandshakeAuth(unittest.TestCase):
+@@ -4525,12 +4768,25 @@ class TestPostHandshakeAuth(unittest.TestCase):
                      # receive CertificateRequest
                      self.assertEqual(s.recv(1024), b'OK\n')
                      # send empty Certificate + Finish
@@ -1341,7 +1335,7 @@ index 71cfdcd..3499334 100644
  
      def test_pha_optional(self):
          if support.verbose:
-@@ -4589,10 +4849,17 @@ class TestPostHandshakeAuth(unittest.TestCase):
+@@ -4589,10 +4845,17 @@ class TestPostHandshakeAuth(unittest.TestCase):
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1363,7 +1357,7 @@ index 71cfdcd..3499334 100644
  
      def test_pha_no_pha_server(self):
          # server doesn't have PHA enabled, cert is requested in handshake
-@@ -4708,7 +4975,11 @@ class TestSSLDebug(unittest.TestCase):
+@@ -4708,7 +4971,11 @@ class TestSSLDebug(unittest.TestCase):
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
          # header, 5 lines for TLS 1.3
@@ -1376,7 +1370,7 @@ index 71cfdcd..3499334 100644
  
          client_context.keylog_filename = None
          server_context.keylog_filename = support.TESTFN
-@@ -4717,7 +4988,11 @@ class TestSSLDebug(unittest.TestCase):
+@@ -4717,7 +4984,11 @@ class TestSSLDebug(unittest.TestCase):
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1389,7 +1383,7 @@ index 71cfdcd..3499334 100644
  
          client_context.keylog_filename = support.TESTFN
          server_context.keylog_filename = support.TESTFN
-@@ -4726,7 +5001,11 @@ class TestSSLDebug(unittest.TestCase):
+@@ -4726,7 +4997,11 @@ class TestSSLDebug(unittest.TestCase):
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1459,7 +1453,7 @@ index 93bf25f..70e5b34 100644
          name ="sha512_224";
          break;
 diff --git a/Modules/_ssl.c b/Modules/_ssl.c
-index 35d9d65..2ca78c5 100644
+index 35d9d65..c1130d5 100644
 --- a/Modules/_ssl.c
 +++ b/Modules/_ssl.c
 @@ -53,6 +53,10 @@ static PySocketModule_APIObject PySocketModule;
@@ -1558,15 +1552,22 @@ index 35d9d65..2ca78c5 100644
  #define TLS_method SSLv23_method
  #define TLS_client_method SSLv23_client_method
  #define TLS_server_method SSLv23_server_method
-@@ -228,6 +263,7 @@ extern const SSL_METHOD *TLSv1_2_method(void);
+@@ -228,11 +263,14 @@ extern const SSL_METHOD *TLSv1_2_method(void);
  #define OpenSSL_version_num SSLeay
  #define OpenSSL_version SSLeay_version
  #define OPENSSL_VERSION SSLEAY_VERSION
 +#endif
  
++#ifndef X509_NAME_ENTRY_set
  static int X509_NAME_ENTRY_set(const X509_NAME_ENTRY *ne)
  {
-@@ -243,6 +279,7 @@ static int COMP_get_type(const COMP_METHOD *meth)
+     return ne->set;
+ }
++#endif
+ 
+ #ifndef OPENSSL_NO_COMP
+ /* LCOV_EXCL_START */
+@@ -243,6 +281,7 @@ static int COMP_get_type(const COMP_METHOD *meth)
  /* LCOV_EXCL_STOP */
  #endif
  
@@ -1574,7 +1575,7 @@ index 35d9d65..2ca78c5 100644
  static pem_password_cb *SSL_CTX_get_default_passwd_cb(SSL_CTX *ctx)
  {
      return ctx->default_passwd_callback;
-@@ -284,6 +321,7 @@ SSL_SESSION_get_ticket_lifetime_hint(const SSL_SESSION *s)
+@@ -284,6 +323,7 @@ SSL_SESSION_get_ticket_lifetime_hint(const SSL_SESSION *s)
  {
      return s->tlsext_tick_lifetime_hint;
  }
@@ -1582,7 +1583,7 @@ index 35d9d65..2ca78c5 100644
  
  #endif /* OpenSSL < 1.1.0 or LibreSSL < 2.7.0 */
  
-@@ -504,7 +542,11 @@ static inline _PySSLError _PySSL_errno(int failed, const SSL *ssl, int retcode)
+@@ -504,7 +544,11 @@ static inline _PySSLError _PySSL_errno(int failed, const SSL *ssl, int retcode)
          _PySSL_FIX_ERRNO;
  #endif
          err.c = errno;
@@ -1594,7 +1595,7 @@ index 35d9d65..2ca78c5 100644
      }
      return err;
  }
-@@ -671,6 +713,13 @@ fill_and_set_sslerror(PySSLSocket *sslsock, PyObject *type, int ssl_errno,
+@@ -671,6 +715,13 @@ fill_and_set_sslerror(PySSLSocket *sslsock, PyObject *type, int ssl_errno,
                  sslsock->server_hostname
              );
              break;
@@ -1608,7 +1609,7 @@ index 35d9d65..2ca78c5 100644
  #endif
          default:
              verify_str = X509_verify_cert_error_string(verify_code);
-@@ -789,13 +838,28 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
+@@ -789,13 +840,28 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
              errstr = "The operation did not complete (connect)";
              break;
          case SSL_ERROR_SYSCALL:
@@ -1637,7 +1638,7 @@ index 35d9d65..2ca78c5 100644
                  } else if (s && ret == -1) {
                      /* underlying BIO reported an I/O error */
                      ERR_clear_error();
-@@ -836,6 +900,49 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
+@@ -836,6 +902,49 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
              }
              break;
          }
@@ -1687,7 +1688,7 @@ index 35d9d65..2ca78c5 100644
          default:
              p = PY_SSL_ERROR_INVALID_ERROR_CODE;
              errstr = "Invalid error code";
-@@ -1230,7 +1337,9 @@ _create_tuple_for_X509_NAME (X509_NAME *xname)
+@@ -1230,7 +1339,9 @@ _create_tuple_for_X509_NAME (X509_NAME *xname)
  
          /* check to see if we've gotten to a new RDN */
          if (rdn_level >= 0) {
@@ -1697,7 +1698,7 @@ index 35d9d65..2ca78c5 100644
                  /* yes, new RDN */
                  /* add old RDN to DN */
                  rdnt = PyList_AsTuple(rdn);
-@@ -1245,7 +1354,9 @@ _create_tuple_for_X509_NAME (X509_NAME *xname)
+@@ -1245,7 +1356,9 @@ _create_tuple_for_X509_NAME (X509_NAME *xname)
                  rdn = PyList_New(0);
                  if (rdn == NULL)
                      goto fail0;
@@ -1707,7 +1708,7 @@ index 35d9d65..2ca78c5 100644
          }
          rdn_level = X509_NAME_ENTRY_set(entry);
  
-@@ -1449,14 +1560,14 @@ _get_peer_alt_names (X509 *certificate) {
+@@ -1449,14 +1562,14 @@ _get_peer_alt_names (X509 *certificate) {
                  PyTuple_SET_ITEM(t, 0, v);
  
                  if (name->d.ip->length == 4) {
@@ -1724,7 +1725,7 @@ index 35d9d65..2ca78c5 100644
                      len = sprintf(
                          buf,
                          "%X:%X:%X:%X:%X:%X:%X:%X",
-@@ -1567,8 +1678,21 @@ _get_aia_uri(X509 *certificate, int nid) {
+@@ -1567,8 +1680,21 @@ _get_aia_uri(X509 *certificate, int nid) {
      PyObject *lst = NULL, *ostr = NULL;
      int i, result;
      AUTHORITY_INFO_ACCESS *info;
@@ -1747,7 +1748,7 @@ index 35d9d65..2ca78c5 100644
      if (info == NULL)
          return Py_None;
      if (sk_ACCESS_DESCRIPTION_num(info) == 0) {
-@@ -2162,7 +2286,11 @@ _ssl__SSLSocket_selected_alpn_protocol_impl(PySSLSocket *self)
+@@ -2162,7 +2288,11 @@ _ssl__SSLSocket_selected_alpn_protocol_impl(PySSLSocket *self)
  
      SSL_get0_alpn_selected(self->ssl, &out, &outlen);
  
@@ -1759,7 +1760,7 @@ index 35d9d65..2ca78c5 100644
          Py_RETURN_NONE;
      return PyUnicode_FromStringAndSize((char *)out, outlen);
  }
-@@ -2841,7 +2969,7 @@ _ssl__SSLSocket_verify_client_post_handshake_impl(PySSLSocket *self)
+@@ -2841,7 +2971,7 @@ _ssl__SSLSocket_verify_client_post_handshake_impl(PySSLSocket *self)
  #endif
  }
  
@@ -1768,7 +1769,7 @@ index 35d9d65..2ca78c5 100644
  
  static SSL_SESSION*
  _ssl_session_dup(SSL_SESSION *session) {
-@@ -2892,7 +3020,7 @@ PySSL_get_session(PySSLSocket *self, void *closure) {
+@@ -2892,7 +3022,7 @@ PySSL_get_session(PySSLSocket *self, void *closure) {
      PySSLSession *pysess;
      SSL_SESSION *session;
  
@@ -1777,7 +1778,7 @@ index 35d9d65..2ca78c5 100644
      /* duplicate session as workaround for session bug in OpenSSL 1.1.0,
       * https://github.com/openssl/openssl/issues/1550 */
      session = SSL_get0_session(self->ssl);  /* borrowed reference */
-@@ -2926,7 +3054,7 @@ static int PySSL_set_session(PySSLSocket *self, PyObject *value,
+@@ -2926,7 +3056,7 @@ static int PySSL_set_session(PySSLSocket *self, PyObject *value,
                               void *closure)
                                {
      PySSLSession *pysess;
@@ -1786,7 +1787,7 @@ index 35d9d65..2ca78c5 100644
      SSL_SESSION *session;
  #endif
      int result;
-@@ -2952,7 +3080,7 @@ static int PySSL_set_session(PySSLSocket *self, PyObject *value,
+@@ -2952,7 +3082,7 @@ static int PySSL_set_session(PySSLSocket *self, PyObject *value,
                          "Cannot set session after handshake.");
          return -1;
      }
@@ -1795,7 +1796,7 @@ index 35d9d65..2ca78c5 100644
      /* duplicate session */
      if ((session = _ssl_session_dup(pysess->session)) == NULL) {
          return -1;
-@@ -3113,11 +3241,13 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
+@@ -3113,11 +3243,13 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
  
      PySSL_BEGIN_ALLOW_THREADS
      switch(proto_version) {
@@ -1810,7 +1811,7 @@ index 35d9d65..2ca78c5 100644
  #if (defined(TLS1_VERSION) && \
          !defined(OPENSSL_NO_TLS1) && \
          !defined(OPENSSL_NO_TLS1_METHOD))
-@@ -3218,7 +3348,7 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
+@@ -3218,7 +3350,7 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
  #ifdef SSL_OP_SINGLE_DH_USE
      options |= SSL_OP_SINGLE_DH_USE;
  #endif
@@ -1819,7 +1820,7 @@ index 35d9d65..2ca78c5 100644
      options |= SSL_OP_SINGLE_ECDH_USE;
  #endif
  #ifdef SSL_OP_IGNORE_UNEXPECTED_EOF
-@@ -5355,9 +5485,12 @@ PySSL_RAND(int len, int pseudo)
+@@ -5355,9 +5487,12 @@ PySSL_RAND(int len, int pseudo)
      if (bytes == NULL)
          return NULL;
      if (pseudo) {
@@ -1833,7 +1834,7 @@ index 35d9d65..2ca78c5 100644
          ok = RAND_pseudo_bytes((unsigned char*)PyBytes_AS_STRING(bytes), len);
  #endif
          if (ok == 0 || ok == 1)
-@@ -6066,6 +6199,9 @@ PyInit__ssl(void)
+@@ -6066,6 +6201,9 @@ PyInit__ssl(void)
          return NULL;
      PySocketModule = *socket_api;
  
@@ -1843,7 +1844,7 @@ index 35d9d65..2ca78c5 100644
  #ifndef OPENSSL_VERSION_1_1
      /* Load all algorithms and initialize cpuid */
      OPENSSL_add_all_algorithms_noconf();
-@@ -6079,7 +6215,7 @@ PyInit__ssl(void)
+@@ -6079,7 +6217,7 @@ PyInit__ssl(void)
      if (!_setup_ssl_threads()) {
          return NULL;
      }
@@ -1852,7 +1853,7 @@ index 35d9d65..2ca78c5 100644
      /* OpenSSL 1.1.0 builtin thread support is enabled */
      _ssl_locks_count++;
  #endif
-@@ -6178,8 +6314,10 @@ PyInit__ssl(void)
+@@ -6178,8 +6316,10 @@ PyInit__ssl(void)
                              X509_V_FLAG_CRL_CHECK);
      PyModule_AddIntConstant(m, "VERIFY_CRL_CHECK_CHAIN",
                              X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
@@ -1863,7 +1864,7 @@ index 35d9d65..2ca78c5 100644
  #ifdef X509_V_FLAG_TRUSTED_FIRST
      PyModule_AddIntConstant(m, "VERIFY_X509_TRUSTED_FIRST",
                              X509_V_FLAG_TRUSTED_FIRST);
-@@ -6470,5 +6608,11 @@ PyInit__ssl(void)
+@@ -6470,5 +6610,11 @@ PyInit__ssl(void)
      if (r == NULL || PyModule_AddObject(m, "_OPENSSL_API_VERSION", r))
          return NULL;
  
