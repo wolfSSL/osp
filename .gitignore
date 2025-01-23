@@ -110,4 +110,67 @@ openssh/regress/authorized_keys*
 stunnel/example/echoserver/echoserver*
 *.plist
 server_err.log
-/.vs
+
+# Visual Studio
+**/.vs
+
+# All backup files
+*.bak
+
+# CMake files to exclude
+/realm/VS2022/**/CMakeCache.txt
+/realm/VS2022/**/*.cmake
+
+/realm/VS2022/**/install_manifest_devel.txt
+/realm/VS2022/**/build/wolfssl
+
+
+# Download by build process:
+/realm/VS2022/zlib/**
+
+/realm/VS2022/**/*.log
+
+# Build-time cache
+/realm/VS2022/**/THIS_WOLFSSL_ROOT_REG.txt
+/realm/VS2022/CMakeFiles/**/*
+/realm/VS2022/test/DebugSync_**
+/realm/VS2022/test/*.lock
+/realm/VS2022/test/*.realm
+/realm/VS2022/test/*.backup-log
+/realm/VS2022/**/*.realm.lock
+/realm/VS2022/**/generate.stamp
+/realm/VS2022/**/generate.stamp.depend
+/realm/VS2022/external/catch/src/Catch2.dir/**/objects.txt
+
+# Realm build-time generated test files
+/realm/VS2022/Testing/**/CTestCheckpoint.txt
+/realm/VS2022/Testing/**/LastTest.log.tmp
+/realm/VS2022/test/benchmark-common-tasks/Debugbenchmark_common_tasks_EmptyCommit_Full_EncryptionOff.realm
+/realm/VS2022/test/benchmark-common-tasks/Debugbenchmark_common_tasks_AddTable_Full_EncryptionOff.realm
+/realm/VS2022/test/benchmark-common-tasks/Debugbenchmark_common_tasks_AddTable_Full_EncryptionOff.realm.lock
+/realm/VS2022/test/DebugLangBindHelper_CompactLargeEncryptedFile.1.path.realm.tmp_compaction_space
+/realm/VS2022/test/DebugShared_CompactEmpty.1.path.realm.tmp_compaction_space
+/realm/VS2022/test/DebugFile_Offset.*
+
+# Realm test-time generated files
+/realm/VS2022/test/**/data.realm
+/realm/VS2022/test/**/Debug**.realm
+/realm/VS2022/test/**/Debugresults.*
+/realm/VS2022/test/**/Debugresults.latest.json
+/realm/VS2022/test/**/*.tmp_compaction_space
+/realm/VS2022/test/**/Debugresults.*.csv
+
+# Realm auto-generated dependency files
+/realm/VS2022/_deps/libuv-build/CMakeFiles
+/realm/VS2022/_deps/libuv-build/Testing
+/realm/VS2022/_deps/libuv-build/DartConfiguration.tcl
+
+/realm/VS2022/_deps/libuv-subbuild/CMakeLists.txt
+/realm/VS2022/_deps/libuv-subbuild/CMakeFiles
+/realm/VS2022/_deps/libuv-subbuild/libuv-populate-prefix/tmp
+/realm/VS2022/_deps/libuv-subbuild/libuv-populate-prefix/src
+
+# Ensure a couple of placeholder files are always included
+!/realm/VS2022/CMakeFiles/VerifyGlobs.cmake
+!/realm/VS2022/CMakeFiles/cmake.verify_globs
+

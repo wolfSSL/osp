@@ -1,0 +1,646 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="../../realm-core-GlobalProperties.props" />
+  <Import Project="../../wolfssl-GlobalProperties.props" />
+  <ItemGroup>
+    <ProjectReference Include="..\..\wolfssl-VS2022-cmake.vcxproj">
+      <Project>{12226dbe-7278-4dfa-a119-5a0294cf0b33}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <!-- Target that initializes before Build -->
+  <Target Name="init" BeforeTargets="CustomBuild;Compile">
+    <Message Text="Peek Storage SolutionDir: $(SolutionDir)" Importance="High" />
+    <Message Text="Project Directory: $(MSBuildProjectDirectory)" Importance="High" />
+    <Message Text="WOLFSSL_USER_SETTINGS_DIRECTORY: $(WOLFSSL_USER_SETTINGS_DIRECTORY)" Importance="High" />
+    <Message Text="WOLFSSL_ROOT: $(WOLFSSL_ROOT)" Importance="High" />
+  </Target>
+
+  <!-- Build target that depends on init -->
+  <Target Name="Build" DependsOnTargets="init;CustomBuild;Compile">
+    <Message Text="Executing build target..." Importance="High" />
+  </Target>
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{294B6277-5BE5-3100-BF9A-CEA035037813}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>Storage</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(REALM_VS2022_ROOT)\src\realm\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Storage.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">realm-dbg</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(REALM_VS2022_ROOT)\src\realm\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Storage.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">realm</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(REALM_VS2022_ROOT)\src\realm\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Storage.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">realm</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(REALM_VS2022_ROOT)\src\realm\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Storage.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">realm</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(REALM_VS2022_ROOT)/zlib/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4146</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;REALM_DEBUG=1;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;REALM_DEBUG=1;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(REALM_VS2022_ROOT)/zlib/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DisableSpecificWarnings>4146</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(REALM_VS2022_ROOT)/zlib/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DisableSpecificWarnings>4146</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "$(REALM_VS2022_ROOT)/zlib/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4146</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;WOLFSSL_LIB;WOLFSSL_USER_SETTINGS;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;_WIN32_WINNT=0x0603;WINVER=0x603;NTDDI_VERSION=0x06030000;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>$(WOLFSSL_USER_SETTINGS_DIRECTORY);$(WOLFSSL_ROOT);;$(REALM_CORE_ROOT)\src;$(REALM_VS2022_ROOT)\src;$(REALM_VS2022_ROOT)\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(REALM_CORE_ROOT)\src\realm\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule $(REALM_CORE_ROOT)/src/realm/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"$(CurrentVsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S$(REALM_CORE_ROOT) -B$(REALM_VS2022_ROOT) --check-stamp-file $(REALM_VS2022_ROOT)/src/realm/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(REALM_VS2022_ROOT)\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(REALM_VS2022_ROOT)\src\realm\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule $(REALM_CORE_ROOT)/src/realm/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"$(CurrentVsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S$(REALM_CORE_ROOT) -B$(REALM_VS2022_ROOT) --check-stamp-file $(REALM_VS2022_ROOT)/src/realm/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(REALM_VS2022_ROOT)\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(REALM_VS2022_ROOT)\src\realm\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule $(REALM_CORE_ROOT)/src/realm/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"$(CurrentVsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S$(REALM_CORE_ROOT) -B$(REALM_VS2022_ROOT) --check-stamp-file $(REALM_VS2022_ROOT)/src/realm/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(REALM_VS2022_ROOT)\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(REALM_VS2022_ROOT)\src\realm\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule $(REALM_CORE_ROOT)/src/realm/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"$(CurrentVsInstallRoot)\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S$(REALM_CORE_ROOT) -B$(REALM_VS2022_ROOT) --check-stamp-file $(REALM_VS2022_ROOT)/src/realm/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(REALM_VS2022_ROOT)\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(REALM_VS2022_ROOT)\src\realm\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\query.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_with_find.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\alloc.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\alloc_slab.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_backlink.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_binary.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_blob.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_blobs_small.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_blobs_big.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_decimal128.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_fixed_bytes.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_integer.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_key.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_mixed.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_unsigned.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_string.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_string_short.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\array_timestamp.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\bplustree.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\chunked_binary.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\cluster.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\collection.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\cluster_tree.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\error_codes.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\column_binary.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\decimal128.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\dictionary.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\disable_sync_to_disk.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\exceptions.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\group.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\db.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\group_writer.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\history.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\impl\copy_replication.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\impl\output_stream.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\impl\simulated_failure.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\impl\transact_log.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\index_string.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\link_translator.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\list.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\node.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\mixed.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\obj.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\object_converter.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\global_key.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\query_engine.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\query_expression.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\query_value.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\replication.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\set.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\spec.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\string_data.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\table.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\table_ref.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\obj_list.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\object_id.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\table_view.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\tokenizer.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\transaction.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\sort_descriptor.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\status.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\unicode.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\utilities.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\uuid.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\version.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\backup_restore.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\geospatial.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(REALM_CORE_ROOT)\src\external;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(REALM_CORE_ROOT)\src\external;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(REALM_CORE_ROOT)\src\external;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(REALM_CORE_ROOT)\src\external;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\backtrace.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\base64.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\basic_system_errors.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\cli_args.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\compression.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\encrypted_file_mapping.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\fifo_helper.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\file.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\file_mapper.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\interprocess_condvar.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\logger.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\memory_stream.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\platform_info.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\misc_errors.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\serializer.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\sha_crypto.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\terminate.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\time.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\timestamp_formatter.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\timestamp_logger.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\thread.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\to_string.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\demangle.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\enum.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\json_parser.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\load_file.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\misc_ext_errors.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\random.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\resource_limits.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\uri.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\bson\bson.cpp" />
+    <ClCompile Include="$(REALM_CORE_ROOT)\src\realm\util\bson\regular_expression.cpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\aggregate_ops.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\alloc.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\alloc_slab.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_backlink.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_basic.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_basic_tpl.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_binary.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_blob.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_blobs_big.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_blobs_small.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_bool.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_decimal128.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_direct.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_fixed_bytes.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_integer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_integer_tpl.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_key.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_list.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_mixed.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_ref.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_string.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_string_short.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_timestamp.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_typed_link.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_unsigned.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\array_with_find.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\binary_data.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\bplustree.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\chunked_binary.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\cluster.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\cluster_tree.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\collection.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\column_binary.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\column_fwd.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\column_integer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\column_type.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\column_type_traits.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\data_type.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\db.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\db_options.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\decimal128.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\dictionary.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\disable_sync_to_disk.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\error_codes.h" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\error_codes.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\exceptions.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\global_key.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\group.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\group_writer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\handover_defs.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\history.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\index_string.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\keys.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\list.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\mixed.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\node.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\node_header.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\null.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\obj.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\obj_list.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\object_id.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\owned_data.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\query.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\query_conditions.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\query_engine.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\query_expression.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\query_state.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\query_value.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\realm_nmmintrin.h" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\replication.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\set.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\sort_descriptor.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\spec.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\status.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\status_with.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\string_data.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\table.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\table_ref.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\table_view.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\transaction.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\timestamp.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\unicode.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\utilities.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\uuid.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\version.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\version_id.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\backup_restore.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\impl\array_writer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\impl\changeset_input_stream.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\impl\cont_transact_hist.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\impl\destroy_guard.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\impl\output_stream.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\impl\simulated_failure.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\impl\transact_log.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\aes_cryptor.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\any.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\assert.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\backtrace.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\base64.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\basic_system_errors.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\bind_ptr.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\bson\bson.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\bson\indexed_map.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\bson\max_key.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\bson\min_key.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\bson\mongo_timestamp.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\bson\regular_expression.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\buffer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\buffer_stream.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\cf_ptr.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\checked_mutex.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\compression.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\encrypted_file_mapping.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\errno.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\features.h" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\flat_map.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\fifo_helper.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\file.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\file_mapper.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\fixed_size_buffer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\function_ref.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\functional.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\future.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\hex_dump.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\input_stream.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\interprocess_condvar.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\interprocess_mutex.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\logger.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\memory_stream.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\misc_errors.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\misc_ext_errors.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\optional.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\overload.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\platform_info.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\priority_queue.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\random.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\safe_int_ops.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\scope_exit.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\serializer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\sha_crypto.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\span.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\tagged_bool.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\terminate.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\thread.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\to_string.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\type_traits.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\uri.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\geospatial.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\link_translator.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\object_converter.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\query_conditions_tpl.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\cf_str.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\circular_buffer.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\cli_args.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\demangle.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\enum.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\from_chars.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\json_parser.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\load_file.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\quote.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\resource_limits.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\scratch_allocator.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\signal_blocker.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\thread_exec_guard.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\time.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\timestamp_formatter.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\timestamp_logger.hpp" />
+    <ClInclude Include="$(REALM_CORE_ROOT)\src\realm\util\value_reset_guard.hpp" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s1angle.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2cellid.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2latlng.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s1interval.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2cap.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2cell.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2cellunion.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2edgeindex.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2edgeutil.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2latlngrect.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2loop.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2pointregion.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2polygon.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2polygonbuilder.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2polyline.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2r2rect.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\s2region.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\mathutil.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.dir\$(Configuration)\mathlimits.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_compare.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_mul.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_div.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_add.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_fma.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_string.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_2_str_tables.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid64_to_bid128.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_to_int64.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid128_quantize.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid_convert_data.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid_decimal_data.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid_decimal_globals.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid_from_int.obj" />
+    <Object Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.dir\$(Configuration)\bid_round.obj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(REALM_VS2022_ROOT)\ZERO_CHECK.vcxproj">
+      <Project>{2C88391C-B836-3F71-A9FC-1A8E3EFD9661}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="$(REALM_VS2022_ROOT)\src\external\IntelRDFPMathLib20U2\Bid.vcxproj">
+      <Project>{D7766DE3-0446-35EB-9753-13E4242D7A43}</Project>
+      <Name>Bid</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="$(REALM_VS2022_ROOT)\src\external\s2\s2geometry.vcxproj">
+      <Project>{A8FD9E6E-5E7D-3CB9-995D-587A2B4F8129}</Project>
+      <Name>s2geometry</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

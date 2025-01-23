@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+    <PropertyGroup Label="wolfsslProjectSettings">
+        <!-- If the wolfSSL paths and other settings are not desired in build output, set WOLFSSL_VERBOSE_MSBUILD to a value other than `True` -->
+        <WOLFSSL_VERBOSE_MSBUILD>False</WOLFSSL_VERBOSE_MSBUILD>
+
+        <!-- SETX may have save WOLFSSL_ROOT to user registry. If non-blank, it MUST match environment variable by the same name. -->
+        <!-- Reminder when editing registry, values may be cached. Reboot if undesired persistent values observed. -->
+
+        <!-- We'll log registry value to a file, assign to a macro, and later compare to environment variable. -->
+        <WOLFSSL_ROOT_REG_LOG_FILE>$(OutDir)THIS_WOLFSSL_ROOT_REG.txt</WOLFSSL_ROOT_REG_LOG_FILE>
+        <WOLFSSLRootKey>HKEY_CURRENT_USER\Environment</WOLFSSLRootKey>
+        <WOLFSSLRootValueName>WOLFSSL_ROOT</WOLFSSLRootValueName>
+        <!--- If a WOLFSSL_ROOT value is found in registry, it will be saved in WOLFSSLRootReg: -->
+        <WOLFSSLRootReg />
+
+        <!--Some projects will load this file repeatedly, we only need to peek at the registry once. Fixes problem of log file write concurrency. -->
+        <WOLFSSLRootReg_COMPLETE>False</WOLFSSLRootReg_COMPLETE>
+
+        <!-- Use Windows paths, no trailing slash: -->
+        <!-- Ensure wolfSSL is configured properly! (double-dash example for ./configure not allowed here. See README.md) -->
+        <!-- Set WOLFSSL_ROOT to the environment variable if it exists and is not blank, otherwise use the default value -->
+
+        <!-- Use MSBuild parameter, or registry if explicitly set -->
+        <WOLFSSL_ROOT Condition="'$(WOLFSSL_ROOT)' != ''">$(WOLFSSL_ROOT)</WOLFSSL_ROOT>
+
+        <!-- Use the environment variable if MSBuild parameter and registry is not set -->
+        <WOLFSSL_ROOT Condition="'$(WOLFSSL_ROOT)' == '' and '$(env:WOLFSSL_ROOT)' != ''">$(env:WOLFSSL_ROOT)</WOLFSSL_ROOT>
+
+        <!-- Fallback to the default value if neither MSBuild parameter nor environment variable is set -->
+        <WOLFSSL_ROOT Condition="'$(WOLFSSL_ROOT)' == '' and '$(env:WOLFSSL_ROOT)' == ''">c:\workspace\wolfssl</WOLFSSL_ROOT>
+
+        <!-- Optional path based on current username
+        <WOLFSSL_USER_PATH>c:\workspace\wolfssl-$(USERNAME)</WOLFSSL_USER_PATH>
+        <WOLFSSL_ROOT Condition="Exists('$(WOLFSSL_USER_PATH)')">$(WOLFSSL_USER_PATH)</WOLFSSL_ROOT>
+        -->
+
+        <!-- cleaned value for $(MSBuildThisFileDirectory)/include for user_settings.h file to use -->
+        <WOLFSSL_USER_SETTINGS_DIR_TEMP>$([System.String]::Copy('$(MSBuildThisFileDirectory)/include').Replace('/', '\'))</WOLFSSL_USER_SETTINGS_DIR_TEMP>
+        <WOLFSSL_USER_SETTINGS_DIRECTORY>$([System.String]::Copy('$(WOLFSSL_USER_SETTINGS_DIR_TEMP)').Replace('\\', '\'))</WOLFSSL_USER_SETTINGS_DIRECTORY>
+        <WOLFSSL_USER_SETTINGS_FILE>$(WOLFSSL_USER_SETTINGS_DIRECTORY)\user_settings.h</WOLFSSL_USER_SETTINGS_FILE>
+
+        <!-- Ensure there are no embedded quotes, such as perhaps those from SET/SETX environment variables -->
+        <WOLFSSL_ROOT>$([System.String]::Copy('$(WOLFSSL_ROOT)').Replace('"', ''))</WOLFSSL_ROOT>
+    </PropertyGroup>
+
+    <Target Name="ReadRegistry" BeforeTargets="PrepareForBuild" Condition="'$(WOLFSSLRootReg_COMPLETE) '== 'False' and $(WOLFSSL_VERBOSE_MSBUILD) == 'True' ">
+        <Message Text="$(MSBuildProjectName) PrepareForBuild ReadRegistry ..." Importance="High" />
+        <!-- Use PowerShell to fetch the registry value, save to log file and later read into WOLFSSL_ROOT_REG_VALUE-->
+        <Exec Command="powershell -NoProfile -Command &quot;(Get-ItemProperty -Path 'Registry::$(WOLFSSLRootKey)' -Name '$(WOLFSSLRootValueName)' -ErrorAction SilentlyContinue).WOLFSSL_ROOT | Out-File -FilePath '$(WOLFSSL_ROOT_REG_LOG_FILE)' -Encoding UTF8&quot;"
+              IgnoreExitCode="true" />
+
+        <ReadLinesFromFile File="$(WOLFSSL_ROOT_REG_LOG_FILE)">
+            <Output TaskParameter="Lines" PropertyName="WOLFSSL_ROOT_REG_VALUE" />
+        </ReadLinesFromFile>
+
+        <!-- Debugging output -->
+        <Message Text="WOLFSSL_ROOT from registry key: '$(WOLFSSL_ROOT_REG_VALUE)' logged to file: $(WOLFSSL_ROOT_REG_LOG_FILE)" Importance="High" />
+        <Message Text="WOLFSSL_ROOT from environment:  '$(env:WOLFSSL_ROOT)'" Importance="High" />
+        <Message Text="WOLFSSL_ROOT macro assignment:  '$(WOLFSSL_ROOT)'"     Importance="High" />
+    </Target>
+
+    <Target Name="ValidateDirectories" BeforeTargets="init;CustomBuild;Compile;Build">
+        <!-- Error for WOLFSSL_ROOT (typically something like "c:\workspace\wolfssl" )-->
+        <Error Condition="!Exists('$(WOLFSSL_ROOT)')"
+               Text="Error: WOLFSSL_ROOT directory not found: $(WOLFSSL_ROOT), WOLFSSL_ROOT_REG_VALUE=$(WOLFSSL_ROOT_REG_VALUE)" />
+
+        <!-- To confirm the WOLFSSL_ROOT contains wolfSSL source check for wolfssl header directory: -->
+        <Error Condition="!Exists('$(WOLFSSL_ROOT)/wolfssl')"
+               Text="Error: WOLFSSL_ROOT directory ('$(WOLFSSL_ROOT)') exists but wolfssl not found: '$(WOLFSSL_ROOT)\wolfssl', WOLFSSL_ROOT_REG_VALUE=$(WOLFSSL_ROOT_REG_VALUE)" />
+
+        <!-- Error for WOLFSSL_USER_SETTINGS_DIRECTORY (typically something like "C:\workspace\osp-[usernme]\realm\VS2022\include"  -->
+        <Error Condition="!Exists('$(WOLFSSL_USER_SETTINGS_DIRECTORY)')"
+               Text="Error: WOLFSSL_USER_SETTINGS_DIRECTORY directory not found: $(WOLFSSL_USER_SETTINGS_DIRECTORY)" />
+
+        <!-- Ensure there's actually a user_setting.h -->
+        <Error Condition="!Exists('$(WOLFSSL_USER_SETTINGS_FILE)')"
+               Text="Error: wolfSSL user_settings.h not found: $(WOLFSSL_USER_SETTINGS_FILE)" />
+    </Target>
+
+    <!-- optional alternative backup values. Be sure to check cmake instances if using this:
+    <PropertyGroup Condition="!Exists('$(WOLFSSL_ROOT)')">
+        <WOLFSSL_ROOT>NOT_FOUND</WOLFSSL_ROOT>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="!Exists('$(WOLFSSL_USER_SETTINGS_DIRECTORY)')">
+        <WOLFSSL_USER_SETTINGS_DIRECTORY>NOT_FOUND</WOLFSSL_USER_SETTINGS_DIRECTORY>
+    </PropertyGroup>
+    -->
+
+    <Target Name="wolfsslShowProjectMessages" BeforeTargets="Build" Condition="'$(WOLFSSL_VERBOSE_MSBUILD)' == 'True'">
+        <!-- Add WOLFSSL_VERBOSE_MSBUILD to preprocessor definitions if set to True -->
+        <PropertyGroup Condition="'$(DefineConstants.Contains(WOLFSSL_VERBOSE_MSBUILD))' == 'false'">
+            <!-- Add WOLFSSL_VERBOSE_MSBUILD to preprocessor definitions only if it hasn't been added -->
+            <DefineConstants>$(DefineConstants);WOLFSSL_VERBOSE_MSBUILD</DefineConstants>
+        </PropertyGroup>
+
+        <Message Text="***********************************************************************************************" Importance="high" />
+        <Message Text="**************************  wolfssl-GlobalProperties.props settings  **************************" Importance="high "/>
+        <Message Text="***********************************************************************************************" Importance="high" />
+        <Message Text="MSBuildProjectName: $(MSBuildProjectName)"                      Importance="high" />
+        <Message Text="This WOLFSSL_ROOT_REG_VALUE=$(WOLFSSL_ROOT_REG_VALUE)"          Importance="high"/>
+        <Message Condition="$(WOLFSSL_ROOT) == 'NOT_FOUND'"
+                 Text="Error: WOLFSSL_ROOT directory does not exist!  $(WOLFSSL_ROOT)" Importance="high" />
+        <Message Condition="$(WOLFSSL_ROOT) != 'NOT_FOUND'"
+                 Text="Success: WOLFSSL_ROOT directory found: $(WOLFSSL_ROOT)"         Importance="high" />
+
+        <Message Condition="$(WOLFSSL_USER_SETTINGS_DIRECTORY) == 'NOT_FOUND'"
+                 Text="Error: WOLFSSL_USER_SETTINGS_DIRECTORY directory does not exist! $(WOLFSSL_USER_SETTINGS_DIRECTORY)" Importance="high" />
+        <Message Condition="$(WOLFSSL_USER_SETTINGS_DIRECTORY) != 'NOT_FOUND'"
+                 Text="Success: WOLFSSL_USER_SETTINGS_DIRECTORY directory found: $(WOLFSSL_USER_SETTINGS_DIRECTORY)"        Importance="high" />
+
+        <Message Text="This VS_ROOT=$(VS_ROOT)" />
+        <Message Text="This MSBuildProjectDirectory=$(MSBuildProjectDirectory)" />
+        <Message Text="***********************************************************************************************" Importance="high" />
+        <Message Text="****************************  end wolfssl-GlobalProperties.props   ****************************" Importance="high" />
+        <Message Text="***********************************************************************************************" Importance="high" />
+    </Target>
+</Project>

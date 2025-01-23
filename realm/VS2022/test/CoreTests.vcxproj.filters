@@ -1,0 +1,549 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="../realm-core-GlobalProperties.props" />
+  <ItemGroup>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(REALM_CORE_ROOT)\test\test_all.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(REALM_CORE_ROOT)\test\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(REALM_CORE_ROOT)\test\downgrade_asymmetric.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_json.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_string.txt">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_test_upgrade_database_9_to_10.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_xjson.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expect_xjson_plus.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_embeddeddict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles3.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles4.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_link_cycles5.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linkdict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linkdict2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_3.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_4.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_5.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist1_6.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle4.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle5.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_cycle6.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_linklist_long3.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_mixed1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_mixed2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_json_nulls.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_embeddeddict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_link.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkdict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkdict2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linklist1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linklist2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkset1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_linkset2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_mixed1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_embeddeddict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_link.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkdict1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkdict2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linklist1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linklist2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkset1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_linkset2.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\expected_xjson_plus_mixed1.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_flx_metadata_tables_v1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_shared_decrypt_4k_page.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_shared_decrypt_64k_page.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_null.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_specified.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_expiration_unspecified.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_for_path.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_readonly.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_sync_label_custom.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_token_sync_label_default.json">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_colkey_error.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_10_to_11.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_2.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_22.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_3.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_4.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_4_to_5_datetime1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_5_to_6_stringindex.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_6_to_7.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_7_to_8.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_8_to_9.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_1000_9_to_10.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_11.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_20.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_10_to_11.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_2.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_22.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_3.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_4.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_4_to_5_datetime1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_6_to_7.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_7_to_8.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_8_to_9.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_4_9_to_10.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_6.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_database_9_to_10_pk_table.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_1.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_2.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_3.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_4.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_5.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_6.realm">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="$(REALM_CORE_ROOT)\test\test_upgrade_progress_7.realm">
+      <Filter>Resources</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_query.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_query2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_query_big.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_table.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_lang_bind_helper.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_parser.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_alloc.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_array.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_array_blob.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_array_blobs_big.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_array_blobs_small.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_array_float.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_array_integer.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_array_mixed.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_array_string_short.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_binary_data.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_bplus_tree.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_column.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_column_float.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_column_string.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_column_timestamp.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_compaction.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_db.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_decimal128.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_destroy_guard.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_dictionary.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_file.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_file_locks.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_global_key.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_group.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_impl_simulated_failure.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_index_string.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_json.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_link_query_view.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_links.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_mixed_null_assertions.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_object_id.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_optional.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_priority_queue.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_replication.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_safe_int_ops.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_self.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_set.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_shared.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_status.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_string_data.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_table_view.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_thread.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_transactions.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_transactions_lasse.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_typed_links.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_unresolved_links.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_upgrade_database.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_utf8.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_any.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_backtrace.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_base64.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_chunked_binary.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_cli_args.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_compression.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_error.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_file.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_fixed_size_buffer.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_flat_map.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_from_chars.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_functional.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_future.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_logger.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_memory_stream.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_overload.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_scope_exit.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_util_to_string.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_uuid.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_encrypted_file_mapping.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_query_geo.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_column_large.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\test_strings.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="$(REALM_VS2022_ROOT)\test\CoreTestLib.dir\$(Configuration)\fuzz_group.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Object Libraries">
+      <UniqueIdentifier>{6396662F-3960-300F-B316-D4B56D45F36A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{A0A7793A-0A93-34E4-865C-F07151D61ECC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{40E47C88-ED84-3184-A68A-28B0B3C66756}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
