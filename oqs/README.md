@@ -1,51 +1,56 @@
 # Introduction
 
-The `openssl-sphincs.patch` file has our modifications to the OQS (Open
-Quantum-Safe) project's fork of OpenSSL. The only files that our patch changes
-are configuration and generated files.
+In order to do a (D)TLS 1.3 connection using post-quantum authentication scheme
+ML-DSA, you will need to generate the certificate chain. This file contains
+instructions for using your system's OpenSSL and the OQS Provider to generate
+those certificates and keys.
 
-The reason we need this patch is that we have chosen to support a different set
-of SPHINCS+ variants than those that were chosen by the OQS team. As such, we
-enable and disable some variants and then re-generate code. We need the patched
-fork of OpenSSL because it generates our X.509 certificates for us and we do
-interop testing against it.
+Note: These steps assume you are on a posix system with OpenSSL 3.x.y installed.
+      You can check your version of OpenSSL with the following command:
 
-This in turn requires that we use a specific version of liboqs as the OpenSSL
-fork expects SIKE and SIDH to be present, but it is no longer there.
+```
+openssl version
+```
 
-You can fetch OpenSSL source, apply our patch, build the code and then generate
-the certificates. Instructions for doing it all are below.
-
-# Building our Fork
-
-Below, you will find some simple instructions on how to build and patch OQS's
-fork of OpenSSL.
-
-## liboqs
-
-Please follow the instructions that can be found in the wolfssl repo's `INSTALL`
-file.  See the section titled: "15. Building with liboqs for TLS 1.3
-[EXPERIMENTAL]".
-
-## OpenSSL
+## OQS OpenSSL Provider
 
 ```
 $ cd ~/oqs/
-$ git clone --single-branch --branch=OQS-OpenSSL_1_1_1-stable https://github.com/open-quantum-safe/openssl.git
-$ cd openssl
-$ git checkout e9160975eeb9796ff3550e8c2c35db63157a409b
-$ patch -p1 < /path/to/osp/oqs/openssl-sphincs.patch
-$ ./config no-shared
-$ make all
+$ git clone https://github.com/open-quantum-safe/oqs-provider.git 
+$ cd oqs-provider
+$ git reset --hard afc1de27034a49c48ff656f36c021b9e046daeb0
+$ ./scripts/fullbuild.sh
+$ openssl list -provider-path _build/lib -provider ./oqsprovider.so -providers
 ```
 
-NOTE: There is no need to install OpenSSL.
+The final command should yield the following output:
 
+```
+Providers:
+  ./oqsprovider.so
+    name: OpenSSL OQS Provider
+    version: 0.8.1-dev
+    status: active
+  default
+    name: OpenSSL Default Provider
+    version: 3.0.2
+    status: active
+```
+
+
+Note: OpenSSL Default Provider version might be different.
+
+Note: There is no need to install the oqs provider.
+
+Note: We use a known good GIT Hash. The tip of the `main` branch is probably
+      fine.
+ 
 # Generating the Certificates
 
-We have scripts for generating certificate chains for all the variants of all
-the post-quantum algorithms that we support. simply copy them into the openssl
-directory and execute them to generate the certificate chains.
+We have scripts for generating certificate chains for all the variants of 
+ML-DSA. simply copy `generate_dilithium_chains_with_provider.sh` into the OQS
+Provider directory and execute it to generate the certificate chains. For your
+convenience, this directory contains the product of these steps.
 
 # References
 
@@ -54,25 +59,3 @@ directory and execute them to generate the certificate chains.
 - README file for our post-quantum examples
     - https://github.com/wolfSSL/wolfssl-examples/blob/master/pq/README.md
 
-# Generating the Patch
-
-Below, you will find some simple instructions on how we generated the patch
-file.
-
-## Creating our Fork of OQS's OpenSSL Fork
-
-NOTE: These instructions are informational; you can just patch and build OpenSSL
-      as specified in the instructions above.
-
-```
-$ cd ~/oqs/
-$ git clone --single-branch --branch=OQS-OpenSSL_1_1_1-stable https://github.com/open-quantum-safe/openssl.git
-$ cd openssl
-$ git checkout e9160975eeb9796ff3550e8c2c35db63157a409b
-$ cp /path/to/osp/oqs/generate.yml oqs-template/generate.yml
-$ LIBOQS_DOCS_DIR=~/oqs/liboqs/docs python3 oqs-template/generate.py
-$ ./config no-shared
-$ make generate_crypto_objects
-$ rm configdata.pm Makefile
-$ git diff > /path/to/osp/oqs/openssl-sphincs.patch
-```
