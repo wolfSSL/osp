@@ -1,0 +1,148 @@
+From b77175b8fdc694ecb93a5962f93e1bb816fe87a5 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Tue, 11 Feb 2025 13:47:33 +0100
+Subject: [PATCH] wolfssl: update suiteb ciphersuites
+
+- For SUITEB128 the 128-bit strength ciphersuites should appears first in the list
+- Update RSA key strengths
+- Update ECC key strengths
+- Update tests to pass with wolfSSL. wolfSSL fails as soon as the key is being loaded if it doesn't match the minimum key strength requirements.
+
+Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
+---
+ src/crypto/tls_wolfssl.c    | 24 +++++++++++++++---------
+ tests/hwsim/test_suite_b.py | 28 ++++++++++++++++++++++++----
+ 2 files changed, 39 insertions(+), 13 deletions(-)
+
+diff --git a/src/crypto/tls_wolfssl.c b/src/crypto/tls_wolfssl.c
+index 5de3c3398..3bf52d64e 100644
+--- a/src/crypto/tls_wolfssl.c
++++ b/src/crypto/tls_wolfssl.c
+@@ -248,16 +248,22 @@ static void wolfSSL_logging_cb(const int log_level,
+ #define SUITEB_TLS13_192_CIPHERS "TLS13-AES256-GCM-SHA384:TLS13-CHACHA20-POLY1305-SHA256"
+ #define SUITEB_TLS_192_CIPHERS SUITEB_TLS13_192_CIPHERS ":" SUITEB_OLDTLS_192_CIPHERS
+ 
+-#define SUITEB_OLDTLS_128_CIPHERS SUITEB_OLDTLS_192_CIPHERS ":ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256"
+-#define SUITEB_TLS13_128_CIPHERS SUITEB_TLS13_192_CIPHERS ":TLS13-AES128-GCM-SHA256"
++#define SUITEB_OLDTLS_128_CIPHERS "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256:" SUITEB_OLDTLS_192_CIPHERS
++#define SUITEB_TLS13_128_CIPHERS "TLS13-AES128-GCM-SHA256:" SUITEB_TLS13_192_CIPHERS
+ #define SUITEB_TLS_128_CIPHERS SUITEB_TLS13_128_CIPHERS ":" SUITEB_OLDTLS_128_CIPHERS
+ 
+ #define SUITEB_TLS_192_SIGALGS "ECDSA+SHA384:RSA-PSS+SHA384:RSA+SHA384"
+-#define SUITEB_TLS_128_SIGALGS SUITEB_TLS_192_SIGALGS ":ECDSA+SHA256:RSA-PSS+SHA256:RSA+SHA256"
++#define SUITEB_TLS_128_SIGALGS "ECDSA+SHA256:RSA-PSS+SHA256:RSA+SHA256:" SUITEB_TLS_192_SIGALGS
+ 
+ #define SUITEB_TLS_192_CURVES "P-384:P-521"
+ #define SUITEB_TLS_128_CURVES "P-256:" SUITEB_TLS_192_CURVES
+ 
++#define SUITEB_TLS_128_RSA_KEY_SZ 2048
++#define SUITEB_TLS_192_RSA_KEY_SZ 3072
++
++#define SUITEB_TLS_128_ECC_KEY_SZ 256
++#define SUITEB_TLS_192_ECC_KEY_SZ 384
++
+ static int handle_ciphersuites(WOLFSSL_CTX *ssl_ctx, WOLFSSL *ssl,
+ 			       const char *openssl_ciphers, unsigned int flags)
+ {
+@@ -283,8 +289,8 @@ static int handle_ciphersuites(WOLFSSL_CTX *ssl_ctx, WOLFSSL *ssl,
+ 			else
+ 				ciphers = SUITEB_TLS_128_CIPHERS;
+ 			sigalgs = SUITEB_TLS_128_SIGALGS;
+-			key_sz = 2048;
+-			ecc_key_sz = 224;
++			key_sz = SUITEB_TLS_128_RSA_KEY_SZ;
++			ecc_key_sz = SUITEB_TLS_128_ECC_KEY_SZ;
+ 			curves = SUITEB_TLS_128_CURVES;
+ 		} else if (os_strcmp(openssl_ciphers, "SUITEB192") == 0) {
+ 			if (tls13only)
+@@ -294,8 +300,8 @@ static int handle_ciphersuites(WOLFSSL_CTX *ssl_ctx, WOLFSSL *ssl,
+ 			else
+ 				ciphers = SUITEB_TLS_192_CIPHERS;
+ 			sigalgs = SUITEB_TLS_192_SIGALGS;
+-			key_sz = 3072;
+-			ecc_key_sz = 256;
++			key_sz = SUITEB_TLS_192_RSA_KEY_SZ;
++			ecc_key_sz = SUITEB_TLS_192_ECC_KEY_SZ;
+ 			curves = SUITEB_TLS_192_CURVES;
+ 		} else {
+ 			ciphers = openssl_ciphers;
+@@ -308,8 +314,8 @@ static int handle_ciphersuites(WOLFSSL_CTX *ssl_ctx, WOLFSSL *ssl,
+ 		else
+ 			ciphers = SUITEB_TLS_192_CIPHERS;
+ 		sigalgs = SUITEB_TLS_192_SIGALGS;
+-		key_sz = 3072;
+-		ecc_key_sz = 256;
++		key_sz = SUITEB_TLS_192_RSA_KEY_SZ;
++		ecc_key_sz = SUITEB_TLS_192_ECC_KEY_SZ;
+ 		curves = SUITEB_TLS_192_CURVES;
+ 	}
+ 
+diff --git a/tests/hwsim/test_suite_b.py b/tests/hwsim/test_suite_b.py
+index ddd1c2ee7..b176bb8e6 100644
+--- a/tests/hwsim/test_suite_b.py
++++ b/tests/hwsim/test_suite_b.py
+@@ -488,7 +488,16 @@ def test_suite_b_192_rsa_insufficient_key(dev, apdev):
+     params["ca_cert"] = "auth_serv/ca.pem"
+     params["server_cert"] = "auth_serv/server.pem"
+     params["private_key"] = "auth_serv/server.key"
+-    hapd = hostapd.add_ap(apdev[0], params)
++
++    try:
++        hapd = hostapd.add_ap(apdev[0], params)
++    except Exception as e:
++        hapd = hostapd.add_ap(apdev[0], suite_b_192_rsa_ap_params())
++        tls = hapd.request("GET tls_library")
++        if tls.startswith("wolfSSL"):
++            # wolfSSL fails immediately during key loading with too short key
++            return
++        raise
+ 
+     dev[0].connect("test-suite-b", key_mgmt="WPA-EAP-SUITE-B-192",
+                    ieee80211w="2",
+@@ -505,6 +514,8 @@ def test_suite_b_192_rsa_insufficient_key(dev, apdev):
+         raise Exception("Certificate error not reported")
+     if "reason=11" in ev and "err='Insufficient RSA modulus size'" in ev:
+         return
++    if "reason=11" in ev and "err='RSA key too small'" in ev:
++        return
+     if "reason=7" in ev and "err='certificate uses insecure algorithm'" in ev:
+         return
+     raise Exception("Unexpected error reason: " + ev)
+@@ -516,7 +527,15 @@ def test_suite_b_192_rsa_insufficient_dh(dev, apdev):
+     params = suite_b_192_rsa_ap_params()
+     params["tls_flags"] = "[SUITEB-NO-ECDH]"
+     params["dh_file"] = "auth_serv/dh.conf"
+-    hapd = hostapd.add_ap(apdev[0], params)
++    try:
++        hapd = hostapd.add_ap(apdev[0], params)
++    except:
++        hapd = hostapd.add_ap(apdev[0], suite_b_192_rsa_ap_params())
++        tls = hapd.request("GET tls_library")
++        if tls.startswith("wolfSSL"):
++            # wolfSSL fails immediately during key loading with too short key
++            return
++        raise
+ 
+     dev[0].connect("test-suite-b", key_mgmt="WPA-EAP-SUITE-B-192",
+                    ieee80211w="2",
+@@ -528,14 +547,15 @@ def test_suite_b_192_rsa_insufficient_dh(dev, apdev):
+                    pairwise="GCMP-256", group="GCMP-256", scan_freq="2412",
+                    wait_connect=False)
+     ev = dev[0].wait_event(["CTRL-EVENT-EAP-STATUS status='local TLS alert'",
+-                            "CTRL-EVENT-CONNECTED"],
++                            "CTRL-EVENT-CONNECTED", "CTRL-EVENT-EAP-FAILURE"],
+                            timeout=10)
+     dev[0].request("DISCONNECT")
+     if ev is None:
+         raise Exception("DH error not reported")
+     if "CTRL-EVENT-CONNECTED" in ev:
+         raise Exception("Unexpected connection")
+-    if "insufficient security" not in ev and "internal error" not in ev:
++    if "insufficient security" not in ev and "internal error" not in ev \
++        and "authentication failed" not in ev:
+         raise Exception("Unexpected error reason: " + ev)
+ 
+ def test_suite_b_192_rsa_radius(dev, apdev):
+-- 
+2.43.0
+
