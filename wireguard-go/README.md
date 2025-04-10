@@ -37,7 +37,7 @@ cd device
 go test
 ```
 
-If go can't fine the wolfSSL .so file, you may have to manually specify the lib install location.
+If go can't find the wolfSSL .so file, you may have to manually specify the lib install location.
 ```
 LD_LIBRARY_PATH=/usr/local/lib/ go test
 ```
