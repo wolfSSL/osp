@@ -1469,6 +1469,31 @@ index d81dae3..c866804 100644
  			peer.handshake.mutex.RUnlock()
  			sendf("protocol_version=1")
  			peer.endpoint.Lock()
--- 
-2.39.3 (Apple Git-146)
-
+diff --git a/device/noise-helpers.go b/device/noise-helpers.go
+index 6f2ed8c..85c0a54 100644
+--- a/device/noise-helpers.go
++++ b/device/noise-helpers.go
+@@ -89,12 +89,15 @@ func newPrivateKey() (sk NoisePrivateKey, err error) {
+             return sk, errors.New("Failed to make ECC key")
+         }
+ 
++        wolfSSL.PRIVATE_KEY_UNLOCK()
+         skLen := len(sk[:])
+         if ret := wolfSSL.Wc_ecc_export_private_only(&key, sk[:], &skLen); ret != 0 {
+             wolfSSL.Wc_FreeRng(&rng)
+             wolfSSL.Wc_ecc_free(&key)
++            wolfSSL.PRIVATE_KEY_LOCK()
+             return sk, errors.New("Failed to export private ECC key")
+         }
++        wolfSSL.PRIVATE_KEY_LOCK()
+ 
+         return sk, nil
+ }
+@@ -156,6 +159,7 @@ func (sk *NoisePrivateKey) sharedSecret(pk NoisePublicKey) (ss [NoisePrivateKeyS
+             wolfSSL.Wc_ecc_free(&privKey)
+             wolfSSL.Wc_ecc_free(&pubKey)
+             wolfSSL.Wc_FreeRng(&rng)
++            wolfSSL.PRIVATE_KEY_LOCK()
+             return ss, errors.New("Failed create ECC shared secret")
+         }
+         wolfSSL.PRIVATE_KEY_LOCK()
