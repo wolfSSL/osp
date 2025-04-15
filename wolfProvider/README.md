@@ -7,7 +7,7 @@ Each of the project directories contains a patch file for a specific version of 
 Source Project.
 
 To apply a patch file, change to the project's directory and run
-`patch -p1 <../PROJ-patch.txt`. Build the project normally.
+`patch -p1 < /path/to/PROJ-patch.txt`. Build the project normally.
 
 The projects supported are:
 
