@@ -3,7 +3,7 @@
 The goal of the wolfProvider project is to replace the crypto used by OpenSSL
 with wolfCrypt or wolfCrypt FIPS, with the least amount of changes possible.
 
-Each of the project directories a patch file for a specific version of the Open
+Each of the project directories contains a patch file for a specific version of the Open
 Source Project.
 
 To apply a patch file, change to the project's directory and run
