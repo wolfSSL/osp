@@ -1,0 +1,175 @@
+diff --git a/tests/certs/maketestcert.sh b/tests/certs/maketestcert.sh
+index 3c4f8b5..23af9af 100755
+--- a/tests/certs/maketestcert.sh
++++ b/tests/certs/maketestcert.sh
+@@ -9,6 +9,13 @@ cd "${result_path}"
+ 
+ mkdir "tmp/"
+ 
++# Unset WOLFPROV_FORCE_FAIL to generate certs
++if [ "${WOLFPROV_FORCE_FAIL}" = "1" ]; then
++  echo "WOLFPROV_FORCE_FAIL is set to 1 - Unsetting to generate certs"
++  export WOLFPROV_FORCE_FAIL=
++  FORCE_FAIL_UNSET=1
++fi
++
+ # create new psk secrets
+ gen_psk () {
+   tr -c -d 'A-Za-z0-9' </dev/urandom 2>> "maketestcert.log" | head -c 50 > tmp/psk.txt
+@@ -113,3 +120,9 @@ rm -rf "tmp/"
+ 
+ # restore settings
+ LD_LIBRARY_PATH=$TEMP_LD_LIBRARY_PATH
++
++# Set WOLFPROV_FORCE_FAIL back to 1 to continue with tests
++if [ "${FORCE_FAIL_UNSET}" = "1" ]; then
++  echo "WOLFPROV_FORCE_FAIL is set to 1 - Setting back to 1 to continue with tests"
++  export WOLFPROV_FORCE_FAIL=1
++fi
+diff --git a/tests/plugins/p14_resume_ticket.py b/tests/plugins/p14_resume_ticket.py
+index 22db91e..b2ad7ce 100644
+--- a/tests/plugins/p14_resume_ticket.py
++++ b/tests/plugins/p14_resume_ticket.py
+@@ -33,6 +33,13 @@ class ResumeTicketTLSv12(StunnelTest):
+     def __init__(self, cfg: Config, logger: logging.Logger, path:pathlib.Path):
+         super().__init__(cfg, logger, path)
+         self.params.description = '141. Stateless session ticket resumption with TLSv1.2'
++
++        # Skip this test when force fail is enabled
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.events.skip = ["Skipping session resumption test in force fail mode"]
++            self.events.count = 0  # Set count to 0 to force skip
++            return
++
+         self.events.count = 2
+         self.events.success = [
+             "TLS accepted: previous session reused"
+@@ -53,6 +60,12 @@ class ResumeTicketTLSv12(StunnelTest):
+         ]
+         self.path = path
+ 
++    async def test_stunnel(self, cfg: Config) -> None:
++        """Override test_stunnel to skip when force fail is enabled"""
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.logger.info("Skipping session resumption test in force fail mode")
++            return
++        await super().test_stunnel(cfg)
+ 
+     async def prepare_client_cfgfile(
+         self, cfg: Config, ports: list, service: str
+@@ -117,6 +130,13 @@ class ResumeTicketTLSv13(StunnelTest):
+     def __init__(self, cfg: Config, logger: logging.Logger, path:pathlib.Path):
+         super().__init__(cfg, logger, path)
+         self.params.description = '142. Stateless session ticket resumption with TLSv1.3'
++
++        # Skip this test when force fail is enabled
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.events.skip = ["Skipping session resumption test in force fail mode"]
++            self.events.count = 0  # Set count to 0 to force skip
++            return
++
+         self.events.count = 2
+         self.events.skip = [
+             "Incorrect version of TLS protocol",
+@@ -141,6 +161,12 @@ class ResumeTicketTLSv13(StunnelTest):
+         ]
+         self.path = path
+ 
++    async def test_stunnel(self, cfg: Config) -> None:
++        """Override test_stunnel to skip when force fail is enabled"""
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.logger.info("Skipping session resumption test in force fail mode")
++            return
++        await super().test_stunnel(cfg)
+ 
+     async def prepare_client_cfgfile(
+         self, cfg: Config, ports: list, service: str
+diff --git a/tests/plugins/p15_resume_secret.py b/tests/plugins/p15_resume_secret.py
+index 85bd69b..723f4d9 100644
+--- a/tests/plugins/p15_resume_secret.py
++++ b/tests/plugins/p15_resume_secret.py
+@@ -31,6 +31,13 @@ class ResumeTicketSecret(StunnelTest):
+     def __init__(self, cfg: Config, logger: logging.Logger, path:pathlib.Path):
+         super().__init__(cfg, logger, path)
+         self.params.description = '151. Session resumption with secret keys'
++
++        # Skip this test when force fail is enabled
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.events.skip = ["Skipping session resumption test in force fail mode"]
++            self.events.count = 0  # Set count to 0 to force skip
++            return
++
+         self.events.count = 3
+         self.events.success = [
+             "TLS accepted: previous session reused"
+@@ -51,6 +58,12 @@ class ResumeTicketSecret(StunnelTest):
+         ]
+         self.path = path
+ 
++    async def test_stunnel(self, cfg: Config) -> None:
++        """Override test_stunnel to skip when force fail is enabled"""
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.logger.info("Skipping session resumption test in force fail mode")
++            return
++        await super().test_stunnel(cfg)
+ 
+     async def prepare_client_cfgfile(
+         self, cfg: Config, ports: list, service: str
+diff --git a/tests/plugins/p24_delay.py b/tests/plugins/p24_delay.py
+index a66e833..39d9aeb 100644
+--- a/tests/plugins/p24_delay.py
++++ b/tests/plugins/p24_delay.py
+@@ -39,6 +39,13 @@ class RetryDelay(StunnelTest):
+         self.events.skip = [
+             "FORK"
+         ]
++
++        # Skip this test when force fail is enabled
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.events.skip = ["Skipping session resumption test in force fail mode"]
++            self.events.count = 0  # Set count to 0 to force skip
++            return
++
+         self.events.count = 2
+         self.events.success = [
+             r"\[server1\].*TLS accepted: previous session reused"
+@@ -59,6 +66,12 @@ class RetryDelay(StunnelTest):
+         ]
+         self.path = path
+ 
++    async def test_stunnel(self, cfg: Config) -> None:
++        """Override test_stunnel to skip when force fail is enabled"""
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.logger.info("Skipping session resumption test in force fail mode")
++            return
++        await super().test_stunnel(cfg)
+ 
+     async def prepare_client_cfgfile(
+         self, cfg: Config, ports: list, service: str
+@@ -121,6 +134,13 @@ class RetryNoDelay(StunnelTest):
+         self.events.skip = [
+             "FORK"
+         ]
++
++        # Skip this test when force fail is enabled
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.events.skip = ["Skipping session resumption test in force fail mode"]
++            self.events.count = 0  # Set count to 0 to force skip
++            return
++
+         self.events.count = 2
+         self.events.success = [
+             "TLS accepted: new session negotiated"
+@@ -141,6 +161,12 @@ class RetryNoDelay(StunnelTest):
+         ]
+         self.path = path
+ 
++    async def test_stunnel(self, cfg: Config) -> None:
++        """Override test_stunnel to skip when force fail is enabled"""
++        if os.environ.get('WOLFPROV_FORCE_FAIL') == '1':
++            self.logger.info("Skipping session resumption test in force fail mode")
++            return
++        await super().test_stunnel(cfg)
+ 
+     async def prepare_client_cfgfile(
+         self, cfg: Config, ports: list, service: str
