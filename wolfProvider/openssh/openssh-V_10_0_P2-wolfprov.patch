@@ -4,9 +4,9 @@ index 8fe9276c2..f9a1b5fd2 100644
 +++ b/myproposal.h
 @@ -59,7 +59,6 @@
  	"rsa-sha2-256"
- 
+
  #define	KEX_SERVER_ENCRYPT \
 -	"chacha20-poly1305@openssh.com," \
  	"aes128-gcm@openssh.com,aes256-gcm@openssh.com," \
  	"aes128-ctr,aes192-ctr,aes256-ctr"
- 
+
