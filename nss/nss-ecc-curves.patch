@@ -1,0 +1,112 @@
+diff --git a/lib/ssl/sslgrp.c b/lib/ssl/sslgrp.c
+index eb53ad381..5f54857d3 100644
+--- a/lib/ssl/sslgrp.c
++++ b/lib/ssl/sslgrp.c
+@@ -72,6 +72,46 @@ ssl_CreateStaticECDHEKeyPair(void *arg)
+     return PR_SUCCESS;
+ }
+ 
++static PRStatus
++ssl_TestKeyPair(void *arg)
++{
++    const sslSocketAndGroupArg *typed_arg = (sslSocketAndGroupArg *)arg;
++    const sslNamedGroupDef *group = typed_arg->group;
++    const sslSocket *ss = typed_arg->ss;
++    unsigned int i = group - ssl_named_groups;
++    SECStatus rv;
++
++    PORT_Assert(i < SSL_NAMED_GROUP_COUNT);
++    switch (group->keaType) {
++        case ssl_kea_ecdh_hybrid:
++            rv = ssl_CreateECDHEphemeralKeyPair(ss, group,
++                                                &gECDHEKeyPairs[i].keyPair);
++            break;
++        case ssl_kea_ecdh:
++            rv = ssl_CreateECDHEphemeralKeyPair(ss, group,
++                                                &gECDHEKeyPairs[i].keyPair);
++            break;
++        case ssl_kea_dh: {
++            const ssl3DHParams *params = ssl_GetDHEParams(group);
++            PORT_Assert(params->name != ssl_grp_ffdhe_custom);
++            rv = ssl_CreateDHEKeyPair(group, params,
++                                                &gECDHEKeyPairs[i].keyPair);
++            break;
++        }
++        default:
++            PORT_Assert(0);
++            PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
++            return SECFailure;
++    }
++    if (rv != SECSuccess) {
++        gECDHEKeyPairs[i].keyPair = NULL;
++        SSL_TRC(5, ("%d: SSL[-]: disabling group %d",
++                    SSL_GETPID(), group->name));
++    }
++
++    return PR_SUCCESS;
++}
++
+ void
+ ssl_FilterSupportedGroups(sslSocket *ss)
+ {
+@@ -111,7 +151,7 @@ ssl_FilterSupportedGroups(sslSocket *ss)
+ 
+         arg.group = group;
+         prv = PR_CallOnceWithArg(&gECDHEKeyPairs[index].once,
+-                                 ssl_CreateStaticECDHEKeyPair,
++                                 ssl_TestKeyPair,
+                                  (void *)&arg);
+         PORT_Assert(prv == PR_SUCCESS);
+         if (prv != PR_SUCCESS) {
+diff --git a/lib/ssl/sslsock.c b/lib/ssl/sslsock.c
+index 85e9d4cca..57ffcf7b8 100644
+--- a/lib/ssl/sslsock.c
++++ b/lib/ssl/sslsock.c
+@@ -155,18 +155,18 @@ static const PRUint16 srtpCiphers[] = {
+ #define FFGROUP(size)                           \
+     {                                           \
+         ssl_grp_ffdhe_##size, size, ssl_kea_dh, \
+-            SEC_OID_TLS_FFDHE_##size, PR_TRUE   \
++            SEC_OID_TLS_FFDHE_##size, PR_FALSE   \
+     }
+ 
+ const sslNamedGroupDef ssl_named_groups[] = {
+     /* Note that 256 for 25519 is a lie, but we only use it for checking bit
+      * security and expect 256 bits there (not 255). */
+-    { ssl_grp_ec_curve25519, 256, ssl_kea_ecdh, SEC_OID_CURVE25519, PR_TRUE },
+-    ECGROUP(secp256r1, 256, SECP256R1, PR_TRUE),
+-    ECGROUP(secp384r1, 384, SECP384R1, PR_TRUE),
+-    ECGROUP(secp521r1, 521, SECP521R1, PR_TRUE),
+-    { ssl_grp_kem_xyber768d00, 256, ssl_kea_ecdh_hybrid, SEC_OID_XYBER768D00, PR_TRUE },
+-    { ssl_grp_kem_mlkem768x25519, 256, ssl_kea_ecdh_hybrid, SEC_OID_MLKEM768X25519, PR_TRUE },
++    { ssl_grp_ec_curve25519, 256, ssl_kea_ecdh, SEC_OID_CURVE25519, PR_FALSE },
++    ECGROUP(secp256r1, 256, SECP256R1, PR_FALSE),
++    ECGROUP(secp384r1, 384, SECP384R1, PR_FALSE),
++    ECGROUP(secp521r1, 521, SECP521R1, PR_FALSE),
++    { ssl_grp_kem_xyber768d00, 256, ssl_kea_ecdh_hybrid, SEC_OID_XYBER768D00, PR_FALSE },
++    { ssl_grp_kem_mlkem768x25519, 256, ssl_kea_ecdh_hybrid, SEC_OID_MLKEM768X25519, PR_FALSE },
+     FFGROUP(2048),
+     FFGROUP(3072),
+     FFGROUP(4096),
+diff --git a/lib/ssl/tls13con.c b/lib/ssl/tls13con.c
+index c489b2b10..2e07d76f8 100644
+--- a/lib/ssl/tls13con.c
++++ b/lib/ssl/tls13con.c
+@@ -591,7 +591,7 @@ tls13_SetupClientHello(sslSocket *ss, sslClientHelloType chType)
+         return SECFailure;
+     }
+ 
+-    /* Select the first enabled group.
++    /* Select the first supported enabled group.
+      * TODO(ekr@rtfm.com): be smarter about offering the group
+      * that the other side negotiated if we are resuming. */
+     PORT_Assert(PR_CLIST_IS_EMPTY(&ss->ephemeralKeyPairs));
+@@ -601,7 +601,7 @@ tls13_SetupClientHello(sslSocket *ss, sslClientHelloType chType)
+         }
+         rv = tls13_AddKeyShare(ss, ss->namedGroupPreferences[i]);
+         if (rv != SECSuccess) {
+-            return SECFailure;
++            continue;
+         }
+         if (++numShares > ss->additionalShares) {
+             break;

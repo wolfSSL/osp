@@ -1,0 +1,40 @@
+diff --git a/lib/pk11wrap/pk11slot.c b/lib/pk11wrap/pk11slot.c
+index d0ee76c41..b471491f8 100644
+--- a/lib/pk11wrap/pk11slot.c
++++ b/lib/pk11wrap/pk11slot.c
+@@ -2089,6 +2089,7 @@ PK11SlotInfo *
+ PK11_GetInternalKeySlot(void)
+ {
+     SECMODModule *mod;
++    PK11SlotInfo *slot;
+ 
+     if (pk11InternalKeySlot) {
+         return PK11_ReferenceSlot(pk11InternalKeySlot);
+@@ -2100,7 +2101,15 @@ PK11_GetInternalKeySlot(void)
+         PORT_SetError(SEC_ERROR_NO_MODULE);
+         return NULL;
+     }
+-    return PK11_ReferenceSlot(mod->isFIPS ? mod->slots[0] : mod->slots[1]);
++    if (mod->slotCount >= 2)
++        slot = mod->isFIPS ? mod->slots[0] : mod->slots[1];
++    else if (mod->slotCount == 1)
++        slot = mod->slots[0];
++    else {
++        PORT_SetError(SEC_ERROR_NO_MODULE);
++        return NULL;
++    }
++    return PK11_ReferenceSlot(slot);
+ }
+ 
+ /* get the internal default slot */
+@@ -2116,6 +2125,10 @@ PK11_GetInternalSlot(void)
+     if (mod->isFIPS) {
+         return PK11_GetInternalKeySlot();
+     }
++    if (mod->slotCount == 0) {
++        PORT_SetError(SEC_ERROR_NO_MODULE);
++        return NULL;
++    }
+     return PK11_ReferenceSlot(mod->slots[0]);
+ }
+ 
