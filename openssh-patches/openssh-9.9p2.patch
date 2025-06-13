@@ -1,12 +1,9 @@
-From b0a960e857e710e1bdc296025a7a54e6eb427113 Mon Sep 17 00:00:00 2001
+From be5ce50735ccf895a3c0dbcd7fcdd5aca91fffcc Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
-Date: Thu, 18 Jan 2024 13:58:48 +0100
-Subject: [PATCH] Patch for wolfSSL
+Date: Tue, 11 Mar 2025 14:17:17 +0100
+Subject: [PATCH] 9.9p2 patch for wolfSSL
 
-This patch was implemented and tested on OpenSSH version 9.6.
-
-- adds wolfSSL to the OpenSSH configure script
-- adds wolfSSL debugging support to OpenSSH
+This patch was implemented and tested on OpenSSH version 9.9p2.
 
 Compile wolfSSL with:
     ./configure --enable-openssh
@@ -28,24 +25,23 @@ OpenSSH should pass all tests run with:
 ```
 make tests
 ```
-
-Signed-off-by: Juliusz Sosinowicz <juliusz@wolfssl.com>
 ---
  Makefile.in                                 |   1 +
+ cipher-aesctr.h                             |   2 -
  cipher.c                                    |   3 +-
+ config.h.in                                 |  41 +++-
  configure.ac                                | 211 +++++++++++++++++++-
- entropy.c                                   |   4 +
  includes.h                                  |   6 +
- log.c                                       |  43 ++++
+ log.c                                       |  45 +++++
+ openbsd-compat/openssl-compat.c             |   3 +
  regress/unittests/test_helper/test_helper.c |   5 +
- ssh-rsa.c                                   |  11 +
- 8 files changed, 280 insertions(+), 4 deletions(-)
+ 9 files changed, 310 insertions(+), 7 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 1efe11f6f..3bb8b989e 100644
+index 4243006b0..709f29793 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -734,6 +734,7 @@ interop-tests t-exec file-tests extra-tests: regress-prep regress-binaries $(TAR
+@@ -746,6 +746,7 @@ interop-tests t-exec file-tests extra-tests: regress-prep regress-binaries $(TAR
  		.CURDIR="$(abs_top_srcdir)/regress" \
  		.OBJDIR="$(BUILDDIR)/regress" \
  		BUILDDIR="$(BUILDDIR)" \
@@ -53,8 +49,21 @@ index 1efe11f6f..3bb8b989e 100644
  		OBJ="$(BUILDDIR)/regress" \
  		PATH="$(BUILDDIR):$${PATH}" \
  		TEST_ENV=MALLOC_OPTIONS="@TEST_MALLOC_OPTIONS@" \
+diff --git a/cipher-aesctr.h b/cipher-aesctr.h
+index 85d55bba2..d12d7802d 100644
+--- a/cipher-aesctr.h
++++ b/cipher-aesctr.h
+@@ -20,8 +20,6 @@
+ 
+ #include "rijndael.h"
+ 
+-#define AES_BLOCK_SIZE 16
+-
+ typedef struct aesctr_ctx {
+ 	int	rounds;				/* keylen-dependent #rounds */
+ 	u32	ek[4*(AES_MAXROUNDS + 1)];	/* encrypt key schedule */
 diff --git a/cipher.c b/cipher.c
-index 90b139c89..f8db815bc 100644
+index 7d6e7d8c6..18fea3bd3 100644
 --- a/cipher.c
 +++ b/cipher.c
 @@ -388,7 +388,8 @@ cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr, u_char *dest,
@@ -67,11 +76,118 @@ index 90b139c89..f8db815bc 100644
  	if (authlen) {
  		/* compute tag (on encrypt) or verify tag (on decrypt) */
  		if (EVP_Cipher(cc->evp, NULL, NULL, 0) < 0)
+diff --git a/config.h.in b/config.h.in
+index 14bee6087..96ac17f2b 100644
+--- a/config.h.in
++++ b/config.h.in
+@@ -496,6 +496,9 @@
+ /* Define to 1 if you have the `EVP_chacha20' function. */
+ #undef HAVE_EVP_CHACHA20
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_EVP_CIPHER_CTX_CTRL
++
+ /* Define to 1 if you have the `EVP_CIPHER_CTX_get_iv' function. */
+ #undef HAVE_EVP_CIPHER_CTX_GET_IV
+ 
+@@ -532,12 +535,18 @@
+ /* Define to 1 if you have the `EVP_MD_CTX_init' function. */
+ #undef HAVE_EVP_MD_CTX_INIT
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_EVP_PKEY_GET0_RSA
++
+ /* Define to 1 if you have the `EVP_PKEY_get_raw_private_key' function. */
+ #undef HAVE_EVP_PKEY_GET_RAW_PRIVATE_KEY
+ 
+ /* Define to 1 if you have the `EVP_PKEY_get_raw_public_key' function. */
+ #undef HAVE_EVP_PKEY_GET_RAW_PUBLIC_KEY
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_EVP_RIPEMD160
++
+ /* Define to 1 if you have the `EVP_sha256' function. */
+ #undef HAVE_EVP_SHA256
+ 
+@@ -1132,6 +1141,21 @@
+ /* Define to 1 if you have the `RSA_get_default_method' function. */
+ #undef HAVE_RSA_GET_DEFAULT_METHOD
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_FINISH
++
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_PRIV_DEC
++
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_PRIV_ENC
++
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_PUB_DEC
++
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_PUB_ENC
++
+ /* Define to 1 if you have the <sandbox.h> header file. */
+ #undef HAVE_SANDBOX_H
+ 
+@@ -1234,6 +1258,9 @@
+ /* Define to 1 if you have the `SHA256Update' function. */
+ #undef HAVE_SHA256UPDATE
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_SHA256_UPDATE
++
+ /* Define to 1 if you have the <sha2.h> header file. */
+ #undef HAVE_SHA2_H
+ 
+@@ -1772,6 +1799,9 @@
+ /* libcrypto has NID_secp521r1 */
+ #undef OPENSSL_HAS_NISTP521
+ 
++/* Defined if using WolfSSL */
++#undef OPENSSL_HAVE_EVPCTR
++
+ /* libcrypto is missing AES 192 and 256 bit functions */
+ #undef OPENSSL_LOBOTOMISED_AES
+ 
+@@ -1935,6 +1965,9 @@
+ /* Support passwords > 8 chars */
+ #undef UNIXWARE_LONG_PASSWORDS
+ 
++/* Defined if using WolfSSL */
++#undef UNSUPPORTED_POSIX_THREADS_HACK
++
+ /* Specify default $PATH */
+ #undef USER_PATH
+ 
+@@ -1971,6 +2004,12 @@
+ /* Define if you have Solaris projects */
+ #undef USE_SOLARIS_PROJECTS
+ 
++/* Defined if using WolfSSL */
++#undef USING_WOLFSSL
++
++/* Defined if using wolfSSL FIPS */
++#undef USING_WOLFSSL_FIPS
++
+ /* compiler variable declarations after code */
+ #undef VARIABLE_DECLARATION_AFTER_CODE
+ 
+@@ -1999,7 +2038,7 @@
+ /* Define if you want IRIX project management */
+ #undef WITH_IRIX_PROJECT
+ 
+-/* use libcrypto for cryptography */
++/* Defined if using WolfSSL */
+ #undef WITH_OPENSSL
+ 
+ /* Define if you want SELinux support. */
 diff --git a/configure.ac b/configure.ac
-index 379cd746b..5def42d73 100644
+index 9053a9a2b..ea87683ff 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -612,6 +612,8 @@ SPP_MSG="no"
+@@ -620,6 +620,8 @@ SPP_MSG="no"
  SOLARIS_PRIVS="no"
  
  # Check for some target-specific stuff
@@ -80,7 +196,7 @@ index 379cd746b..5def42d73 100644
  case "$host" in
  *-*-aix*)
  	# Some versions of VAC won't allow macro redefinitions at
-@@ -738,6 +740,12 @@ case "$host" in
+@@ -746,6 +748,12 @@ case "$host" in
  	AC_DEFINE([BROKEN_SETREGID])
  	;;
  *-*-darwin*)
@@ -93,7 +209,7 @@ index 379cd746b..5def42d73 100644
  	use_pie=auto
  	AC_MSG_CHECKING([if we have working getaddrinfo])
  	AC_RUN_IFELSE([AC_LANG_SOURCE([[
-@@ -891,6 +899,7 @@ int main(void) { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
+@@ -899,6 +907,7 @@ int main(void) { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
  	no_dev_ptmx=1
  	use_pie=auto
  	check_for_openpty_ctty_bug=1
@@ -101,7 +217,7 @@ index 379cd746b..5def42d73 100644
  	dnl Target SUSv3/POSIX.1-2001 plus BSD specifics.
  	dnl _DEFAULT_SOURCE is the new name for _BSD_SOURCE
  	dnl _GNU_SOURCE is needed for setres*id prototypes.
-@@ -1874,6 +1883,10 @@ AC_CHECK_FUNCS([ \
+@@ -1892,6 +1901,10 @@ AC_CHECK_FUNCS([ \
  	Blowfish_expandstate \
  	Blowfish_expand0state \
  	Blowfish_stream2word \
@@ -112,7 +228,7 @@ index 379cd746b..5def42d73 100644
  	SHA256Update \
  	SHA384Update \
  	SHA512Update \
-@@ -2690,7 +2703,162 @@ AC_CHECK_FUNCS([getpgrp],[
+@@ -2717,7 +2730,162 @@ AC_CHECK_FUNCS([getpgrp],[
  	)
  ])
  
@@ -275,9 +391,9 @@ index 379cd746b..5def42d73 100644
  saved_CPPFLAGS="$CPPFLAGS"
  saved_LDFLAGS="$LDFLAGS"
  openssl_bin_PATH="$PATH"
-@@ -3169,13 +3337,26 @@ if test "x$openssl" = "xyes" ; then
- 		]
- 	)
+@@ -3223,13 +3391,26 @@ if test "x$openssl" = "xyes" ; then
+ 		fi
+ 	fi
  fi
 +LIBS="$nocrypto_saved_LIBS"
 +
@@ -303,7 +419,7 @@ index 379cd746b..5def42d73 100644
  if test "x$ac_cv_func_dlopen" != "xyes" ; then
  	enable_pkcs11="disabled; missing dlopen(3)"
  	enable_sk="disabled; missing dlopen(3)"
-@@ -3384,12 +3565,13 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
+@@ -3438,12 +3619,13 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
  	AC_DEFINE([OPENSSL_PRNG_ONLY], [1],
  		[Define if you want the OpenSSL internally seeded PRNG only])
  	RAND_MSG="OpenSSL internal ONLY"
@@ -319,7 +435,7 @@ index 379cd746b..5def42d73 100644
  
  saved_LIBS="$LIBS"
  AC_CHECK_LIB([iaf], [ia_openinfo], [
-@@ -3431,6 +3613,9 @@ AC_ARG_WITH([pam],
+@@ -3485,6 +3667,9 @@ AC_ARG_WITH([pam],
  			PAM_MSG="yes"
  
  			SSHDLIBS="$SSHDLIBS -lpam"
@@ -329,7 +445,7 @@ index 379cd746b..5def42d73 100644
  			AC_DEFINE([USE_PAM], [1],
  				[Define if you want to enable PAM support])
  
-@@ -5579,6 +5764,8 @@ AC_SUBST([TEST_SSH_UTF8], [$TEST_SSH_UTF8])
+@@ -5643,6 +5828,8 @@ AC_SUBST([TEST_SSH_UTF8], [$TEST_SSH_UTF8])
  AC_SUBST([TEST_MALLOC_OPTIONS], [$TEST_MALLOC_OPTIONS])
  AC_SUBST([UNSUPPORTED_ALGORITHMS], [$unsupported_algorithms])
  AC_SUBST([DEPEND], [$(cat $srcdir/.depend)])
@@ -338,7 +454,7 @@ index 379cd746b..5def42d73 100644
  
  # Binaries for interop tests.
  AC_PATH_PROG([PLINK], [plink])
-@@ -5653,6 +5840,7 @@ echo "         Solaris privilege support: $SPP_MSG"
+@@ -5717,6 +5904,7 @@ echo "         Solaris privilege support: $SPP_MSG"
  echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
  echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
  echo "                  BSD Auth support: $BSD_AUTH_MSG"
@@ -346,7 +462,7 @@ index 379cd746b..5def42d73 100644
  echo "              Random number source: $RAND_MSG"
  echo "             Privsep sandbox style: $SANDBOX_STYLE"
  echo "                   PKCS#11 support: $enable_pkcs11"
-@@ -5705,3 +5893,20 @@ if test "$AUDIT_MODULE" = "bsm" ; then
+@@ -5769,3 +5957,20 @@ if test "$AUDIT_MODULE" = "bsm" ; then
  	echo "WARNING: BSM audit support is currently considered EXPERIMENTAL."
  	echo "See the Solaris section in README.platform for details."
  fi
@@ -367,21 +483,6 @@ index 379cd746b..5def42d73 100644
 +    echo "---"
 +    echo ""
 +fi
-diff --git a/entropy.c b/entropy.c
-index 842c66fd6..80622fdd8 100644
---- a/entropy.c
-+++ b/entropy.c
-@@ -66,6 +66,10 @@ seed_rng(void)
- 	/* Initialise libcrypto */
- 	ssh_libcrypto_init();
- 
-+#ifdef WC_RNG_SEED_CB
-+    wc_SetSeed_Cb(wc_GenerateSeed);
-+#endif
-+
- 	if (!ssh_compatible_openssl(OPENSSL_VERSION_NUMBER,
- 	    OpenSSL_version_num()))
- 		fatal("OpenSSL version mismatch. Built against %lx, you "
 diff --git a/includes.h b/includes.h
 index 6d17ef6da..97197532c 100644
 --- a/includes.h
@@ -400,7 +501,7 @@ index 6d17ef6da..97197532c 100644
  #include <openssl/opensslv.h> /* For OPENSSL_VERSION_NUMBER */
  #endif
 diff --git a/log.c b/log.c
-index 9fc1a2e2e..4e7c63734 100644
+index 23ad10c02..4df34a901 100644
 --- a/log.c
 +++ b/log.c
 @@ -186,6 +186,40 @@ log_verbose_reset(void)
@@ -444,10 +545,12 @@ index 9fc1a2e2e..4e7c63734 100644
  /*
   * Initialize the log.
   */
-@@ -200,6 +234,15 @@ log_init(const char *av0, LogLevel level, SyslogFacility facility,
+@@ -200,6 +234,17 @@ log_init(const char *av0, LogLevel level, SyslogFacility facility,
  
  	argv0 = av0;
  
++    /* hijack log init callback since every ssh program calls it
++     * to make sure wolfssl is inited and has a seed callback registered */
 +#ifdef USING_WOLFSSL
 +    wolfSSL_Debugging_ON();
 +    wolfSSL_SetLoggingCb(Logging_cb);
@@ -460,6 +563,20 @@ index 9fc1a2e2e..4e7c63734 100644
  	if (log_change_level(level) != 0) {
  		fprintf(stderr, "Unrecognized internal syslog level code %d\n",
  		    (int) level);
+diff --git a/openbsd-compat/openssl-compat.c b/openbsd-compat/openssl-compat.c
+index 14865077e..2ac872422 100644
+--- a/openbsd-compat/openssl-compat.c
++++ b/openbsd-compat/openssl-compat.c
+@@ -71,6 +71,9 @@ ssh_compatible_openssl(long headerver, long libver)
+ void
+ ssh_libcrypto_init(void)
+ {
++#ifdef USING_WOLFSSL
++    wolfSSL_Init();
++#endif
+ #if defined(HAVE_OPENSSL_INIT_CRYPTO) && \
+       defined(OPENSSL_INIT_ADD_ALL_CIPHERS) && \
+       defined(OPENSSL_INIT_ADD_ALL_DIGESTS)
 diff --git a/regress/unittests/test_helper/test_helper.c b/regress/unittests/test_helper/test_helper.c
 index e23128aa5..da9f9e6af 100644
 --- a/regress/unittests/test_helper/test_helper.c
@@ -483,35 +600,6 @@ index e23128aa5..da9f9e6af 100644
  	seed_rng();
  #ifdef WITH_OPENSSL
  	ERR_load_crypto_strings();
-diff --git a/ssh-rsa.c b/ssh-rsa.c
-index be8f51e75..5b4d04477 100644
---- a/ssh-rsa.c
-+++ b/ssh-rsa.c
-@@ -633,6 +633,7 @@ static int
- openssh_RSA_verify(int hash_alg, u_char *hash, size_t hashlen,
-     u_char *sigbuf, size_t siglen, RSA *rsa)
- {
-+#ifndef USING_WOLFSSL_FIPS
- 	size_t rsasize = 0, oidlen = 0, hlen = 0;
- 	int ret, len, oidmatch, hashmatch;
- 	const u_char *oid = NULL;
-@@ -675,6 +676,16 @@ openssh_RSA_verify(int hash_alg, u_char *hash, size_t hashlen,
- done:
- 	freezero(decrypted, rsasize);
- 	return ret;
-+#else
-+	int nid = rsa_hash_alg_nid(hash_alg);
-+	if (nid == -1) {
-+		return SSH_ERR_INVALID_ARGUMENT;
-+	}
-+	if (RSA_verify(nid, hash, hashlen, sigbuf, siglen, rsa) != 1) {
-+		return SSH_ERR_SIGNATURE_INVALID;
-+	}
-+	return 0;
-+#endif
- }
- 
- static const struct sshkey_impl_funcs sshkey_rsa_funcs = {
 -- 
 2.43.0
 
