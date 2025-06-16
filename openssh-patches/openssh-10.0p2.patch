@@ -1,4 +1,4 @@
-From 1bc48b0bd5ec1fe5d9aee7b761c736c10d26989c Mon Sep 17 00:00:00 2001
+From 3cef05d622d63b642fd7a3abd5728893240b9b6b Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Mon, 26 May 2025 13:26:59 +0200
 Subject: [PATCH] 10.0p2 patch for wolfSSL
@@ -32,10 +32,10 @@ make tests
  config.h.in                                 |  41 +++-
  configure.ac                                | 211 +++++++++++++++++++-
  includes.h                                  |   6 +
- log.c                                       |  45 +++++
+ log.c                                       |  46 +++++
  openbsd-compat/openssl-compat.c             |   3 +
  regress/unittests/test_helper/test_helper.c |   5 +
- 9 files changed, 310 insertions(+), 7 deletions(-)
+ 9 files changed, 311 insertions(+), 7 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
 index 4617cebcd..03fba6469 100644
@@ -504,7 +504,7 @@ index 8f933568d..ad612446f 100644
  #include <openssl/opensslv.h> /* For OPENSSL_VERSION_NUMBER */
  #endif
 diff --git a/log.c b/log.c
-index 6617f2672..891af621d 100644
+index 6617f2672..0f0436f0d 100644
 --- a/log.c
 +++ b/log.c
 @@ -188,6 +188,40 @@ log_verbose_reset(void)
@@ -548,7 +548,7 @@ index 6617f2672..891af621d 100644
  /*
   * Initialize the log.
   */
-@@ -202,6 +236,17 @@ log_init(const char *av0, LogLevel level, SyslogFacility facility,
+@@ -202,6 +236,18 @@ log_init(const char *av0, LogLevel level, SyslogFacility facility,
  
  	argv0 = av0;
  
@@ -558,8 +558,9 @@ index 6617f2672..891af621d 100644
 +    wolfSSL_Debugging_ON();
 +    wolfSSL_SetLoggingCb(Logging_cb);
 +    wolfSSL_Init();
++#ifndef WC_RNG_SEED_CB
++#error wolfSSL needs to be built with WC_RNG_SEED_CB
 +#endif
-+#ifdef WC_RNG_SEED_CB
 +    wc_SetSeed_Cb(wolf_seed);
 +#endif
 +
