@@ -4,3 +4,19 @@ the patch names is:
     <version that the patch was implemented and tested on>.patch
 Instructions for applying each patch are included in the patch commit message.
 
+To run the bind9 tests locally, the following Dockerfile is helpful:
+
+```
+FROM ubuntu:latest
+
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+RUN apt-get -y update
+RUN apt-get -y upgrade
+RUN apt-get install -y build-essential libssl-dev git gcc libpcre2-dev zlib1g-dev make autoconf libtool wget bsdmainutils net-tools gdbserver valgrind pkg-config
+RUN cpan -iT Proc::Find Net::SSLeay IO::Socket::SSL
+RUN apt-get install -y libuv1-dev libnghttp2-dev libcap-dev vim libcmocka-dev
+RUN apt-get install -y iproute2 
+RUN apt-get install -y python3 python-is-python3 pip python3-pytest
+```
+
