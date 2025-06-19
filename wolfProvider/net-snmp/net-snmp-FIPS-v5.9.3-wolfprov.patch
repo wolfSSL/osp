@@ -1,0 +1,79 @@
+diff --git a/configure.d/config_project_with_enable b/configure.d/config_project_with_enable
+index cdf56de..3385d0e 100644
+--- a/configure.d/config_project_with_enable
++++ b/configure.d/config_project_with_enable
+@@ -424,6 +424,15 @@ if test "x$enable_blumenthal_aes" = "xyes"; then
+     fi
+ fi
+
++NETSNMP_ARG_ENABLE(wolfprov-fips,
++[  --enable-wolfprov-fips          Enable FIPS-compatible crypto algorithms.
++                                   Allows for full FIPS compatibility with
++                                   testing suite.])
++if test "x$enable_wolfprov_fips" = "xyes"; then
++    AC_DEFINE([WOLFPROV_FIPS], 1,
++        [Define if FIPS-compatible crypto algorithms should be used])
++fi
++
+
+ ##
+ #   Project: Library: Misc configuration
+diff --git a/snmplib/scapi.c b/snmplib/scapi.c
+index 54fdd5c..baf4b7a 100644
+--- a/snmplib/scapi.c
++++ b/snmplib/scapi.c
+@@ -635,7 +635,12 @@ sc_get_openssl_hashfn(int auth_type)
+     switch (auth_type) {
+ #ifndef NETSNMP_DISABLE_MD5
+         case NETSNMP_USMAUTH_HMACMD5:
++#ifdef WOLFPROV_FIPS
++            /* Use SHA-1 instead of MD5 for FIPS compatibility */
++            hashfn = (const EVP_MD *) EVP_sha1();
++#else
+             hashfn = (const EVP_MD *) EVP_md5();
++#endif
+             break;
+ #endif
+         case NETSNMP_USMAUTH_HMACSHA1:
+@@ -674,16 +679,41 @@ sc_get_openssl_privfn(int priv_type)
+     DEBUGTRACE;
+
+     switch(priv_type & (USM_PRIV_MASK_ALG | USM_PRIV_MASK_VARIANT)) {
++#ifndef NETSNMP_DISABLE_DES
++        case USM_CREATE_USER_PRIV_DES:
++#ifdef WOLFPROV_FIPS
++            /* Use AES-128-CBC instead of DES for FIPS compatibility */
++            fn = (const EVP_CIPHER *)EVP_aes_128_cbc();
++#else
++            fn = (const EVP_CIPHER *)EVP_des_cbc();
++#endif
++            break;
++#endif
+ #ifdef HAVE_AES
+         case USM_CREATE_USER_PRIV_AES:
++#ifdef WOLFPROV_FIPS
++            /* Use CBC mode instead of CFB for FIPS compatibility */
++            fn = (const EVP_CIPHER *)EVP_aes_128_cbc();
++#else
+             fn = (const EVP_CIPHER *)EVP_aes_128_cfb();
++#endif
+             break;
+ #ifdef NETSNMP_DRAFT_BLUMENTHAL_AES_04
+         case USM_CREATE_USER_PRIV_AES192:
++#ifdef WOLFPROV_FIPS
++            /* Use CBC mode instead of CFB for FIPS compatibility */
++            fn = (const void*)EVP_aes_192_cbc();
++#else
+             fn = (const void*)EVP_aes_192_cfb();
++#endif
+             break;
+         case USM_CREATE_USER_PRIV_AES256:
++#ifdef WOLFPROV_FIPS
++            /* Use CBC mode instead of CFB for FIPS compatibility */
++            fn = (const void*)EVP_aes_256_cbc();
++#else
+             fn = (const void*)EVP_aes_256_cfb();
++#endif
+             break;
+ #endif
+ #endif /* HAVE_AES */
