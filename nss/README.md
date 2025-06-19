@@ -91,8 +91,7 @@ do not do the `./fips-hash.sh` command.
 
 ### wolfPKCS11
 
-Finally, wolfPKCS11 needs to be compiled. For now, this needs to be done using
-the nss branch in wolfPKCS11, which contains NSS compatibility features:
+Finally, wolfPKCS11 needs to be compiled:
 
 ```
 ./autogen.sh
