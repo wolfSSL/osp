@@ -1,6 +1,6 @@
-From 8317acd9b699b29449b429492e5f5484c5a3ba54 Mon Sep 17 00:00:00 2001
+From b6c47f18931a45cfdbee9ef182dd8cdd9d8c1108 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
-Date: Tue, 17 Jun 2025 16:24:19 +0200
+Date: Fri, 20 Jun 2025 13:07:50 +0200
 Subject: [PATCH] Patch for wolfSSL
 
 - `--with-wolfssl` configure option added. Uses `PKG_CHECK_MODULES` and `PKG_CHECK_VAR` to find the install location of the wolfSSL module.
@@ -43,11 +43,12 @@ make check
 If any tests fail, please first try compiling with OpenSSL to check if your system is correctly configured to run tests.
 
 The system tests could not be successfully run (even when compiling with OpenSSL). To skip these when running `make check`, modify the Makefile with `sed -i 's/SUBDIRS = system//g' bin/tests/Makefile`.
+
+Upstream-Status: Inappropriate [Intrusive patch]
 ---
  bin/tests/system/dyndb/driver/db.c      |  6 +-
  bin/tests/system/dyndb/driver/syncptr.c |  2 +-
  configure.ac                            | 74 +++++++++++++++++++++++++
- doc/dev/unexpected                      |  2 +-
  lib/bind9/check.c                       |  3 +
  lib/dns/dst_openssl.h                   |  4 ++
  lib/dns/name.c                          |  8 +--
@@ -66,10 +67,10 @@ The system tests could not be successfully run (even when compiling with OpenSSL
  lib/isc/netmgr/netmgr.c                 |  4 +-
  lib/isc/sockaddr.c                      |  6 +-
  lib/isc/tls.c                           |  2 +-
- 22 files changed, 153 insertions(+), 26 deletions(-)
+ 21 files changed, 152 insertions(+), 25 deletions(-)
 
 diff --git a/bin/tests/system/dyndb/driver/db.c b/bin/tests/system/dyndb/driver/db.c
-index 28ee358f9d7..c9d09080000 100644
+index 28ee358f9d..c9d0908000 100644
 --- a/bin/tests/system/dyndb/driver/db.c
 +++ b/bin/tests/system/dyndb/driver/db.c
 @@ -133,7 +133,7 @@ beginload(dns_db_t *db, dns_rdatacallbacks_t *callbacks) {
@@ -100,7 +101,7 @@ index 28ee358f9d7..c9d09080000 100644
  	/* Not reached */
  	return ISC_R_SUCCESS;
 diff --git a/bin/tests/system/dyndb/driver/syncptr.c b/bin/tests/system/dyndb/driver/syncptr.c
-index dcd399aadc7..1196d192fa3 100644
+index dcd399aadc..1196d192fa 100644
 --- a/bin/tests/system/dyndb/driver/syncptr.c
 +++ b/bin/tests/system/dyndb/driver/syncptr.c
 @@ -157,7 +157,7 @@ syncptr_find_zone(sample_instance_t *inst, dns_rdata_t *rdata, dns_name_t *name,
@@ -113,7 +114,7 @@ index dcd399aadc7..1196d192fa3 100644
  	}
  
 diff --git a/configure.ac b/configure.ac
-index b941a990d01..21fd0e7cf40 100644
+index b941a990d0..21fd0e7cf4 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -561,6 +561,78 @@ AS_IF([test "$enable_pthread_rwlock" = "yes"],
@@ -204,18 +205,8 @@ index b941a990d01..21fd0e7cf40 100644
  #
  # Check whether FIPS mode is available and whether we should enable it
  #
-diff --git a/doc/dev/unexpected b/doc/dev/unexpected
-index bb9f00a8b50..1ef2689bb6a 100644
---- a/doc/dev/unexpected
-+++ b/doc/dev/unexpected
-@@ -52,4 +52,4 @@ scheme.
- 
- In the (rare) situation where a library routine encounters a fatal error and
- has no way of reporting the error to the application, the library may call
--FATAL_ERROR().  This will log the problem and then terminate the application.
-+BIND_FATAL_ERROR().  This will log the problem and then terminate the application.
 diff --git a/lib/bind9/check.c b/lib/bind9/check.c
-index cefc3eb3ac0..64b815c12a1 100644
+index cefc3eb3ac..64b815c12a 100644
 --- a/lib/bind9/check.c
 +++ b/lib/bind9/check.c
 @@ -18,6 +18,9 @@
@@ -229,7 +220,7 @@ index cefc3eb3ac0..64b815c12a1 100644
  
  #ifdef HAVE_DNSTAP
 diff --git a/lib/dns/dst_openssl.h b/lib/dns/dst_openssl.h
-index 819af0fee10..a8200bc4337 100644
+index 819af0fee1..a8200bc433 100644
 --- a/lib/dns/dst_openssl.h
 +++ b/lib/dns/dst_openssl.h
 @@ -35,7 +35,11 @@
@@ -245,7 +236,7 @@ index 819af0fee10..a8200bc4337 100644
  
  #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 diff --git a/lib/dns/name.c b/lib/dns/name.c
-index cc0e30e5b58..b587245d4a5 100644
+index cc0e30e5b5..b587245d4a 100644
 --- a/lib/dns/name.c
 +++ b/lib/dns/name.c
 @@ -1246,7 +1246,7 @@ dns_name_fromtext(dns_name_t *name, isc_buffer_t *source,
@@ -285,7 +276,7 @@ index cc0e30e5b58..b587245d4a5 100644
  		}
  	}
 diff --git a/lib/dns/openssl_shim.h b/lib/dns/openssl_shim.h
-index 439d9f999ae..466822cdb20 100644
+index 439d9f999a..466822cdb2 100644
 --- a/lib/dns/openssl_shim.h
 +++ b/lib/dns/openssl_shim.h
 @@ -13,6 +13,7 @@
@@ -297,7 +288,7 @@ index 439d9f999ae..466822cdb20 100644
  #include <openssl/dh.h>
  #include <openssl/ecdsa.h>
 diff --git a/lib/dns/openssldh_link.c b/lib/dns/openssldh_link.c
-index a4ba0f78d30..99c14255ef1 100644
+index a4ba0f78d3..99c14255ef 100644
 --- a/lib/dns/openssldh_link.c
 +++ b/lib/dns/openssldh_link.c
 @@ -321,6 +321,7 @@ err:
@@ -395,7 +386,7 @@ index a4ba0f78d30..99c14255ef1 100644
  	bld = OSSL_PARAM_BLD_new();
  	if (bld == NULL) {
 diff --git a/lib/dns/opensslecdsa_link.c b/lib/dns/opensslecdsa_link.c
-index ca12bb56203..2435eba661e 100644
+index ca12bb5620..2435eba661 100644
 --- a/lib/dns/opensslecdsa_link.c
 +++ b/lib/dns/opensslecdsa_link.c
 @@ -920,7 +920,12 @@ ecdsa_check(EC_KEY *eckey, EC_KEY *pubeckey) {
@@ -413,7 +404,7 @@ index ca12bb56203..2435eba661e 100644
  	} else if (pubeckey != NULL) {
  		pubkey = EC_KEY_get0_public_key(pubeckey);
 diff --git a/lib/dns/opensslrsa_link.c b/lib/dns/opensslrsa_link.c
-index 37e8a63a61d..b5b0dfff517 100644
+index 37e8a63a61..b5b0dfff51 100644
 --- a/lib/dns/opensslrsa_link.c
 +++ b/lib/dns/opensslrsa_link.c
 @@ -357,6 +357,7 @@ err:
@@ -491,7 +482,7 @@ index 37e8a63a61d..b5b0dfff517 100644
  	if (ctx != NULL) {
  		EVP_PKEY_CTX_free(ctx);
 diff --git a/lib/dns/rbtdb.c b/lib/dns/rbtdb.c
-index a341b007c75..3d8018e60d5 100644
+index a341b007c7..3d8018e60d 100644
 --- a/lib/dns/rbtdb.c
 +++ b/lib/dns/rbtdb.c
 @@ -4564,7 +4564,7 @@ zone_findzonecut(dns_db_t *db, const dns_name_t *name, unsigned int options,
@@ -504,7 +495,7 @@ index a341b007c75..3d8018e60d5 100644
  	UNREACHABLE();
  	return ISC_R_NOTIMPLEMENTED;
 diff --git a/lib/dns/rpz.c b/lib/dns/rpz.c
-index be2285763b4..d8469b7ed8a 100644
+index be2285763b..d8469b7ed8 100644
 --- a/lib/dns/rpz.c
 +++ b/lib/dns/rpz.c
 @@ -194,7 +194,7 @@ dns_rpz_type2str(dns_rpz_type_t type) {
@@ -517,7 +508,7 @@ index be2285763b4..d8469b7ed8a 100644
  }
  
 diff --git a/lib/isc/entropy.c b/lib/isc/entropy.c
-index 38fcfa0df7b..5af7ac9d20d 100644
+index 38fcfa0df7..5af7ac9d20 100644
 --- a/lib/isc/entropy.c
 +++ b/lib/isc/entropy.c
 @@ -22,7 +22,7 @@
@@ -530,7 +521,7 @@ index 38fcfa0df7b..5af7ac9d20d 100644
  	}
  }
 diff --git a/lib/isc/include/isc/tls.h b/lib/isc/include/isc/tls.h
-index efffffb0978..49af0893dd3 100644
+index efffffb097..49af0893dd 100644
 --- a/lib/isc/include/isc/tls.h
 +++ b/lib/isc/include/isc/tls.h
 @@ -18,10 +18,16 @@
@@ -552,7 +543,7 @@ index efffffb0978..49af0893dd3 100644
  void
  isc_tlsctx_free(isc_tlsctx_t **ctpx);
 diff --git a/lib/isc/include/isc/util.h b/lib/isc/include/isc/util.h
-index af197d24cff..e11595b7438 100644
+index af197d24cf..e11595b743 100644
 --- a/lib/isc/include/isc/util.h
 +++ b/lib/isc/include/isc/util.h
 @@ -315,7 +315,7 @@ mock_assert(const int result, const char *const expression,
@@ -574,7 +565,7 @@ index af197d24cff..e11595b7438 100644
  #endif /* UNIT_TESTING */
  
 diff --git a/lib/isc/iterated_hash.c b/lib/isc/iterated_hash.c
-index 1c51e6dca9a..9e0bfdca286 100644
+index 1c51e6dca9..9e0bfdca28 100644
 --- a/lib/isc/iterated_hash.c
 +++ b/lib/isc/iterated_hash.c
 @@ -22,6 +22,7 @@
@@ -586,7 +577,7 @@ index 1c51e6dca9a..9e0bfdca286 100644
  int
  isc_iterated_hash(unsigned char *out, const unsigned int hashalg,
 diff --git a/lib/isc/lex.c b/lib/isc/lex.c
-index 8f00d05e594..4dfea3d3796 100644
+index 8f00d05e59..4dfea3d379 100644
 --- a/lib/isc/lex.c
 +++ b/lib/isc/lex.c
 @@ -917,7 +917,7 @@ isc_lex_gettoken(isc_lex_t *lex, unsigned int options, isc_token_t *tokenp) {
@@ -599,7 +590,7 @@ index 8f00d05e594..4dfea3d3796 100644
  	} while (!done);
  
 diff --git a/lib/isc/netmgr/netmgr-int.h b/lib/isc/netmgr/netmgr-int.h
-index 4b9b5874416..4808baba1f7 100644
+index 4b9b587441..4808baba1f 100644
 --- a/lib/isc/netmgr/netmgr-int.h
 +++ b/lib/isc/netmgr/netmgr-int.h
 @@ -2335,7 +2335,7 @@ isc__nmsocket_writetimeout_cb(void *data, isc_result_t eresult);
@@ -612,7 +603,7 @@ index 4b9b5874416..4808baba1f7 100644
  
  void
 diff --git a/lib/isc/netmgr/netmgr.c b/lib/isc/netmgr/netmgr.c
-index d9a5a07ef46..c2c8742d842 100644
+index d9a5a07ef4..c2c8742d84 100644
 --- a/lib/isc/netmgr/netmgr.c
 +++ b/lib/isc/netmgr/netmgr.c
 @@ -229,7 +229,7 @@ isc__netmgr_create(isc_mem_t *mctx, uint32_t nworkers, isc_nm_t **netmgrp) {
@@ -634,7 +625,7 @@ index d9a5a07ef46..c2c8742d842 100644
  			    "libuv failures",
  			    uv_version_string(), UV_VERSION_STRING);
 diff --git a/lib/isc/sockaddr.c b/lib/isc/sockaddr.c
-index 1424259a9fc..e54e54b84de 100644
+index 1424259a9f..e54e54b84d 100644
 --- a/lib/isc/sockaddr.c
 +++ b/lib/isc/sockaddr.c
 @@ -340,7 +340,7 @@ isc_sockaddr_pf(const isc_sockaddr_t *sockaddr) {
@@ -665,7 +656,7 @@ index 1424259a9fc..e54e54b84de 100644
  	}
  
 diff --git a/lib/isc/tls.c b/lib/isc/tls.c
-index 237f1dd52df..200626457d7 100644
+index 237f1dd52d..200626457d 100644
 --- a/lib/isc/tls.c
 +++ b/lib/isc/tls.c
 @@ -122,7 +122,7 @@ tls_initialize(void) {
