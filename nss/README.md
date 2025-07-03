@@ -20,6 +20,11 @@ test the PKCS11 layer to see which curves are supported.
 NSS assumes that it is using a two-slot PKCS11 backend for non-FIPS by default.
 This patch falls back to one slot if a second slot is not found.
 
+### nss-default.patch
+
+This makes wolfPCKS11 the default provider for NSS, even if it is not explicitly
+specified.
+
 ## Compiling
 
 ### NSS
