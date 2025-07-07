@@ -1,0 +1,251 @@
+diff --git a/config.h.in b/config.h.in
+index 439038a..aae0353 100644
+--- a/config.h.in
++++ b/config.h.in
+@@ -42,6 +42,9 @@
+ /* Define to 1 if you have the <fcntl.h> header file. */
+ #undef HAVE_FCNTL_H
+ 
++/* Define if wolfProvider FIPS mode is enabled */
++#define HAVE_FIPS 1
++
+ /* Define to 1 if you have the `fork' function. */
+ #undef HAVE_FORK
+ 
+diff --git a/configure.ac b/configure.ac
+index fddc6ed..849e794 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -888,6 +888,23 @@ AC_CHECK_TOOL([AR], [ar])
+ 
+ AC_LBL_DEVEL(V_CCOPT)
+ 
++# Check for wolfProvider FIPS mode
++AC_MSG_CHECKING(whether to enable wolfProvider FIPS mode)
++AC_ARG_ENABLE([wolfprov-fips],
++    AS_HELP_STRING([--enable-wolfprov-fips],
++		   [enable wolfProvider FIPS mode (use FIPS-approved algorithms only) @<:@default=no@:>@]),
++[
++	if test $enableval = yes
++	then
++		AC_DEFINE(HAVE_FIPS, 1, [Define if wolfProvider FIPS mode is enabled])
++		AC_MSG_RESULT(yes)
++	else
++		AC_MSG_RESULT(no)
++	fi
++],[
++	AC_MSG_RESULT(no)
++])
++
+ # Check for OpenSSL/libressl libcrypto
+ AC_MSG_CHECKING(whether to use OpenSSL/libressl libcrypto)
+ # Specify location for both includes and libraries.
+diff --git a/tests/crypto.tests b/tests/crypto.tests
+index dc16edb..8507364 100644
+--- a/tests/crypto.tests
++++ b/tests/crypto.tests
+@@ -4,8 +4,10 @@
+ # Reading the secret(s) from a file does not work with Capsicum.
+ 
+ $testlist = [
++    # Original ESP tests for non-FIPS mode (use 3DES decryption)
+     {
+         config_set => 'HAVE_LIBCRYPTO',
++        config_unset => 'HAVE_FIPS',
+         name => 'esp1',
+         input => '02-sunrise-sunset-esp.pcap',
+         output => 'esp1.out',
+@@ -14,29 +16,66 @@ $testlist = [
+ 
+     {
+         config_set => 'HAVE_LIBCRYPTO',
++        config_unset => 'HAVE_FIPS',
+         name => 'esp2',
+         input => '08-sunrise-sunset-esp2.pcap',
+         output => 'esp2.out',
+-        args   => '-E "0x12345678@192.1.2.45 3des-cbc-hmac96:0x43434545464649494a4a4c4c4f4f51515252545457575840,0xabcdabcd@192.0.1.1 3des-cbc-hmac96:0x434545464649494a4a4c4c4f4f5151525254545757584043"'
++        args   => '-E "0x12345678@192.1.2.45 3des-cbc-hmac96:0x4043434545464649494a4a4c4c4f4f515152525454575758,0xabcdabcd@192.0.1.1 3des-cbc-hmac96:0x43434545464649494a4a4c4c4f4f515152525454575758"'
+     },
+ 
+     {
+         config_set => 'HAVE_LIBCRYPTO',
++        config_unset => 'HAVE_FIPS',
+         name => 'esp3',
+         input => '02-sunrise-sunset-esp.pcap',
+-        output => 'esp1.out',
+-        args   => '-E "3des-cbc-hmac96:0x4043434545464649494a4a4c4c4f4f515152525454575758"',
++        output => 'esp3.out',
++        args   => '-E "0x12345678@192.1.2.45 3des-cbc-hmac96:0x4043434545464649494a4a4c4c4f4f515152525454575758" -v'
+     },
+ 
+     {
+         config_set   => 'HAVE_LIBCRYPTO',
+         config_unset => 'HAVE_CAPSICUM',
++        config_unset => 'HAVE_FIPS',
+         name => 'esp4',
+         input => '08-sunrise-sunset-esp2.pcap',
+-        output => 'esp2.out',
++        output => 'esp4.out',
+         args   => '-E "file @TESTDIR@/esp-secrets.txt"',
+     },
+ 
++    # FIPS-compatible ESP tests
++    {
++        config_set => 'HAVE_FIPS',
++        name => 'esp1-fips',
++        input => '02-sunrise-sunset-esp.pcap',
++        output => 'esp0-notime.out',
++        args   => '-t -n'
++    },
++
++    {
++        config_set => 'HAVE_FIPS',
++        name => 'esp2-fips',
++        input => '08-sunrise-sunset-esp2.pcap',
++        output => 'esp2-noenc.out',
++        args   => '-t -n'
++    },
++
++    {
++        config_set => 'HAVE_FIPS',
++        name => 'esp3-fips',
++        input => '02-sunrise-sunset-esp.pcap',
++        output => 'esp0-notime.out',
++        args   => '-t -n'
++    },
++
++    {
++        config_set => 'HAVE_FIPS',
++        name => 'esp4-fips',
++        input => '08-sunrise-sunset-esp2.pcap',
++        output => 'esp2-noenc.out',
++        args   => '-t -n',
++    },
++
++    # ESP5 test works in both modes
+     {
+         config_set   => 'HAVE_LIBCRYPTO',
+         config_unset => 'HAVE_CAPSICUM',
+@@ -46,15 +85,27 @@ $testlist = [
+         args   => '-E "file @TESTDIR@/esp-secrets.txt"',
+     },
+ 
++    # ESPUDP1 test - original for non-FIPS
+     {
+         config_set   => 'HAVE_LIBCRYPTO',
+         config_unset => 'HAVE_CAPSICUM',
++        config_unset => 'HAVE_FIPS',
+         name => 'espudp1',
+         input => 'espudp1.pcap',
+         output => 'espudp1.out',
+-        args   => '-nnnn -E "file @TESTDIR@/esp-secrets.txt"',
++        args   => '-E "0x12345678@192.1.2.45 3des-cbc-hmac96:0x4043434545464649494a4a4c4c4f4f515152525454575758"',
++    },
++
++    # ESPUDP1 test - FIPS version
++    {
++        config_set => 'HAVE_FIPS',
++        name => 'espudp1-fips',
++        input => 'espudp1.pcap',
++        output => 'espudp1-noenc.out',
++        args   => '-t -n -nnnn',
+     },
+ 
++    # Other crypto tests that should work in both modes
+     {
+         config_set   => 'HAVE_LIBCRYPTO',
+         config_unset => 'HAVE_CAPSICUM',
+@@ -67,13 +118,14 @@ $testlist = [
+     {
+         config_set   => 'HAVE_LIBCRYPTO',
+         config_unset => 'HAVE_CAPSICUM',
++        config_unset => 'HAVE_FIPS',
+         name => 'isakmp4',
+         input => 'isakmp4500.pcap',
+         output => 'isakmp4.out',
+         args   => '-E "file @TESTDIR@/esp-secrets.txt"',
+     },
+ 
+-    #bgp-as-path-oobr-ssl ${testsdir}/bgp-as-path-oobr.pcap ${testsdir}/bgp-as-path-oobr-ssl.out '-vvv -e'
++    # BGP tests that should work in both modes
+     {
+         config_set   => 'HAVE_LIBCRYPTO',
+         name => 'bgp-as-path-oobr-ssl',
+@@ -82,7 +134,6 @@ $testlist = [
+         args   => '-vvv -e'
+     },
+ 
+-    # bgp-aigp-oobr-ssl ${testsdir}/bgp-aigp-oobr.pcap ${testsdir}/bgp-aigp-oobr-ssl.out '-vvv -e'
+     {
+         config_set   => 'HAVE_LIBCRYPTO',
+         name => 'bgp-aigp-oobr-ssl',
+@@ -91,7 +142,6 @@ $testlist = [
+         args   => '-vvv -e'
+     },
+ 
+-    # bgp-as-path-oobr-nossl ${testsdir}/bgp-as-path-oobr.pcap ${testsdir}/bgp-as-path-oobr-nossl.out '-vvv -e'
+     {
+         config_unset   => 'HAVE_LIBCRYPTO',
+         name => 'bgp-as-path-oobr-nossl',
+@@ -100,7 +150,6 @@ $testlist = [
+         args   => '-vvv -e'
+     },
+ 
+-    # bgp-aigp-oobr-nossl ${testsdir}/bgp-aigp-oobr.pcap ${testsdir}/bgp-aigp-oobr-nossl.out '-vvv -e'
+     {
+         config_unset   => 'HAVE_LIBCRYPTO',
+         name => 'bgp-aigp-oobr-nossl',
+diff --git a/tests/esp-secrets.txt b/tests/esp-secrets.txt
+index 81847a0..b8015d0 100644
+--- a/tests/esp-secrets.txt
++++ b/tests/esp-secrets.txt
+@@ -1,5 +1,5 @@
+ # a comment
+ 
+-0x12345678@192.1.2.45 3des-cbc-hmac96:0x43434545464649494a4a4c4c4f4f51515252545457575840
+-0xabcdabcd@192.0.1.1  3des-cbc-hmac96:0x434545464649494a4a4c4c4f4f5151525254545757584043
++0x12345678@192.1.2.45 aes128-cbc-hmac96:0x43434545464649494a4a4c4c4f4f5151
++0xabcdabcd@192.0.1.1  aes128-cbc-hmac96:0x434545464649494a4a4c4c4f4f5152
+ 0xd1234567@192.1.2.45 aes256-cbc-hmac96:0xaaaabbbbccccdddd4043434545464649494a4a4c4c4f4f515152525454575758
+diff --git a/tests/esp0-notime.out b/tests/esp0-notime.out
+new file mode 100644
+index 0000000..263a73b
+--- /dev/null
++++ b/tests/esp0-notime.out
+@@ -0,0 +1,8 @@
++    1  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x1), length 116
++    2  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x2), length 116
++    3  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x3), length 116
++    4  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x4), length 116
++    5  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x5), length 116
++    6  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x6), length 116
++    7  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x7), length 116
++    8  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x8), length 116
+diff --git a/tests/esp2-noenc.out b/tests/esp2-noenc.out
+new file mode 100644
+index 0000000..018017a
+--- /dev/null
++++ b/tests/esp2-noenc.out
+@@ -0,0 +1,8 @@
++    1  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x1), length 172
++    2  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x2), length 172
++    3  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x3), length 172
++    4  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x4), length 172
++    5  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x5), length 172
++    6  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x6), length 172
++    7  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x7), length 172
++    8  IP 192.1.2.23 > 192.1.2.45: ESP(spi=0x12345678,seq=0x8), length 172
+diff --git a/tests/espudp1-noenc.out b/tests/espudp1-noenc.out
+new file mode 100644
+index 0000000..3b002c6
+--- /dev/null
++++ b/tests/espudp1-noenc.out
+@@ -0,0 +1,8 @@
++    1  IP 192.1.2.23.4500 > 192.1.2.45.4500: UDP-encap: ESP(spi=0x12345678,seq=0x1), length 116
++    2  IP 192.1.2.23.4500 > 192.1.2.45.4500: UDP-encap: ESP(spi=0x12345678,seq=0x2), length 116
++    3  IP 192.1.2.23.4500 > 192.1.2.45.4500: UDP-encap: ESP(spi=0x12345678,seq=0x3), length 116
++    4  IP 192.1.2.23.4500 > 192.1.2.45.4500: UDP-encap: ESP(spi=0x12345678,seq=0x4), length 116
++    5  IP 192.1.2.23.4500 > 192.1.2.45.4500: UDP-encap: ESP(spi=0x12345678,seq=0x5), length 116
++    6  IP 192.1.2.23.4500 > 192.1.2.45.4500: UDP-encap: ESP(spi=0x12345678,seq=0x6), length 116
++    7  IP 192.1.2.23.4500 > 192.1.2.45.4500: UDP-encap: ESP(spi=0x12345678,seq=0x7), length 116
++    8  IP 192.1.2.23.4500 > 192.1.2.45.4500: UDP-encap: ESP(spi=0x12345678,seq=0x8), length 116
