@@ -1,0 +1,32 @@
+diff --git a/main.go b/main.go
+index e016116..dbcf215 100644
+--- a/main.go
++++ b/main.go
+@@ -13,6 +13,7 @@ import (
+ 	"os/signal"
+ 	"runtime"
+ 	"strconv"
++	"strings"
+ 
+ 	"golang.org/x/sys/unix"
+ 	"golang.zx2c4.com/wireguard/conn"
+@@ -226,6 +227,19 @@ func main() {
+ 
+ 	logger.Verbosef("Device started")
+ 
++	config := `private_key=16ac38cb7277fe3f583091fccab1372302ad7fac2cfd39801c15fe658f956513
++listen_port=51821
++public_key=046b589b2b23030de6fc43100781486f4f71b4e57ae14a33adb0ab749938580b18364796324a5e868fe8e474225a73a043fcf4dbcf9776c180fc8e49a637dbec20
++endpoint=127.0.0.1:51820
++allowed_ip=10.0.0.1/32
++`
++        err = device.IpcSetOperation(strings.NewReader(config))
++        if err != nil {
++                logger.Errorf("Failed to apply embedded config: %v", err)
++                os.Exit(ExitSetupFailed)
++        }
++        logger.Verbosef("Embedded configuration applied")
++
+ 	errs := make(chan error)
+ 	term := make(chan os.Signal, 1)
+ 

@@ -41,3 +41,5 @@ If go can't find the wolfSSL .so file, you may have to manually specify the lib 
 ```
 LD_LIBRARY_PATH=/usr/local/lib/ go test
 ```
+
+After running `go build` in the wireguard-go directory, you'll have the wireguard executable available to run. Reference the `main_configuration.patch` file as an example for how to configure the wireguard executable. You can also apply the `gen_key_on_test.patch` to your wireguard-go src so that every run of `go test` generates and prints an ECC 256 Public/Private key pair that you can use for your configuration. 
