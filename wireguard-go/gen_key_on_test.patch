@@ -1,0 +1,26 @@
+diff --git a/device/noise_test.go b/device/noise_test.go
+index 7f99737..e4b711c 100644
+--- a/device/noise_test.go
++++ b/device/noise_test.go
+@@ -9,6 +9,7 @@ import (
+ 	"bytes"
+ 	"encoding/binary"
+ 	"testing"
++	"encoding/hex"
+ 
+         wolfSSL "github.com/wolfssl/go-wolfssl"
+ 	"golang.zx2c4.com/wireguard/conn"
+@@ -201,4 +202,13 @@ func TestNoiseHandshake(t *testing.T) {
+ 		assertIntEqual(t, ret, 0)
+                 assertEqual(t, out[:len(out)-wolfSSL.AES_BLOCK_SIZE], testMsg)
+ 	}()
++
++        sk, err := newPrivateKey()
++        slice := hex.EncodeToString(sk[:])
++        print("Private key: ",slice, "\n")
++        var pk NoisePublicKey
++        pk = sk.publicKey()
++        slice = hex.EncodeToString(pk[:])
++        print("Public key: ",slice, "\n")
++
+ }
