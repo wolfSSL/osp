@@ -1,0 +1,66 @@
+diff --git a/configure.ac b/configure.ac
+index eb6051e..dd9daa3 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -167,6 +167,14 @@ AC_ARG_WITH([crypto],
+ AM_CONDITIONAL(ESYS_OSSL, test "x$with_crypto" = "xossl")
+ AM_CONDITIONAL(ESYS_MBED, test "x$with_crypto" = "xmbed")
+ 
++AC_ARG_ENABLE([wolfprov-fips],
++            [AS_HELP_STRING([--enable-wolfprov-fips],
++                            [enable wolfProvider FIPS mode (defines HAVE_FIPS macro)])],,
++            [enable_wolfprov_fips=no])
++
++AS_IF([test "x$enable_wolfprov_fips" = "xyes"],
++    [AC_DEFINE([HAVE_FIPS], [1], [wolfProvider FIPS mode enabled])])
++
+ AC_ARG_ENABLE([vendor],
+             [AS_HELP_STRING([--enable-vendor],
+                             [build vendor specific extensions (default is yes)])],
+diff --git a/test/unit/esys-crypto.c b/test/unit/esys-crypto.c
+index 1576726..f91512b 100644
+--- a/test/unit/esys-crypto.c
++++ b/test/unit/esys-crypto.c
+@@ -213,6 +216,9 @@ check_pk_encrypt(void **state)
+     assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+ }
+ 
++/* AES-CFB is the only supported mode in libtss2 wolfProvider
++ * FIPS does not support AES-CFB so we must skip this test. */
++#if !defined(HAVE_FIPS)
+ static void
+ check_aes_encrypt(void **state)
+ {
+@@ -258,7 +264,8 @@ check_aes_encrypt(void **state)
+     assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+ }
+ 
+-#if HAVE_EVP_SM4_CFB && !defined(OPENSSL_NO_SM4)
++/* SM4 is not a FIPS approved algorithm skipping test */
++#if (HAVE_EVP_SM4_CFB && !defined(OPENSSL_NO_SM4))
+ static void
+ check_sm4_encrypt(void **state)
+ {
+@@ -311,7 +318,8 @@ check_sm4_encrypt(void **state)
+                                       &buffer[0], size, &key[0]);
+     assert_int_equal (rc, TSS2_RC_SUCCESS);
+ }
+-#endif
++#endif /* HAVE_EVP_SM4_CFB && !OPENSSL_NO_SM4 */
++#endif /* !HAVE_FIPS */
+ 
+ static void
+ check_free(void **state)
+@@ -435,9 +443,11 @@ main(int argc, char *argv[])
+         cmocka_unit_test(check_hmac_functions),
+         cmocka_unit_test(check_random),
+         cmocka_unit_test(check_pk_encrypt),
++#if !defined(HAVE_FIPS)
+         cmocka_unit_test(check_aes_encrypt),
+-#if HAVE_EVP_SM4_CFB && !defined(OPENSSL_NO_SM4)
++#if (HAVE_EVP_SM4_CFB && !defined(OPENSSL_NO_SM4))
+         cmocka_unit_test(check_sm4_encrypt),
++#endif
+ #endif
+         cmocka_unit_test(check_free),
+         cmocka_unit_test(check_get_sys_context),
