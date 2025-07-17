@@ -1,0 +1,64 @@
+diff --git a/docs/libssh2_userauth_keyboard_interactive_ex.3 b/docs/libssh2_userauth_keyboard_interactive_ex.3
+index ada012a..222b2ba 100644
+--- a/docs/libssh2_userauth_keyboard_interactive_ex.3
++++ b/docs/libssh2_userauth_keyboard_interactive_ex.3
+@@ -52,7 +52,7 @@ number, it isn't really a failure per se.
+ 
+ \fILIBSSH2_ERROR_SOCKET_SEND\fP - Unable to send data on socket.
+ 
+-\fLIBSSH2_ERROR_AUTHENTICATION_FAILED\fP - failed, invalid username/password
++\fILIBSSH2_ERROR_AUTHENTICATION_FAILED\fP - failed, invalid username/password
+ or public/private key.
+ .SH SEE ALSO
+ .BR libssh2_session_init_ex(3)
+diff --git a/docs/libssh2_userauth_password_ex.3 b/docs/libssh2_userauth_password_ex.3
+index dc9e108..03b90a1 100644
+--- a/docs/libssh2_userauth_password_ex.3
++++ b/docs/libssh2_userauth_password_ex.3
+@@ -51,7 +51,7 @@ Some of the errors this function may return include:
+ 
+ \fILIBSSH2_ERROR_PASSWORD_EXPIRED\fP - 
+ 
+-\fLIBSSH2_ERROR_AUTHENTICATION_FAILED\fP - failed, invalid username/password
++\fILIBSSH2_ERROR_AUTHENTICATION_FAILED\fP - failed, invalid username/password
+ or public/private key.
+ .SH SEE ALSO
+ .BR libssh2_session_init_ex(3)
+diff --git a/tests/ssh2.c b/tests/ssh2.c
+index f903e07..b714b67 100644
+--- a/tests/ssh2.c
++++ b/tests/ssh2.c
+@@ -45,6 +45,12 @@ int main(int argc, char *argv[])
+     const char *password = "password";
+     int ec = 1;
+ 
++    /* Initialize libssh2 library (important for wolfProvider) */
++    if (libssh2_init(0) != 0) {
++        fprintf(stderr, "Failed to initialize libssh2\n");
++        return 1;
++    }
++
+ #ifdef WIN32
+     WSADATA wsadata;
+     int err;
+@@ -182,5 +188,6 @@ int main(int argc, char *argv[])
+     close(sock);
+ #endif
+ 
++    libssh2_exit();
+     return ec;
+ }
+diff --git a/tests/ssh2.sh b/tests/ssh2.sh
+index 07795bb..aeed0d3 100755
+--- a/tests/ssh2.sh
++++ b/tests/ssh2.sh
+@@ -22,6 +22,9 @@ fi
+ 
+ chmod go-rwx "$srcdir"/etc/host*
+ $SSHD -f /dev/null -h "$srcdir"/etc/host \
++    -o 'KexAlgorithms diffie-hellman-group14-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512' \
++    -o 'HostKeyAlgorithms +ssh-rsa' \
++    -o 'PubkeyAcceptedAlgorithms +ssh-rsa' \
+     -o 'Port 4711' \
+     -o 'Protocol 2' \
+     -o "AuthorizedKeysFile $srcdir/etc/user.pub" \
