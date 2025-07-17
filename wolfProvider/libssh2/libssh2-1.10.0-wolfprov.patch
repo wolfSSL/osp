@@ -32,7 +32,7 @@ index f903e07..b714b67 100644
      const char *password = "password";
      int ec = 1;
  
-+    /* Initialize libssh2 library (important for wolfProvider) */
++    /* Initialize libssh2 library */
 +    if (libssh2_init(0) != 0) {
 +        fprintf(stderr, "Failed to initialize libssh2\n");
 +        return 1;
