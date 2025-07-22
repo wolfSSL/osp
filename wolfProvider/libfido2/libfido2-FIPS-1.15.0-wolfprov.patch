@@ -1,0 +1,41 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c41de28..7943bbe 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -44,11 +44,16 @@ option(USE_HIDAPI        "Use hidapi as the HID backend"           OFF)
+ option(USE_PCSC          "Enable experimental PCSC support"        OFF)
+ option(USE_WINHELLO      "Abstract Windows Hello as a FIDO device" ON)
+ option(NFC_LINUX         "Enable NFC support on Linux"             ON)
++option(HAVE_FIPS         "Enable FIPS mode (skip EdDSA tests)"     OFF)
+ 
+ add_definitions(-D_FIDO_MAJOR=${FIDO_MAJOR})
+ add_definitions(-D_FIDO_MINOR=${FIDO_MINOR})
+ add_definitions(-D_FIDO_PATCH=${FIDO_PATCH})
+ 
++if(HAVE_FIPS)
++	add_definitions(-DHAVE_FIPS)
++endif()
++
+ if(BUILD_SHARED_LIBS)
+ 	set(_FIDO2_LIBRARY fido2_shared)
+ elseif(BUILD_STATIC_LIBS)
+diff --git a/regress/CMakeLists.txt b/regress/CMakeLists.txt
+index 246bffa..9103ee5 100644
+--- a/regress/CMakeLists.txt
++++ b/regress/CMakeLists.txt
+@@ -43,7 +43,14 @@ endif()
+ add_regress_test(regress_assert assert.c ${_FIDO2_LIBRARY})
+ add_regress_test(regress_cred cred.c ${_FIDO2_LIBRARY})
+ add_regress_test(regress_dev dev.c ${_FIDO2_LIBRARY})
+-add_regress_test(regress_eddsa eddsa.c ${_FIDO2_LIBRARY})
++# Skip EdDSA test in FIPS mode since Ed25519 is not FIPS-approved
++if(NOT HAVE_FIPS)
++	add_regress_test(regress_eddsa eddsa.c ${_FIDO2_LIBRARY})
++else()
++	add_custom_command(TARGET regress POST_BUILD
++	    COMMAND "${CMAKE_COMMAND}" -E echo
++	    "FIPS mode detected. Skipping EdDSA test.")
++endif()
+ add_regress_test(regress_es256 es256.c ${_FIDO2_LIBRARY})
+ add_regress_test(regress_es384 es384.c ${_FIDO2_LIBRARY})
+ add_regress_test(regress_rs256 rs256.c ${_FIDO2_LIBRARY})
