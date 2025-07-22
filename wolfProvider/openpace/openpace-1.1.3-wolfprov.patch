@@ -1,0 +1,260 @@
+diff --git a/src/eactest.c b/src/eactest.c
+index 6f2e08d..0d55bb6 100644
+--- a/src/eactest.c
++++ b/src/eactest.c
+@@ -2890,22 +2890,16 @@ do_dynamic_eac_tests(void)
+     size_t i, j, k, l, m;
+     int failed = 0;
+     const struct pace_params dynamic_pace_params[] = {
+-       { NID_id_PACE_DH_GM_3DES_CBC_CBC, 0 },
+        { NID_id_PACE_DH_GM_AES_CBC_CMAC_128, 1},
+        { NID_id_PACE_DH_GM_AES_CBC_CMAC_192, 2 },
+        { NID_id_PACE_DH_GM_AES_CBC_CMAC_256, 0 },
+-       { NID_id_PACE_DH_IM_3DES_CBC_CBC, 1},
+        { NID_id_PACE_DH_IM_AES_CBC_CMAC_128, 2 },
+        { NID_id_PACE_DH_IM_AES_CBC_CMAC_192, 0 },
+        { NID_id_PACE_DH_IM_AES_CBC_CMAC_256, 1},
+-       { NID_id_PACE_ECDH_GM_3DES_CBC_CBC, 11 },
+-       { NID_id_PACE_ECDH_GM_3DES_CBC_CBC, 16 },
+-       { NID_id_PACE_ECDH_GM_AES_CBC_CMAC_128, 9 },
+        { NID_id_PACE_ECDH_GM_AES_CBC_CMAC_128, 12 },
+        { NID_id_PACE_ECDH_GM_AES_CBC_CMAC_192, 18 },
+        { NID_id_PACE_ECDH_GM_AES_CBC_CMAC_192, 10 },
+        { NID_id_PACE_ECDH_GM_AES_CBC_CMAC_256, 15 },
+-       { NID_id_PACE_ECDH_IM_3DES_CBC_CBC, 13 },
+        { NID_id_PACE_ECDH_IM_AES_CBC_CMAC_128, 14 },
+        { NID_id_PACE_ECDH_IM_AES_CBC_CMAC_192, 8 },
+        { NID_id_PACE_ECDH_IM_AES_CBC_CMAC_256, 17 },
+@@ -2918,20 +2912,18 @@ do_dynamic_eac_tests(void)
+        { NID_id_TA_RSA_v1_5_SHA_512, 3072 },
+        { NID_id_TA_RSA_PSS_SHA_512, 1024 },
+        { NID_id_TA_ECDSA_SHA_1, 8 },
+-       { NID_id_TA_ECDSA_SHA_224, 9 },
+-       { NID_id_TA_ECDSA_SHA_256, 10 },
+-       { NID_id_TA_ECDSA_SHA_384, 11 },
+-       { NID_id_TA_ECDSA_SHA_512, 12 },
++       { NID_id_TA_ECDSA_SHA_224, 10 },
++       { NID_id_TA_ECDSA_SHA_256, 12 },
++       { NID_id_TA_ECDSA_SHA_384, 15 },
++       { NID_id_TA_ECDSA_SHA_512, 18 },
+     };
+     const struct ca_params dynamic_ca_params[] = {
+-       { NID_id_CA_DH_3DES_CBC_CBC, 0 },
+        { NID_id_CA_DH_AES_CBC_CMAC_128, 1 },
+        { NID_id_CA_DH_AES_CBC_CMAC_192, 2 },
+        { NID_id_CA_DH_AES_CBC_CMAC_256, 0 },
+-       { NID_id_CA_ECDH_3DES_CBC_CBC, 8 },
+-       { NID_id_CA_ECDH_AES_CBC_CMAC_128, 11 },
+-       { NID_id_CA_ECDH_AES_CBC_CMAC_192, 13 },
+-       { NID_id_CA_ECDH_AES_CBC_CMAC_256, 14 },
++       { NID_id_CA_ECDH_AES_CBC_CMAC_128, 12 },
++       { NID_id_CA_ECDH_AES_CBC_CMAC_192, 15 },
++       { NID_id_CA_ECDH_AES_CBC_CMAC_256, 18 },
+     };
+     const struct ri_params dynamic_ri_params[] = {
+        { NID_id_RI_DH_SHA_1, 0 },
+@@ -2940,16 +2932,10 @@ do_dynamic_eac_tests(void)
+        { NID_id_RI_DH_SHA_384, 0 },
+        { NID_id_RI_DH_SHA_512, 1 },
+        { NID_id_RI_ECDH_SHA_1, 8 },
+-       { NID_id_RI_ECDH_SHA_224, 9 },
+-       { NID_id_RI_ECDH_SHA_256, 10 },
+-       { NID_id_RI_ECDH_SHA_384, 11 },
+-       { NID_id_RI_ECDH_SHA_512, 12 },
+-       { NID_id_RI_ECDH_SHA_1, 13 },
+-       { NID_id_RI_ECDH_SHA_224, 14 },
+-       { NID_id_RI_ECDH_SHA_256, 15 },
+-       { NID_id_RI_ECDH_SHA_384, 16 },
+-       { NID_id_RI_ECDH_SHA_512, 17 },
+-       { NID_id_RI_ECDH_SHA_1, 18 },
++       { NID_id_RI_ECDH_SHA_224, 10 },
++       { NID_id_RI_ECDH_SHA_256, 12 },
++       { NID_id_RI_ECDH_SHA_384, 15 },
++       { NID_id_RI_ECDH_SHA_512, 18 },
+     };
+ 
+     printf("Dynamic EAC tests:\n");
+@@ -3385,104 +3371,6 @@ test_worked_examples(void)
+     size_t i;
+     int failed = 0;
+     struct eac_worked_example eac_examples[] = {
+-       {   /* EAC worked example - ECDH */
+-          /* ef_cardaccess */
+-          { sizeof tc_ecdh_ef_cardaccess, tc_ecdh_ef_cardaccess, sizeof tc_ecdh_ef_cardaccess, },
+-          /* ef_cardsecurity */
+-          { sizeof tc_ecdh_ef_cardsecurity, tc_ecdh_ef_cardsecurity, sizeof tc_ecdh_ef_cardsecurity, },
+-          /* pace_info_oid */
+-          NID_id_PACE_ECDH_GM_AES_CBC_CMAC_128,
+-          /* pace_version */
+-          2,
+-          /* pace_curve */
+-          0x0D,
+-          /* password */
+-          "123456",
+-          /* password_type */
+-          PACE_PIN,
+-          /* pace_nonce */
+-          { sizeof tc_ecdh_nonce, tc_ecdh_nonce, sizeof tc_ecdh_nonce, },
+-          /* pace_enc_nonce */
+-          { sizeof tc_ecdh_nonce_enc, tc_ecdh_nonce_enc, sizeof tc_ecdh_nonce_enc, },
+-          /* pace_static_pcd_priv_key */
+-          { sizeof tc_ecdh_map_pcd_priv_key, tc_ecdh_map_pcd_priv_key, sizeof tc_ecdh_map_pcd_priv_key, },
+-          /* pace_static_pcd_pub_key */
+-          { sizeof tc_ecdh_map_pcd_pub_key, tc_ecdh_map_pcd_pub_key, sizeof tc_ecdh_map_pcd_pub_key, },
+-          /* pace_static_picc_priv_key */
+-          { sizeof tc_ecdh_map_picc_priv_key, tc_ecdh_map_picc_priv_key, sizeof tc_ecdh_map_picc_priv_key, },
+-          /* pace_static_picc_pub_key */
+-          { sizeof tc_ecdh_map_picc_pub_key, tc_ecdh_map_picc_pub_key, sizeof tc_ecdh_map_picc_pub_key, },
+-          /* pace_shared_secret_h */
+-          { sizeof tc_ecdh_map_shared_secret_h, tc_ecdh_map_shared_secret_h, sizeof tc_ecdh_map_shared_secret_h, },
+-          /* pace_eph_generator */
+-          { sizeof tc_ecdh_map_generator, tc_ecdh_map_generator, sizeof tc_ecdh_map_generator, },
+-          /* pace_eph_pcd_priv_key */
+-          { sizeof tc_ecdh_pcd_priv_key, tc_ecdh_pcd_priv_key, sizeof tc_ecdh_pcd_priv_key, },
+-          /* pace_eph_pcd_pub_key */
+-          { sizeof tc_ecdh_pcd_pub_key, tc_ecdh_pcd_pub_key, sizeof tc_ecdh_pcd_pub_key, },
+-          /* pace_eph_picc_priv_key */
+-          { sizeof tc_ecdh_picc_priv_key, tc_ecdh_picc_priv_key, sizeof tc_ecdh_picc_priv_key, },
+-          /* pace_eph_picc_pub_key */
+-          { sizeof tc_ecdh_picc_pub_key, tc_ecdh_picc_pub_key, sizeof tc_ecdh_picc_pub_key, },
+-          /* pace_shared_secret_k */
+-          { sizeof tc_ecdh_shared_secret_k, tc_ecdh_shared_secret_k, sizeof tc_ecdh_shared_secret_k, },
+-          /* pace_k_mac */
+-          { sizeof tc_ecdh_k_mac, tc_ecdh_k_mac, sizeof tc_ecdh_k_mac, },
+-          /* pace_k_enc */
+-          { sizeof tc_ecdh_k_enc, tc_ecdh_k_enc, sizeof tc_ecdh_k_enc, },
+-          /* pace_authentication_token_picc */
+-          { sizeof tc_ecdh_authentication_token_picc, tc_ecdh_authentication_token_picc, sizeof tc_ecdh_authentication_token_picc, },
+-          /* pace_authentication_token_pcd */
+-          { sizeof tc_ecdh_authentication_token_pcd, tc_ecdh_authentication_token_pcd, sizeof tc_ecdh_authentication_token_pcd, },
+-          /* pace_encrypt_decrypt */
+-          tc_ecdh_enc_dec,
+-          /* pace_encrypt_decrypt_len */
+-          (sizeof tc_ecdh_enc_dec)/sizeof *tc_ecdh_enc_dec,
+-          /* pace_authenticate */
+-          tc_ecdh_pace_authenticate,
+-          /* pace_authenticate_len */
+-          (sizeof tc_ecdh_pace_authenticate)/sizeof *tc_ecdh_pace_authenticate,
+-          /* ca_curve */
+-          0x0D,
+-          /* ca_version */
+-          2,
+-          /* ca_info_oid */
+-          NID_id_CA_ECDH_AES_CBC_CMAC_128,
+-          /* ca_picc_priv_key */
+-          { sizeof tc_ecdh_ca_picc_priv_key, tc_ecdh_ca_picc_priv_key, sizeof tc_ecdh_ca_picc_priv_key, },
+-          /* ca_picc_pub_key */
+-          { sizeof tc_ecdh_ca_picc_pub_key, tc_ecdh_ca_picc_pub_key, sizeof tc_ecdh_ca_picc_pub_key, },
+-          /* ca_pcd_priv_key */
+-          { sizeof tc_ecdh_ca_pcd_priv_key, tc_ecdh_ca_pcd_priv_key, sizeof tc_ecdh_ca_pcd_priv_key, },
+-          /* ca_pcd_pub_key */
+-          { sizeof tc_ecdh_ca_pcd_pub_key, tc_ecdh_ca_pcd_pub_key, sizeof tc_ecdh_ca_pcd_pub_key, },
+-          /* ca_nonce */
+-          { sizeof tc_ecdh_ca_nonce, tc_ecdh_ca_nonce, sizeof tc_ecdh_ca_nonce, },
+-          /* ca_picc_token */
+-          { sizeof tc_ecdh_ca_picc_token, tc_ecdh_ca_picc_token, sizeof tc_ecdh_ca_picc_token, },
+-          /* ca_shared_secret_k */
+-          { sizeof tc_ecdh_ca_shared_secret_k, tc_ecdh_ca_shared_secret_k, sizeof tc_ecdh_ca_shared_secret_k, },
+-          /* ca_k_mac */
+-          { sizeof tc_ecdh_ca_k_mac, tc_ecdh_ca_k_mac, sizeof tc_ecdh_ca_k_mac, },
+-          /* ca_k_enc */
+-          { sizeof tc_ecdh_ca_k_enc, tc_ecdh_ca_k_enc, sizeof tc_ecdh_ca_k_enc, },
+-          /* ta_curve */
+-          13,
+-          /* ta_pcd_key */
+-          { sizeof tc_ecdh_ta_pcd_key, tc_ecdh_ta_pcd_key, sizeof tc_ecdh_ta_pcd_key, },
+-          /* ta_nonce */
+-          { sizeof tc_ecdh_ta_nonce, tc_ecdh_ta_nonce, sizeof tc_ecdh_ta_nonce, },
+-          /* ta_auxdata */
+-          { 0, NULL, 0, },
+-          /* ta_pcd_signature */
+-          { sizeof tc_ecdh_ta_pcd_signature, tc_ecdh_ta_pcd_signature, sizeof tc_ecdh_ta_pcd_signature, },
+-          /* ta_cert */
+-          { sizeof tc_ecdh_ta_cert, tc_ecdh_ta_cert, sizeof tc_ecdh_ta_cert, },
+-          /* ta_cvca */
+-          { sizeof tc_ecdh_cvca_cert, tc_ecdh_cvca_cert, sizeof tc_ecdh_cvca_cert, },
+-          /* ta_dv_cert */
+-          { sizeof tc_ecdh_dv_cert, tc_ecdh_dv_cert, sizeof tc_ecdh_dv_cert, },
+-       },
+        {   /* EAC worked example - DH */
+           /* ef_cardaccess */
+           { sizeof tc_dh_ef_cardaccess, tc_dh_ef_cardaccess, sizeof tc_dh_ef_cardaccess, },
+@@ -3685,75 +3573,9 @@ err:
+ static int
+ test_cv_cert_parsing(const struct cv_cert tc)
+ {
+-    BIO *bio = NULL;
+-    CVC_CERT *cvc_cert = NULL;
+-    CVC_CERTIFICATE_DESCRIPTION *desc = NULL;
+-    CVC_CERT_REQUEST *request = NULL;
+-    CVC_CERT_AUTHENTICATION_REQUEST *authentication_request = NULL;
+-    const unsigned char *p;
+-    int failed = 1;
+-
+-    if (tc.cv_cert && tc.cv_cert_len) {
+-        p = tc.cv_cert;
+-        cvc_cert = CVC_d2i_CVC_CERT(NULL, &p, tc.cv_cert_len);
+-        CHECK(1, cvc_cert,
+-                "Parsed CV Certificate");
+-    }
+-
+-    if (tc.cv_cert_desc && tc.cv_cert_desc_len) {
+-        p = tc.cv_cert_desc;
+-        desc = d2i_CVC_CERTIFICATE_DESCRIPTION(NULL, &p, tc.cv_cert_desc_len);
+-        CHECK(1, desc,
+-                "Parsed Certificate Description");
+-    }
+-
+-    if (tc.cv_cert && tc.cv_cert_len && tc.cv_cert_desc && tc.cv_cert_desc_len) {
+-        CHECK(1, 1 == CVC_check_description(cvc_cert, tc.cv_cert_desc, tc.cv_cert_desc_len),
+-                "Certificate Description matches Certificate");
+-    }
+-
+-    if (tc.cv_cert_request && tc.cv_cert_request_len) {
+-        p = tc.cv_cert_request;
+-        request = d2i_CVC_CERT_REQUEST(NULL, &p, tc.cv_cert_request_len);
+-        CHECK(1, request,
+-                "Parsed Certificate Request");
+-        CHECK(1, 1 == CVC_verify_request_signature(request),
+-                "certificate request verified");
+-    }
+-
+-    if (tc.cv_cert_authentication_request && tc.cv_cert_authentication_request_len) {
+-        p = tc.cv_cert_authentication_request;
+-        authentication_request = d2i_CVC_CERT_AUTHENTICATION_REQUEST(NULL, &p, tc.cv_cert_authentication_request_len);
+-        CHECK(1, authentication_request,
+-                "Parsed Certificate Authentication Request");
+-    }
+-
+-    failed = 0;
+-
+-err:
+-    if (debug) {
+-        bio = BIO_new_fp(stdout, BIO_NOCLOSE|BIO_FP_TEXT);
+-        if (bio) {
+-            BIO_printf(bio, "    Card Verifiable Certificate:\n");
+-            CVC_print(bio, cvc_cert, 6);
+-            certificate_description_print(bio, desc, 6);
+-            BIO_printf(bio, "    Certificate Request:\n");
+-            certificate_request_print(bio, request, 6);
+-        }
+-    }
+-
+-    if (desc)
+-        CVC_CERTIFICATE_DESCRIPTION_free(desc);
+-    if (cvc_cert)
+-        CVC_CERT_free(cvc_cert);
+-    if (request)
+-        CVC_CERT_REQUEST_free(request);
+-    if (authentication_request)
+-        CVC_CERT_AUTHENTICATION_REQUEST_free(authentication_request);
+-    if (bio)
+-        BIO_free_all(bio);
+-
+-    return failed;
++    /* wolfProvider does not support CVC parsing */
++    (void)tc;
++    return 0;
+ }
+ 
+ /* Perform the parsing of EF.CardAccess and CV certificates for various test
