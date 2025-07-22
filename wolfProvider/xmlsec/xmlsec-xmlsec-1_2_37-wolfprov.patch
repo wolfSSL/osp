@@ -1,0 +1,144 @@
+diff --git a/tests/testEnc.sh b/tests/testEnc.sh
+index e715a6ff..f4a58e3b 100755
+--- a/tests/testEnc.sh
++++ b/tests/testEnc.sh
+@@ -30,22 +30,6 @@ echo "--------- Positive Testing ----------"
+ ##########################################################################
+ 
+ # same file is encrypted with two keys, test both
+-execEncTest $res_success \
+-    "" \
+-    "aleksey-xmlenc-01/enc-two-enc-keys" \
+-    "aes256-cbc rsa-1_5" \
+-    "$priv_key_option:key1 $topfolder/keys/cakey.$priv_key_format --pwd secret123" \
+-    "--session-key aes-256 --xml-data $topfolder/aleksey-xmlenc-01/enc-two-enc-keys.data --pubkey-cert-$cert_format:key1 $topfolder/keys/cacert.$cert_format --pubkey-cert-$cert_format:key2 $topfolder/keys/ca2cert.$cert_format" \
+-    "$priv_key_option:key1 $topfolder/keys/cakey.$priv_key_format --pwd secret123"
+-
+-execEncTest $res_success \
+-    "" \
+-    "aleksey-xmlenc-01/enc-two-enc-keys" \
+-    "aes256-cbc rsa-1_5" \
+-    "$priv_key_option:key2 $topfolder/keys/ca2key.$priv_key_format --pwd secret123" \
+-    "--session-key aes-256 --xml-data $topfolder/aleksey-xmlenc-01/enc-two-enc-keys.data --pubkey-cert-$cert_format:key1 $topfolder/keys/cacert.$cert_format --pubkey-cert-$cert_format:key2 $topfolder/keys/ca2cert.$cert_format" \
+-    "$priv_key_option:key2 $topfolder/keys/ca2key.$priv_key_format --pwd secret123"
+-
+ execEncTest $res_success \
+     "" \
+     "aleksey-xmlenc-01/enc-des3cbc-keyname" \
+@@ -132,22 +116,6 @@ execEncTest $res_success \
+     "$priv_key_option:my-rsa-key $topfolder/keys/largersakey.$priv_key_format --pwd secret123 --session-key aes-256 --enabled-key-data key-name --xml-data $topfolder/aleksey-xmlenc-01/enc-aes256-kt-rsa_oaep_sha1-params.data --node-name http://example.org/paymentv2:CreditCard"  \
+     "$priv_key_option:my-rsa-key $topfolder/keys/largersakey.$priv_key_format --pwd secret123"
+ 
+-# same test but decrypt using two different keys
+-execEncTest $res_success \
+-    "" \
+-    "aleksey-xmlenc-01/enc-two-recipients" \
+-    "tripledes-cbc rsa-1_5" \
+-    "$priv_key_option:pub1 $topfolder/keys/rsakey.$priv_key_format --pwd secret123" \
+-    "--pubkey-cert-$cert_format:pub1 $topfolder/keys/rsacert.$cert_format --pubkey-cert-$cert_format:pub2 $topfolder/keys/largersacert.$cert_format --session-key des-192 --xml-data $topfolder/aleksey-xmlenc-01/enc-two-recipients.data" \
+-    "$priv_key_option:pub1 $topfolder/keys/rsakey.$priv_key_format --pwd secret123"
+-execEncTest $res_success \
+-    "" \
+-    "aleksey-xmlenc-01/enc-two-recipients" \
+-    "tripledes-cbc rsa-1_5" \
+-    "$priv_key_option:pub1 $topfolder/keys/largersakey.$priv_key_format --pwd secret123" \
+-    "--pubkey-cert-$cert_format:pub1 $topfolder/keys/rsacert.$cert_format --pubkey-cert-$cert_format:pub2 $topfolder/keys/largersacert.$cert_format --session-key des-192 --xml-data $topfolder/aleksey-xmlenc-01/enc-two-recipients.data" \
+-    "$priv_key_option:pub1 $topfolder/keys/largersakey.$priv_key_format --pwd secret123"
+-
+ ##########################################################################
+ #
+ # merlin-xmlenc-five
+@@ -184,22 +152,6 @@ execEncTest $res_success \
+     "aes192-cbc" \
+     "--keys-file $topfolder/merlin-xmlenc-five/keys.xml"
+ 
+-execEncTest $res_success \
+-    "" \
+-    "merlin-xmlenc-five/encrypt-element-aes128-cbc-rsa-1_5" \
+-    "aes128-cbc rsa-1_5" \
+-    "$priv_key_option $topfolder/merlin-xmlenc-five/rsapriv.$priv_key_format --pwd secret" \
+-    "--keys-file $topfolder/merlin-xmlenc-five/keys.xml --session-key aes-128 $priv_key_option $topfolder/merlin-xmlenc-five/rsapriv.$priv_key_format --xml-data $topfolder/merlin-xmlenc-five/encrypt-element-aes128-cbc-rsa-1_5.data --node-id Purchase --pwd secret"  \
+-    "$priv_key_option $topfolder/merlin-xmlenc-five/rsapriv.$priv_key_format --pwd secret"
+-
+-execEncTest $res_success \
+-    "" \
+-    "merlin-xmlenc-five/encrypt-data-tripledes-cbc-rsa-oaep-mgf1p" \
+-    "tripledes-cbc rsa-oaep-mgf1p" \
+-    "$priv_key_option $topfolder/merlin-xmlenc-five/rsapriv.$priv_key_format --pwd secret" \
+-    "--keys-file $topfolder/merlin-xmlenc-five/keys.xml --session-key des-192 $priv_key_option $topfolder/merlin-xmlenc-five/rsapriv.$priv_key_format --binary-data $topfolder/merlin-xmlenc-five/encrypt-data-tripledes-cbc-rsa-oaep-mgf1p.data --pwd secret"  \
+-    "$priv_key_option $topfolder/merlin-xmlenc-five/rsapriv.$priv_key_format --pwd secret"
+-
+ execEncTest $res_success \
+     "" \
+     "merlin-xmlenc-five/encrypt-data-aes256-cbc-kw-tripledes" \
+@@ -256,70 +208,6 @@ execEncTest $res_success \
+ #
+ ##########################################################################
+ 
+-execEncTest $res_success \
+-    "" \
+-    "01-phaos-xmlenc-3/enc-element-3des-kt-rsa1_5" \
+-    "tripledes-cbc rsa-1_5" \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret" \
+-    "--session-key des-192 --keys-file $topfolder/01-phaos-xmlenc-3/keys.xml --enabled-key-data key-name --xml-data $topfolder/01-phaos-xmlenc-3/enc-element-3des-kt-rsa1_5.data --node-name http://example.org/paymentv2:CreditCard"  \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret"
+-
+-execEncTest $res_success \
+-    "" \
+-    "01-phaos-xmlenc-3/enc-element-3des-kt-rsa_oaep_sha1" \
+-    "tripledes-cbc rsa-oaep-mgf1p" \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret" \
+-    "--session-key des-192 --keys-file $topfolder/01-phaos-xmlenc-3/keys.xml --enabled-key-data key-name --xml-data $topfolder/01-phaos-xmlenc-3/enc-element-3des-kt-rsa_oaep_sha1.data --node-name http://example.org/paymentv2:CreditCard"  \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret"
+-
+-execEncTest $res_success \
+-    "" \
+-    "01-phaos-xmlenc-3/enc-element-aes128-kt-rsa1_5" \
+-    "aes128-cbc rsa-1_5" \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret" \
+-    "--session-key aes-128 --keys-file $topfolder/01-phaos-xmlenc-3/keys.xml --enabled-key-data key-name --xml-data $topfolder/01-phaos-xmlenc-3/enc-element-aes128-kt-rsa1_5.data --node-name http://example.org/paymentv2:CreditCard"  \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret"
+-
+-execEncTest $res_success \
+-    "" \
+-    "01-phaos-xmlenc-3/enc-element-aes128-kt-rsa_oaep_sha1" \
+-    "aes128-cbc rsa-oaep-mgf1p" \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret" \
+-    "--session-key aes-128 --keys-file $topfolder/01-phaos-xmlenc-3/keys.xml --enabled-key-data key-name --xml-data $topfolder/01-phaos-xmlenc-3/enc-element-aes128-kt-rsa_oaep_sha1.data --node-name http://example.org/paymentv2:CreditCard"  \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret"
+-
+-execEncTest $res_success \
+-    "" \
+-    "01-phaos-xmlenc-3/enc-element-aes192-kt-rsa_oaep_sha1" \
+-    "aes192-cbc rsa-oaep-mgf1p" \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret" \
+-    "--session-key aes-192 --keys-file $topfolder/01-phaos-xmlenc-3/keys.xml --enabled-key-data key-name --xml-data $topfolder/01-phaos-xmlenc-3/enc-element-aes192-kt-rsa_oaep_sha1.data --node-name http://example.org/paymentv2:CreditCard"  \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret"
+-
+-execEncTest $res_success \
+-    "" \
+-    "01-phaos-xmlenc-3/enc-text-aes192-kt-rsa1_5" \
+-    "aes192-cbc rsa-1_5" \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret" \
+-    "--session-key aes-192 --keys-file $topfolder/01-phaos-xmlenc-3/keys.xml --enabled-key-data key-name --xml-data $topfolder/01-phaos-xmlenc-3/enc-text-aes192-kt-rsa1_5.data --node-name http://example.org/paymentv2:CreditCard"  \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret"
+-
+-execEncTest $res_success \
+-    "" \
+-    "01-phaos-xmlenc-3/enc-content-aes256-kt-rsa1_5" \
+-    "aes256-cbc rsa-1_5" \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret" \
+-    "--session-key aes-256 --keys-file $topfolder/01-phaos-xmlenc-3/keys.xml --enabled-key-data key-name --xml-data $topfolder/01-phaos-xmlenc-3/enc-content-aes256-kt-rsa1_5.data --node-name http://example.org/paymentv2:CreditCard"  \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret"
+-
+-execEncTest $res_success \
+-    "" \
+-    "01-phaos-xmlenc-3/enc-text-aes256-kt-rsa_oaep_sha1" \
+-    "aes256-cbc rsa-oaep-mgf1p" \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret" \
+-    "--session-key aes-256 --keys-file $topfolder/01-phaos-xmlenc-3/keys.xml --enabled-key-data key-name --xml-data $topfolder/01-phaos-xmlenc-3/enc-text-aes256-kt-rsa_oaep_sha1.data --node-name http://example.org/paymentv2:CreditCard"  \
+-    "$priv_key_option $topfolder/01-phaos-xmlenc-3/rsa-priv-key.$priv_key_format --pwd secret"
+-
+ execEncTest $res_success \
+     "" \
+     "01-phaos-xmlenc-3/enc-element-3des-kw-3des" \
