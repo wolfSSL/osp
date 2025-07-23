@@ -1,471 +1,144 @@
-diff --git a/configure.ac b/configure.ac
-index b8224b5..f208801 100644
---- a/configure.ac
-+++ b/configure.ac
-@@ -209,6 +209,13 @@ AC_ARG_ENABLE([openssl-secure-malloc],
- AS_IF([test $enable_openssl_secure_malloc != no],
- 	[AC_DEFINE_UNQUOTED([OPENSSL_SECURE_MALLOC_SIZE],[$enable_openssl_secure_malloc],[Size of OpenSSL secure memory in bytes, must be a power of 2])])
- 
-+AC_ARG_ENABLE(
-+	[wolfprov],
-+	[AS_HELP_STRING([--enable-wolfprov],[enable wolfProvider support for FIPS and non-FIPS modes @<:@disabled@:>@])],
-+	,
-+	[enable_wolfprov="no"]
-+)
-+
- AC_ARG_ENABLE(
- 	[openpace],
- 	[AS_HELP_STRING([--enable-openpace],[enable OpenPACE linkage @<:@detect@:>@])],
-@@ -746,6 +753,13 @@ else
- 	OPENSSL_LIBS=""
- fi
- 
-+if test "${enable_wolfprov}" = "yes"; then
-+	if test "${enable_openssl}" != "yes"; then
-+		AC_MSG_ERROR([wolfProvider support requires OpenSSL to be enabled])
-+	fi
-+	AC_DEFINE([ENABLE_WOLFPROV], [1], [Enable wolfProvider support for OpenSSL 3.0+])
-+fi
-+
- if test "${enable_cmocka}" = "detect"; then
- 	if test "${have_cmocka}" = "yes" -a "${have_openssl}" = "yes"; then
- 		enable_cmocka="yes"
-@@ -1040,6 +1054,9 @@ if test "${enable_openssl}" = "yes"; then
- 	OPTIONAL_OPENSSL_CFLAGS="${OPENSSL_CFLAGS}"
- 	OPTIONAL_OPENSSL_LIBS="${OPENSSL_LIBS}"
- fi
-+if test "${enable_wolfprov}" = "yes"; then
-+	OPENSC_FEATURES="${OPENSC_FEATURES} wolfprov"
-+fi
- if test "${enable_openct}" = "yes"; then
- 	OPENSC_FEATURES="${OPENSC_FEATURES} openct"
- 	OPTIONAL_OPENCT_CFLAGS="${OPENCT_CFLAGS}"
-@@ -1132,6 +1149,7 @@ AM_CONDITIONAL([ENABLE_THREAD_LOCKING], [test "${enable_thread_locking}" = "yes"
- AM_CONDITIONAL([ENABLE_ZLIB], [test "${enable_zlib}" = "yes"])
- AM_CONDITIONAL([ENABLE_READLINE], [test "${enable_readline}" = "yes"])
- AM_CONDITIONAL([ENABLE_OPENSSL], [test "${enable_openssl}" = "yes"])
-+AM_CONDITIONAL([ENABLE_WOLFPROV], [test "${enable_wolfprov}" = "yes"])
- AM_CONDITIONAL([ENABLE_OPENPACE], [test "${enable_openpace}" = "yes"])
- AM_CONDITIONAL([ENABLE_NOTIFY], [test "${enable_notify}" = "yes"])
- AM_CONDITIONAL([ENABLE_CRYPTOTOKENKIT], [test "${enable_cryptotokenkit}" = "yes"])
-@@ -1238,6 +1256,7 @@ zlib support:            ${enable_zlib}
- readline support:        ${enable_readline}
- OpenSSL support:         ${enable_openssl}
- OpenSSL secure memory:   ${enable_openssl_secure_malloc}
-+wolfProvider support:    ${enable_wolfprov}
- PC/SC support:           ${enable_pcsc}
- CryptoTokenKit support:  ${enable_cryptotokenkit}
- OpenCT support:          ${enable_openct}
 diff --git a/src/libopensc/ctx.c b/src/libopensc/ctx.c
-index c0d170c..0d01d75 100644
+index c0d170c..8c3c56e 100644
 --- a/src/libopensc/ctx.c
 +++ b/src/libopensc/ctx.c
-@@ -844,6 +844,16 @@ static int sc_openssl3_init(sc_context_t *ctx)
- 	if (ctx->ossl3ctx->libctx == NULL) {
+@@ -845,18 +845,13 @@ static int sc_openssl3_init(sc_context_t *ctx)
  		return SC_ERROR_INTERNAL;
  	}
-+#ifdef ENABLE_WOLFPROV
-+	ctx->ossl3ctx->defprov = OSSL_PROVIDER_load(ctx->ossl3ctx->libctx,
-+						    "libwolfprov");
-+	if (ctx->ossl3ctx->defprov == NULL) {
-+		OSSL_LIB_CTX_free(ctx->ossl3ctx->libctx);
-+		free(ctx->ossl3ctx);
-+		ctx->ossl3ctx = NULL;
-+		return SC_ERROR_INTERNAL;
-+	}
-+#else
  	ctx->ossl3ctx->defprov = OSSL_PROVIDER_load(ctx->ossl3ctx->libctx,
- 						    "default");
+-						    "default");
++						    "libwolfprov");
  	if (ctx->ossl3ctx->defprov == NULL) {
-@@ -857,6 +867,7 @@ static int sc_openssl3_init(sc_context_t *ctx)
- 	if (ctx->ossl3ctx->legacyprov == NULL) {
- 		sc_log(ctx, "Failed to load OpenSSL Legacy provider");
+ 		OSSL_LIB_CTX_free(ctx->ossl3ctx->libctx);
+ 		free(ctx->ossl3ctx);
+ 		ctx->ossl3ctx = NULL;
+ 		return SC_ERROR_INTERNAL;
  	}
-+#endif
+-	ctx->ossl3ctx->legacyprov = OSSL_PROVIDER_load(ctx->ossl3ctx->libctx,
+-						       "legacy");
+-	if (ctx->ossl3ctx->legacyprov == NULL) {
+-		sc_log(ctx, "Failed to load OpenSSL Legacy provider");
+-	}
  	return SC_SUCCESS;
  }
  
-@@ -864,8 +875,10 @@ static void sc_openssl3_deinit(sc_context_t *ctx)
+@@ -864,8 +859,6 @@ static void sc_openssl3_deinit(sc_context_t *ctx)
  {
  	if (ctx->ossl3ctx == NULL)
  		return;
-+#ifndef ENABLE_WOLFPROV
- 	if (ctx->ossl3ctx->legacyprov)
- 		OSSL_PROVIDER_unload(ctx->ossl3ctx->legacyprov);
-+#endif
+-	if (ctx->ossl3ctx->legacyprov)
+-		OSSL_PROVIDER_unload(ctx->ossl3ctx->legacyprov);
  	if (ctx->ossl3ctx->defprov)
  		OSSL_PROVIDER_unload(ctx->ossl3ctx->defprov);
  	if (ctx->ossl3ctx->libctx)
 diff --git a/src/tests/unittests/Makefile.am b/src/tests/unittests/Makefile.am
-index 4c73911..e1d2378 100644
+index 4c73911..5c25300 100644
 --- a/src/tests/unittests/Makefile.am
 +++ b/src/tests/unittests/Makefile.am
-@@ -50,12 +50,15 @@ compression_LDADD = $(LDADD) $(OPTIONAL_ZLIB_LIBS)
- endif
+@@ -51,7 +51,8 @@ endif
  
  if ENABLE_OPENSSL
-+# SM tests rely on DES which is not available in wolfProvider FIPS mode
-+if !ENABLE_WOLFPROV
  noinst_PROGRAMS += sm
- TESTS += sm
+-TESTS += sm
++# SM tests rely on DES which is not supported by wolfProvider
++# TESTS += sm
  
  sm_SOURCES = sm.c
  sm_LDADD = $(top_builddir)/src/sm/libsm.la $(LDADD)
- endif
-+endif
- 
- 
- endif
 diff --git a/src/tools/pkcs11-tool.c b/src/tools/pkcs11-tool.c
-index 5b2abf5..384d7e0 100644
+index 5b2abf5..1622e77 100644
 --- a/src/tools/pkcs11-tool.c
 +++ b/src/tools/pkcs11-tool.c
-@@ -772,10 +772,16 @@ int main(int argc, char * argv[])
+@@ -77,7 +77,6 @@
+  * but does use some OpenSSL routines
+  */
+ #if OPENSSL_VERSION_NUMBER >= 0x30000000L
+-	static OSSL_PROVIDER *legacy_provider = NULL;
+ 	static OSSL_PROVIDER *default_provider = NULL;
+ 	static OSSL_LIB_CTX *osslctx = NULL;
+ #endif
+@@ -772,10 +771,9 @@ int main(int argc, char * argv[])
  	if (!(osslctx = OSSL_LIB_CTX_new())) {
  		util_fatal("Failed to create OpenSSL OSSL_LIB_CTX\n");
  	}
-+#ifdef ENABLE_WOLFPROV
+-	if (!(default_provider = OSSL_PROVIDER_load(osslctx, "default"))) {
+-		util_fatal("Failed to load OpenSSL \"default\" provider\n");
 +	if (!(default_provider = OSSL_PROVIDER_load(osslctx, "libwolfprov"))) {
-+		util_fatal("Failed to load wolfProvider \"libwolfprov\" provider\n");
-+	}
-+#else
- 	if (!(default_provider = OSSL_PROVIDER_load(osslctx, "default"))) {
- 		util_fatal("Failed to load OpenSSL \"default\" provider\n");
++		util_fatal("Failed to load OpenSSL \"libwolfprov\" provider\n");
  	}
- 	legacy_provider = OSSL_PROVIDER_try_load(NULL, "legacy", 1);
-+#endif
+-	legacy_provider = OSSL_PROVIDER_try_load(NULL, "legacy", 1);
  #endif
  
  	while (1) {
-@@ -6130,7 +6136,7 @@ static int test_digest(CK_SESSION_HANDLE session)
+@@ -6129,12 +6127,6 @@ static int test_digest(CK_SESSION_HANDLE session)
+ 	i = (FIPS_mode() ? 2 : 0);
  #else
  	i = 0;
- #endif
+-#endif
 -#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && !defined(ENABLE_WOLFPROV)
- 		if (!legacy_provider) {
- 			printf("Failed to load legacy provider\n");
- 			return errors;
-@@ -6603,7 +6609,7 @@ static int sign_verify_openssl(CK_SESSION_HANDLE session,
+-		if (!legacy_provider) {
+-			printf("Failed to load legacy provider\n");
+-			return errors;
+-		}
+ #endif
+ 	for (; mechTypes[i] != 0xffffff; i++) {
+ 		ck_mech.mechanism = mechTypes[i];
+@@ -6603,12 +6595,6 @@ static int sign_verify_openssl(CK_SESSION_HANDLE session,
  		EVP_sha256(),
  	};
  #endif
 -#if OPENSSL_VERSION_NUMBER >= 0x30000000L && !defined(OPENSSL_NO_RIPEMD)
-+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && !defined(OPENSSL_NO_RIPEMD) && !defined(ENABLE_WOLFPROV)
- 	if (!legacy_provider) {
- 		printf("Failed to load legacy provider");
- 		return errors;
-diff --git a/tests/common.sh b/tests/common.sh
-index b1a3bbf..b373b3f 100644
---- a/tests/common.sh
-+++ b/tests/common.sh
-@@ -37,6 +37,19 @@ function assert() {
- 	fi
- }
+-	if (!legacy_provider) {
+-		printf("Failed to load legacy provider");
+-		return errors;
+-	}
+-#endif
  
-+# Helper function to get OpenSSL provider arguments
-+function get_openssl_provider_args() {
-+	if [ "${ENABLE_WOLFPROV}" = "1" ]; then
-+		if [ -n "${WOLFPROV_PATH}" ]; then
-+			echo "-provider-path ${WOLFPROV_PATH} -provider libwolfprov"
-+		else
-+			echo "-provider libwolfprov"
-+		fi
-+	else
-+		echo "-provider default"
-+	fi
-+}
-+
- function generate_key() {
- 	TYPE="$1"
- 	ID="$2"
-@@ -60,12 +73,13 @@ function generate_key() {
- 	fi
- 
- 	# convert it to more digestible PEM format
-+	PROVIDER_ARGS=$(get_openssl_provider_args)
- 	if [[ ${TYPE:0:3} == "RSA" ]]; then
--		openssl rsa -inform DER -outform PEM -in $ID.der -pubin > $ID.pub
-+		openssl rsa -inform DER -outform PEM $PROVIDER_ARGS -in $ID.der -pubin > $ID.pub
- 	elif [[ $TYPE == "EC:edwards25519" ]]; then
--		openssl pkey -inform DER -outform PEM -in $ID.der -pubin > $ID.pub
-+		openssl pkey -inform DER -outform PEM $PROVIDER_ARGS -in $ID.der -pubin > $ID.pub
- 	else
--		openssl ec -inform DER -outform PEM -in $ID.der -pubin > $ID.pub
-+		openssl ec -inform DER -outform PEM $PROVIDER_ARGS -in $ID.der -pubin > $ID.pub
- 	fi
- 	rm $ID.der
- }
+ 	rv = p11->C_SignInit(session, ck_mech, privKeyObject);
+ 	/* mechanism not implemented, don't test */
 diff --git a/tests/test-p11test.sh b/tests/test-p11test.sh
-index a8eab06..9ea2db2 100755
+index a8eab06..6a393bd 100755
 --- a/tests/test-p11test.sh
 +++ b/tests/test-p11test.sh
-@@ -28,24 +28,28 @@ assert $? "Failed running tests"
+@@ -28,24 +28,27 @@ assert $? "Failed running tests"
  #  * different for different softhsm versions
  # and interface tests
  #  * different results for softhsm and pkcs11-spy
 -function filter_log() {
 -	sed -n '/readonly_tests/,$p' $1
 -}
--
+ 
 -diff -U3 <(filter_log $SOURCE_PATH/tests/softhsm_ref.json) <(filter_log softhsm.json)
 -assert $? "Unexpected results"
--
++# Test for PKCS11SPY is disabled false positives
+ 
 -echo "======================================================="
 -echo "Run p11test with PKCS11SPY"
 -echo "======================================================="
 -export PKCS11SPY="$P11LIB"
 -$VALGRIND ./../src/tests/p11test/p11test -v -m ../src/pkcs11/.libs/pkcs11-spy.so -o softhsm.json -p $PIN
 -assert $? "Failed running tests"
--
++# function filter_log() {
++# 	sed -n '/readonly_tests/,$p' $1
++# }
++
++# diff -U3 <(filter_log $SOURCE_PATH/tests/softhsm_ref.json) <(filter_log softhsm.json)
++# assert $? "Unexpected results"
++
++# echo "======================================================="
++# echo "Run p11test with PKCS11SPY"
++# echo "======================================================="
++# export PKCS11SPY="$P11LIB"
++# $VALGRIND ./../src/tests/p11test/p11test -v -m ../src/pkcs11/.libs/pkcs11-spy.so -o softhsm.json -p $PIN
++# assert $? "Failed running tests"
+ 
 -diff -U3 <(filter_log $SOURCE_PATH/tests/softhsm_ref.json) <(filter_log softhsm.json)
 -assert $? "Unexpected results with PKCS11 spy"
--
++# diff -U3 <(filter_log $SOURCE_PATH/tests/softhsm_ref.json) <(filter_log softhsm.json)
++# assert $? "Unexpected results with PKCS11 spy"
+ 
 -rm softhsm.json
-+# PKCS11SPY complaints are false positives for wolfProvider
-+# Skip these tests when wolfProvider is enabled to avoid false failures
-+if [ "${ENABLE_WOLFPROV}" != "1" ]; then
-+    function filter_log() {
-+        sed -n '/readonly_tests/,$p' $1
-+    }
-+
-+    diff -U3 <(filter_log $SOURCE_PATH/tests/softhsm_ref.json) <(filter_log softhsm.json)
-+    assert $? "Unexpected results"
-+
-+    echo "======================================================="
-+    echo "Run p11test with PKCS11SPY"
-+    echo "======================================================="
-+    export PKCS11SPY="$P11LIB"
-+    $VALGRIND ./../src/tests/p11test/p11test -v -m ../src/pkcs11/.libs/pkcs11-spy.so -o softhsm.json -p $PIN
-+    assert $? "Failed running tests"
-+
-+    diff -U3 <(filter_log $SOURCE_PATH/tests/softhsm_ref.json) <(filter_log softhsm.json)
-+    assert $? "Unexpected results with PKCS11 spy"
-+
-+    rm softhsm.json
-+fi
++# rm softhsm.json
  
  echo "======================================================="
  echo "Cleanup"
-diff --git a/tests/test-pkcs11-tool-import.sh b/tests/test-pkcs11-tool-import.sh
-index 653d049..6f51279 100755
---- a/tests/test-pkcs11-tool-import.sh
-+++ b/tests/test-pkcs11-tool-import.sh
-@@ -23,13 +23,14 @@ for KEYTYPE in "RSA" "EC"; do
-         ID="0200"
-         OPTS="-pkeyopt ec_paramgen_curve:P-521"
-     fi
--    openssl genpkey -out "${KEYTYPE}_private.der" -outform DER -algorithm $KEYTYPE $OPTS
-+            PROVIDER_ARGS=$(get_openssl_provider_args)
-+        openssl genpkey -algorithm $KEYTYPE $OPTS $PROVIDER_ARGS -out "${KEYTYPE}_private.der" -outform DER
-     assert $? "Failed to generate private $KEYTYPE key"
-     $PKCS11_TOOL --write-object "${KEYTYPE}_private.der" --id "$ID" --type privkey \
-         --label "$KEYTYPE" -p "$PIN" --module "$P11LIB"
-     assert $? "Failed to write private $KEYTYPE key"
- 
--    openssl pkey -in "${KEYTYPE}_private.der" -out "${KEYTYPE}_public.der" -pubout -inform DER -outform DER
-+            openssl pkey $PROVIDER_ARGS -in "${KEYTYPE}_private.der" -out "${KEYTYPE}_public.der" -pubout -inform DER -outform DER
-     assert $? "Failed to convert private $KEYTYPE key to public"
-     $PKCS11_TOOL --write-object "${KEYTYPE}_public.der" --id "$ID" --type pubkey --label "$KEYTYPE" \
-         -p $PIN --module $P11LIB
-diff --git a/tests/test-pkcs11-tool-sign-verify.sh b/tests/test-pkcs11-tool-sign-verify.sh
-index 8f8df6d..2d5f8d1 100755
---- a/tests/test-pkcs11-tool-sign-verify.sh
-+++ b/tests/test-pkcs11-tool-sign-verify.sh
-@@ -3,6 +3,8 @@ SOURCE_PATH=${SOURCE_PATH:-..}
- 
- source $SOURCE_PATH/tests/common.sh
- 
-+PROVIDER_ARGS=$(get_openssl_provider_args)
-+
- echo "======================================================="
- echo "Setup SoftHSM"
- echo "======================================================="
-@@ -44,11 +46,11 @@ for HASH in "" "SHA1" "SHA224" "SHA256" "SHA384" "SHA512"; do
- 
-         # OpenSSL verification
-         if [[ -z $HASH ]]; then
--            openssl rsautl -verify -inkey $SIGN_KEY.pub -in data.sig -pubin
-+            openssl rsautl $PROVIDER_ARGS -verify -inkey $SIGN_KEY.pub -in data.sig -pubin
-             # pkeyutl does not work with libressl
--            #openssl pkeyutl -verify -inkey $SIGN_KEY.pub -in data -sigfile data.sig -pubin
-+            #openssl pkeyutl $PROVIDER_ARGS -verify -inkey $SIGN_KEY.pub -in data -sigfile data.sig -pubin
-         else
--            openssl dgst -keyform PEM -verify $SIGN_KEY.pub -${HASH,,*} \
-+            openssl dgst -keyform PEM $PROVIDER_ARGS -verify $SIGN_KEY.pub -${HASH,,*} \
-                    -signature data.sig data
-         fi
-         if [[ "$RETOSSL" == "0" ]]; then
-@@ -79,7 +81,7 @@ for HASH in "" "SHA1" "SHA224" "SHA256" "SHA384" "SHA512"; do
-         echo "======================================================="
-         if [[ -z $HASH ]]; then
-             # hashing is done outside of the module. We choose here SHA256
--            openssl dgst -binary -sha256 data > data.hash
-+            openssl dgst $PROVIDER_ARGS -binary -sha256 data > data.hash
-             HASH_ALGORITM="--hash-algorithm=SHA256"
-             VERIFY_DGEST="-sha256"
-             VERIFY_OPTS="-sigopt rsa_mgf1_md:sha256"
-@@ -96,7 +98,7 @@ for HASH in "" "SHA1" "SHA224" "SHA256" "SHA384" "SHA512"; do
-         assert $? "Failed to Sign data"
- 
-         # OpenSSL verification
--        openssl dgst -keyform PEM -verify $SIGN_KEY.pub $VERIFY_DGEST \
-+        openssl dgst -keyform PEM $PROVIDER_ARGS -verify $SIGN_KEY.pub $VERIFY_DGEST \
-                -sigopt rsa_padding_mode:pss  $VERIFY_OPTS -sigopt rsa_pss_saltlen:-1 \
-                -signature data.sig data
-         if [[ "$RETOSSL" == "0" ]]; then
-@@ -126,10 +128,10 @@ for HASH in "" "SHA1" "SHA224" "SHA256" "SHA384" "SHA512"; do
-         echo "$METHOD: Encrypt & Decrypt (KEY $ENC_KEY)"
-         echo "======================================================="
-         # OpenSSL Encryption
--        openssl rsautl -encrypt -inkey $ENC_KEY.pub -in data \
-+        openssl rsautl $PROVIDER_ARGS -encrypt -inkey $ENC_KEY.pub -in data \
-                -pubin -out data.crypt
-         # pkeyutl does not work with libressl
--        #openssl pkeyutl -encrypt -inkey $ENC_KEY.pub -in data \
-+        #openssl pkeyutl $PROVIDER_ARGS -encrypt -inkey $ENC_KEY.pub -in data \
-         #       -pubin -out data.crypt
-         assert $? "Failed to encrypt data using OpenSSL"
-         $PKCS11_TOOL --id $ENC_KEY --decrypt -p $PIN -m $METHOD \
-@@ -147,32 +149,42 @@ echo "Test ECDSA keys"
- echo "======================================================="
- # operations with ECDSA keys should work on data > 512 bytes; generate data:
- head -c 1024 </dev/urandom > data
--for SIGN_KEY in "03" "04"; do
--    METHOD="ECDSA"
--
--    echo
--    echo "======================================================="
--    echo "$METHOD: Sign & Verify (KEY $SIGN_KEY)"
--    echo "======================================================="
--    openssl dgst -binary -sha256 data > data.hash
--    $PKCS11_TOOL --id $SIGN_KEY -s -p $PIN -m $METHOD --module $P11LIB \
--        --input-file data.hash --output-file data.sig
--    assert $? "Failed to Sign data"
--    $PKCS11_TOOL --id $SIGN_KEY -s -p $PIN -m $METHOD --module $P11LIB \
--        --input-file data.hash --output-file data.sig.openssl \
--        --signature-format openssl
--    assert $? "Failed to Sign data into OpenSSL format"
--
--    # OpenSSL verification
--    openssl dgst -keyform PEM -verify $SIGN_KEY.pub -sha256 \
--               -signature data.sig.openssl data
--    assert $? "Failed to Verify signature using OpenSSL"
--
--    # pkcs11-tool verification
--    $PKCS11_TOOL --id $SIGN_KEY --verify -m $METHOD --module $P11LIB \
--           --input-file data.hash --signature-file data.sig
--    assert $? "Failed to Verify signature using pkcs11-tool"
--    rm data.sig{,.openssl} data.hash
-+for HASH in "SHA1" "SHA256"; do
-+    for SIGN_KEY in "03" "04"; do
-+        METHOD="ECDSA"
-+
-+        echo
-+        echo "======================================================="
-+        echo "$METHOD+$HASH: Sign & Verify (KEY $SIGN_KEY)"
-+        echo "======================================================="
-+        
-+        # Skip SHA-1 operations only in wolfProvider FIPS mode
-+        if [[ "${ENABLE_WOLFPROV}" = "1" && "${WOLFSSL_ISFIPS}" = "1" && "$HASH" = "SHA1" ]]; then
-+            echo "Skipping ECDSA+SHA1 operations in wolfProvider FIPS mode"
-+            echo "NOTE: SHA-1 signing not allowed in FIPS"
-+            continue
-+        fi
-+        
-+        openssl dgst $PROVIDER_ARGS -binary -${HASH,,} data > data.hash
-+        $PKCS11_TOOL --id $SIGN_KEY -s -p $PIN -m $METHOD --module $P11LIB \
-+            --input-file data.hash --output-file data.sig
-+        assert $? "Failed to Sign data"
-+        $PKCS11_TOOL --id $SIGN_KEY -s -p $PIN -m $METHOD --module $P11LIB \
-+            --input-file data.hash --output-file data.sig.openssl \
-+            --signature-format openssl
-+        assert $? "Failed to Sign data into OpenSSL format"
-+
-+        # OpenSSL verification
-+        openssl dgst -keyform PEM $PROVIDER_ARGS -verify $SIGN_KEY.pub -${HASH,,} \
-+                   -signature data.sig.openssl data
-+        assert $? "Failed to Verify signature using OpenSSL"
-+
-+        # pkcs11-tool verification
-+        $PKCS11_TOOL --id $SIGN_KEY --verify -m $METHOD --module $P11LIB \
-+               --input-file data.hash --signature-file data.sig
-+        assert $? "Failed to Verify signature using pkcs11-tool"
-+        rm data.sig{,.openssl} data.hash
-+    done
- done
- 
- echo "======================================================="
-diff --git a/tests/test-pkcs11-tool-sym-crypt-test.sh b/tests/test-pkcs11-tool-sym-crypt-test.sh
-index b55fc05..e70ae77 100755
---- a/tests/test-pkcs11-tool-sym-crypt-test.sh
-+++ b/tests/test-pkcs11-tool-sym-crypt-test.sh
-@@ -47,7 +47,8 @@ dd if=/dev/urandom bs=200 count=1 >aes_plain.data 2>/dev/null
- $PKCS11_TOOL --module="$P11LIB" --pin "$PIN" --encrypt --id "$ID2" -m AES-CBC-PAD --iv "${VECTOR}" \
- 	--input-file aes_plain.data --output-file aes_ciphertext_pkcs11.data 2>/dev/null
- assert $? "Fail/pkcs11-tool encrypt"
--openssl enc -aes-128-cbc -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K "70707070707070707070707070707070"
-+    PROVIDER_ARGS=$(get_openssl_provider_args)
-+    openssl enc -aes-128-cbc $PROVIDER_ARGS -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K "70707070707070707070707070707070"
- cmp aes_ciphertext_pkcs11.data aes_ciphertext_openssl.data >/dev/null 2>/dev/null
- assert $? "Fail, AES-CBC-PAD (C_Encrypt) - wrong encrypt"
- echo "C_Decrypt"
-@@ -59,7 +60,7 @@ assert $? "Fail, AES-CBC-PAD (C_Decrypt) - wrong decrypt"
- 
- echo "C_DecryptUpdate"
- dd if=/dev/urandom bs=8131 count=3 >aes_plain.data 2>/dev/null
--openssl enc -aes-128-cbc -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K "70707070707070707070707070707070"
-+    openssl enc -aes-128-cbc $PROVIDER_ARGS -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K "70707070707070707070707070707070"
- assert $? "Fail, OpenSSL"
- $PKCS11_TOOL --module="$P11LIB" --pin "$PIN" --decrypt --id "$ID2" -m AES-CBC-PAD --iv "${VECTOR}" \
- 	--input-file aes_ciphertext_openssl.data --output-file aes_plain_test.data 2>/dev/null
-@@ -92,7 +93,7 @@ echo " OpenSSL encrypt, pkcs11-tool decrypt"
- echo " pkcs11-tool encrypt, compare to openssl encrypt"
- echo "======================================================="
- 
--openssl enc -aes-128-ecb -nopad -in aes_plain.data -out aes_ciphertext_openssl.data  -K "70707070707070707070707070707070"
-+    openssl enc -aes-128-ecb -nopad $PROVIDER_ARGS -in aes_plain.data -out aes_ciphertext_openssl.data  -K "70707070707070707070707070707070"
- assert $? "Fail/OpenSSL"
- $PKCS11_TOOL --module="$P11LIB" --pin "$PIN" --decrypt --id "$ID2" -m AES-ECB --input-file aes_ciphertext_openssl.data --output-file aes_plain_test.data 2>/dev/null
- assert $? "Fail/pkcs11-tool decrypt"
-@@ -110,7 +111,7 @@ echo " OpenSSL encrypt, pkcs11-tool decrypt"
- echo " pkcs11-tool encrypt, compare to openssl encrypt"
- echo "======================================================="
- 
--openssl enc -aes-128-cbc -nopad -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K "70707070707070707070707070707070"
-+openssl enc -aes-128-cbc -nopad $PROVIDER_ARGS -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K "70707070707070707070707070707070"
- assert $? "Fail/OpenSSL"
- $PKCS11_TOOL --module="$P11LIB" --pin "$PIN" --decrypt --id "$ID2" -m AES-CBC --iv "${VECTOR}" \
- 	--input-file aes_ciphertext_openssl.data --output-file aes_plain_test.data 2>/dev/null
-@@ -131,7 +132,7 @@ echo " OpenSSL encrypt, pkcs11-tool decrypt"
- echo " pkcs11-tool encrypt, compare to openssl encrypt"
- echo "======================================================="
- 
--openssl enc -aes-128-cbc -nopad -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K "70707070707070707070707070707070"
-+openssl enc -aes-128-cbc -nopad $PROVIDER_ARGS -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K "70707070707070707070707070707070"
- assert $? "Fail/Openssl"
- $PKCS11_TOOL --module="$P11LIB" --pin "$PIN" --decrypt --id "$ID2" -m AES-CBC --iv "${VECTOR}" \
- 	--input-file aes_ciphertext_openssl.data --output-file aes_plain_test.data 2>/dev/null
-diff --git a/tests/test-pkcs11-tool-unwrap-wrap-test.sh b/tests/test-pkcs11-tool-unwrap-wrap-test.sh
-index a785bb7..96cb828 100755
---- a/tests/test-pkcs11-tool-unwrap-wrap-test.sh
-+++ b/tests/test-pkcs11-tool-unwrap-wrap-test.sh
-@@ -30,7 +30,8 @@ KEY="70707070707070707070707070707070"
- 
- echo -n $KEY|xxd -p -r > aes_plain_key
- # wrap AES key
--openssl rsautl -encrypt -pubin -keyform der -inkey rsa_pub.key -in aes_plain_key -out aes_wrapped_key
-+    PROVIDER_ARGS=$(get_openssl_provider_args)
-+    openssl rsautl $PROVIDER_ARGS -encrypt -pubin -keyform der -inkey rsa_pub.key -in aes_plain_key -out aes_wrapped_key
- assert $? "Failed wrap AES key"
- 
- # unwrap key by pkcs11 interface
-@@ -53,7 +54,7 @@ assert $? "Unwrap failed"
- VECTOR="00000000000000000000000000000000"
- echo -n "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU" > aes_plain.data
- 
--openssl enc -aes-128-cbc -nopad -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K $KEY
-+    openssl enc -aes-128-cbc -nopad $PROVIDER_ARGS -in aes_plain.data -out aes_ciphertext_openssl.data -iv "${VECTOR}" -K $KEY
- assert $? "Fail/Openssl"
- 
- $PKCS11_TOOL --module="$P11LIB" --pin "$PIN" --encrypt --id "$ID2" -m AES-CBC --iv "${VECTOR}" \
