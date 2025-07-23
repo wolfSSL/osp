@@ -1,0 +1,60 @@
+diff --git a/src/corelib/tools/qcryptographichash.cpp b/src/corelib/tools/qcryptographichash.cpp
+index fea5bdfa906..622d6c8c664 100644
+--- a/src/corelib/tools/qcryptographichash.cpp
++++ b/src/corelib/tools/qcryptographichash.cpp
+@@ -186,7 +186,6 @@ static constexpr const char * methodToName(QCryptographicHash::Algorithm method)
+         return Name \
+     /*end*/
+     CASE(Sha1, "SHA1");
+-    CASE(Md4, "MD4");
+     CASE(Md5, "MD5");
+     CASE(Sha224, "SHA224");
+     CASE(Sha256, "SHA256");
+@@ -262,8 +261,8 @@ public:
+     struct EVP {
+         EVP_MD_ptr algorithm;
+         EVP_MD_CTX_ptr context;
+-        OSSL_PROVIDER_ptr defaultProvider;
+-        OSSL_PROVIDER_ptr legacyProvider;
++        OSSL_PROVIDER_ptr wolfProvider;
++        OSSL_PROVIDER_ptr wolfProvider;
+         bool initializationFailed;
+ 
+         explicit EVP(QCryptographicHash::Algorithm method);
+@@ -542,22 +541,8 @@ void QCryptographicHashPrivate::State::destroy(QCryptographicHash::Algorithm met
+     }
+ }
+ 
+-QCryptographicHashPrivate::EVP::EVP(QCryptographicHash::Algorithm method)
+-    : initializationFailed{true}
+-{
+-    if (method == QCryptographicHash::Md4) {
+-        /*
+-         * We need to load the legacy provider in order to have the MD4
+-         * algorithm available.
+-         */
+-        legacyProvider = OSSL_PROVIDER_ptr(OSSL_PROVIDER_load(nullptr, "legacy"));
+-
+-        if (!legacyProvider)
+-            return;
+-    }
+-
+-    defaultProvider = OSSL_PROVIDER_ptr(OSSL_PROVIDER_load(nullptr, "default"));
+-    if (!defaultProvider)
++    wolfProvider = OSSL_PROVIDER_ptr(OSSL_PROVIDER_load(nullptr, "libwolfprov"));
++    if (!wolfProvider)
+         return;
+ 
+     context = EVP_MD_CTX_ptr(EVP_MD_CTX_new());
+@@ -1233,8 +1218,8 @@ bool QCryptographicHashPrivate::supportsAlgorithm(QCryptographicHash::Algorithm
+     case QCryptographicHash::RealSha3_512:
+     case QCryptographicHash::Blake2b_512:
+     case QCryptographicHash::Blake2s_256: {
+-    auto legacyProvider = OSSL_PROVIDER_ptr(OSSL_PROVIDER_load(nullptr, "legacy"));
+-    auto defaultProvider = OSSL_PROVIDER_ptr(OSSL_PROVIDER_load(nullptr, "default"));
++    auto wolfProvider = OSSL_PROVIDER_ptr(OSSL_PROVIDER_load(nullptr, "libwolfprov"));
++    auto wolfProvider = OSSL_PROVIDER_ptr(OSSL_PROVIDER_load(nullptr, "libwolfprov"));
+ 
+     const char *restriction = "-fips";
+     EVP_MD_ptr algorithm = EVP_MD_ptr(EVP_MD_fetch(nullptr, methodToName(method), restriction));
+
