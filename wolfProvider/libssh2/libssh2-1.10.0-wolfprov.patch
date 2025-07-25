@@ -25,10 +25,24 @@ index dc9e108..03b90a1 100644
  .SH SEE ALSO
  .BR libssh2_session_init_ex(3)
 diff --git a/tests/ssh2.c b/tests/ssh2.c
-index f903e07..b714b67 100644
+index f903e07..3105c15 100644
 --- a/tests/ssh2.c
 +++ b/tests/ssh2.c
-@@ -45,6 +45,12 @@ int main(int argc, char *argv[])
+@@ -28,6 +28,8 @@
+ #include <errno.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <stdio.h>
++#include <pwd.h>
+ #include <ctype.h>
+ 
+ int main(int argc, char *argv[])
+@@ -41,10 +43,16 @@ int main(int argc, char *argv[])
+     LIBSSH2_CHANNEL *channel;
+     const char *pubkeyfile = "etc/user.pub";
+     const char *privkeyfile = "etc/user";
+-    const char *username = "username";
++    const char *username = NULL;
      const char *password = "password";
      int ec = 1;
  
@@ -41,7 +55,27 @@ index f903e07..b714b67 100644
  #ifdef WIN32
      WSADATA wsadata;
      int err;
-@@ -182,5 +188,6 @@ int main(int argc, char *argv[])
+@@ -59,8 +67,17 @@ int main(int argc, char *argv[])
+     (void)argc;
+     (void)argv;
+ 
+-    if(getenv("USER"))
+-      username = getenv("USER");
++    /* Detect Docker by /.dockerenv or IN_DOCKER env var */
++    if (getenv("IN_DOCKER") || access("/.dockerenv", F_OK) == 0) {
++        username = "user";
++    } else {
++        struct passwd *pw = getpwuid(getuid());
++        if (pw) {
++            username = pw->pw_name;
++        } else {
++            username = "user";
++        }
++    }
+ 
+     if(getenv ("PRIVKEY"))
+       privkeyfile = getenv("PRIVKEY");
+@@ -182,5 +199,6 @@ int main(int argc, char *argv[])
      close(sock);
  #endif
  
@@ -49,11 +83,32 @@ index f903e07..b714b67 100644
      return ec;
  }
 diff --git a/tests/ssh2.sh b/tests/ssh2.sh
-index 07795bb..aeed0d3 100755
+index 07795bb..53c909e 100755
 --- a/tests/ssh2.sh
 +++ b/tests/ssh2.sh
-@@ -22,6 +22,9 @@ fi
+@@ -1,10 +1,12 @@
+-#!/bin/sh
++#!/bin/bash
  
+ # Written by Simon Josefsson.
+ 
+ # Start sshd, invoke parameters, saving exit code, kill sshd, and
+ # return exit code.
+ 
++WOLFPROV_DIR=$(cd "$(dirname "$0")/../.." && pwd)
++
+ srcdir=${srcdir:-$PWD}
+ SSHD=${SSHD:-/usr/sbin/sshd}
+ 
+@@ -20,14 +22,22 @@ if test -n "$DEBUG"; then
+     libssh2_sshd_params="-d -d"
+ fi
+ 
++# Set the wrapper script to load the system ossl for sshd
++chmod +x "$WOLFPROV_DIR/libssh2/tests/sshd-wrapper.sh"
++export SSHD="$WOLFPROV_DIR/libssh2/tests/sshd-wrapper.sh"
++
++# Start sshd with FIPS approved algos
  chmod go-rwx "$srcdir"/etc/host*
  $SSHD -f /dev/null -h "$srcdir"/etc/host \
 +    -o 'KexAlgorithms diffie-hellman-group14-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512' \
@@ -62,3 +117,38 @@ index 07795bb..aeed0d3 100755
      -o 'Port 4711' \
      -o 'Protocol 2' \
      -o "AuthorizedKeysFile $srcdir/etc/user.pub" \
+     -o 'UsePrivilegeSeparation no' \
+     -o 'StrictModes no' \
+-    -D \
++    -D -e -d \
+     $libssh2_sshd_params &
+ sshdpid=$!
+ 
+@@ -37,6 +47,9 @@ trap "kill ${sshdpid}; echo signal killing sshd; exit 1;" EXIT
+ 
+ sleep 3
+ 
++# Set wolfProvider to test ./ssh2 commands
++source "$WOLFPROV_DIR/scripts/env-setup"
++
+ : Invoking $cmd...
+ eval $cmd
+ ec=$?
+diff --git a/tests/sshd-wrapper.sh b/tests/sshd-wrapper.sh
+new file mode 100755
+index 0000000..5652e18
+--- /dev/null
++++ b/tests/sshd-wrapper.sh
+@@ -0,0 +1,12 @@
++#!/bin/sh
++# Sets a clean env for sshd(openssh) so we can use system ossl
++exec env -i \
++  PATH=/usr/sbin:/usr/bin:/bin \
++  LC_ALL=C LANG=C \
++  LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
++  OPENSSL_CONF= \
++  OPENSSL_MODULES= \
++  PKG_CONFIG_PATH= \
++  LDFLAGS= \
++  CPPFLAGS= \
++  /usr/sbin/sshd "$@"
