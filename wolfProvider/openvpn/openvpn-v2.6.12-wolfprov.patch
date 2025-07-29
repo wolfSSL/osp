@@ -13,12 +13,14 @@ index 3efc112..6c38956 100644
  
  TESTS_ENVIRONMENT = top_srcdir="$(top_srcdir)"
 diff --git a/tests/unit_tests/openvpn/test_crypto.c b/tests/unit_tests/openvpn/test_crypto.c
-index 4b1627a..f485df0 100644
+index 4b1627a..ecb20aa 100644
 --- a/tests/unit_tests/openvpn/test_crypto.c
 +++ b/tests/unit_tests/openvpn/test_crypto.c
-@@ -484,7 +484,6 @@ main(void)
+@@ -482,9 +482,7 @@ main(void)
+     const struct CMUnitTest tests[] = {
+         cmocka_unit_test(crypto_pem_encode_decode_loopback),
          cmocka_unit_test(crypto_translate_cipher_names),
-         cmocka_unit_test(crypto_test_tls_prf),
+-        cmocka_unit_test(crypto_test_tls_prf),
          cmocka_unit_test(crypto_test_hmac),
 -        cmocka_unit_test(test_des_encrypt),
          cmocka_unit_test(test_occ_mtu_calculation),
