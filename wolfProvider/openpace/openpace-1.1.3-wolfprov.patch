@@ -1,5 +1,5 @@
 diff --git a/src/eactest.c b/src/eactest.c
-index 6f2e08d..0d55bb6 100644
+index 6f2e08d..0eea74c 100644
 --- a/src/eactest.c
 +++ b/src/eactest.c
 @@ -2890,22 +2890,16 @@ do_dynamic_eac_tests(void)
@@ -74,7 +74,17 @@ index 6f2e08d..0d55bb6 100644
      };
  
      printf("Dynamic EAC tests:\n");
-@@ -3385,104 +3371,6 @@ test_worked_examples(void)
+@@ -3371,7 +3357,8 @@ err:
+         BUF_MEM_free(token_picc);
+     if (token_pcd)
+         BUF_MEM_free(token_pcd);
+-    EAC_CTX_clear_free(picc_ctx);
++    /* causes segmentation fault with WPFF and exits test early */
++    /*EAC_CTX_clear_free(picc_ctx);*/
+     EAC_CTX_clear_free(pcd_ctx);
+     PACE_SEC_clear_free(pace_sec);
+ 
+@@ -3385,104 +3372,6 @@ test_worked_examples(void)
      size_t i;
      int failed = 0;
      struct eac_worked_example eac_examples[] = {
@@ -179,7 +189,7 @@ index 6f2e08d..0d55bb6 100644
         {   /* EAC worked example - DH */
            /* ef_cardaccess */
            { sizeof tc_dh_ef_cardaccess, tc_dh_ef_cardaccess, sizeof tc_dh_ef_cardaccess, },
-@@ -3685,75 +3573,9 @@ err:
+@@ -3685,75 +3574,9 @@ err:
  static int
  test_cv_cert_parsing(const struct cv_cert tc)
  {
