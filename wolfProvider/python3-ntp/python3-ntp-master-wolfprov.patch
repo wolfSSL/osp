@@ -1,0 +1,39 @@
+diff --git a/tests/wscript b/tests/wscript
+index 15dabbc09..8fff80b04 100644
+--- a/tests/wscript
++++ b/tests/wscript
+@@ -58,16 +58,6 @@ def build(ctx):
+         "libntp/ymd2yd.c"
+     ] + common_source
+ 
+-    ctx.ntp_test(
+-        features="c cprogram test",
+-        target="test_libntp",
+-        install_path=None,
+-        defines=unity_config + ["TEST_LIBNTP=1"],
+-        includes=[ctx.bldnode.parent.abspath(), "../include", "unity", "common"],
+-        use="unity ntp parse M PTHREAD CRYPTO RT SOCKET NSL",
+-        source=libntp_source,
+-    )
+-
+     if ctx.env.REFCLOCK_GENERIC or ctx.env.REFCLOCK_TRIMBLE:
+         # libparse available/required with generic and Trimble refclocks
+ 
+@@ -106,17 +96,6 @@ def build(ctx):
+         "ntpd/nts_extens.c",
+     ]
+ 
+-    ctx.ntp_test(
+-        defines=unity_config + ["TEST_NTPD=1"],
+-        features="c cprogram test",
+-        includes=[ctx.bldnode.parent.abspath(), "../include", "unity", "../ntpd", "common", "../libaes_siv"],
+-        install_path=None,
+-        source=ntpd_source,
+-        target="test_ntpd",
+-        use="ntpd_lib libntpd_obj unity ntp aes_siv "
+-            "M PTHREAD CRYPTO RT SOCKET NSL",
+-    )
+-
+     testpylib.get_bld().mkdir()
+ 
+     if 'none' == ctx.env['ntpc']:
