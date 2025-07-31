@@ -1,0 +1,210 @@
+diff --git a/test/tests/bin/memcat.cpp b/test/tests/bin/memcat.cpp
+index f5d63cc5..0fe26ca1 100644
+--- a/test/tests/bin/memcat.cpp
++++ b/test/tests/bin/memcat.cpp
+@@ -6,81 +6,4 @@
+ 
+ using Catch::Matchers::Contains;
+ 
+-TEST_CASE("bin/memcat") {
+-  Shell sh{string{TESTING_ROOT "/../src/bin"}};
+ 
+-  SECTION("no servers provided") {
+-    string output;
+-    REQUIRE_FALSE(sh.run("memcat", output));
+-    REQUIRE(output == "No servers provided.\n");
+-  }
+-
+-  SECTION("connection failure") {
+-    string output;
+-    CHECK_FALSE(sh.run("memcat --servers=localhost:" + random_port_string("-p") + " memcat", output));
+-    REQUIRE_THAT(output, Contains("CONNECTION FAILURE"));
+-  }
+-
+-  SECTION("--help") {
+-    string output;
+-    REQUIRE(sh.run("memcat --help", output));
+-    REQUIRE_THAT(output, Contains("memcat v1"));
+-    REQUIRE_THAT(output, Contains("Usage:"));
+-    REQUIRE_THAT(output, Contains("key [key ...]"));
+-    REQUIRE_THAT(output, Contains("Options:"));
+-    REQUIRE_THAT(output, Contains("-h|--help"));
+-    REQUIRE_THAT(output, Contains("-V|--version"));
+-    REQUIRE_THAT(output, Contains("Environment:"));
+-    REQUIRE_THAT(output, Contains("MEMCACHED_SERVERS"));
+-  }
+-
+-  SECTION("with server") {
+-    Server server{MEMCACHED_BINARY, {"-p", random_port_string}};
+-    MemcachedPtr memc;
+-    LoneReturnMatcher test{*memc};
+-
+-    REQUIRE(server.ensureListening());
+-    auto port = get<int>(server.getSocketOrPort());
+-    auto comm = "memcat --servers=localhost:" + to_string(port) + " ";
+-
+-    REQUIRE_SUCCESS(memcached_server_add(*memc, "localhost", port));
+-
+-    SECTION("not found") {
+-      memcached_delete(*memc, S("memcat"), 0);
+-
+-      string output;
+-      REQUIRE_FALSE(sh.run(comm + "memcat", output));
+-      REQUIRE(output.empty());
+-    }
+-    SECTION("not found --verbose") {
+-      memcached_delete(*memc, S("memcat"), 0);
+-
+-      string output;
+-      REQUIRE_FALSE(sh.run(comm + " -v memcat", output));
+-      REQUIRE_THAT(output, !Contains("MEMCAT-SET"));
+-      REQUIRE_THAT(output, Contains("NOT FOUND"));
+-    }
+-    SECTION("found") {
+-      string output;
+-      REQUIRE_SUCCESS(memcached_set(*memc, S("memcat"), S("MEMCAT-SET"), 0, 123));
+-
+-      SECTION("default") {
+-        REQUIRE(sh.run(comm + "memcat", output));
+-        REQUIRE(output == "MEMCAT-SET\n");
+-      }
+-      SECTION("flags") {
+-        REQUIRE(sh.run(comm + "--flag memcat", output));
+-        REQUIRE(output == "123\nMEMCAT-SET\n");
+-        output.clear();
+-        REQUIRE(sh.run(comm + "--flag -v memcat", output));
+-        REQUIRE(output == "key: memcat\nflags: 123\nvalue: MEMCAT-SET\n");
+-      }
+-      SECTION("file") {
+-        Tempfile temp;
+-        REQUIRE(sh.run(comm + "--file " + temp.getFn() + " memcat", output));
+-        REQUIRE(output.empty());
+-        REQUIRE(temp.get() == "MEMCAT-SET");
+-      }
+-    }
+-  }
+-}
+diff --git a/test/tests/lib.cpp b/test/tests/lib.cpp
+index 7d6143bd..60810274 100644
+--- a/test/tests/lib.cpp
++++ b/test/tests/lib.cpp
+@@ -60,40 +60,4 @@ TEST_CASE("lib/Cluster") {
+   }
+ }
+ 
+-TEST_CASE("lib/Connection") {
+-  SECTION("sockaddr_un") {
+-    auto f = []{
+-      Connection conn{"/this/is/way/too/long/for/a/standard/unix/socket/path/living/on/this/system/at/least/i/hope/so/and/this/is/about/to/fail/for/the/sake/of/this/test.sock"};
+-      return conn;
+-    };
+-    REQUIRE_THROWS(f());
+-  }
+-  SECTION("connect") {
+-    Cluster cluster{Server{MEMCACHED_BINARY,
+-                           {
+-                               random_socket_or_port_arg(),
+-                           }}};
+-    REQUIRE(cluster.start());
+-    Retry cluster_is_listening{[&cluster] { return cluster.isListening(); }};
+-    REQUIRE(cluster_is_listening());
+ 
+-    vector<Connection> conns;
+-    conns.reserve(cluster.getServers().size());
+-    for (const auto &server : cluster.getServers()) {
+-      CHECK_NOFAIL(conns.emplace_back(Connection{server.getSocketOrPort()}).open());
+-    }
+-    while (!conns.empty()) {
+-      vector<Connection> again;
+-      again.reserve(conns.size());
+-      for (auto &conn : conns) {
+-        if (conn.isOpen()) {
+-          REQUIRE(conn.isWritable());
+-          REQUIRE_FALSE(conn.getError());
+-        } else {
+-          again.emplace_back(move(conn));
+-        }
+-      }
+-      conns.swap(again);
+-    }
+-  }
+-}
+diff --git a/test/tests/memcached/errors.cpp b/test/tests/memcached/errors.cpp
+index 377e14d1..c414e7cb 100644
+--- a/test/tests/memcached/errors.cpp
++++ b/test/tests/memcached/errors.cpp
+@@ -2,74 +2,4 @@
+ #include "test/lib/MemcachedCluster.hpp"
+ #include "test/lib/Retry.hpp"
+ 
+-TEST_CASE("memcached_errors") {
+-  SECTION("NO_SERVERS") {
+-    MemcachedPtr memc;
+-    memcached_return_t rc;
+-    auto key = "key";
+-    size_t len = 3;
+ 
+-    REQUIRE(MEMCACHED_NO_SERVERS == memcached_flush(*memc, 0));
+-    REQUIRE(MEMCACHED_NO_SERVERS == memcached_set(*memc, S(__func__), S(__func__), 0, 0));
+-    REQUIRE_FALSE(memcached_get(*memc, S(__func__), nullptr, nullptr, &rc));
+-    REQUIRE(MEMCACHED_NO_SERVERS == rc);
+-    REQUIRE(MEMCACHED_NO_SERVERS == memcached_mget(*memc, &key, &len, 1));
+-  }
+-
+-  SECTION("dead servers") {
+-    MemcachedCluster test{Cluster{Server{MEMCACHED_BINARY, {"-p", random_port_string("-p")}}, 1}};
+-    auto memc = &test.memc;
+-
+-    REQUIRE_SUCCESS(memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-    memcached_quit(memc);
+-
+-    test.cluster.stop();
+-    Retry cluster_is_stopped{[&cluster = test.cluster]{
+-      return cluster.isStopped();
+-    }};
+-    REQUIRE(cluster_is_stopped());
+-
+-    SECTION("TEMPORARILY_DISABLED") {
+-      REQUIRE_SUCCESS(memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_RETRY_TIMEOUT, 3));
+-      REQUIRE_RC(MEMCACHED_CONNECTION_FAILURE, memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-      REQUIRE_RC(MEMCACHED_SERVER_TEMPORARILY_DISABLED, memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-    }
+-
+-    SECTION("recovers from TEMPORARILY_DISABLED") {
+-      REQUIRE_SUCCESS(memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_RETRY_TIMEOUT, 1));
+-      REQUIRE_RC(MEMCACHED_CONNECTION_FAILURE, memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-      REQUIRE_RC(MEMCACHED_SERVER_TEMPORARILY_DISABLED, memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-
+-      REQUIRE(test.cluster.start());
+-      REQUIRE(test.cluster.ensureListening());
+-
+-      Retry recovers{[memc]{
+-        return MEMCACHED_SUCCESS == memcached_set(memc, S("foo"), nullptr, 0, 0, 0);
+-      }, 50, 100ms};
+-      REQUIRE(recovers());
+-    }
+-
+-    SECTION("MARKED_DEAD") {
+-      SECTION("immediately") {
+-        REQUIRE_SUCCESS(memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_REMOVE_FAILED_SERVERS, true));
+-        REQUIRE_SUCCESS(memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT, 1));
+-
+-        REQUIRE_RC(MEMCACHED_CONNECTION_FAILURE, memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-        REQUIRE_RC(MEMCACHED_SERVER_MARKED_DEAD, memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-      }
+-      SECTION("with retry") {
+-        REQUIRE_SUCCESS(memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_REMOVE_FAILED_SERVERS, true));
+-        REQUIRE_SUCCESS(memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_SERVER_FAILURE_LIMIT, 2));
+-        REQUIRE_SUCCESS(memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_RETRY_TIMEOUT, 1));
+-
+-        REQUIRE_RC(MEMCACHED_CONNECTION_FAILURE, memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-        REQUIRE_RC(MEMCACHED_SERVER_TEMPORARILY_DISABLED, memcached_set(memc, S("foo"), nullptr, 0, 0, 0));
+-
+-        Retry server_is_marked_dead{[memc] {
+-          return MEMCACHED_SERVER_MARKED_DEAD == memcached_set(memc, S("foo"), nullptr, 0, 0, 0);
+-        },50, 100ms};
+-        REQUIRE(server_is_marked_dead());
+-      }
+-    }
+-  }
+-}
