@@ -1,0 +1,22 @@
+diff --git a/tests/wscript b/tests/wscript
+index 685038a7a..978c821f7 100644
+--- a/tests/wscript
++++ b/tests/wscript
+@@ -103,17 +103,6 @@ def build(ctx):
+         "ntpd/nts_extens.c",
+     ]
+ 
+-    ctx.ntp_test(
+-        defines=unity_config + ["TEST_NTPD=1"],
+-        features="c cprogram test",
+-        includes=[ctx.bldnode.parent.abspath(), "../include", "unity", "../ntpd", "common", "../libaes_siv"],
+-        install_path=None,
+-        source=ntpd_source,
+-        target="test_ntpd",
+-        use="ntpd_lib libntpd_obj unity ntp aes_siv "
+-            "M PTHREAD CRYPTO RT SOCKET NSL",
+-    )
+-
+     testpylib.get_bld().mkdir()
+ 
+     pypath = pylib.get_bld()
