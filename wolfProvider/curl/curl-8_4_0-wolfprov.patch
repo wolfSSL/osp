@@ -1,0 +1,11 @@
+diff --git a/tests/data/DISABLED b/tests/data/DISABLED
+index 308d27e..5d69f92 100644
+--- a/tests/data/DISABLED
++++ b/tests/data/DISABLED
+@@ -115,3 +115,6 @@
+ %if bearssl
+ 313
+ %endif
++# test 1560 requires IDN support - wolfProvider works locally in Jenkins
++# this fails even with the dependency installed
++1560
