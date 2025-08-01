@@ -1,6 +1,6 @@
-From 17b00c421bbecf2b3b792694682539322ef46808 Mon Sep 17 00:00:00 2001
+From cb28f222c7102d0995fd1670e92ff65a82759457 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
-Date: Fri, 20 Jun 2025 19:46:06 +0200
+Date: Fri, 11 Jul 2025 16:23:50 +0200
 Subject: [PATCH] wolfSSL Patch
 
 This patch implements wolfSSL support in libspdm.
@@ -28,7 +28,6 @@ To debug the binary, configure wolfSSL with `--enable-debug` and libspdm with `-
 ---
  CMakeLists.txt                                | 36 +++++++++++++++-
  include/library/spdm_lib_config.h             | 16 +++++++
- library/spdm_crypt_lib/libspdm_crypt_cert.c   |  2 +
  os_stub/cryptlib_openssl/CMakeLists.txt       | 27 +++++++++---
  os_stub/cryptlib_openssl/hmac/hmac_sha.c      |  2 +
  os_stub/cryptlib_openssl/hmac/hmac_sha3.c     |  1 +
@@ -37,10 +36,10 @@ To debug the binary, configure wolfSSL with `--enable-debug` and libspdm with `-
  os_stub/cryptlib_openssl/pk/ec.c              |  1 +
  os_stub/cryptlib_openssl/pk/rsa_ext.c         |  6 +++
  os_stub/cryptlib_openssl/pk/x509.c            | 43 +++++++++++++++++--
- 11 files changed, 130 insertions(+), 11 deletions(-)
+ 10 files changed, 128 insertions(+), 11 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 56562e72..52aaa797 100644
+index 56562e72a7..52aaa7970b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -11,11 +11,17 @@ message("#########################")
@@ -131,7 +130,7 @@ index 56562e72..52aaa797 100644
  
          target_link_libraries(${LIB_NAME}
 diff --git a/include/library/spdm_lib_config.h b/include/library/spdm_lib_config.h
-index 16028930..dd0fcbcc 100644
+index 1602893038..dd0fcbcc06 100644
 --- a/include/library/spdm_lib_config.h
 +++ b/include/library/spdm_lib_config.h
 @@ -283,8 +283,12 @@
@@ -186,26 +185,8 @@ index 16028930..dd0fcbcc 100644
  
  /* If 1 then endpoint supports parsing X.509 certificate chains. */
  #ifndef LIBSPDM_CERT_PARSE_SUPPORT
-diff --git a/library/spdm_crypt_lib/libspdm_crypt_cert.c b/library/spdm_crypt_lib/libspdm_crypt_cert.c
-index aea42f8b..0cc9b82e 100644
---- a/library/spdm_crypt_lib/libspdm_crypt_cert.c
-+++ b/library/spdm_crypt_lib/libspdm_crypt_cert.c
-@@ -911,11 +911,13 @@ static bool libspdm_verify_leaf_cert_spdm_eku(const uint8_t *cert, size_t cert_s
-     req_auth_oid_find_success = false;
-     rsp_auth_oid_find_success = false;
- 
-+#ifndef SPDM_USING_WOLFSSL /* wolfssl returns data without sequence tag */
-     status = libspdm_asn1_get_tag(&ptr, eku + eku_size, &obj_len,
-                                   LIBSPDM_CRYPTO_ASN1_SEQUENCE | LIBSPDM_CRYPTO_ASN1_CONSTRUCTED);
-     if (!status) {
-         return false;
-     }
-+#endif
- 
-     while(ptr < eku + eku_size) {
-         status = libspdm_asn1_get_tag(&ptr, eku + eku_size, &obj_len, LIBSPDM_CRYPTO_ASN1_OID);
 diff --git a/os_stub/cryptlib_openssl/CMakeLists.txt b/os_stub/cryptlib_openssl/CMakeLists.txt
-index cad55aea..df08fae2 100644
+index cad55aeadd..df08fae299 100644
 --- a/os_stub/cryptlib_openssl/CMakeLists.txt
 +++ b/os_stub/cryptlib_openssl/CMakeLists.txt
 @@ -2,6 +2,19 @@ cmake_minimum_required(VERSION 3.5)
@@ -266,7 +247,7 @@ index cad55aea..df08fae2 100644
          pk/rsa_ext.c
          pk/x509.c
 diff --git a/os_stub/cryptlib_openssl/hmac/hmac_sha.c b/os_stub/cryptlib_openssl/hmac/hmac_sha.c
-index 12d5d6c2..229271d7 100644
+index 12d5d6c29e..229271d79f 100644
 --- a/os_stub/cryptlib_openssl/hmac/hmac_sha.c
 +++ b/os_stub/cryptlib_openssl/hmac/hmac_sha.c
 @@ -10,6 +10,8 @@
@@ -279,7 +260,7 @@ index 12d5d6c2..229271d7 100644
  /**
   * Allocates and initializes one HMAC_CTX context for subsequent HMAC-MD use.
 diff --git a/os_stub/cryptlib_openssl/hmac/hmac_sha3.c b/os_stub/cryptlib_openssl/hmac/hmac_sha3.c
-index ed2fdda3..7eca0c5e 100644
+index ed2fdda35e..7eca0c5ee7 100644
 --- a/os_stub/cryptlib_openssl/hmac/hmac_sha3.c
 +++ b/os_stub/cryptlib_openssl/hmac/hmac_sha3.c
 @@ -10,6 +10,7 @@
@@ -291,7 +272,7 @@ index ed2fdda3..7eca0c5e 100644
  void *hmac_md_new(void);
  void hmac_md_free(void *hmac_md_ctx);
 diff --git a/os_stub/cryptlib_openssl/internal_crypt_lib.h b/os_stub/cryptlib_openssl/internal_crypt_lib.h
-index d7a4fdf3..dc3830c9 100644
+index d7a4fdf3cb..dc3830c944 100644
 --- a/os_stub/cryptlib_openssl/internal_crypt_lib.h
 +++ b/os_stub/cryptlib_openssl/internal_crypt_lib.h
 @@ -18,7 +18,9 @@
@@ -305,7 +286,7 @@ index d7a4fdf3..dc3830c9 100644
  #include <openssl/opensslv.h>
  
 diff --git a/os_stub/cryptlib_openssl/pem/pem.c b/os_stub/cryptlib_openssl/pem/pem.c
-index 0f9a28ea..922d3684 100644
+index 0f9a28ea40..922d368491 100644
 --- a/os_stub/cryptlib_openssl/pem/pem.c
 +++ b/os_stub/cryptlib_openssl/pem/pem.c
 @@ -232,6 +232,10 @@ bool libspdm_ecd_get_private_key_from_pem(const uint8_t *pem_data,
@@ -328,7 +309,7 @@ index 0f9a28ea..922d3684 100644
  
  /**
 diff --git a/os_stub/cryptlib_openssl/pk/ec.c b/os_stub/cryptlib_openssl/pk/ec.c
-index c540dacd..1d8f3ccb 100644
+index c540dacdb2..1d8f3ccb18 100644
 --- a/os_stub/cryptlib_openssl/pk/ec.c
 +++ b/os_stub/cryptlib_openssl/pk/ec.c
 @@ -15,6 +15,7 @@
@@ -340,7 +321,7 @@ index c540dacd..1d8f3ccb 100644
  /**
   * Allocates and Initializes one Elliptic Curve context for subsequent use
 diff --git a/os_stub/cryptlib_openssl/pk/rsa_ext.c b/os_stub/cryptlib_openssl/pk/rsa_ext.c
-index ae3c8d8a..8f0ecd7c 100644
+index ae3c8d8a67..8f0ecd7cbc 100644
 --- a/os_stub/cryptlib_openssl/pk/rsa_ext.c
 +++ b/os_stub/cryptlib_openssl/pk/rsa_ext.c
 @@ -247,6 +247,7 @@ bool libspdm_rsa_check_key(void *rsa_context)
@@ -364,7 +345,7 @@ index ae3c8d8a..8f0ecd7c 100644
  
      return true;
 diff --git a/os_stub/cryptlib_openssl/pk/x509.c b/os_stub/cryptlib_openssl/pk/x509.c
-index 40e0c8ff..7c147273 100644
+index 40e0c8ffa9..7c14727314 100644
 --- a/os_stub/cryptlib_openssl/pk/x509.c
 +++ b/os_stub/cryptlib_openssl/pk/x509.c
 @@ -74,6 +74,19 @@ bool libspdm_x509_construct_certificate(const uint8_t *cert, size_t cert_size,
