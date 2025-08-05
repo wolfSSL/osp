@@ -12,10 +12,10 @@ index ccf2112..8800e53 100644
  CS_STR_WITH([plain-mode],   [cipher mode for plain mode], [cbc-essiv:sha256])
  CS_NUM_WITH([plain-keybits],[key length in bits for plain mode], [256])
 diff --git a/lib/crypto_backend/crypto_openssl.c b/lib/crypto_backend/crypto_openssl.c
-index 607ec38..86c0d9f 100644
+index 607ec38..73b137c 100644
 --- a/lib/crypto_backend/crypto_openssl.c
 +++ b/lib/crypto_backend/crypto_openssl.c
-@@ -171,20 +171,20 @@ static int openssl_backend_init(bool fips)
+@@ -171,20 +171,19 @@ static int openssl_backend_init(bool fips)
  		if (!ossl_ctx)
  			return -EINVAL;
  
@@ -28,8 +28,7 @@ index 607ec38..86c0d9f 100644
  
 -		/* Optional */
 -		ossl_legacy = OSSL_PROVIDER_try_load(ossl_ctx, "legacy", 0);
-+		/* Load wolfProvider instead of legacy */
-+		ossl_legacy = OSSL_PROVIDER_try_load(ossl_ctx, "libwolfprov", 0);
++		ossl_legacy = ossl_default;
  	}
  
  	r = snprintf(backend_version, sizeof(backend_version), "%s %s%s%s",
