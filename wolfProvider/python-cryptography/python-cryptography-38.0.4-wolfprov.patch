@@ -1,8 +1,16 @@
 diff --git a/src/cryptography/hazmat/bindings/openssl/binding.py b/src/cryptography/hazmat/bindings/openssl/binding.py
-index 2b4c574b4..a089a4221 100644
+index 2b4c574b4..c5acb761f 100644
 --- a/src/cryptography/hazmat/bindings/openssl/binding.py
 +++ b/src/cryptography/hazmat/bindings/openssl/binding.py
-@@ -170,18 +170,36 @@ class Binding:
+@@ -123,7 +123,6 @@ class Binding:
+     ffi = ffi
+     _lib_loaded = False
+     _init_lock = threading.Lock()
+-    _legacy_provider: typing.Any = None
+     _default_provider: typing.Any = None
+
+     def __init__(self):
+@@ -170,14 +169,9 @@ class Binding:
                  # are ugly legacy, but we aren't going to get rid of them
                  # any time soon.
                  if cls.lib.CRYPTOGRAPHY_OPENSSL_300_OR_GREATER:
@@ -12,57 +20,23 @@ index 2b4c574b4..a089a4221 100644
 -                    _openssl_assert(
 -                        cls.lib, cls._legacy_provider != cls.ffi.NULL
 -                    )
--                    cls._default_provider = cls.lib.OSSL_PROVIDER_load(
++                    # Always load libwolfprov instead of default provider
+                     cls._default_provider = cls.lib.OSSL_PROVIDER_load(
 -                        cls.ffi.NULL, b"default"
--                    )
--                    _openssl_assert(
--                        cls.lib, cls._default_provider != cls.ffi.NULL
--                    )
-+                    # Check if wolfProvider is configured via OPENSSL_CONF
-+                    import os
-+                    openssl_conf = os.environ.get('OPENSSL_CONF', '')
-+                    if openssl_conf and 'wolfProvider' in openssl_conf:
-+                        # Load wolfProvider instead of default providers
-+                        cls._legacy_provider = cls.lib.OSSL_PROVIDER_load(
-+                            cls.ffi.NULL, b"libwolfprov"
-+                        )
-+                        _openssl_assert(
-+                            cls.lib, cls._legacy_provider != cls.ffi.NULL
-+                        )
-+                        cls._default_provider = cls.lib.OSSL_PROVIDER_load(
-+                            cls.ffi.NULL, b"libwolfprov"
-+                        )
-+                        _openssl_assert(
-+                            cls.lib, cls._default_provider != cls.ffi.NULL
-+                        )
-+                    else:
-+                        cls._legacy_provider = cls.lib.OSSL_PROVIDER_load(
-+                            cls.ffi.NULL, b"legacy"
-+                        )
-+                        _openssl_assert(
-+                            cls.lib, cls._legacy_provider != cls.ffi.NULL
-+                        )
-+                        cls._default_provider = cls.lib.OSSL_PROVIDER_load(
-+                            cls.ffi.NULL, b"default"
-+                        )
-+                        _openssl_assert(
-+                            cls.lib, cls._default_provider != cls.ffi.NULL
-+                        )
-
-     @classmethod
-     def init_static_locks(cls):
++                        cls.ffi.NULL, b"libwolfprov"
+                     )
+                     _openssl_assert(
+                         cls.lib, cls._default_provider != cls.ffi.NULL
 diff --git a/tests/hazmat/backends/test_openssl_memleak.py b/tests/hazmat/backends/test_openssl_memleak.py
-index 2605566bd..406a4d2e0 100644
+index 2605566bd..fbe565826 100644
 --- a/tests/hazmat/backends/test_openssl_memleak.py
 +++ b/tests/hazmat/backends/test_openssl_memleak.py
-@@ -97,8 +97,10 @@ def main(argv):
+@@ -97,8 +97,8 @@ def main(argv):
          gc.collect()
 
          if lib.CRYPTOGRAPHY_OPENSSL_300_OR_GREATER:
 -            lib.OSSL_PROVIDER_unload(backend._binding._legacy_provider)
 -            lib.OSSL_PROVIDER_unload(backend._binding._default_provider)
-+            if backend._binding._legacy_provider is not None:
-+                lib.OSSL_PROVIDER_unload(backend._binding._legacy_provider)
 +            if backend._binding._default_provider is not None:
 +                lib.OSSL_PROVIDER_unload(backend._binding._default_provider)
 
