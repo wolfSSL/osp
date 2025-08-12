@@ -7,23 +7,33 @@ use its own files or a TPM.
 
 ## Patches
 
-The support comes in the form of two patches, both of which need to be applied.
+The support comes in the form of two patches, only the first is required.
 
-### nss-ecc-curves.patch
+### Naming
+
+The format of the patch names is:
+<name>-<year>-<month>-<day>-<commit that the patch was implemented and tested on>.patch
+
+The date in the patch name corresponds to the date of the commit that the
+patch was implemented and tested on to make choosing the appropriate patch
+easier.
+
+### nss-fixes
 
 NSS uses a fixed list of ECC curves and tries to use this list regardless of
 whether or not the underlying PKCS11 backend supports it. This patch makes NSS
 test the PKCS11 layer to see which curves are supported.
 
-### nss-slot.patch
+In addition, NSS assumes that it is using a two-slot PKCS11 backend for non-FIPS
+by default. This patch falls back to one slot if a second slot is not found.
 
-NSS assumes that it is using a two-slot PKCS11 backend for non-FIPS by default.
-This patch falls back to one slot if a second slot is not found.
+Finally, this makes wolfPCKS11 the default provider for NSS, even if it is not
+explicitly specified.
 
-### nss-default.patch
+### nss-tests
 
-This makes wolfPCKS11 the default provider for NSS, even if it is not explicitly
-specified.
+This modifies the NSS test suite to be compatible with the features that
+wolfPKCS11 supports.
 
 ## Compiling
 
@@ -53,8 +63,7 @@ hg clone https://hg.mozilla.org/projects/nspr
 hg clone https://hg.mozilla.org/projects/nss
 git clone https://github.com/wolfssl/osp
 cd nss
-patch -p1 < ../osp/nss/nss-ecc-curves.patch
-patch -p1 < ../osp/nss/nss-slot.patch
+patch -p1 < ../osp/nss/nss-fixes-2025-08-12-978205bd37c33d862a5798d8158df7091412d3a7.patch
 export USE_64=0
 ./build.sh -v
 ```
@@ -109,30 +118,6 @@ Finally, wolfPKCS11 needs to be compiled:
 make
 make install
 ```
-
-## Setup
-
-Now that everything is installed, NSS needs to be configured to use wolfPKCS11.
-To do this, either edit or create `/etc/pki/nssdb/pkcs11.txt` with the following
-contents:
-
-```
-library=/usr/local/lib/libwolfpkcs11.so
-name=wolfPKCS11
-NSS=Flags=internal,critical cipherOrder=100 slotParams={0x00000001=[slotFlags=ECC,RSA,DSA,DH,RC2,RC4,DES,RANDOM,SHA1,MD5,MD2,SSL,TLS,AES,Camellia,SEED,SHA256,SHA512] }
-```
-
-**Notes:**
-
-* If you are using Firefox or Thunderbird, `pkcs11.txt` is found in the user’s
-profile directory instead (also, Firefox is likely statically compiled with a
-built-in NSS).
-* The `slotFlags` do not really determine the algorithms, this is probed for
-later.
-* If there are other entries in this file, they should be removed.
-
-From this point forward, anything using NSS will now use wolfPKCS11 for the
-crypto backend.
 
 ## Debug Tracing
 
