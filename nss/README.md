@@ -9,7 +9,16 @@ use its own files or a TPM.
 
 The support comes in the form of two patches, only the first is required.
 
-### nss-fixes.patch
+### Naming
+
+The format of the patch names is:
+<name>-<year>-<month>-<day>-<commit that the patch was implemented and tested on>.patch
+
+The date in the patch name corresponds to the date of the commit that the
+patch was implemented and tested on to make choosing the appropriate patch
+easier.
+
+### nss-fixes
 
 NSS uses a fixed list of ECC curves and tries to use this list regardless of
 whether or not the underlying PKCS11 backend supports it. This patch makes NSS
@@ -21,7 +30,7 @@ by default. This patch falls back to one slot if a second slot is not found.
 Finally, this makes wolfPCKS11 the default provider for NSS, even if it is not
 explicitly specified.
 
-### nss-tests.patch
+### nss-tests
 
 This modifies the NSS test suite to be compatible with the features that
 wolfPKCS11 supports.
@@ -54,7 +63,7 @@ hg clone https://hg.mozilla.org/projects/nspr
 hg clone https://hg.mozilla.org/projects/nss
 git clone https://github.com/wolfssl/osp
 cd nss
-patch -p1 < ../osp/nss/nss-fixes.patch
+patch -p1 < ../osp/nss/nss-fixes-2025-08-12-978205bd37c33d862a5798d8158df7091412d3a7.patch
 export USE_64=0
 ./build.sh -v
 ```
