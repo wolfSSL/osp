@@ -1497,3 +1497,18 @@ index 6f2ed8c..85c0a54 100644
              return ss, errors.New("Failed create ECC shared secret")
          }
          wolfSSL.PRIVATE_KEY_LOCK()
+diff --git a/device/noise-protocol.go b/device/noise-protocol.go
+index 953954e..c207929 100644
+--- a/device/noise-protocol.go
++++ b/device/noise-protocol.go
+@@ -45,8 +45,8 @@ func (hs handshakeState) String() string {
+ }
+ 
+ const (
+-	NoiseConstruction = "Noise_IKpsk2_ECC_256_AesGcm_SHA256"
+-	WGIdentifier      = "WireGuard v1 zx2c4 Jason@zx2c4.com"
++	NoiseConstruction = "Noise_IKpsk2_SECP256R1_AesGcm_SHA256"
++	WGIdentifier      = "WolfGuard v1 info@wolfssl.com"
+ 	WGLabelMAC1       = "mac1----"
+ 	WGLabelCookie     = "cookie--"
+ )
