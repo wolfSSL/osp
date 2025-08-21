@@ -18,6 +18,12 @@ The date in the patch name corresponds to the date of the commit that the
 patch was implemented and tested on to make choosing the appropriate patch
 easier.
 
+For releases, there are patches using the
+<name>-<release that the patch was implemented and tested on>.patch convention.
+
+Note that release patches are using the parent to the `nss` directory as a base
+to maintain compatibility with NSS's Debian packaging.
+
 ### nss-fixes
 
 NSS uses a fixed list of ECC curves and tries to use this list regardless of
