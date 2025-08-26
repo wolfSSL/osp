@@ -116,3 +116,73 @@ $ make
 Run the ssl tests with:
 $ make test TESTOPTS="-v test_ssl"
 
+# 3.12 Patches
+
+These patches are for the Python versions 3.12.6, 3.12.9 and 3.12.11, which can
+be downloaded from
+
+https://www.python.org/ftp/python/3.12.6/Python-3.12.6.tar.xz
+https://www.python.org/ftp/python/3.12.9/Python-3.12.9.tar.xz
+https://www.python.org/ftp/python/3.12.11/Python-3.12.11.tar.xz
+
+To build wolfSSL for use with one of these versions, see the simple script
+build_wolfssl_py312.sh which can be used to build wolfSSL sources, configure,
+and compile the library using the current wolfssl master branch code.
+
+build_wolfssl_py312.sh is identical to build_wolfssl.sh, aside from some
+variations in the configuration options. In particular, it uses the following
+configuration for wolfSSL:
+
+$ cd wolfssl-master
+$ ./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-scrypt --enable-sessioncerts --enable-crl CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT -DNO_INT128"
+$ make check
+
+After compiling wolfSSL, install:
+
+$ sudo make install
+
+To build Python-3.12.6 with wolfSSL enabled:
+
+$ tar xvf Python-3.12.6.tar.xz
+$ cd Python-3.12.6
+$ patch -p1 < wolfssl-python-3.12.6.patch
+$ autoreconf -fi
+$ ./configure --with-wolfssl=/usr/local
+$ make
+
+To build Python-3.12.9 with wolfSSL enabled:
+
+$ tar xvf Python-3.12.9.tar.xz
+$ cd Python-3.12.9
+$ patch -p1 < wolfssl-python-3.12.9.patch
+$ autoreconf -fi
+$ ./configure --with-wolfssl=/usr/local
+$ make
+
+To build Python-3.12.11 with wolfSSL enabled:
+
+$ tar xvf Python-3.12.11.tar.xz
+$ cd Python-3.12.11
+$ patch -p1 < wolfssl-python-3.12.11.patch
+$ autoreconf -fi
+$ ./configure --with-wolfssl=/usr/local
+$ make
+
+If you see an error similar to the following when running make:
+
+*** WARNING: renaming "_ssl" since importing it failed: libwolfssl.so.30:
+cannot open shared object file: No such file or directory
+
+You may need to add your wolfSSL installation location to the library
+search path and re-run make:
+
+$ export LD_LIBRARY_PATH=/usr/local/lib
+$ make
+
+To run all Python tests:
+
+$ make test
+
+Or, to run a specific test in verbose mode:
+
+$ make test TESTOPTS="-v test_ssl"
