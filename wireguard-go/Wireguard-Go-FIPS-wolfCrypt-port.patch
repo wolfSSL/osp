@@ -1512,3 +1512,44 @@ index 953954e..c207929 100644
  	WGLabelMAC1       = "mac1----"
  	WGLabelCookie     = "cookie--"
  )
+diff --git a/Makefile b/Makefile
+index 3f6e407..09e19ef 100644
+--- a/Makefile
++++ b/Makefile
+@@ -14,18 +14,18 @@ generate-version-and-build:
+ 	[ "$$(cat version.go 2>/dev/null)" != "$$ver" ] && \
+ 	echo "$$ver" > version.go && \
+ 	git update-index --assume-unchanged version.go || true
+-	@$(MAKE) wireguard-go
++	@$(MAKE) wolfguard-go
+ 
+-wireguard-go: $(wildcard *.go) $(wildcard */*.go)
++wolfguard-go: $(wildcard *.go) $(wildcard */*.go)
+ 	go build -v -o "$@"
+ 
+-install: wireguard-go
+-	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 "$<" "$(DESTDIR)$(BINDIR)/wireguard-go"
++install: wolfguard-go
++	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 "$<" "$(DESTDIR)$(BINDIR)/wolfguard-go"
+ 
+ test:
+ 	go test ./...
+ 
+ clean:
+-	rm -f wireguard-go
++	rm -f wolfguard-go
+ 
+ .PHONY: all clean test install generate-version-and-build
+diff --git a/main.go b/main.go
+index e016116..9adb085 100644
+--- a/main.go
++++ b/main.go
+@@ -59,7 +59,7 @@ func warning() {
+ 
+ func main() {
+ 	if len(os.Args) == 2 && os.Args[1] == "--version" {
+-		fmt.Printf("wireguard-go v%s\n\nUserspace WireGuard daemon for %s-%s.\nInformation available at https://www.wireguard.com.\nCopyright (C) Jason A. Donenfeld <Jason@zx2c4.com>.\n", Version, runtime.GOOS, runtime.GOARCH)
++		fmt.Printf("wolfguard-go v%s\n\nUserspace WolfGuard daemon for %s-%s.\nInformation available at https://www.wolfssl.com.\nCopyright (C) wolfSSL Inc. <facts@wolfssl.com>.\n", Version, runtime.GOOS, runtime.GOARCH)
+ 		return
+ 	}
+ 
