@@ -186,3 +186,41 @@ $ make test
 Or, to run a specific test in verbose mode:
 
 $ make test TESTOPTS="-v test_ssl"
+
+# 3.13.7 Patch
+
+This patch is for Python 3.13.7, which can be downloaded from
+
+https://www.python.org/ftp/python/3.13.7/Python-3.13.7.tar.xz
+
+To build wolfSSL for use with one of these versions, see the simple script
+build_wolfssl_py313.sh which can be used to build wolfSSL sources, configure,
+and compile the library using the current wolfssl master branch code.
+
+build_wolfssl_py313.sh is identical to build_wolfssl.sh, aside from some
+variations in the configuration options. In particular, it uses the following
+configuration for wolfSSL:
+
+$ cd wolfssl-master
+$ ./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-scrypt --enable-sessioncerts --enable-crl --enable-psk CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT -DNO_INT128"
+$ make check
+
+After compiling wolfSSL, install:
+
+$ sudo make install
+
+To build Python-3.13.7 with wolfSSL enabled follow the instructions below.
+
+$ tar xvf Python-3.13.7.tar.xz
+$ cd Python-3.13.7
+$ patch -p1 < wolfssl-python-3.13.7.patch
+$ autoreconf -fi
+$ ./configure --with-wolfssl=/usr/local
+$ make
+
+If make fails with a shared object error, you may need to update your
+LD_LIBRARY_PATH first:
+$ export LD_LIBRARY_PATH=/usr/local/lib
+
+Run the ssl tests with:
+$ make test TESTOPTS="-v test_ssl"
