@@ -1,30 +1,31 @@
-From b785c19d4ded7a4c13a72595f689f28e08265fda Mon Sep 17 00:00:00 2001
+From 83e72e0135e7a0cf6b35cfbb53416f21efe8f7da Mon Sep 17 00:00:00 2001
 From: David Garske <david@wolfssl.com>
 Date: Thu, 16 Sep 2021 15:44:56 -0700
 Subject: [PATCH] Fix to add wolfSSL configure support in ASIO (`./configure
  --with-wolfssl=DIR`). Fixes #574
 
 ---
- asio/configure.ac | 28 +++++++++++++++++++++++++---
- 1 file changed, 25 insertions(+), 3 deletions(-)
+ asio/configure.ac | 29 ++++++++++++++++++++++++++---
+ 1 file changed, 26 insertions(+), 3 deletions(-)
 
 diff --git a/asio/configure.ac b/asio/configure.ac
-index 341c277b..be30dae2 100644
+index 341c277b2..f9380b295 100644
 --- a/asio/configure.ac
 +++ b/asio/configure.ac
-@@ -50,6 +50,24 @@ if test "$STANDALONE" != yes; then
+@@ -50,6 +50,25 @@ if test "$STANDALONE" != yes; then
    ],[])
  fi
  
-+
 +# wolfSSL support
 +AC_ARG_WITH(wolfssl,
 +  AC_HELP_STRING([--with-wolfssl=DIR],[location of wolfssl]),
 +[
 +  CPPFLAGS="$CPPFLAGS -I${withval}/include/wolfssl -DASIO_USE_WOLFSSL"
 +  LIBS="$LIBS -L${withval}/lib"
++],
++[
 +  WOLFSSL_USE=no
-+],[])
++])
 +
 +if test x$WOLFSSL_USE != xno; then
 +    AC_CHECK_HEADER([wolfssl/options.h],,
@@ -37,7 +38,7 @@ index 341c277b..be30dae2 100644
  AC_ARG_WITH(openssl,
    AC_HELP_STRING([--with-openssl=DIR],[location of openssl]),
  [
-@@ -62,11 +80,15 @@ AC_CHECK_HEADER([openssl/ssl.h],,
+@@ -62,11 +81,15 @@ AC_CHECK_HEADER([openssl/ssl.h],,
    OPENSSL_FOUND=no
  ],[])
  
@@ -57,5 +58,5 @@ index 341c277b..be30dae2 100644
  WINDOWS=no
  case $host in
 -- 
-2.37.0
+2.39.5 (Apple Git-154)
 
