@@ -1,24 +1,55 @@
-From 249c065952576c5da1842f0f32640c221c05a4f2 Mon Sep 17 00:00:00 2001
-From: Lealem Amedie <lealemta47@gmail.com>
-Date: Thu, 1 Aug 2024 16:12:41 -0600
+From 039ca05b51a12ba0d6651ef3c8348f6a8f71958d Mon Sep 17 00:00:00 2001
+From: Lealem Amedie <lealem@wolfssl.com>
+Date: Tue, 9 Sep 2025 16:28:34 -0600
 Subject: [PATCH] FIPS wolfCrypt port
 
 ---
- device/cookie.go         | 202 ++++++++++++++++++++--------------
+ Makefile                 |  10 +-
+ device/cookie.go         | 202 +++++++++++++++++++++--------------
  device/cookie_test.go    |   7 --
  device/device_test.go    |   7 +-
  device/indextable.go     |  17 ++-
  device/kdf_test.go       |  35 +++---
  device/keypair.go        |   5 +-
- device/noise-helpers.go  | 165 +++++++++++++++++++---------
- device/noise-protocol.go | 227 ++++++++++++++++++++++-----------------
+ device/noise-helpers.go  | 169 ++++++++++++++++++++---------
+ device/noise-protocol.go | 223 ++++++++++++++++++++++-----------------
  device/noise-types.go    |  10 +-
  device/noise_test.go     |  45 ++++++--
- device/receive.go        |  28 ++---
- device/send.go           |  21 ++--
+ device/receive.go        |  27 ++---
+ device/send.go           |  20 ++--
  device/uapi.go           |  11 +-
- 13 files changed, 472 insertions(+), 308 deletions(-)
+ main.go                  |   4 +-
+ main_windows.go          |   2 +-
+ 16 files changed, 477 insertions(+), 317 deletions(-)
 
+diff --git a/Makefile b/Makefile
+index 3f6e407..09e19ef 100644
+--- a/Makefile
++++ b/Makefile
+@@ -14,18 +14,18 @@ generate-version-and-build:
+ 	[ "$$(cat version.go 2>/dev/null)" != "$$ver" ] && \
+ 	echo "$$ver" > version.go && \
+ 	git update-index --assume-unchanged version.go || true
+-	@$(MAKE) wireguard-go
++	@$(MAKE) wolfguard-go
+ 
+-wireguard-go: $(wildcard *.go) $(wildcard */*.go)
++wolfguard-go: $(wildcard *.go) $(wildcard */*.go)
+ 	go build -v -o "$@"
+ 
+-install: wireguard-go
+-	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 "$<" "$(DESTDIR)$(BINDIR)/wireguard-go"
++install: wolfguard-go
++	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 "$<" "$(DESTDIR)$(BINDIR)/wolfguard-go"
+ 
+ test:
+ 	go test ./...
+ 
+ clean:
+-	rm -f wireguard-go
++	rm -f wolfguard-go
+ 
+ .PHONY: all clean test install generate-version-and-build
 diff --git a/device/cookie.go b/device/cookie.go
 index 876f05d..b428eda 100644
 --- a/device/cookie.go
@@ -531,7 +562,7 @@ index e3540d7..4062e01 100644
  	isInitiator  bool
  	created      time.Time
 diff --git a/device/noise-helpers.go b/device/noise-helpers.go
-index c2f356b..1a1d4fc 100644
+index c2f356b..85c0a54 100644
 --- a/device/noise-helpers.go
 +++ b/device/noise-helpers.go
 @@ -6,56 +6,50 @@
@@ -632,7 +663,7 @@ index c2f356b..1a1d4fc 100644
  }
  
  /* This function is not used as pervasively as it should because this is mostly impossible in Go at the moment */
-@@ -77,32 +71,99 @@ func setZero(arr []byte) {
+@@ -77,32 +71,103 @@ func setZero(arr []byte) {
  	}
  }
  
@@ -661,12 +692,15 @@ index c2f356b..1a1d4fc 100644
 +            return sk, errors.New("Failed to make ECC key")
 +        }
 +
++        wolfSSL.PRIVATE_KEY_UNLOCK()
 +        skLen := len(sk[:])
 +        if ret := wolfSSL.Wc_ecc_export_private_only(&key, sk[:], &skLen); ret != 0 {
 +            wolfSSL.Wc_FreeRng(&rng)
 +            wolfSSL.Wc_ecc_free(&key)
++            wolfSSL.PRIVATE_KEY_LOCK()
 +            return sk, errors.New("Failed to export private ECC key")
 +        }
++        wolfSSL.PRIVATE_KEY_LOCK()
 +
 +        return sk, nil
  }
@@ -738,6 +772,7 @@ index c2f356b..1a1d4fc 100644
 +            wolfSSL.Wc_ecc_free(&privKey)
 +            wolfSSL.Wc_ecc_free(&pubKey)
 +            wolfSSL.Wc_FreeRng(&rng)
++            wolfSSL.PRIVATE_KEY_LOCK()
 +            return ss, errors.New("Failed create ECC shared secret")
 +        }
 +        wolfSSL.PRIVATE_KEY_LOCK()
@@ -750,7 +785,7 @@ index c2f356b..1a1d4fc 100644
  }
 +
 diff --git a/device/noise-protocol.go b/device/noise-protocol.go
-index e8f6145..953954e 100644
+index e8f6145..bb1d6e0 100644
 --- a/device/noise-protocol.go
 +++ b/device/noise-protocol.go
 @@ -10,10 +10,9 @@ import (
@@ -766,15 +801,17 @@ index e8f6145..953954e 100644
  
  	"golang.zx2c4.com/wireguard/tai64n"
  )
-@@ -46,7 +45,7 @@ func (hs handshakeState) String() string {
+@@ -46,8 +45,8 @@ func (hs handshakeState) String() string {
  }
  
  const (
 -	NoiseConstruction = "Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s"
-+	NoiseConstruction = "Noise_IKpsk2_ECC_256_AesGcm_SHA256"
- 	WGIdentifier      = "WireGuard v1 zx2c4 Jason@zx2c4.com"
+-	WGIdentifier      = "WireGuard v1 zx2c4 Jason@zx2c4.com"
++	NoiseConstruction = "Noise_IKpsk2_SECP256R1_AesGcm_SHA256"
++	WGIdentifier      = "WolfGuard v1 info@wolfssl.com"
  	WGLabelMAC1       = "mac1----"
  	WGLabelCookie     = "cookie--"
+ )
 @@ -60,11 +59,11 @@ const (
  )
  
@@ -1034,7 +1071,7 @@ index e8f6145..953954e 100644
  
  	// protect against replay & flood
  
-@@ -394,21 +410,28 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
+@@ -394,21 +410,25 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
  
  	// add preshared key
  
@@ -1058,19 +1095,16 @@ index e8f6145..953954e 100644
  
 -	aead, _ := chacha20poly1305.New(key[:])
 -	aead.Seal(msg.Empty[:0], ZeroNonce[:], nil, handshake.hash[:])
-+        var testOut [NoisePublicKeySize + wolfSSL.AES_BLOCK_SIZE]byte
-+        var testIn [NoisePublicKeySize]byte
 +        var aes wolfSSL.Aes
 +        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
 +        wolfSSL.Wc_AesGcmSetKey(&aes, key[:], len(key[:]))
-+        wolfSSL.Wc_AesGcmEncrypt(&aes, testOut[:], testIn[:], ZeroNonce[:], msg.Empty[:], handshake.hash[:])
++        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, msg.Empty[:], nil, ZeroNonce[:], handshake.hash[:])
 +        wolfSSL.Wc_AesFree(&aes)
-+        setZero(testOut[:])
 +
  	handshake.mixHash(msg.Empty[:])
  
  	handshake.state = handshakeResponseCreated
-@@ -430,8 +453,8 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
+@@ -430,8 +450,8 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
  	}
  
  	var (
@@ -1081,7 +1115,7 @@ index e8f6145..953954e 100644
  	)
  
  	ok := func() bool {
-@@ -451,44 +474,52 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
+@@ -451,44 +471,49 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
  
  		// finish 3-way DH
  
@@ -1131,15 +1165,12 @@ index e8f6145..953954e 100644
 -		_, err = aead.Open(nil, ZeroNonce[:], msg.Empty[:], hash[:])
 -		if err != nil {
 -			return false
-+                var testOut [NoisePublicKeySize + wolfSSL.AES_BLOCK_SIZE]byte
-+                var testIn [NoisePublicKeySize]byte
 +                var authTag [wolfSSL.AES_BLOCK_SIZE]byte
 +                var aes wolfSSL.Aes
 +                wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
 +                wolfSSL.Wc_AesGcmSetKey(&aes, key[:], len(key[:]))
-+                wolfSSL.Wc_AesGcmEncrypt(&aes, testOut[:], testIn[:], ZeroNonce[:], authTag[:], hash[:])
++        	wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, authTag[:], nil, ZeroNonce[:], hash[:])
 +                wolfSSL.Wc_AesFree(&aes)
-+                setZero(testOut[:])
 +
 +                if !bytes.Equal(authTag[:], msg.Empty[:]) {
 +                    return false
@@ -1149,7 +1180,7 @@ index e8f6145..953954e 100644
  		return true
  	}()
  
-@@ -525,21 +556,21 @@ func (peer *Peer) BeginSymmetricSession() error {
+@@ -525,21 +550,21 @@ func (peer *Peer) BeginSymmetricSession() error {
  	// derive keys
  
  	var isInitiator bool
@@ -1177,7 +1208,7 @@ index e8f6145..953954e 100644
  			handshake.chainKey[:],
  			nil,
  		)
-@@ -558,13 +589,13 @@ func (peer *Peer) BeginSymmetricSession() error {
+@@ -558,13 +583,13 @@ func (peer *Peer) BeginSymmetricSession() error {
  	// create AEAD instances
  
  	keypair := new(Keypair)
@@ -1324,7 +1355,7 @@ index 2dd5324..ee166a4 100644
  	}()
  }
 diff --git a/device/receive.go b/device/receive.go
-index 1ab3e29..4dac8ba 100644
+index 1ab3e29..38ab0ed 100644
 --- a/device/receive.go
 +++ b/device/receive.go
 @@ -13,7 +13,7 @@ import (
@@ -1345,7 +1376,7 @@ index 1ab3e29..4dac8ba 100644
  
  	defer device.log.Verbosef("Routine: decryption worker %d - stopped", id)
  	device.log.Verbosef("Routine: decryption worker %d - started", id)
-@@ -249,20 +249,24 @@ func (device *Device) RoutineDecryption(id int) {
+@@ -249,20 +249,23 @@ func (device *Device) RoutineDecryption(id int) {
  			content := elem.packet[MessageTransportOffsetContent:]
  
  			// decrypt and release to consumer
@@ -1375,13 +1406,12 @@ index 1ab3e29..4dac8ba 100644
 +                            elem.packet = elem.packet[wolfSSL.AES_BLOCK_SIZE:]
 +                            elem.packet = elem.packet[:len(elem.packet) - wolfSSL.AES_BLOCK_SIZE]
 +                        }
-+                        setZero(elem.keypair.receive[:])
 +                    }
  		elemsContainer.Unlock()
  	}
  }
 diff --git a/device/send.go b/device/send.go
-index 769720a..b133852 100644
+index 769720a..458b63f 100644
 --- a/device/send.go
 +++ b/device/send.go
 @@ -14,7 +14,7 @@ import (
@@ -1402,7 +1432,7 @@ index 769720a..b133852 100644
  
  	defer device.log.Verbosef("Routine: encryption worker %d - stopped", id)
  	device.log.Verbosef("Routine: encryption worker %d - started", id)
-@@ -468,13 +468,16 @@ func (device *Device) RoutineEncryption(id int) {
+@@ -468,13 +468,15 @@ func (device *Device) RoutineEncryption(id int) {
  			// encrypt content and release to consumer
  
  			binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
@@ -1421,7 +1451,6 @@ index 769720a..b133852 100644
 +                        wolfSSL.Wc_AesFree(&aes)
 +
 +                        elem.packet = append(header[:], elem.packet[:]...)
-+                        setZero(elem.keypair.send[:])
 +                    }
  		elemsContainer.Unlock()
  	}
@@ -1469,79 +1498,8 @@ index d81dae3..c866804 100644
  			peer.handshake.mutex.RUnlock()
  			sendf("protocol_version=1")
  			peer.endpoint.Lock()
-diff --git a/device/noise-helpers.go b/device/noise-helpers.go
-index 6f2ed8c..85c0a54 100644
---- a/device/noise-helpers.go
-+++ b/device/noise-helpers.go
-@@ -89,12 +89,15 @@ func newPrivateKey() (sk NoisePrivateKey, err error) {
-             return sk, errors.New("Failed to make ECC key")
-         }
- 
-+        wolfSSL.PRIVATE_KEY_UNLOCK()
-         skLen := len(sk[:])
-         if ret := wolfSSL.Wc_ecc_export_private_only(&key, sk[:], &skLen); ret != 0 {
-             wolfSSL.Wc_FreeRng(&rng)
-             wolfSSL.Wc_ecc_free(&key)
-+            wolfSSL.PRIVATE_KEY_LOCK()
-             return sk, errors.New("Failed to export private ECC key")
-         }
-+        wolfSSL.PRIVATE_KEY_LOCK()
- 
-         return sk, nil
- }
-@@ -156,6 +159,7 @@ func (sk *NoisePrivateKey) sharedSecret(pk NoisePublicKey) (ss [NoisePrivateKeyS
-             wolfSSL.Wc_ecc_free(&privKey)
-             wolfSSL.Wc_ecc_free(&pubKey)
-             wolfSSL.Wc_FreeRng(&rng)
-+            wolfSSL.PRIVATE_KEY_LOCK()
-             return ss, errors.New("Failed create ECC shared secret")
-         }
-         wolfSSL.PRIVATE_KEY_LOCK()
-diff --git a/device/noise-protocol.go b/device/noise-protocol.go
-index 953954e..c207929 100644
---- a/device/noise-protocol.go
-+++ b/device/noise-protocol.go
-@@ -45,8 +45,8 @@ func (hs handshakeState) String() string {
- }
- 
- const (
--	NoiseConstruction = "Noise_IKpsk2_ECC_256_AesGcm_SHA256"
--	WGIdentifier      = "WireGuard v1 zx2c4 Jason@zx2c4.com"
-+	NoiseConstruction = "Noise_IKpsk2_SECP256R1_AesGcm_SHA256"
-+	WGIdentifier      = "WolfGuard v1 info@wolfssl.com"
- 	WGLabelMAC1       = "mac1----"
- 	WGLabelCookie     = "cookie--"
- )
-diff --git a/Makefile b/Makefile
-index 3f6e407..09e19ef 100644
---- a/Makefile
-+++ b/Makefile
-@@ -14,18 +14,18 @@ generate-version-and-build:
- 	[ "$$(cat version.go 2>/dev/null)" != "$$ver" ] && \
- 	echo "$$ver" > version.go && \
- 	git update-index --assume-unchanged version.go || true
--	@$(MAKE) wireguard-go
-+	@$(MAKE) wolfguard-go
- 
--wireguard-go: $(wildcard *.go) $(wildcard */*.go)
-+wolfguard-go: $(wildcard *.go) $(wildcard */*.go)
- 	go build -v -o "$@"
- 
--install: wireguard-go
--	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 "$<" "$(DESTDIR)$(BINDIR)/wireguard-go"
-+install: wolfguard-go
-+	@install -v -d "$(DESTDIR)$(BINDIR)" && install -v -m 0755 "$<" "$(DESTDIR)$(BINDIR)/wolfguard-go"
- 
- test:
- 	go test ./...
- 
- clean:
--	rm -f wireguard-go
-+	rm -f wolfguard-go
- 
- .PHONY: all clean test install generate-version-and-build
 diff --git a/main.go b/main.go
-index e016116..9adb085 100644
+index e016116..5ed21b8 100644
 --- a/main.go
 +++ b/main.go
 @@ -59,7 +59,7 @@ func warning() {
@@ -1553,3 +1511,28 @@ index e016116..9adb085 100644
  		return
  	}
  
+@@ -145,7 +145,7 @@ func main() {
+ 		fmt.Sprintf("(%s) ", interfaceName),
+ 	)
+ 
+-	logger.Verbosef("Starting wireguard-go version %s", Version)
++	logger.Verbosef("Starting wolfguard-go version %s", Version)
+ 
+ 	if err != nil {
+ 		logger.Errorf("Failed to create TUN device: %v", err)
+diff --git a/main_windows.go b/main_windows.go
+index a4dc46f..7bc6b6b 100644
+--- a/main_windows.go
++++ b/main_windows.go
+@@ -36,7 +36,7 @@ func main() {
+ 		device.LogLevelVerbose,
+ 		fmt.Sprintf("(%s) ", interfaceName),
+ 	)
+-	logger.Verbosef("Starting wireguard-go version %s", Version)
++	logger.Verbosef("Starting wolfguard-go version %s", Version)
+ 
+ 	tun, err := tun.CreateTUN(interfaceName, 0)
+ 	if err == nil {
+-- 
+2.39.5 (Apple Git-154)
+
