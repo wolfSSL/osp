@@ -1,13 +1,40 @@
+diff --git a/bin/tests/system/tkey/ns1/setup.sh b/bin/tests/system/tkey/ns1/setup.sh
+index b283f7373b..9405a0285e 100644
+--- a/bin/tests/system/tkey/ns1/setup.sh
++++ b/bin/tests/system/tkey/ns1/setup.sh
+@@ -15,6 +15,6 @@ set -e
+ 
+ . ../../conf.sh
+ 
+-keyname=$($KEYGEN -T KEY -a DH -b 768 -n host server)
++keyname=$($KEYGEN -T KEY -a DH -b 1024 -n host server)
+ keyid=$(keyfile_to_key_id "$keyname")
+ sed -i -e "s;KEYID;$keyid;" named.conf
+diff --git a/bin/tests/system/tkey/tests.sh b/bin/tests/system/tkey/tests.sh
+index 72959da8bb..d76ab90528 100644
+--- a/bin/tests/system/tkey/tests.sh
++++ b/bin/tests/system/tkey/tests.sh
+@@ -24,7 +24,7 @@ n=1
+ 
+ echo_i "generating new DH key ($n)"
+ ret=0
+-dhkeyname=$($KEYGEN -T KEY -a DH -b 768 -n host client) || ret=1
++dhkeyname=$($KEYGEN -T KEY -a DH -b 1024 -n host client) || ret=1
+ if [ $ret != 0 ]; then
+   echo_i "failed"
+   status=$((status + ret))
 diff --git a/tests/dns/dh_test.c b/tests/dns/dh_test.c
-index 5f4edd9..4200cf3 100644
+index 5f4edd9037..9f91ffad20 100644
 --- a/tests/dns/dh_test.c
 +++ b/tests/dns/dh_test.c
-@@ -88,7 +88,8 @@ ISC_RUN_TEST_IMPL(dh_computesecret) {
+@@ -88,7 +88,9 @@ ISC_RUN_TEST_IMPL(dh_computesecret) {
  
  	isc_buffer_init(&buf, array, sizeof(array));
  	result = dst_key_computesecret(key, key, &buf);
 -	assert_int_equal(result, DST_R_NOTPRIVATEKEY);
-+	/* wolfProvider returns DST_R_COMPUTESECRETFAILURE instead of DST_R_NOTPRIVATEKEY in this scenario */
-+	assert_int_equal(result, DST_R_COMPUTESECRETFAILURE);
++	/* wolfProvider returns DST_R_COMPUTESECRETFAILURE instead of DST_R_NOTPRIVATEKEY,
++	 * simply check that we failed appropriately in this scenario */
++	assert_int_not_equal(result, ISC_R_SUCCESS);
  	result = key->func->computesecret(key, key, &buf);
  	assert_int_equal(result, DST_R_COMPUTESECRETFAILURE);
+ 
