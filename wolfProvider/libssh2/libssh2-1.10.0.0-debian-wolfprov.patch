@@ -1,0 +1,161 @@
+diff --git a/docs/libssh2_userauth_keyboard_interactive_ex.3 b/docs/libssh2_userauth_keyboard_interactive_ex.3
+index ada012a..222b2ba 100644
+--- a/docs/libssh2_userauth_keyboard_interactive_ex.3
++++ b/docs/libssh2_userauth_keyboard_interactive_ex.3
+@@ -52,7 +52,7 @@ number, it isn't really a failure per se.
+ 
+ \fILIBSSH2_ERROR_SOCKET_SEND\fP - Unable to send data on socket.
+ 
+-\fLIBSSH2_ERROR_AUTHENTICATION_FAILED\fP - failed, invalid username/password
++\fILIBSSH2_ERROR_AUTHENTICATION_FAILED\fP - failed, invalid username/password
+ or public/private key.
+ .SH SEE ALSO
+ .BR libssh2_session_init_ex(3)
+diff --git a/docs/libssh2_userauth_password_ex.3 b/docs/libssh2_userauth_password_ex.3
+index dc9e108..03b90a1 100644
+--- a/docs/libssh2_userauth_password_ex.3
++++ b/docs/libssh2_userauth_password_ex.3
+@@ -51,7 +51,7 @@ Some of the errors this function may return include:
+ 
+ \fILIBSSH2_ERROR_PASSWORD_EXPIRED\fP - 
+ 
+-\fLIBSSH2_ERROR_AUTHENTICATION_FAILED\fP - failed, invalid username/password
++\fILIBSSH2_ERROR_AUTHENTICATION_FAILED\fP - failed, invalid username/password
+ or public/private key.
+ .SH SEE ALSO
+ .BR libssh2_session_init_ex(3)
+diff --git a/tests/ssh2.c b/tests/ssh2.c
+index f903e07..3105c15 100644
+--- a/tests/ssh2.c
++++ b/tests/ssh2.c
+@@ -28,6 +28,8 @@
+ #include <errno.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <stdio.h>
++#include <pwd.h>
+ #include <ctype.h>
+ 
+ int main(int argc, char *argv[])
+@@ -41,10 +43,16 @@ int main(int argc, char *argv[])
+     LIBSSH2_CHANNEL *channel;
+     const char *pubkeyfile = "etc/user.pub";
+     const char *privkeyfile = "etc/user";
+-    const char *username = "username";
++    const char *username = NULL;
+     const char *password = "password";
+     int ec = 1;
+ 
++    /* Initialize libssh2 library */
++    if (libssh2_init(0) != 0) {
++        fprintf(stderr, "Failed to initialize libssh2\n");
++        return 1;
++    }
++
+ #ifdef WIN32
+     WSADATA wsadata;
+     int err;
+@@ -59,8 +67,17 @@ int main(int argc, char *argv[])
+     (void)argc;
+     (void)argv;
+ 
+-    if(getenv("USER"))
+-      username = getenv("USER");
++    /* Detect Docker by /.dockerenv or IN_DOCKER env var */
++    if (getenv("IN_DOCKER") || access("/.dockerenv", F_OK) == 0) {
++        username = "user";
++    } else {
++        struct passwd *pw = getpwuid(getuid());
++        if (pw) {
++            username = pw->pw_name;
++        } else {
++            username = "user";
++        }
++    }
+ 
+     if(getenv ("PRIVKEY"))
+       privkeyfile = getenv("PRIVKEY");
+@@ -182,5 +199,6 @@ int main(int argc, char *argv[])
+     close(sock);
+ #endif
+ 
++    libssh2_exit();
+     return ec;
+ }
+diff --git a/tests/ssh2.sh b/tests/ssh2.sh
+index 07795bb..657fb4b 100755
+--- a/tests/ssh2.sh
++++ b/tests/ssh2.sh
+@@ -1,10 +1,12 @@
+-#!/bin/sh
++#!/bin/bash
+ 
+ # Written by Simon Josefsson.
+ 
+ # Start sshd, invoke parameters, saving exit code, kill sshd, and
+ # return exit code.
+ 
++WOLFPROV_DIR=$(cd "$(dirname "$0")/../.." && pwd)
++
+ srcdir=${srcdir:-$PWD}
+ SSHD=${SSHD:-/usr/sbin/sshd}
+ 
+@@ -20,14 +22,39 @@ if test -n "$DEBUG"; then
+     libssh2_sshd_params="-d -d"
+ fi
+ 
++# Create privilege separation directory if it doesn't exist
++mkdir -p /run/sshd 2>/dev/null || sudo mkdir -p /run/sshd 2>/dev/null || true
++
++# Create a 'user' account if it doesn't exist (for SSH authentication)
++if ! id "user" &>/dev/null; then
++    # Create user account without home directory and shell
++    useradd -r -s /bin/false user 2>/dev/null || true
++    # Unlock the account for SSH authentication
++    passwd -u user 2>/dev/null || true
++    # Alternative: set empty password to unlock
++    passwd -d user 2>/dev/null || true
++fi
++
++# Set the wrapper script to load the system ossl for sshd
++chmod +x "$WOLFPROV_DIR/libssh2/tests/sshd-wrapper.sh"
++export SSHD="$WOLFPROV_DIR/libssh2/tests/sshd-wrapper.sh"
++
++# Start sshd with FIPS approved algos
+ chmod go-rwx "$srcdir"/etc/host*
+ $SSHD -f /dev/null -h "$srcdir"/etc/host \
++    -o 'KexAlgorithms diffie-hellman-group14-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512' \
++    -o 'HostKeyAlgorithms +ssh-rsa' \
++    -o 'PubkeyAcceptedAlgorithms +ssh-rsa' \
+     -o 'Port 4711' \
+     -o 'Protocol 2' \
+     -o "AuthorizedKeysFile $srcdir/etc/user.pub" \
+     -o 'UsePrivilegeSeparation no' \
+     -o 'StrictModes no' \
+-    -D \
++    -o 'PubkeyAuthentication yes' \
++    -o 'PasswordAuthentication no' \
++    -o 'ChallengeResponseAuthentication no' \
++    -o 'UsePAM no' \
++    -D -e -d \
+     $libssh2_sshd_params &
+ sshdpid=$!
+ 
+diff --git a/tests/sshd-wrapper.sh b/tests/sshd-wrapper.sh
+new file mode 100755
+index 0000000..5652e18
+--- /dev/null
++++ b/tests/sshd-wrapper.sh
+@@ -0,0 +1,12 @@
++#!/bin/sh
++# Sets a clean env for sshd(openssh) so we can use system ossl
++exec env -i \
++  PATH=/usr/sbin:/usr/bin:/bin \
++  LC_ALL=C LANG=C \
++  LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
++  OPENSSL_CONF= \
++  OPENSSL_MODULES= \
++  PKG_CONFIG_PATH= \
++  LDFLAGS= \
++  CPPFLAGS= \
++  /usr/sbin/sshd "$@"
