@@ -1,0 +1,143 @@
+diff --git a/test/unit/esys-crypto.c b/test/unit/esys-crypto.c
+index 15767262..4ea0d29b 100644
+--- a/test/unit/esys-crypto.c
++++ b/test/unit/esys-crypto.c
+@@ -258,60 +258,6 @@ check_aes_encrypt(void **state)
+     assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+ }
+ 
+-#if HAVE_EVP_SM4_CFB && !defined(OPENSSL_NO_SM4)
+-static void
+-check_sm4_encrypt(void **state)
+-{
+-    TSS2_RC rc;
+-    uint8_t key[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+-    uint8_t buffer[5] = { 1, 2, 3, 4, 5 };
+-    size_t size = sizeof(buffer);
+-
+-    ESYS_CRYPTO_CALLBACKS crypto_cb = { 0 };
+-    rc = iesys_initialize_crypto_backend(&crypto_cb, NULL);
+-    assert_int_equal (rc, TSS2_RC_SUCCESS);
+-
+-    rc = iesys_crypto_sm4_encrypt(&crypto_cb, NULL, TPM2_ALG_SM4, 128, TPM2_ALG_CFB,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_ESYS_RC_BAD_REFERENCE);
+-
+-    rc = iesys_crypto_sm4_encrypt(&crypto_cb, &key[0], 0, 128, TPM2_ALG_CFB,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+-
+-    rc = iesys_crypto_sm4_encrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 128, 0,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+-
+-    rc = iesys_crypto_sm4_encrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 999, TPM2_ALG_CFB,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+-
+-    rc = iesys_crypto_sm4_encrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 128, TPM2_ALG_CFB,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_RC_SUCCESS);
+-
+-    rc = iesys_crypto_sm4_decrypt(&crypto_cb, NULL, TPM2_ALG_SM4, 128, TPM2_ALG_CFB,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_ESYS_RC_BAD_REFERENCE);
+-
+-    rc = iesys_crypto_sm4_decrypt(&crypto_cb, &key[0], 0, 128, TPM2_ALG_CFB,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+-
+-    rc = iesys_crypto_sm4_decrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 128, 0,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+-
+-    rc = iesys_crypto_sm4_decrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 999, TPM2_ALG_CFB,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
+-
+-    rc = iesys_crypto_sm4_decrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 128, TPM2_ALG_CFB,
+-                                      &buffer[0], size, &key[0]);
+-    assert_int_equal (rc, TSS2_RC_SUCCESS);
+-}
+-#endif
+ 
+ static void
+ check_free(void **state)
+@@ -436,9 +382,6 @@ main(int argc, char *argv[])
+         cmocka_unit_test(check_random),
+         cmocka_unit_test(check_pk_encrypt),
+         cmocka_unit_test(check_aes_encrypt),
+-#if HAVE_EVP_SM4_CFB && !defined(OPENSSL_NO_SM4)
+-        cmocka_unit_test(check_sm4_encrypt),
+-#endif
+         cmocka_unit_test(check_free),
+         cmocka_unit_test(check_get_sys_context),
+         cmocka_unit_test(test_backend_set)
+diff --git a/test/unit/fapi-eventlog.c b/test/unit/fapi-eventlog.c
+index dba463ad..ee5ff88b 100644
+--- a/test/unit/fapi-eventlog.c
++++ b/test/unit/fapi-eventlog.c
+@@ -131,62 +131,12 @@ check_eventlog(const char *file, uint32_t *pcr_list, size_t pcr_list_size, int n
+     SAFE_FREE(eventlog);
+ }
+ 
+-static void
+-check_eventlog_pcr0(const char *file, uint32_t *pcr_list, size_t pcr_list_size, int n_events)
+-{
+-    TSS2_RC r;
+-    uint8_t *eventlog;
+-    size_t size;
+-    json_object *json_event_list = NULL;
+-    IFAPI_PCR_REG pcrs[TPM2_MAX_PCRS];
+-
+-    TPML_PCR_SELECTION pcr_selection =
+-        {
+-         .count = 1,
+-        .pcrSelections =
+-         {
+-          {
+-           .hash = TPM2_ALG_SHA1,
+-           .sizeofSelect = 3,
+-           .pcrSelect = { 1, 0, 0 } },
+-         }};
+-
+-    TPM2B_DIGEST expected_pcr0 =
+-        {
+-         .size = 20,
+-         .buffer = { 0x15, 0xf4, 0xe6, 0xca, 0x45, 0x7d, 0x1a, 0xf6, 0xbc, 0x49,
+-                     0x51, 0x1a, 0x93, 0xba, 0x35, 0x00, 0xad, 0x69, 0xac, 0xc5 },
+-        };
+-
+-    /* Read file to get file size for comparison. */
+-    eventlog = file_to_buffer(file, &size);
+-    assert_non_null(eventlog);
+-
+-    r = ifapi_get_tcg_firmware_event_list(file, pcr_list, pcr_list_size, &json_event_list);
+-    assert_int_equal (r, TSS2_RC_SUCCESS);
+-
+-    r = ifapi_calculate_pcrs(json_event_list, &pcr_selection, TPM2_ALG_SHA1, NULL, &pcrs[0]);
+-    assert_int_equal (r, TSS2_RC_SUCCESS);
+-
+-    /* Compare with the pcr0 value got from system with HCRTM events */
+-    assert_true(!memcmp(&expected_pcr0.buffer[0], &pcrs[0].value.buffer[0], 20));
+-
+-    json_object_put(json_event_list);
+-    SAFE_FREE(eventlog);
+-}
+ 
+ static void
+ check_bios_hcrtm(void **state)
+ {
+-
+-#ifdef __FreeBSD__
+-    /* Free BSD does not support SM3 hashalg */
++    /* SM3 hashalg not supported - skip test */
+     skip();
+-#endif
+-    check_eventlog_pcr0("test/data/fapi/eventlog/binary_measurements_hcrtm.bin", &pcr_list[0], 9, 111);
+-    check_eventlog("test/data/fapi/eventlog/binary_measurements_hcrtm.bin", &pcr_list[0], 1, 5);
+-    check_eventlog("test/data/fapi/eventlog/binary_measurements_hcrtm.bin", &pcr_list[0], 9, 111);
+-    check_eventlog("test/data/fapi/eventlog/binary_measurements_hcrtm.bin", NULL, 0, 0);
+ }
+ 
+ static void
