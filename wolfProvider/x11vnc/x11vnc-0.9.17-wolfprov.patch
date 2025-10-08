@@ -1,0 +1,22 @@
+diff --git a/src/ssltools.h b/src/ssltools.h
+index c177fe9..14c362d 100644
+--- a/src/ssltools.h
++++ b/src/ssltools.h
+@@ -110,7 +110,7 @@ char genCA[] =
+ "\n"
+ "default_days	= 730			# how long to certify for\n"
+ "default_crl_days= 30			# how long before next CRL\n"
+-"default_md	= md5			# which md to use.\n"
++"default_md = SHA256			# which md to use.\n"
+ "preserve	= no			# keep passed DN ordering\n"
+ "\n"
+ "policy		= policy_match\n"
+@@ -465,7 +465,7 @@ char genCert[] =
+ "		fi\n"
+ "	fi\n"
+ "	if [ \"x$x\" != \"xn\" ]; then\n"
+-"		\"$OPENSSL\" rsa -in \"$target\" -des3 -out \"$target\"\n"
++"		\"$OPENSSL\" rsa -in \"$target\" -aes256 -out \"$target\"\n"
+ "		if [ $? != 0 ]; then\n"
+ "			echo \"openssl 'rsa' command failed\"\n"
+ "			rm -f \"$DIR/$dest.key\" \"$DIR/$dest.crt\" \"$DIR/$dest.req\"\n"

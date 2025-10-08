@@ -1,0 +1,9 @@
+diff --git a/mkspecs/linux-g++/qmake.conf b/mkspecs/linux-g++/qmake.conf
+index 35bce8f0647..670d737684c 100644
+--- a/mkspecs/linux-g++/qmake.conf
++++ b/mkspecs/linux-g++/qmake.conf
+@@ -10,3 +10,4 @@ include(../common/linux.conf)
+ include(../common/gcc-base-unix.conf)
+ include(../common/g++-unix.conf)
+ load(qt_config)
++QMAKE_CXXFLAGS += -std=c++14

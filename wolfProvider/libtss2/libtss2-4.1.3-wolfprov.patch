@@ -1,143 +1,708 @@
+diff --git a/test/unit/CommonPreparePrologue.c b/test/unit/CommonPreparePrologue.c
+index c961afb0..1d3c0897 100644
+--- a/test/unit/CommonPreparePrologue.c
++++ b/test/unit/CommonPreparePrologue.c
+@@ -12,6 +12,7 @@
+ #include <stdio.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_sys.h"
+diff --git a/test/unit/CopyCommandHeader.c b/test/unit/CopyCommandHeader.c
+index b0974b6f..8a20b5b0 100644
+--- a/test/unit/CopyCommandHeader.c
++++ b/test/unit/CopyCommandHeader.c
+@@ -13,6 +13,7 @@
+ #include <arpa/inet.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_sys.h"
+diff --git a/test/unit/TPM2B-marshal.c b/test/unit/TPM2B-marshal.c
+index 1665ff56..077cb4c4 100644
+--- a/test/unit/TPM2B-marshal.c
++++ b/test/unit/TPM2B-marshal.c
+@@ -12,6 +12,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include "tss2_mu.h"
+ #include "util/tss2_endian.h"
+diff --git a/test/unit/TPMA-marshal.c b/test/unit/TPMA-marshal.c
+index f8759382..14b7b69f 100644
+--- a/test/unit/TPMA-marshal.c
++++ b/test/unit/TPMA-marshal.c
+@@ -11,6 +11,7 @@
+ #include <stdarg.h>
+ #include <stddef.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <stdio.h>
+ #include "tss2_mu.h"
+diff --git a/test/unit/TPML-marshal.c b/test/unit/TPML-marshal.c
+index dba2aeaf..e49d4a06 100644
+--- a/test/unit/TPML-marshal.c
++++ b/test/unit/TPML-marshal.c
+@@ -12,6 +12,7 @@
+ #include <stddef.h>
+ #include <string.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <stdio.h>
+ #include "tss2_mu.h"
+diff --git a/test/unit/TPMS-marshal.c b/test/unit/TPMS-marshal.c
+index 13b2f18e..5c0728f0 100644
+--- a/test/unit/TPMS-marshal.c
++++ b/test/unit/TPMS-marshal.c
+@@ -11,6 +11,7 @@
+ #include <stdarg.h>
+ #include <stddef.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <stdio.h>
+ #include "tss2_mu.h"
+diff --git a/test/unit/TPMT-marshal.c b/test/unit/TPMT-marshal.c
+index 33aca5b2..c0fda6c4 100644
+--- a/test/unit/TPMT-marshal.c
++++ b/test/unit/TPMT-marshal.c
+@@ -11,6 +11,7 @@
+ #include <stdarg.h>
+ #include <stddef.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <stdio.h>
+ #include "tss2_mu.h"
+diff --git a/test/unit/TPMU-marshal.c b/test/unit/TPMU-marshal.c
+index bb26bd93..19c0caed 100644
+--- a/test/unit/TPMU-marshal.c
++++ b/test/unit/TPMU-marshal.c
+@@ -12,6 +12,7 @@
+ #include <stddef.h>
+ #include <string.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <stdio.h>
+ #include "tss2_mu.h"
+diff --git a/test/unit/UINT16-marshal.c b/test/unit/UINT16-marshal.c
+index dd6c717d..b1903f84 100644
+--- a/test/unit/UINT16-marshal.c
++++ b/test/unit/UINT16-marshal.c
+@@ -12,6 +12,7 @@
+ #include <stdio.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_mu.h"
+diff --git a/test/unit/UINT32-marshal.c b/test/unit/UINT32-marshal.c
+index 288a9c48..8fd237d5 100644
+--- a/test/unit/UINT32-marshal.c
++++ b/test/unit/UINT32-marshal.c
+@@ -12,6 +12,7 @@
+ #include <stdio.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_mu.h"
+diff --git a/test/unit/UINT64-marshal.c b/test/unit/UINT64-marshal.c
+index 4832a3eb..1678f07e 100644
+--- a/test/unit/UINT64-marshal.c
++++ b/test/unit/UINT64-marshal.c
+@@ -12,6 +12,7 @@
+ #include <stdio.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_mu.h"
+diff --git a/test/unit/UINT8-marshal.c b/test/unit/UINT8-marshal.c
+index befb36f4..d812ad28 100644
+--- a/test/unit/UINT8-marshal.c
++++ b/test/unit/UINT8-marshal.c
+@@ -12,6 +12,7 @@
+ #include <stdio.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_mu.h"
+diff --git a/test/unit/dlopen-fail.c b/test/unit/dlopen-fail.c
+index 243e60d5..da6b4852 100644
+--- a/test/unit/dlopen-fail.c
++++ b/test/unit/dlopen-fail.c
+@@ -8,6 +8,7 @@
+ #include <stddef.h>
+ #include <stdio.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include <dlfcn.h>
+diff --git a/test/unit/esys-ac-getcapability.c b/test/unit/esys-ac-getcapability.c
+index 78ea0151..7fc35860 100644
+--- a/test/unit/esys-ac-getcapability.c
++++ b/test/unit/esys-ac-getcapability.c
+@@ -16,6 +16,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-ac-send.c b/test/unit/esys-ac-send.c
+index 9824ca93..f738c408 100644
+--- a/test/unit/esys-ac-send.c
++++ b/test/unit/esys-ac-send.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-context-null.c b/test/unit/esys-context-null.c
+index b889e712..5617de5c 100644
+--- a/test/unit/esys-context-null.c
++++ b/test/unit/esys-context-null.c
+@@ -22,6 +22,7 @@
+ #include "esys_iutil.h"
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ /**
 diff --git a/test/unit/esys-crypto.c b/test/unit/esys-crypto.c
-index 15767262..4ea0d29b 100644
+index 15767262..2c762df7 100644
 --- a/test/unit/esys-crypto.c
 +++ b/test/unit/esys-crypto.c
-@@ -258,60 +258,6 @@ check_aes_encrypt(void **state)
-     assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
- }
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
  
--#if HAVE_EVP_SM4_CFB && !defined(OPENSSL_NO_SM4)
--static void
--check_sm4_encrypt(void **state)
--{
--    TSS2_RC rc;
--    uint8_t key[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
--    uint8_t buffer[5] = { 1, 2, 3, 4, 5 };
--    size_t size = sizeof(buffer);
--
--    ESYS_CRYPTO_CALLBACKS crypto_cb = { 0 };
--    rc = iesys_initialize_crypto_backend(&crypto_cb, NULL);
--    assert_int_equal (rc, TSS2_RC_SUCCESS);
--
--    rc = iesys_crypto_sm4_encrypt(&crypto_cb, NULL, TPM2_ALG_SM4, 128, TPM2_ALG_CFB,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_ESYS_RC_BAD_REFERENCE);
--
--    rc = iesys_crypto_sm4_encrypt(&crypto_cb, &key[0], 0, 128, TPM2_ALG_CFB,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
--
--    rc = iesys_crypto_sm4_encrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 128, 0,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
--
--    rc = iesys_crypto_sm4_encrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 999, TPM2_ALG_CFB,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
--
--    rc = iesys_crypto_sm4_encrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 128, TPM2_ALG_CFB,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_RC_SUCCESS);
--
--    rc = iesys_crypto_sm4_decrypt(&crypto_cb, NULL, TPM2_ALG_SM4, 128, TPM2_ALG_CFB,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_ESYS_RC_BAD_REFERENCE);
--
--    rc = iesys_crypto_sm4_decrypt(&crypto_cb, &key[0], 0, 128, TPM2_ALG_CFB,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
--
--    rc = iesys_crypto_sm4_decrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 128, 0,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
--
--    rc = iesys_crypto_sm4_decrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 999, TPM2_ALG_CFB,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_ESYS_RC_BAD_VALUE);
--
--    rc = iesys_crypto_sm4_decrypt(&crypto_cb, &key[0], TPM2_ALG_SM4, 128, TPM2_ALG_CFB,
--                                      &buffer[0], size, &key[0]);
--    assert_int_equal (rc, TSS2_RC_SUCCESS);
--}
--#endif
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
  
- static void
- check_free(void **state)
-@@ -436,9 +382,6 @@ main(int argc, char *argv[])
-         cmocka_unit_test(check_random),
-         cmocka_unit_test(check_pk_encrypt),
-         cmocka_unit_test(check_aes_encrypt),
--#if HAVE_EVP_SM4_CFB && !defined(OPENSSL_NO_SM4)
--        cmocka_unit_test(check_sm4_encrypt),
--#endif
-         cmocka_unit_test(check_free),
-         cmocka_unit_test(check_get_sys_context),
-         cmocka_unit_test(test_backend_set)
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-getpollhandles.c b/test/unit/esys-getpollhandles.c
+index 1dd99369..5cd8c558 100644
+--- a/test/unit/esys-getpollhandles.c
++++ b/test/unit/esys-getpollhandles.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-nulltcti.c b/test/unit/esys-nulltcti.c
+index f2ea6580..ae9e131e 100644
+--- a/test/unit/esys-nulltcti.c
++++ b/test/unit/esys-nulltcti.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-policy-ac-sendselect.c b/test/unit/esys-policy-ac-sendselect.c
+index 806c3fbd..53d8ef05 100644
+--- a/test/unit/esys-policy-ac-sendselect.c
++++ b/test/unit/esys-policy-ac-sendselect.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-resubmissions.c b/test/unit/esys-resubmissions.c
+index 14f7f272..f9fdd17d 100644
+--- a/test/unit/esys-resubmissions.c
++++ b/test/unit/esys-resubmissions.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-sequence-finish.c b/test/unit/esys-sequence-finish.c
+index 0c897a70..1ceec413 100644
+--- a/test/unit/esys-sequence-finish.c
++++ b/test/unit/esys-sequence-finish.c
+@@ -14,6 +14,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-tcti-rcs.c b/test/unit/esys-tcti-rcs.c
+index 7a775cbc..86bc69a7 100644
+--- a/test/unit/esys-tcti-rcs.c
++++ b/test/unit/esys-tcti-rcs.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-tpm-rcs.c b/test/unit/esys-tpm-rcs.c
+index ec0f8665..1355a63e 100644
+--- a/test/unit/esys-tpm-rcs.c
++++ b/test/unit/esys-tpm-rcs.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/esys-vendor.c b/test/unit/esys-vendor.c
+index 5490624b..b197223d 100644
+--- a/test/unit/esys-vendor.c
++++ b/test/unit/esys-vendor.c
+@@ -11,6 +11,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_esys.h"
+diff --git a/test/unit/fapi-check-ima-log.c b/test/unit/fapi-check-ima-log.c
+index 04ac7afe..061ebaf5 100644
+--- a/test/unit/fapi-check-ima-log.c
++++ b/test/unit/fapi-check-ima-log.c
+@@ -17,6 +17,7 @@
+ #include <json-c/json_tokener.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_fapi.h"
+diff --git a/test/unit/fapi-config.c b/test/unit/fapi-config.c
+index a2242ebc..678b4dce 100644
+--- a/test/unit/fapi-config.c
++++ b/test/unit/fapi-config.c
+@@ -19,6 +19,7 @@
+ #include <json-c/json_tokener.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <errno.h>
+ 
 diff --git a/test/unit/fapi-eventlog.c b/test/unit/fapi-eventlog.c
-index dba463ad..ee5ff88b 100644
+index dba463ad..74670c34 100644
 --- a/test/unit/fapi-eventlog.c
 +++ b/test/unit/fapi-eventlog.c
-@@ -131,62 +131,12 @@ check_eventlog(const char *file, uint32_t *pcr_list, size_t pcr_list_size, int n
-     SAFE_FREE(eventlog);
- }
+@@ -17,6 +17,7 @@
+ #include <json-c/json_tokener.h>
  
--static void
--check_eventlog_pcr0(const char *file, uint32_t *pcr_list, size_t pcr_list_size, int n_events)
--{
--    TSS2_RC r;
--    uint8_t *eventlog;
--    size_t size;
--    json_object *json_event_list = NULL;
--    IFAPI_PCR_REG pcrs[TPM2_MAX_PCRS];
--
--    TPML_PCR_SELECTION pcr_selection =
--        {
--         .count = 1,
--        .pcrSelections =
--         {
--          {
--           .hash = TPM2_ALG_SHA1,
--           .sizeofSelect = 3,
--           .pcrSelect = { 1, 0, 0 } },
--         }};
--
--    TPM2B_DIGEST expected_pcr0 =
--        {
--         .size = 20,
--         .buffer = { 0x15, 0xf4, 0xe6, 0xca, 0x45, 0x7d, 0x1a, 0xf6, 0xbc, 0x49,
--                     0x51, 0x1a, 0x93, 0xba, 0x35, 0x00, 0xad, 0x69, 0xac, 0xc5 },
--        };
--
--    /* Read file to get file size for comparison. */
--    eventlog = file_to_buffer(file, &size);
--    assert_non_null(eventlog);
--
--    r = ifapi_get_tcg_firmware_event_list(file, pcr_list, pcr_list_size, &json_event_list);
--    assert_int_equal (r, TSS2_RC_SUCCESS);
--
--    r = ifapi_calculate_pcrs(json_event_list, &pcr_selection, TPM2_ALG_SHA1, NULL, &pcrs[0]);
--    assert_int_equal (r, TSS2_RC_SUCCESS);
--
--    /* Compare with the pcr0 value got from system with HCRTM events */
--    assert_true(!memcmp(&expected_pcr0.buffer[0], &pcrs[0].value.buffer[0], 20));
--
--    json_object_put(json_event_list);
--    SAFE_FREE(eventlog);
--}
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
  
- static void
- check_bios_hcrtm(void **state)
- {
--
--#ifdef __FreeBSD__
--    /* Free BSD does not support SM3 hashalg */
-+    /* SM3 hashalg not supported - skip test */
-     skip();
--#endif
--    check_eventlog_pcr0("test/data/fapi/eventlog/binary_measurements_hcrtm.bin", &pcr_list[0], 9, 111);
--    check_eventlog("test/data/fapi/eventlog/binary_measurements_hcrtm.bin", &pcr_list[0], 1, 5);
--    check_eventlog("test/data/fapi/eventlog/binary_measurements_hcrtm.bin", &pcr_list[0], 9, 111);
--    check_eventlog("test/data/fapi/eventlog/binary_measurements_hcrtm.bin", NULL, 0, 0);
- }
+ #include "tss2_fapi.h"
+diff --git a/test/unit/fapi-get-web-cert.c b/test/unit/fapi-get-web-cert.c
+index 740f6f0e..5fc3eaaf 100644
+--- a/test/unit/fapi-get-web-cert.c
++++ b/test/unit/fapi-get-web-cert.c
+@@ -18,6 +18,7 @@
+ #include <openssl/evp.h>
  
- static void
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_fapi.h"
+diff --git a/test/unit/fapi-helpers.c b/test/unit/fapi-helpers.c
+index ecb0f627..dff17b27 100644
+--- a/test/unit/fapi-helpers.c
++++ b/test/unit/fapi-helpers.c
+@@ -17,6 +17,7 @@
+ #include <json-c/json_tokener.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_fapi.h"
+diff --git a/test/unit/fapi-ima-eventlog.c b/test/unit/fapi-ima-eventlog.c
+index 44b311e6..fdd3ab94 100644
+--- a/test/unit/fapi-ima-eventlog.c
++++ b/test/unit/fapi-ima-eventlog.c
+@@ -19,6 +19,7 @@
+ #include <openssl/evp.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_fapi.h"
+diff --git a/test/unit/fapi-ima-fuzzing.c b/test/unit/fapi-ima-fuzzing.c
+index 11558d87..49e6b25e 100644
+--- a/test/unit/fapi-ima-fuzzing.c
++++ b/test/unit/fapi-ima-fuzzing.c
+@@ -14,6 +14,7 @@
+ #include <openssl/evp.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_fapi.h"
+diff --git a/test/unit/fapi-io.c b/test/unit/fapi-io.c
+index 84663766..29eaeef5 100644
+--- a/test/unit/fapi-io.c
++++ b/test/unit/fapi-io.c
+@@ -19,6 +19,7 @@
+ #include <json-c/json_tokener.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <errno.h>
+ 
+diff --git a/test/unit/fapi-json.c b/test/unit/fapi-json.c
+index df0965a4..097b9666 100644
+--- a/test/unit/fapi-json.c
++++ b/test/unit/fapi-json.c
+@@ -17,6 +17,7 @@
+ #include <json-c/json_tokener.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_fapi.h"
+diff --git a/test/unit/fapi-profiles.c b/test/unit/fapi-profiles.c
+index 4577539d..036b2189 100644
+--- a/test/unit/fapi-profiles.c
++++ b/test/unit/fapi-profiles.c
+@@ -19,6 +19,7 @@
+ #include <json-c/json_tokener.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <errno.h>
+ 
+diff --git a/test/unit/fapi-system-fuzzing.c b/test/unit/fapi-system-fuzzing.c
+index 688a460b..647222cc 100644
+--- a/test/unit/fapi-system-fuzzing.c
++++ b/test/unit/fapi-system-fuzzing.c
+@@ -12,6 +12,7 @@
+ #include <json-c/json_tokener.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_fapi.h"
+diff --git a/test/unit/io.c b/test/unit/io.c
+index fa0e2528..2db0f6dc 100644
+--- a/test/unit/io.c
++++ b/test/unit/io.c
+@@ -14,6 +14,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tpm2_types.h"
+diff --git a/test/unit/key-value-parse.c b/test/unit/key-value-parse.c
+index bc4676a6..945a3c59 100644
+--- a/test/unit/key-value-parse.c
++++ b/test/unit/key-value-parse.c
+@@ -15,6 +15,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "util/key-value-parse.h"
+diff --git a/test/unit/log.c b/test/unit/log.c
+index ad83c159..b6ba4a81 100644
+--- a/test/unit/log.c
++++ b/test/unit/log.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tpm2_types.h"
+diff --git a/test/unit/sys-execute.c b/test/unit/sys-execute.c
+index f19f0851..cad8db4a 100644
+--- a/test/unit/sys-execute.c
++++ b/test/unit/sys-execute.c
+@@ -14,6 +14,7 @@
+ #include <string.h>
+ #include <stdlib.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_sys.h"
+diff --git a/test/unit/tcti-cmd.c b/test/unit/tcti-cmd.c
+index 3cfe6a2c..ec18da10 100644
+--- a/test/unit/tcti-cmd.c
++++ b/test/unit/tcti-cmd.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <unistd.h>
+ #include <signal.h>
+diff --git a/test/unit/tcti-device.c b/test/unit/tcti-device.c
+index f1cd1808..148580be 100644
+--- a/test/unit/tcti-device.c
++++ b/test/unit/tcti-device.c
+@@ -17,6 +17,7 @@
+ #include <poll.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_mu.h"
+diff --git a/test/unit/tcti-i2c-ftdi.c b/test/unit/tcti-i2c-ftdi.c
+index 007d497c..4a22a799 100644
+--- a/test/unit/tcti-i2c-ftdi.c
++++ b/test/unit/tcti-i2c-ftdi.c
+@@ -32,6 +32,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tcti-i2c-helper.c b/test/unit/tcti-i2c-helper.c
+index 9dc1ba16..8e01d10e 100644
+--- a/test/unit/tcti-i2c-helper.c
++++ b/test/unit/tcti-i2c-helper.c
+@@ -32,6 +32,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tcti-libtpms.c b/test/unit/tcti-libtpms.c
+index 11e501a4..416dd537 100644
+--- a/test/unit/tcti-libtpms.c
++++ b/test/unit/tcti-libtpms.c
+@@ -16,6 +16,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <unistd.h>
+ 
+diff --git a/test/unit/tcti-mssim.c b/test/unit/tcti-mssim.c
+index bafcb743..094fb840 100644
+--- a/test/unit/tcti-mssim.c
++++ b/test/unit/tcti-mssim.c
+@@ -16,6 +16,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tcti-pcap.c b/test/unit/tcti-pcap.c
+index ef589752..5a024ad4 100644
+--- a/test/unit/tcti-pcap.c
++++ b/test/unit/tcti-pcap.c
+@@ -19,6 +19,7 @@
+ #include <netinet/in.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tcti-spi-ftdi.c b/test/unit/tcti-spi-ftdi.c
+index e1758cd3..5aaeb68c 100644
+--- a/test/unit/tcti-spi-ftdi.c
++++ b/test/unit/tcti-spi-ftdi.c
+@@ -16,6 +16,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tcti-spi-helper.c b/test/unit/tcti-spi-helper.c
+index 7c725406..d6b487eb 100644
+--- a/test/unit/tcti-spi-helper.c
++++ b/test/unit/tcti-spi-helper.c
+@@ -16,6 +16,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tcti-spi-ltt2go.c b/test/unit/tcti-spi-ltt2go.c
+index f82c9463..4ee270b0 100644
+--- a/test/unit/tcti-spi-ltt2go.c
++++ b/test/unit/tcti-spi-ltt2go.c
+@@ -16,6 +16,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tcti-spidev.c b/test/unit/tcti-spidev.c
+index 88d063e4..babbfad8 100644
+--- a/test/unit/tcti-spidev.c
++++ b/test/unit/tcti-spidev.c
+@@ -16,6 +16,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ #include <sys/select.h>
+ #include <sys/time.h>
+diff --git a/test/unit/tcti-swtpm.c b/test/unit/tcti-swtpm.c
+index 78ef9daa..c48c1214 100644
+--- a/test/unit/tcti-swtpm.c
++++ b/test/unit/tcti-swtpm.c
+@@ -16,6 +16,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tctildr-dl.c b/test/unit/tctildr-dl.c
+index 135e1b14..06b0a38b 100644
+--- a/test/unit/tctildr-dl.c
++++ b/test/unit/tctildr-dl.c
+@@ -16,6 +16,7 @@
+ #include <dlfcn.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tctildr-getinfo.c b/test/unit/tctildr-getinfo.c
+index afdd7a39..2f625f3b 100644
+--- a/test/unit/tctildr-getinfo.c
++++ b/test/unit/tctildr-getinfo.c
+@@ -13,6 +13,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tctildr-nodl.c b/test/unit/tctildr-nodl.c
+index 21574636..8b9d5046 100644
+--- a/test/unit/tctildr-nodl.c
++++ b/test/unit/tctildr-nodl.c
+@@ -15,6 +15,7 @@
+ #include <dlfcn.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tctildr-tcti.c b/test/unit/tctildr-tcti.c
+index 4aab4961..dfa12d26 100644
+--- a/test/unit/tctildr-tcti.c
++++ b/test/unit/tctildr-tcti.c
+@@ -12,6 +12,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tcti.h"
+diff --git a/test/unit/tctildr.c b/test/unit/tctildr.c
+index 54fb9385..df1f8374 100644
+--- a/test/unit/tctildr.c
++++ b/test/unit/tctildr.c
+@@ -14,6 +14,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_tctildr.h"
+diff --git a/test/unit/test_tss2_rc.c b/test/unit/test_tss2_rc.c
+index 4eb263a7..f4dca9cd 100644
+--- a/test/unit/test_tss2_rc.c
++++ b/test/unit/test_tss2_rc.c
+@@ -8,6 +8,7 @@
+ #include <string.h>
+ 
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #include "tss2_rc.h"
+diff --git a/test/unit/tss2_policy.c b/test/unit/tss2_policy.c
+index 2c72979a..55f20015 100644
+--- a/test/unit/tss2_policy.c
++++ b/test/unit/tss2_policy.c
+@@ -16,6 +16,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <setjmp.h>
++#include <stdint.h>
+ #include <cmocka.h>
+ 
+ #if defined(__linux__)
