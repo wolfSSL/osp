@@ -183,7 +183,7 @@ index 8519fed..60afe33 100644
                                          "necessary certificates")
              raise
 diff --git a/Lib/test/test_asyncio/test_events.py b/Lib/test/test_asyncio/test_events.py
-index abf425f..8254c59 100644
+index abf425f..d181b1f 100644
 --- a/Lib/test/test_asyncio/test_events.py
 +++ b/Lib/test/test_asyncio/test_events.py
 @@ -633,7 +633,10 @@ class EventLoopTestsMixin:
@@ -192,7 +192,7 @@ index abf425f..8254c59 100644
  
 -        self.assertEqual(cm.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
 +        if ssl.IS_WOLFSSL:
-+            self.assertEqual(cm.exception.reason, 'ASN_NO_SIGNER_E')
++            self.assertIn(cm.exception.reason, ('ASN_NO_SIGNER_E', 'ASN_SELF_SIGNED_E'))
 +        else:
 +            self.assertEqual(cm.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
  
@@ -207,7 +207,7 @@ index abf425f..8254c59 100644
 -                    self.loop.run_until_complete(f_c)
 +                if ssl.IS_WOLFSSL:
 +                    with self.assertRaisesRegex(ssl.SSLError,
-+                                                'ASN no signer error to confirm failure'):
++                                                'ASN_NO_SIGNER_E'):
 +                        self.loop.run_until_complete(f_c)
 +                else:
 +                    with self.assertRaisesRegex(ssl.SSLError,
@@ -225,7 +225,7 @@ index abf425f..8254c59 100644
 -                    self.loop.run_until_complete(f_c)
 +                if ssl.IS_WOLFSSL:
 +                    with self.assertRaisesRegex(ssl.SSLError,
-+                                                'ASN no signer error to confirm failure'):
++                                                'ASN_NO_SIGNER_E'):
 +                        self.loop.run_until_complete(f_c)
 +                else:
 +                    with self.assertRaisesRegex(ssl.SSLError,
@@ -234,8 +234,49 @@ index abf425f..8254c59 100644
  
              # execute the loop to log the connection error
              test_utils.run_briefly(self.loop)
+@@ -1131,11 +1144,13 @@ class EventLoopTestsMixin:
+         regex = re.compile(r"""(
+             IP address mismatch, certificate is not valid for '127.0.0.1'   # OpenSSL
+             |
++            IPADDR_MISMATCH                                                 # wolfSSL
++            |
+             CERTIFICATE_VERIFY_FAILED                                       # AWS-LC
+         )""", re.X)
+         with mock.patch.object(self.loop, 'call_exception_handler'):
+             with test_utils.disable_logger():
+-                with self.assertRaisesRegex(ssl.CertificateError, regex):
++                with self.assertRaisesRegex(ssl.SSLError, regex):
+                     self.loop.run_until_complete(f_c)
+ 
+         # close connection
+diff --git a/Lib/test/test_asyncio/test_ssl.py b/Lib/test/test_asyncio/test_ssl.py
+index e072ede..86c9397 100644
+--- a/Lib/test/test_asyncio/test_ssl.py
++++ b/Lib/test/test_asyncio/test_ssl.py
+@@ -1350,8 +1350,10 @@ class TestSSL(test_utils.TestCase):
+             time.sleep(0.2)  # wait for the peer to fill its backlog
+ 
+             # send close_notify but don't wait for response
+-            with self.assertRaises(ssl.SSLWantReadError):
++            try:
+                 sslobj.unwrap()
++            except ssl.SSLWantReadError:
++                pass
+             sock.send(outgoing.read())
+ 
+             # should receive all data
+@@ -1368,7 +1370,8 @@ class TestSSL(test_utils.TestCase):
+             self.assertEqual(data_len, CHUNK * SIZE)
+ 
+             # verify that close_notify is received
+-            sslobj.unwrap()
++            if not ssl.IS_WOLFSSL:
++                sslobj.unwrap()
+ 
+             sock.close()
+ 
 diff --git a/Lib/test/test_httplib.py b/Lib/test/test_httplib.py
-index 6e63a88..4af19d4 100644
+index 6e63a88..771fb76 100644
 --- a/Lib/test/test_httplib.py
 +++ b/Lib/test/test_httplib.py
 @@ -1922,7 +1922,10 @@ class HTTPSTest(TestCase):
@@ -244,7 +285,7 @@ index 6e63a88..4af19d4 100644
                  h.request('GET', '/')
 -            self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
 +            if ssl.IS_WOLFSSL:
-+                self.assertEqual(exc_info.exception.reason, 'ASN_NO_SIGNER_E')
++                self.assertIn(exc_info.exception.reason, ('ASN_NO_SIGNER_E', 'ASN_SELF_SIGNED_E'))
 +            else:
 +                self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
  
@@ -256,7 +297,7 @@ index 6e63a88..4af19d4 100644
                  h.request('GET', '/')
 -            self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
 +            if ssl.IS_WOLFSSL:
-+                self.assertEqual(exc_info.exception.reason, 'ASN_NO_SIGNER_E')
++                self.assertIn(exc_info.exception.reason, ('ASN_NO_SIGNER_E', 'ASN_SELF_SIGNED_E'))
 +            else:
 +                self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
  
@@ -268,14 +309,67 @@ index 6e63a88..4af19d4 100644
              h.request('GET', '/')
 -        self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
 +        if ssl.IS_WOLFSSL:
-+            self.assertEqual(exc_info.exception.reason, 'ASN_NO_SIGNER_E')
++            self.assertIn(exc_info.exception.reason, ('ASN_NO_SIGNER_E', 'ASN_SELF_SIGNED_E'))
 +        else:
 +            self.assertEqual(exc_info.exception.reason, 'CERTIFICATE_VERIFY_FAILED')
  
      def test_local_good_hostname(self):
          # The (valid) cert validates the HTTPS hostname
+diff --git a/Lib/test/test_imaplib.py b/Lib/test/test_imaplib.py
+index 69f995f..a854594 100644
+--- a/Lib/test/test_imaplib.py
++++ b/Lib/test/test_imaplib.py
+@@ -558,9 +558,11 @@ class NewIMAPSSLTests(NewIMAPTestsMixin, unittest.TestCase):
+         regex = re.compile(r"""(
+             IP address mismatch, certificate is not valid for '127.0.0.1'   # OpenSSL
+             |
++            IPADDR_MISMATCH                                                 # wolfSSL
++            |
+             CERTIFICATE_VERIFY_FAILED                                       # AWS-LC
+         )""", re.X)
+-        with self.assertRaisesRegex(ssl.CertificateError, regex):
++        with self.assertRaisesRegex(ssl.SSLError, regex):
+             _, server = self._setup(SimpleIMAPHandler, connect=False)
+             client = self.imap_class(*server.server_address,
+                                      ssl_context=ssl_context)
+@@ -957,9 +959,11 @@ class ThreadedNetworkedTestsSSL(ThreadedNetworkedTests):
+         regex = re.compile(r"""(
+             IP address mismatch, certificate is not valid for '127.0.0.1'   # OpenSSL
+             |
++            IPADDR_MISMATCH                                                 # wolfSSL
++            |
+             CERTIFICATE_VERIFY_FAILED                                       # AWS-LC
+         )""", re.X)
+-        with self.assertRaisesRegex(ssl.CertificateError, regex):
++        with self.assertRaisesRegex(ssl.SSLError, regex):
+             with self.reaped_server(SimpleIMAPHandler) as server:
+                 client = self.imap_class(*server.server_address,
+                                          ssl_context=ssl_context)
+diff --git a/Lib/test/test_poplib.py b/Lib/test/test_poplib.py
+index 869f943..762ec6a 100644
+--- a/Lib/test/test_poplib.py
++++ b/Lib/test/test_poplib.py
+@@ -185,7 +185,8 @@ class DummyPOP3Handler(asynchat.async_chat):
+                     return self.handle_close()
+                 # TODO: SSLError does not expose alert information
+                 elif ("SSLV3_ALERT_BAD_CERTIFICATE" in err.args[1] or
+-                      "SSLV3_ALERT_CERTIFICATE_UNKNOWN" in err.args[1]):
++                      "SSLV3_ALERT_CERTIFICATE_UNKNOWN" in err.args[1] or
++                      (ssl.IS_WOLFSSL and "ALERT_FATAL_ERROR" in err.args[1])):
+                     return self.handle_close()
+                 raise
+             except OSError as err:
+@@ -382,7 +383,7 @@ class TestPOP3Class(TestCase):
+         ctx.load_verify_locations(CAFILE)
+         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+         self.assertEqual(ctx.check_hostname, True)
+-        with self.assertRaises(ssl.CertificateError):
++        with self.assertRaises(ssl.SSLError):
+             resp = self.client.stls(context=ctx)
+         self.client = poplib.POP3("localhost", self.server.port,
+                                   timeout=test_support.LOOPBACK_TIMEOUT)
 diff --git a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
-index 9b59ddd..0f19ce9 100644
+index 9b59ddd..067e444 100644
 --- a/Lib/test/test_ssl.py
 +++ b/Lib/test/test_ssl.py
 @@ -77,9 +77,17 @@ BYTES_ONLYKEY = os.fsencode(ONLYKEY)
@@ -406,7 +500,7 @@ index 9b59ddd..0f19ce9 100644
 -        expected = (129, 'serverAuth', 'TLS Web Server Authentication',
 -                    '1.3.6.1.5.5.7.3.1')
 +        if ssl.IS_WOLFSSL:
-+            expected = (71, 'serverAuth', 'TLS Web Server Authentication',
++            expected = (67240238, 'serverAuth', 'TLS Web Server Authentication',
 +                        '1.3.6.1.5.5.7.3.1')
 +        else:
 +            expected = (129, 'serverAuth', 'TLS Web Server Authentication',
@@ -417,7 +511,7 @@ index 9b59ddd..0f19ce9 100644
 -        self.assertEqual(val.nid, 129)
 +
 +        if ssl.IS_WOLFSSL:
-+            self.assertEqual(val.nid, 71)
++            self.assertEqual(val.nid, 67240238)
 +        else:
 +            self.assertEqual(val.nid, 129)
 +
@@ -429,7 +523,7 @@ index 9b59ddd..0f19ce9 100644
 -
 -        val = ssl._ASN1Object.fromnid(129)
 +        if ssl.IS_WOLFSSL:
-+            val = ssl._ASN1Object.fromnid(71)
++            val = ssl._ASN1Object.fromnid(67240238)
 +        else:
 +            val = ssl._ASN1Object.fromnid(129)
          self.assertEqual(val, expected)
@@ -470,7 +564,7 @@ index 9b59ddd..0f19ce9 100644
          self.assertEqual(ssl.Purpose.SERVER_AUTH, val)
 -        self.assertEqual(ssl.Purpose.SERVER_AUTH.nid, 129)
 +        if ssl.IS_WOLFSSL:
-+            self.assertEqual(ssl.Purpose.SERVER_AUTH.nid, 71)
++            self.assertEqual(ssl.Purpose.SERVER_AUTH.nid, 67240238)
 +        else:
 +            self.assertEqual(ssl.Purpose.SERVER_AUTH.nid, 129)
          self.assertEqual(ssl.Purpose.SERVER_AUTH.shortname, 'serverAuth')
@@ -482,7 +576,7 @@ index 9b59ddd..0f19ce9 100644
          self.assertEqual(ssl.Purpose.CLIENT_AUTH, val)
 -        self.assertEqual(ssl.Purpose.CLIENT_AUTH.nid, 130)
 +        if ssl.IS_WOLFSSL:
-+            self.assertEqual(ssl.Purpose.CLIENT_AUTH.nid, 72)
++            self.assertEqual(ssl.Purpose.CLIENT_AUTH.nid, 117571886)
 +        else:
 +            self.assertEqual(ssl.Purpose.CLIENT_AUTH.nid, 130)
          self.assertEqual(ssl.Purpose.CLIENT_AUTH.shortname, 'clientAuth')
@@ -586,7 +680,7 @@ index 9b59ddd..0f19ce9 100644
              ctx.load_verify_locations(BADCERT)
          ctx.load_verify_locations(CERTFILE, CAPATH)
          ctx.load_verify_locations(CERTFILE, capath=BYTES_CAPATH)
-@@ -1295,20 +1372,22 @@ class ContextTests(unittest.TestCase):
+@@ -1295,19 +1372,21 @@ class ContextTests(unittest.TestCase):
          self.assertEqual(ctx.cert_store_stats()["x509_ca"], 2)
  
          # test DER
@@ -603,7 +697,6 @@ index 9b59ddd..0f19ce9 100644
 -        combined = b"".join((cacert_der, neuronio_der))
 -        ctx.load_verify_locations(cadata=combined)
 -        self.assertEqual(ctx.cert_store_stats()["x509_ca"], 2)
--
 +        # wolfSSL_CTX_load_verify_locations() works with PEM
 +        if not ssl.IS_WOLFSSL:
 +            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -619,10 +712,9 @@ index 9b59ddd..0f19ce9 100644
 +            combined = b"".join((cacert_der, neuronio_der))
 +            ctx.load_verify_locations(cadata=combined)
 +            self.assertEqual(ctx.cert_store_stats()["x509_ca"], 2)
-+  
+ 
          # error cases
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-         self.assertRaises(TypeError, ctx.load_verify_locations, cadata=object)
 @@ -1323,8 +1402,10 @@ class ContextTests(unittest.TestCase):
              "not enough data: cadata does not contain a certificate"
          ):
@@ -1070,7 +1162,19 @@ index 9b59ddd..0f19ce9 100644
  
      def test_internal_chain_server(self):
          client_context, server_context, hostname = testing_context()
-@@ -4636,7 +4816,11 @@ class TestSSLDebug(unittest.TestCase):
+@@ -4586,7 +4766,10 @@ class TestPostHandshakeAuth(unittest.TestCase):
+                 self.assertEqual(res, b'\x02\n')
+                 s.write(b'UNVERIFIEDCHAIN\n')
+                 res = s.recv(1024)
+-                self.assertEqual(res, b'\x02\n')
++                if ssl.IS_WOLFSSL:
++                    self.assertEqual(res, b'\x01\n')
++                else:
++                    self.assertEqual(res, b'\x02\n')
+ 
+ 
+ HAS_KEYLOG = hasattr(ssl.SSLContext, 'keylog_filename')
+@@ -4636,7 +4819,11 @@ class TestSSLDebug(unittest.TestCase):
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
          # header, 5 lines for TLS 1.3
@@ -1083,7 +1187,7 @@ index 9b59ddd..0f19ce9 100644
  
          client_context.keylog_filename = None
          server_context.keylog_filename = os_helper.TESTFN
-@@ -4645,7 +4829,11 @@ class TestSSLDebug(unittest.TestCase):
+@@ -4645,7 +4832,11 @@ class TestSSLDebug(unittest.TestCase):
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1096,7 +1200,7 @@ index 9b59ddd..0f19ce9 100644
  
          client_context.keylog_filename = os_helper.TESTFN
          server_context.keylog_filename = os_helper.TESTFN
-@@ -4654,7 +4842,11 @@ class TestSSLDebug(unittest.TestCase):
+@@ -4654,7 +4845,11 @@ class TestSSLDebug(unittest.TestCase):
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1109,6 +1213,18 @@ index 9b59ddd..0f19ce9 100644
  
          client_context.keylog_filename = None
          server_context.keylog_filename = None
+diff --git a/Makefile.pre.in b/Makefile.pre.in
+index 0e64ccc..0a6d26d 100644
+--- a/Makefile.pre.in
++++ b/Makefile.pre.in
+@@ -2124,6 +2124,7 @@ TESTSUBDIRS=	idlelib/idle_test \
+ 		test/audiodata \
+ 		test/certdata \
+ 		test/certdata/capath \
++		test/certdata/capath-2048-plus \
+ 		test/cjkencodings \
+ 		test/crashers \
+ 		test/configdata \
 diff --git a/Modules/_hashopenssl.c b/Modules/_hashopenssl.c
 index 2998820..217cd21 100644
 --- a/Modules/_hashopenssl.c
@@ -1137,7 +1253,7 @@ index 2998820..217cd21 100644
  /* LCOV_EXCL_START */
  static PyObject *
 diff --git a/Modules/_ssl.c b/Modules/_ssl.c
-index 85fbc16..ee32f47 100644
+index 85fbc16..1e29366 100644
 --- a/Modules/_ssl.c
 +++ b/Modules/_ssl.c
 @@ -69,7 +69,21 @@
@@ -1483,7 +1599,7 @@ index 85fbc16..ee32f47 100644
  {
 +#ifdef HAVE_WOLFSSL
 +    wolfSSL_Init();
-+    wolfSSL_Debugging_ON();
++    /* wolfSSL_Debugging_ON(); */
 +
 +   /* Run all casts on initialization with these FIPS versions to avoid
 +    * threaded competition when running them ad hoc */
