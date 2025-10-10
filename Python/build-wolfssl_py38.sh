@@ -17,7 +17,7 @@ if [ "${PIPESTATUS[0]}" != 0 ]; then
 fi
 
 echo "Running ./configure"
-./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-scrypt --enable-debug CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT"
+./configure --enable-opensslall --enable-tls13 --enable-tlsx --enable-tlsv10 --enable-postauth --enable-certext --enable-certgen --enable-scrypt --enable-blake2 --enable-blake2s --enable-shake128 --enable-shake256 --enable-debug CFLAGS="-DHAVE_EX_DATA -DWOLFSSL_ERROR_CODE_OPENSSL -DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON -DWOLFSSL_ALT_NAMES -DWOLFSSL_SIGNER_DER_CERT -DNO_INT128"
 if [ "${PIPESTATUS[0]}" != 0 ]; then
     echo "./configure failed"
     popd
