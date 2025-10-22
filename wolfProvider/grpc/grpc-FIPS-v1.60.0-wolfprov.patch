@@ -1,0 +1,195 @@
+diff --git a/src/core/tsi/test_creds/server1.key b/src/core/tsi/test_creds/server1.key
+index 086462992c..cdf2201d90 100644
+--- a/src/core/tsi/test_creds/server1.key
++++ b/src/core/tsi/test_creds/server1.key
+@@ -1,28 +1,52 @@
+ -----BEGIN PRIVATE KEY-----
+-MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDnE443EknxvxBq
+-6+hvn/t09hl8hx366EBYvZmVM/NC+7igXRAjiJiA/mIaCvL3MS0Iz5hBLxSGICU+
+-WproA3GCIFITIwcf/ETyWj/5xpgZ4AKrLrjQmmX8mhwUajfF3UvwMJrCOVqPp67t
+-PtP+2kBXaqrXdvnvXR41FsIB8V7zIAuIZB6bHQhiGVlc1sgZYsE2EGG9WMmHtS86
+-qkAOTjG2XyjmPTGAwhGDpYkYrpzp99IiDh4/Veai81hn0ssQkbry0XRD/Ig3jcHh
+-23WiriPNJ0JsbgXUSLKRPZObA9VgOLy2aXoN84IMaeK3yy+cwSYG/99w93fUZJte
+-MXwz4oYZAgMBAAECggEBAIVn2Ncai+4xbH0OLWckabwgyJ4IM9rDc0LIU368O1kU
+-koais8qP9dujAWgfoh3sGh/YGgKn96VnsZjKHlyMgF+r4TaDJn3k2rlAOWcurGlj
+-1qaVlsV4HiEzp7pxiDmHhWvp4672Bb6iBG+bsjCUOEk/n9o9KhZzIBluRhtxCmw5
+-nw4Do7z00PTvN81260uPWSc04IrytvZUiAIx/5qxD72bij2xJ8t/I9GI8g4FtoVB
+-8pB6S/hJX1PZhh9VlU6Yk+TOfOVnbebG4W5138LkB835eqk3Zz0qsbc2euoi8Hxi
+-y1VGwQEmMQ63jXz4c6g+X55ifvUK9Jpn5E8pq+pMd7ECgYEA93lYq+Cr54K4ey5t
+-sWMa+ye5RqxjzgXj2Kqr55jb54VWG7wp2iGbg8FMlkQwzTJwebzDyCSatguEZLuB
+-gRGroRnsUOy9vBvhKPOch9bfKIl6qOgzMJB267fBVWx5ybnRbWN/I7RvMQf3k+9y
+-biCIVnxDLEEYyx7z85/5qxsXg/MCgYEA7wmWKtCTn032Hy9P8OL49T0X6Z8FlkDC
+-Rk42ygrc/MUbugq9RGUxcCxoImOG9JXUpEtUe31YDm2j+/nbvrjl6/bP2qWs0V7l
+-dTJl6dABP51pCw8+l4cWgBBX08Lkeen812AAFNrjmDCjX6rHjWHLJcpS18fnRRkP
+-V1d/AHWX7MMCgYEA6Gsw2guhp0Zf2GCcaNK5DlQab8OL4Hwrpttzo4kuTlwtqNKp
+-Q9H4al9qfF4Cr1TFya98+EVYf8yFRM3NLNjZpe3gwYf2EerlJj7VLcahw0KKzoN1
+-QBENfwgPLRk5sDkx9VhSmcfl/diLroZdpAwtv3vo4nEoxeuGFbKTGx3Qkf0CgYEA
+-xyR+dcb05Ygm3w4klHQTowQ10s1H80iaUcZBgQuR1ghEtDbUPZHsoR5t1xCB02ys
+-DgAwLv1bChIvxvH/L6KM8ovZ2LekBX4AviWxoBxJnfz/EVau98B0b1auRN6eSC83
+-FRuGldlSOW1z/nSh8ViizSYE5H5HX1qkXEippvFRE88CgYB3Bfu3YQY60ITWIShv
+-nNkdcbTT9eoP9suaRJjw92Ln+7ZpALYlQMKUZmJ/5uBmLs4RFwUTQruLOPL4yLTH
+-awADWUzs3IRr1fwn9E+zM8JVyKCnUEM3w4N5UZskGO2klashAd30hWO+knRv/y0r
+-uGIYs9Ek7YXlXIRVrzMwcsrt1w==
++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
++q5S53w5vdeRDAp6L/YwvuKgcmFQZyQ==
+ -----END PRIVATE KEY-----
+diff --git a/src/core/tsi/test_creds/server1.pem b/src/core/tsi/test_creds/server1.pem
+index 88244f856c..78e66ec1ee 100644
+--- a/src/core/tsi/test_creds/server1.pem
++++ b/src/core/tsi/test_creds/server1.pem
+@@ -1,22 +1,31 @@
+ -----BEGIN CERTIFICATE-----
+-MIIDtDCCApygAwIBAgIUbJfTREJ6k6/+oInWhV1O1j3ZT0IwDQYJKoZIhvcNAQEL
++MIIFVDCCBDygAwIBAgIUJLrifEpXNbj7wQ49Udd8KeEveFowDQYJKoZIhvcNAQEL
+ BQAwVjELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+-GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDEPMA0GA1UEAwwGdGVzdGNhMB4XDTIw
+-MDMxODAzMTA0MloXDTMwMDMxNjAzMTA0MlowZTELMAkGA1UEBhMCVVMxETAPBgNV
++GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDEPMA0GA1UEAwwGdGVzdGNhMB4XDTI1
++MTAyMjE4MTk1MVoXDTM1MTAyMDE4MTk1MVowZTELMAkGA1UEBhMCVVMxETAPBgNV
+ BAgMCElsbGlub2lzMRAwDgYDVQQHDAdDaGljYWdvMRUwEwYDVQQKDAxFeGFtcGxl
+-LCBDby4xGjAYBgNVBAMMESoudGVzdC5nb29nbGUuY29tMIIBIjANBgkqhkiG9w0B
+-AQEFAAOCAQ8AMIIBCgKCAQEA5xOONxJJ8b8Qauvob5/7dPYZfIcd+uhAWL2ZlTPz
+-Qvu4oF0QI4iYgP5iGgry9zEtCM+YQS8UhiAlPlqa6ANxgiBSEyMHH/xE8lo/+caY
+-GeACqy640Jpl/JocFGo3xd1L8DCawjlaj6eu7T7T/tpAV2qq13b5710eNRbCAfFe
+-8yALiGQemx0IYhlZXNbIGWLBNhBhvVjJh7UvOqpADk4xtl8o5j0xgMIRg6WJGK6c
+-6ffSIg4eP1XmovNYZ9LLEJG68tF0Q/yIN43B4dt1oq4jzSdCbG4F1EiykT2TmwPV
+-YDi8tml6DfOCDGnit8svnMEmBv/fcPd31GSbXjF8M+KGGQIDAQABo2swaTAJBgNV
+-HRMEAjAAMAsGA1UdDwQEAwIF4DBPBgNVHREESDBGghAqLnRlc3QuZ29vZ2xlLmZy
+-ghh3YXRlcnpvb2kudGVzdC5nb29nbGUuYmWCEioudGVzdC55b3V0dWJlLmNvbYcE
+-wKgBAzANBgkqhkiG9w0BAQsFAAOCAQEAS8hDQA8PSgipgAml7Q3/djwQ644ghWQv
+-C2Kb+r30RCY1EyKNhnQnIIh/OUbBZvh0M0iYsy6xqXgfDhCB93AA6j0i5cS8fkhH
+-Jl4RK0tSkGQ3YNY4NzXwQP/vmUgfkw8VBAZ4Y4GKxppdATjffIW+srbAmdDruIRM
+-wPeikgOoRrXf0LA1fi4TqxARzeRwenQpayNfGHTvVF9aJkl8HoaMunTAdG5pIVcr
+-9GKi/gEMpXUJbbVv3U5frX1Wo4CFo+rZWJ/LyCMeb0jciNLxSdMwj/E/ZuExlyeZ
+-gc9ctPjSMvgSyXEKv6Vwobleeg88V2ZgzenziORoWj4KszG/lbQZvg==
++LCBDby4xGjAYBgNVBAMMESoudGVzdC5nb29nbGUuY29tMIICIjANBgkqhkiG9w0B
++AQEFAAOCAg8AMIICCgKCAgEA4u+d8ayYSPEpGVkuWx6mAqm5gs61uFYUX5oHbnn8
++toO1UjkRVdV3XdRZL1J6oaPmu3ax2fIh4iXpUnX7WDh3RgfHXHcrw7fMQ+nE8m5A
++HUnVNNniQiHsJUX81krZUYIPbMd+ccVKEuNSXOlUnY27gkmXGAhMsuYf8CYQpfUv
++7gD7jC9a2Tugitc+b8Qn5VJU/ZYBdR/kdRTnSjYCv4M5y4BTFMIFh7QTNyWPvf1f
++WuPFJ5C5S2cjOiGfoIY1dgwpOZOUFt7+OTK2LfSgFns5xNxmBl2ytXowahh0Er/0
++jYP+zHCxm8tJzq2yCyS544TqZJFtAFPor9bgEAK+dlffhFB/jMZP6a2S7fJDxlxf
++0rbJr3yfcUIBYr+VcMWVeXwraxDFBdvwNIvY2+eghIb/hV5McUYqST92wjJg91ii
++6e+O7VWmNGEqLgx/Y/lvyp1tuYgy+PagqT+LEEHGhgBi3DmSB8w18Gt/pVaBWzZB
++tGsQqC3jK67p4nxCpHTm/XqCB1LLqIbxst3ISU51mUj5ZGnlltcYIw1P3+KjdJLL
++xaOqIwMsZ5gbq+8nLFDEXfd+rKSWhLSR/GnAD8lC2EiwLcKp6KeuOljYeGJyRCRW
++9ZKdp3vEsWMSk22eWycoTOAuhpu5d3f3FPlIkQ4/HvI4X+AWQmLZHyEZqf8Uevmd
++fvUCAwEAAaOCAQkwggEFMAkGA1UdEwQCMAAwCwYDVR0PBAQDAgXgME8GA1UdEQRI
++MEaCECoudGVzdC5nb29nbGUuZnKCGHdhdGVyem9vaS50ZXN0Lmdvb2dsZS5iZYIS
++Ki50ZXN0LnlvdXR1YmUuY29thwTAqAEDMB0GA1UdDgQWBBSK4kHF8vH7iWk2JdkZ
++n1M936kTZDB7BgNVHSMEdDByoVqkWDBWMQswCQYDVQQGEwJBVTETMBEGA1UECAwK
++U29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMQ8w
++DQYDVQQDDAZ0ZXN0Y2GCFFqz9Fbx3Mviz+lLmDbYi/YAYQ+aMA0GCSqGSIb3DQEB
++CwUAA4IBAQADc4orBdIANU3fyvkzmYPqp9zIEzWOVOpKoWMihmYi9DdDSnPDwTE0
++Ba8C/b4xRP4dAcVN5AkzT/p7717Qkwd/u/AsW41TW4XXP0kKG1JI8MUyZboXLxsP
++resGiNiCNqRpTSiFaN7Dot2TlSrvU4+84sUUm+xWeOpZ4u7LFaZyYTHn0AUB+1Zu
++tMN3H7xTDvBwMlpIP1gJA9yCabdRhEs2Tma9VgDWzrAHak5Lw7/FsrBvLW+C7MmH
++C0IJfYWpmMvTaDzFK3MdRuRHFW7PyEioapDM9/UDahIq/2Cy7GxaL4U2r3qFr2aI
++mo0jyWthmHpODGkHx/mwFjG85U6aMn/A
+ -----END CERTIFICATE-----
+diff --git a/test/core/handshake/client_ssl.cc b/test/core/handshake/client_ssl.cc
+index 45e39c1517..33262dca19 100644
+--- a/test/core/handshake/client_ssl.cc
++++ b/test/core/handshake/client_ssl.cc
+@@ -216,20 +216,49 @@ static void server_thread(void* arg) {
+   if (!ctx) {
+     perror("Unable to create SSL context");
+     ERR_print_errors_fp(stderr);
++    // Check if we're in force-fail mode (WOLFPROV_FORCE_FAIL)
++    const char* force_fail = getenv("WOLFPROV_FORCE_FAIL");
++    if (force_fail != nullptr && strcmp(force_fail, "1") == 0) {
++      gpr_log(GPR_ERROR, "SSL context creation failed (expected with WOLFPROV_FORCE_FAIL)");
++      return;  // Exit gracefully instead of abort
++    }
+     abort();
+   }
+
+   // Load key pair.
+-  if (SSL_CTX_use_certificate_file(ctx, SSL_CERT_PATH, SSL_FILETYPE_PEM) < 0) {
+-    perror("Unable to use certificate file.");
++  // First try loading the private key
++  if (SSL_CTX_use_PrivateKey_file(ctx, SSL_KEY_PATH, SSL_FILETYPE_PEM) < 0) {
++    perror("Unable to use private key file.");
+     ERR_print_errors_fp(stderr);
++    const char* force_fail = getenv("WOLFPROV_FORCE_FAIL");
++    if (force_fail != nullptr && strcmp(force_fail, "1") == 0) {
++      gpr_log(GPR_ERROR, "Private key loading failed (expected with WOLFPROV_FORCE_FAIL)");
++      SSL_CTX_free(ctx);
++      return;
++    }
+     abort();
+   }
+-  if (SSL_CTX_use_PrivateKey_file(ctx, SSL_KEY_PATH, SSL_FILETYPE_PEM) < 0) {
+-    perror("Unable to use private key file.");
++
++  // Then load the certificate
++  if (SSL_CTX_use_certificate_file(ctx, SSL_CERT_PATH, SSL_FILETYPE_PEM) < 0) {
++    perror("Unable to use certificate file.");
+     ERR_print_errors_fp(stderr);
++
++    // Check if this is a FIPS-related issue
++    unsigned long err_code = ERR_peek_last_error();
++    if (ERR_GET_REASON(err_code) == 0x18F) {  // SSL_R_EE_KEY_TOO_SMALL
++      gpr_log(GPR_ERROR, "Certificate rejected in FIPS mode (key size issue).");
++    }
++
++    const char* force_fail = getenv("WOLFPROV_FORCE_FAIL");
++    if (force_fail != nullptr && strcmp(force_fail, "1") == 0) {
++      gpr_log(GPR_ERROR, "Certificate loading failed (expected with WOLFPROV_FORCE_FAIL)");
++      SSL_CTX_free(ctx);
++      return;
++    }
+     abort();
+   }
++
+   if (SSL_CTX_check_private_key(ctx) != 1) {
+     perror("Check private key failed.");
+     ERR_print_errors_fp(stderr);
