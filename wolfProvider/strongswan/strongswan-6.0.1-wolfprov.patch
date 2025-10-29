@@ -1,0 +1,92 @@
+diff --git a/src/libstrongswan/plugins/openssl/openssl_plugin.c b/src/libstrongswan/plugins/openssl/openssl_plugin.c
+index f567a8d6e..a4b06d5f9 100644
+--- a/src/libstrongswan/plugins/openssl/openssl_plugin.c
++++ b/src/libstrongswan/plugins/openssl/openssl_plugin.c
+@@ -792,28 +792,6 @@ static int concat_ossl_providers(OSSL_PROVIDER *provider, void *cbdata)
+ plugin_t *openssl_plugin_create()
+ {
+ 	private_openssl_plugin_t *this;
+-	int fips_mode;
+-
+-	fips_mode = lib->settings->get_int(lib->settings,
+-							"%s.plugins.openssl.fips_mode", FIPS_MODE, lib->ns);
+-#ifdef OPENSSL_FIPS
+-	if (fips_mode)
+-	{
+-		if (FIPS_mode() != fips_mode && !FIPS_mode_set(fips_mode))
+-		{
+-			DBG1(DBG_LIB, "unable to set OpenSSL FIPS mode(%d) from (%d)",
+-				 fips_mode, FIPS_mode());
+-			return NULL;
+-		}
+-	}
+-#elif OPENSSL_VERSION_NUMBER < 0x30000000L
+-	/* OpenSSL 3.0+ is handled below */
+-	if (fips_mode)
+-	{
+-		DBG1(DBG_LIB, "OpenSSL FIPS mode(%d) unavailable", fips_mode);
+-		return NULL;
+-	}
+-#endif
+ 
+ 	INIT(this,
+ 		.public = {
+@@ -840,49 +818,16 @@ plugin_t *openssl_plugin_create()
+ #endif /* OPENSSL_VERSION_NUMBER */
+ 
+ #if OPENSSL_VERSION_NUMBER >= 0x30000000L
+-	if (fips_mode)
+-	{
+-		OSSL_PROVIDER *fips;
+-
+-		fips = OSSL_PROVIDER_load(NULL, "fips");
+-		if (!fips)
+-		{
+-			DBG1(DBG_LIB, "unable to load OpenSSL FIPS provider");
+-			destroy(this);
+-			return NULL;
+-		}
+-		/* explicitly load the base provider containing encoding functions */
+-		OSSL_PROVIDER_load(NULL, "base");
+-	}
+-	else if (lib->settings->get_bool(lib->settings, "%s.plugins.openssl.load_legacy",
+-									 TRUE, lib->ns))
+-	{
+-		/* load the legacy provider for algorithms like MD4, DES, BF etc. */
+-		OSSL_PROVIDER_load(NULL, "legacy");
+-		/* explicitly load the default provider, as mentioned by crypto(7) */
+-		OSSL_PROVIDER_load(NULL, "default");
+-	}
+-	ossl_provider_names_t data = {};
+-	OSSL_PROVIDER_do_all(NULL, concat_ossl_providers, &data);
+-	dbg(DBG_LIB, strpfx(lib->ns, "charon") ? 1 : 2,
+-		"providers loaded by OpenSSL:%s", data.names);
+-#endif /* OPENSSL_VERSION_NUMBER */
+-
+-#ifdef OPENSSL_FIPS
+-	/* we do this here as it may have been enabled via openssl.conf */
+-	fips_mode = FIPS_mode();
+-	dbg(DBG_LIB, strpfx(lib->ns, "charon") ? 1 : 2,
+-		"OpenSSL FIPS mode(%d) - %sabled ", fips_mode, fips_mode ? "en" : "dis");
+-#endif /* OPENSSL_FIPS */
++    if (OSSL_PROVIDER_load(NULL, "libwolfprov") == NULL) {
++        DBG1(DBG_LIB, "Error loading wolfProvider");
++        return NULL;
++    }
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x1010100fL
+-	if (!seed_rng())
+-	{
+-		DBG1(DBG_CFG, "no RNG found to seed OpenSSL");
+-		destroy(this);
+-		return NULL;
+-	}
+-#endif /* OPENSSL_VERSION_NUMBER */
++    ossl_provider_names_t data = {};
++    OSSL_PROVIDER_do_all(NULL, concat_ossl_providers, &data);
++    dbg(DBG_LIB, strpfx(lib->ns, "charon") ? 1 : 2,
++        "providers loaded by OpenSSL:%s", data.names);
++#endif
+ 
+ 	return &this->public.plugin;
+ }
