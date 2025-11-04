@@ -1534,5 +1534,266 @@ index a4dc46f..7bc6b6b 100644
  	tun, err := tun.CreateTUN(interfaceName, 0)
  	if err == nil {
 -- 
+diff --git a/device/cookie.go b/device/cookie.go
+index b428eda..a6d3c12 100644
+--- a/device/cookie.go
++++ b/device/cookie.go
+@@ -182,11 +182,12 @@ func (st *CookieChecker) CreateReply(
+                 return nil, errors.New("RNG failed")
+         }
+ 
+-        var aes wolfSSL.Aes
+-        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-        wolfSSL.Wc_AesGcmSetKey(&aes, st.mac2.encryptionKey[:], len(st.mac2.encryptionKey[:]))
+-        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, reply.Cookie[:], cookie[:], reply.Nonce[:], msg[smac1:smac2])
+-        wolfSSL.Wc_AesFree(&aes)
++	aes := wolfSSL.Wc_AesAllocAligned()
++	wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++        wolfSSL.Wc_AesGcmSetKey(aes, st.mac2.encryptionKey[:], len(st.mac2.encryptionKey[:]))
++        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(aes, reply.Cookie[:], cookie[:], reply.Nonce[:], msg[smac1:smac2])
++        wolfSSL.Wc_AesFree(aes)
++	wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+ 	st.RUnlock()
+ 
+@@ -231,11 +232,12 @@ func (st *CookieGenerator) ConsumeReply(msg *MessageCookieReply) bool {
+ 	var cookie [wolfSSL.WC_SHA256_DIGEST_SIZE]byte
+ 
+ 
+-        var aes wolfSSL.Aes
+-        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-        wolfSSL.Wc_AesGcmSetKey(&aes, st.mac2.encryptionKey[:], len(st.mac2.encryptionKey[:]))
+-        ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(&aes, cookie[:], msg.Cookie[:], msg.Nonce[:], st.mac2.lastMAC1[:])
+-        wolfSSL.Wc_AesFree(&aes)
++	aes := wolfSSL.Wc_AesAllocAligned()
++        wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++        wolfSSL.Wc_AesGcmSetKey(aes, st.mac2.encryptionKey[:], len(st.mac2.encryptionKey[:]))
++        ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(aes, cookie[:], msg.Cookie[:], msg.Nonce[:], st.mac2.lastMAC1[:])
++        wolfSSL.Wc_AesFree(aes)
++	wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+ 	if ret < 0 {
+ 		return false
+diff --git a/device/noise-protocol.go b/device/noise-protocol.go
+index bb1d6e0..984e09d 100644
+--- a/device/noise-protocol.go
++++ b/device/noise-protocol.go
+@@ -222,11 +222,12 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
+ 		ss[:],
+ 	)
+ 
+-        var aes wolfSSL.Aes
+-        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-        wolfSSL.Wc_AesGcmSetKey(&aes, key[:], len(key[:]))
+-        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, msg.Static[:], device.staticIdentity.publicKey[:], ZeroNonce[:], handshake.hash[:])
+-        wolfSSL.Wc_AesFree(&aes)
++	aes := wolfSSL.Wc_AesAllocAligned()
++        wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++        wolfSSL.Wc_AesGcmSetKey(aes, key[:], len(key[:]))
++        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(aes, msg.Static[:], device.staticIdentity.publicKey[:], ZeroNonce[:], handshake.hash[:])
++        wolfSSL.Wc_AesFree(aes)
++	wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 	handshake.mixHash(msg.Static[:])
+ 
+ 	// encrypt timestamp
+@@ -240,10 +241,12 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
+ 		handshake.precomputedStaticStatic[:],
+ 	)
+ 	timestamp := tai64n.Now()
+-        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-        wolfSSL.Wc_AesGcmSetKey(&aes, key[:], len(key[:]))
+-        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, msg.Timestamp[:], timestamp[:], ZeroNonce[:], handshake.hash[:])
+-        wolfSSL.Wc_AesFree(&aes)
++	aes = wolfSSL.Wc_AesAllocAligned()
++        wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++        wolfSSL.Wc_AesGcmSetKey(aes, key[:], len(key[:]))
++        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(aes, msg.Timestamp[:], timestamp[:], ZeroNonce[:], handshake.hash[:])
++        wolfSSL.Wc_AesFree(aes)
++	wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+         // assign index
+ 	device.indexTable.Delete(handshake.localIndex)
+@@ -283,11 +286,12 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
+ 		return nil
+ 	}
+         KDF2(chainKey[:], key[:], chainKey[:], ss[:])
+-        var aes wolfSSL.Aes
+-        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-        wolfSSL.Wc_AesGcmSetKey(&aes, key[:], len(key[:]))
+-        wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(&aes, peerPK[:], msg.Static[:], ZeroNonce[:], hash[:])
+-        wolfSSL.Wc_AesFree(&aes)
++	aes := wolfSSL.Wc_AesAllocAligned()
++        wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++        wolfSSL.Wc_AesGcmSetKey(aes, key[:], len(key[:]))
++        wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(aes, peerPK[:], msg.Static[:], ZeroNonce[:], hash[:])
++        wolfSSL.Wc_AesFree(aes)
++	wolfSSL.Wc_AesFreeAllocAligned(aes)
+         mixHash(hash[:], hash[:], msg.Static[:])
+ 
+ 	// lookup peer
+@@ -315,10 +319,12 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
+ 		chainKey[:],
+ 		handshake.precomputedStaticStatic[:],
+ 	)
+-        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-        wolfSSL.Wc_AesGcmSetKey(&aes, key[:], len(key[:]))
+-        ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(&aes, timestamp[:], msg.Timestamp[:], ZeroNonce[:], hash[:])
+-        wolfSSL.Wc_AesFree(&aes)
++	aes = wolfSSL.Wc_AesAllocAligned()
++        wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++        wolfSSL.Wc_AesGcmSetKey(aes, key[:], len(key[:]))
++        ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(aes, timestamp[:], msg.Timestamp[:], ZeroNonce[:], hash[:])
++        wolfSSL.Wc_AesFree(aes)
++	wolfSSL.Wc_AesFreeAllocAligned(aes)
+         if ret < 0 {
+ 		handshake.mutex.RUnlock()
+ 		return nil
+@@ -423,11 +429,12 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
+ 
+ 	handshake.mixHash(tau[:])
+ 
+-        var aes wolfSSL.Aes
+-        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-        wolfSSL.Wc_AesGcmSetKey(&aes, key[:], len(key[:]))
+-        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, msg.Empty[:], nil, ZeroNonce[:], handshake.hash[:])
+-        wolfSSL.Wc_AesFree(&aes)
++	aes := wolfSSL.Wc_AesAllocAligned()
++        wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++        wolfSSL.Wc_AesGcmSetKey(aes, key[:], len(key[:]))
++        wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(aes, msg.Empty[:], nil, ZeroNonce[:], handshake.hash[:])
++        wolfSSL.Wc_AesFree(aes)
++	wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+ 	handshake.mixHash(msg.Empty[:])
+ 
+@@ -504,11 +511,12 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
+ 		// authenticate transcript
+ 
+                 var authTag [wolfSSL.AES_BLOCK_SIZE]byte
+-                var aes wolfSSL.Aes
+-                wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-                wolfSSL.Wc_AesGcmSetKey(&aes, key[:], len(key[:]))
+-        	wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, authTag[:], nil, ZeroNonce[:], hash[:])
+-                wolfSSL.Wc_AesFree(&aes)
++		aes := wolfSSL.Wc_AesAllocAligned()
++                wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++                wolfSSL.Wc_AesGcmSetKey(aes, key[:], len(key[:]))
++        	wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(aes, authTag[:], nil, ZeroNonce[:], hash[:])
++                wolfSSL.Wc_AesFree(aes)
++		wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+                 if !bytes.Equal(authTag[:], msg.Empty[:]) {
+                     return false
+diff --git a/device/noise_test.go b/device/noise_test.go
+index ee166a4..defb692 100644
+--- a/device/noise_test.go
++++ b/device/noise_test.go
+@@ -166,17 +166,21 @@ func TestNoiseHandshake(t *testing.T) {
+ 		testMsg := []byte("wireguard test message 1")
+ 		var out []byte
+ 		var nonce [12]byte
+-                var aes wolfSSL.Aes
+ 
+-                wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-                wolfSSL.Wc_AesGcmSetKey(&aes, key1.send[:], len(key1.send[:]))
+-                out, _ = wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, out, testMsg, nonce[:], nil)
+-                wolfSSL.Wc_AesFree(&aes)
++		aes := wolfSSL.Wc_AesAllocAligned()
++                wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++                wolfSSL.Wc_AesGcmSetKey(aes, key1.send[:], len(key1.send[:]))
++                out, _ = wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(aes, out, testMsg, nonce[:], nil)
++                wolfSSL.Wc_AesFree(aes)
++		wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+-                wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-                wolfSSL.Wc_AesGcmSetKey(&aes, key2.receive[:], len(key2.receive[:]))
+-                ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(&aes, out, out, nonce[:], nil)
+-                wolfSSL.Wc_AesFree(&aes)
++
++		aes = wolfSSL.Wc_AesAllocAligned()
++                wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++                wolfSSL.Wc_AesGcmSetKey(aes, key2.receive[:], len(key2.receive[:]))
++                ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(aes, out, out, nonce[:], nil)
++                wolfSSL.Wc_AesFree(aes)
++		wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+ 		assertIntEqual(t, ret, 0)
+                 assertEqual(t, out[:len(out)-wolfSSL.AES_BLOCK_SIZE], testMsg)
+@@ -186,17 +190,20 @@ func TestNoiseHandshake(t *testing.T) {
+ 		testMsg := []byte("wireguard test message 2")
+ 		var out []byte
+ 		var nonce [12]byte
+-                var aes wolfSSL.Aes
+-
+-                wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-                wolfSSL.Wc_AesGcmSetKey(&aes, key2.send[:], len(key2.send[:]))
+-                out, _ = wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, out, testMsg, nonce[:], nil)
+-                wolfSSL.Wc_AesFree(&aes)
+ 
+-                wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-                wolfSSL.Wc_AesGcmSetKey(&aes, key1.receive[:], len(key1.receive[:]))
+-                ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(&aes, out, out, nonce[:], nil)
+-                wolfSSL.Wc_AesFree(&aes)
++		aes := wolfSSL.Wc_AesAllocAligned()
++                wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++                wolfSSL.Wc_AesGcmSetKey(aes, key2.send[:], len(key2.send[:]))
++                out, _ = wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(aes, out, testMsg, nonce[:], nil)
++                wolfSSL.Wc_AesFree(aes)
++		wolfSSL.Wc_AesFreeAllocAligned(aes)
++
++		aes = wolfSSL.Wc_AesAllocAligned()
++                wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++                wolfSSL.Wc_AesGcmSetKey(aes, key1.receive[:], len(key1.receive[:]))
++                ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(aes, out, out, nonce[:], nil)
++                wolfSSL.Wc_AesFree(aes)
++		wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+ 		assertIntEqual(t, ret, 0)
+                 assertEqual(t, out[:len(out)-wolfSSL.AES_BLOCK_SIZE], testMsg)
+diff --git a/device/receive.go b/device/receive.go
+index 38ab0ed..bcf679a 100644
+--- a/device/receive.go
++++ b/device/receive.go
+@@ -253,11 +253,12 @@ func (device *Device) RoutineDecryption(id int) {
+ 			// copy counter to nonce
+ 			binary.LittleEndian.PutUint64(nonce[0x4:0xc], elem.counter)
+ 
+-                        var aes wolfSSL.Aes
+-                        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-                        wolfSSL.Wc_AesGcmSetKey(&aes, elem.keypair.receive[:], len(elem.keypair.receive[:]))
+-                        ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(&aes, content, content, nonce[:], nil)
+-                        wolfSSL.Wc_AesFree(&aes)
++			aes := wolfSSL.Wc_AesAllocAligned()
++                        wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++                        wolfSSL.Wc_AesGcmSetKey(aes, elem.keypair.receive[:], len(elem.keypair.receive[:]))
++                        ret := wolfSSL.Wc_AesGcm_Appended_Tag_Decrypt(aes, content, content, nonce[:], nil)
++                        wolfSSL.Wc_AesFree(aes)
++			wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+ 			if ret < 0 {
+ 				elem.packet = nil
+diff --git a/device/send.go b/device/send.go
+index 458b63f..45c2382 100644
+--- a/device/send.go
++++ b/device/send.go
+@@ -469,11 +469,12 @@ func (device *Device) RoutineEncryption(id int) {
+ 
+ 			binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
+ 
+-                        var aes wolfSSL.Aes
+-                        wolfSSL.Wc_AesInit(&aes, nil, wolfSSL.INVALID_DEVID)
+-                        wolfSSL.Wc_AesGcmSetKey(&aes, elem.keypair.send[:], len(elem.keypair.send[:]))
+-                        elem.packet, _ = wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(&aes, elem.packet, elem.packet, nonce[:], nil)
+-                        wolfSSL.Wc_AesFree(&aes)
++			aes := wolfSSL.Wc_AesAllocAligned()
++                        wolfSSL.Wc_AesInit(aes, nil, wolfSSL.INVALID_DEVID)
++                        wolfSSL.Wc_AesGcmSetKey(aes, elem.keypair.send[:], len(elem.keypair.send[:]))
++                        elem.packet, _ = wolfSSL.Wc_AesGcm_Appended_Tag_Encrypt(aes, elem.packet, elem.packet, nonce[:], nil)
++                        wolfSSL.Wc_AesFree(aes)
++			wolfSSL.Wc_AesFreeAllocAligned(aes)
+ 
+                         elem.packet = append(header[:], elem.packet[:]...)
+                     }
+-- 
 2.39.5 (Apple Git-154)
 
