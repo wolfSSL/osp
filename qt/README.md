@@ -16,7 +16,7 @@ cd wolfssl
 ./configure --enable-qt --enable-qt-test --enable-alpn --enable-rc2 --prefix=/path/to/wolfssl-install\
  CFLAGS="-DWOLFSSL_ERROR_CODE_OPENSSL -DWOLFSSL_LOAD_VERIFY_DEFAULT_FLAGS=0x1b"
 
-Note : 
+Note :
 WOLFSSL_LOAD_VERIFY_DEFAULT_FLAGS=0x1b is to be compliant with OpenSSL by Or'ed the following flags:
 LOAD_FLAG_IGNORE_ERROR, LOAD_FLAG_DATE_ERR_OKAY, LOAD_FLAG_IGNORE_BAT_PATH_ERR and \
 LOAD_FLAG_IGNORE_ZEROFILE
@@ -41,7 +41,7 @@ LD_LIBRARY_PATH=/path/to/wolfssl\install/lib:$LD_LIBRARY_PATH
 
 1. Clone Qt library from base directory:
 ```
-git clone git://code.qt.io/qt/qt5.git --branch v5.15.x 
+git clone git://code.qt.io/qt/qt5.git --branch v5.15.x
 ```
 
 2. Checkout Qt version and init repository:
@@ -72,7 +72,13 @@ git apply -v ../wolfssl-qt-515.patch
    cd qtbase
    git apply -v ../wolfssl-qt-515_unit_test.patch
    ```
-   4-4. Copy unit test folder and certificate files
+   4-4. Copy certs in wolfssl certs folder to qssl_wolf certs folder
+   This step is needed to avoid certificate-expiration issues during unit testing.
+   ```
+   copy ca-cert.pem, client-cert.pem and server-cert.pem files from \
+        /path/to/wolfssl/certs/ to /path/to/osp/qt/qssl_wolf/certs folder
+   ```
+   4-5. Copy unit test folder and certificate files
    ```
    copy /path/to/osp-repo/qt/qssl_wolf folder to /path/to/qt5/qtbase/tests/auto/network/ssl
    copy crt, key and pem files from /path/to/qt5/qtbase/tests/auto/network/ssl/qsslsocket/certs to \
@@ -101,7 +107,7 @@ make check
 
 ### SSL unit tests
 
-The Qt SSL unit tests can be found from the root qt5 directory: 
+The Qt SSL unit tests can be found from the root qt5 directory:
 
 `qt5/qtbase/tests/auto/network/ssl/`
 
