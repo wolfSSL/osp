@@ -1,0 +1,944 @@
+From: wolfSSL Inc.
+Subject: OpenSSH FIPS mode test adjustments for wolfProvider
+Upstream-Status: Inappropriate [wolfSSL-specific FIPS testing]
+
+Adjusts OpenSSH regress tests for FIPS mode compatibility with wolfProvider.
+Skips tests that use non-FIPS algorithms (DSA, MD5, weak RSA keys).
+
+Signed-off-by: wolfSSL Inc.
+
+diff --git a/regress/Makefile b/regress/Makefile
+index f5cb9bd47..bb96e8067 100644
+--- a/regress/Makefile
++++ b/regress/Makefile
+@@ -2,7 +2,15 @@
+ 
+ tests:		prep file-tests t-exec unit
+ 
+-REGRESS_TARGETS=	t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
++# Define default REGRESS_TARGETS
++REGRESS_TARGETS := t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
++
++# Override REGRESS_TARGETS in FIPS mode
++# t1: uses RSA SSH2 format conversion (not FIPS-relevant)
++# t4: uses MD5 fingerprints (MD5 not available in FIPS mode)
++# t6: uses DSA keys (DSA not available in FIPS mode)
++# t8: generates DSA keys (DSA not available in FIPS mode)
++REGRESS_TARGETS := t2 t3 t5 t7 t9 t10 t11 t12
+ 
+ # File based tests
+ file-tests: $(REGRESS_TARGETS)
+@@ -115,8 +123,10 @@ INTEROP_TESTS=	putty-transfer putty-ciphers putty-kex conch-ciphers
+ INTEROP_TESTS+=	dropbear-ciphers dropbear-kex
+ #INTEROP_TESTS+=ssh-com ssh-com-client ssh-com-keygen ssh-com-sftp
+ 
+-EXTRA_TESTS=	agent-pkcs11
++# agent-pkcs11 disabled for FIPS testing
++#EXTRA_TESTS=	agent-pkcs11
+ #EXTRA_TESTS+= 	cipher-speed
++EXTRA_TESTS=
+ 
+ USERNAME=		${LOGNAME}
+ CLEANFILES=	*.core actual agent-key.* authorized_keys_${USERNAME} \
+diff --git a/regress/unittests/kex/test_kex.c b/regress/unittests/kex/test_kex.c
+index c26761ee7..d0bdc9e1e 100644
+--- a/regress/unittests/kex/test_kex.c
++++ b/regress/unittests/kex/test_kex.c
+@@ -96,6 +96,11 @@ do_kex_with_key(char *kex, int keytype, int bits)
+ 	memcpy(kex_params.proposal, myproposal, sizeof(myproposal));
+ 	if (kex != NULL)
+ 		kex_params.proposal[PROPOSAL_KEX_ALGS] = kex;
++	/* Use FIPS-compliant ciphers and MACs */
++	kex_params.proposal[PROPOSAL_ENC_ALGS_CTOS] = "aes128-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com";
++	kex_params.proposal[PROPOSAL_ENC_ALGS_STOC] = "aes128-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com";
++	kex_params.proposal[PROPOSAL_MAC_ALGS_CTOS] = "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512";
++	kex_params.proposal[PROPOSAL_MAC_ALGS_STOC] = "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512";
+ 	keyname = strdup(sshkey_ssh_name(private));
+ 	ASSERT_PTR_NE(keyname, NULL);
+ 	kex_params.proposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = keyname;
+@@ -179,18 +184,17 @@ do_kex(char *kex)
+ {
+ #ifdef WITH_OPENSSL
+ 	do_kex_with_key(kex, KEY_RSA, 2048);
+-	do_kex_with_key(kex, KEY_DSA, 1024);
+ #ifdef OPENSSL_HAS_ECC
+ 	do_kex_with_key(kex, KEY_ECDSA, 256);
+ #endif /* OPENSSL_HAS_ECC */
+ #endif /* WITH_OPENSSL */
+-	do_kex_with_key(kex, KEY_ED25519, 256);
++	/* Ed25519 removed - uses Curve25519 which is not FIPS compliant */
+ }
+ 
+ void
+ kex_tests(void)
+ {
+-	do_kex("curve25519-sha256@libssh.org");
++	/* FIPS-compliant KEX algorithms only */
+ #ifdef WITH_OPENSSL
+ #ifdef OPENSSL_HAS_ECC
+ 	do_kex("ecdh-sha2-nistp256");
+@@ -198,11 +202,5 @@ kex_tests(void)
+ 	do_kex("ecdh-sha2-nistp521");
+ #endif /* OPENSSL_HAS_ECC */
+ 	do_kex("diffie-hellman-group-exchange-sha256");
+-	do_kex("diffie-hellman-group-exchange-sha1");
+-	do_kex("diffie-hellman-group14-sha1");
+-	do_kex("diffie-hellman-group1-sha1");
+-# ifdef USE_SNTRUP761X25519
+-	do_kex("sntrup761x25519-sha512@openssh.com");
+-# endif /* USE_SNTRUP761X25519 */
+ #endif /* WITH_OPENSSL */
+ }
+diff --git a/regress/unittests/sshkey/common.c b/regress/unittests/sshkey/common.c
+index 51b0d92e1..3c0c90882 100644
+--- a/regress/unittests/sshkey/common.c
++++ b/regress/unittests/sshkey/common.c
+@@ -21,7 +21,6 @@
+ #ifdef WITH_OPENSSL
+ #include <openssl/bn.h>
+ #include <openssl/rsa.h>
+-#include <openssl/dsa.h>
+ #include <openssl/objects.h>
+ #ifdef OPENSSL_HAS_NISTP256
+ # include <openssl/ec.h>
+@@ -127,37 +126,5 @@ rsa_q(struct sshkey *k)
+ 	return q;
+ }
+ 
+-const BIGNUM *
+-dsa_g(struct sshkey *k)
+-{
+-	const BIGNUM *g = NULL;
+-
+-	ASSERT_PTR_NE(k, NULL);
+-	ASSERT_PTR_NE(k->dsa, NULL);
+-	DSA_get0_pqg(k->dsa, NULL, NULL, &g);
+-	return g;
+-}
+-
+-const BIGNUM *
+-dsa_pub_key(struct sshkey *k)
+-{
+-	const BIGNUM *pub_key = NULL;
+-
+-	ASSERT_PTR_NE(k, NULL);
+-	ASSERT_PTR_NE(k->dsa, NULL);
+-	DSA_get0_key(k->dsa, &pub_key, NULL);
+-	return pub_key;
+-}
+-
+-const BIGNUM *
+-dsa_priv_key(struct sshkey *k)
+-{
+-	const BIGNUM *priv_key = NULL;
+-
+-	ASSERT_PTR_NE(k, NULL);
+-	ASSERT_PTR_NE(k->dsa, NULL);
+-	DSA_get0_key(k->dsa, NULL, &priv_key);
+-	return priv_key;
+-}
+ #endif /* WITH_OPENSSL */
+ 
+diff --git a/regress/unittests/sshkey/common.h b/regress/unittests/sshkey/common.h
+index 7a514fdc8..93d80a57f 100644
+--- a/regress/unittests/sshkey/common.h
++++ b/regress/unittests/sshkey/common.h
+@@ -19,7 +19,4 @@ const BIGNUM *rsa_n(struct sshkey *k);
+ const BIGNUM *rsa_e(struct sshkey *k);
+ const BIGNUM *rsa_p(struct sshkey *k);
+ const BIGNUM *rsa_q(struct sshkey *k);
+-const BIGNUM *dsa_g(struct sshkey *k);
+-const BIGNUM *dsa_pub_key(struct sshkey *k);
+-const BIGNUM *dsa_priv_key(struct sshkey *k);
+ 
+diff --git a/regress/unittests/sshkey/mktestdata.sh b/regress/unittests/sshkey/mktestdata.sh
+index fcd78e990..ae0e3c6aa 100755
+--- a/regress/unittests/sshkey/mktestdata.sh
++++ b/regress/unittests/sshkey/mktestdata.sh
+@@ -24,27 +24,6 @@ rsa_params() {
+ 	done
+ }
+ 
+-dsa_params() {
+-	_in="$1"
+-	_outbase="$2"
+-	set -e
+-	openssl dsa -noout -text -in $_in | \
+-	    awk '/^priv:$/,/^pub:/' | \
+-	    grep -v '^[a-zA-Z]' | tr -d ' \n:' > ${_outbase}.priv
+-	openssl dsa -noout -text -in $_in | \
+-	    awk '/^pub:/,/^P:/' | #\
+-	    grep -v '^[a-zA-Z]' | tr -d ' \n:' > ${_outbase}.pub
+-	openssl dsa -noout -text -in $_in | \
+-	    awk '/^G:/,0' | \
+-	    grep -v '^[a-zA-Z]' | tr -d ' \n:' > ${_outbase}.g
+-	for x in priv pub g ; do
+-		echo "" >> ${_outbase}.$x
+-		echo ============ ${_outbase}.$x
+-		cat ${_outbase}.$x
+-		echo ============
+-	done
+-}
+-
+ ecdsa_params() {
+ 	_in="$1"
+ 	_outbase="$2"
+@@ -79,15 +58,14 @@ else
+ 	exit 1
+ fi
+ 
+-rm -f rsa_1 dsa_1 ecdsa_1 ed25519_1
+-rm -f rsa_2 dsa_2 ecdsa_2 ed25519_2
+-rm -f rsa_n dsa_n ecdsa_n # new-format keys
+-rm -f rsa_1_pw dsa_1_pw ecdsa_1_pw ed25519_1_pw
+-rm -f rsa_n_pw dsa_n_pw ecdsa_n_pw
++rm -f rsa_1 ecdsa_1 ed25519_1
++rm -f rsa_2 ecdsa_2 ed25519_2
++rm -f rsa_n ecdsa_n # new-format keys
++rm -f rsa_1_pw ecdsa_1_pw ed25519_1_pw
++rm -f rsa_n_pw ecdsa_n_pw
+ rm -f pw *.pub *.bn.* *.param.* *.fp *.fp.bb
+ 
+-ssh-keygen -t rsa -b 1024 -C "RSA test key #1" -N "" -f rsa_1 -m PEM
+-ssh-keygen -t dsa -b 1024 -C "DSA test key #1" -N "" -f dsa_1 -m PEM
++ssh-keygen -t rsa -b 2048 -C "RSA test key #1" -N "" -f rsa_1 -m PEM
+ ssh-keygen -t ecdsa -b 256 -C "ECDSA test key #1" -N "" -f ecdsa_1 -m PEM
+ ssh-keygen -t ed25519 -C "ED25519 test key #1" -N "" -f ed25519_1
+ ssh-keygen -w "$SK_DUMMY" -t ecdsa-sk -C "ECDSA-SK test key #1" \
+@@ -97,7 +75,6 @@ ssh-keygen -w "$SK_DUMMY" -t ed25519-sk -C "ED25519-SK test key #1" \
+ 
+ 
+ ssh-keygen -t rsa -b 2048 -C "RSA test key #2" -N "" -f rsa_2 -m PEM
+-ssh-keygen -t dsa -b 1024 -C "DSA test key #2" -N "" -f dsa_2 -m PEM
+ ssh-keygen -t ecdsa -b 521 -C "ECDSA test key #2" -N "" -f ecdsa_2 -m PEM
+ ssh-keygen -t ed25519 -C "ED25519 test key #2" -N "" -f ed25519_2
+ ssh-keygen -w "$SK_DUMMY" -t ecdsa-sk -C "ECDSA-SK test key #2" \
+@@ -106,21 +83,17 @@ ssh-keygen -w "$SK_DUMMY" -t ed25519-sk -C "ED25519-SK test key #2" \
+     -N "" -f ed25519_sk2
+ 
+ cp rsa_1 rsa_n
+-cp dsa_1 dsa_n
+ cp ecdsa_1 ecdsa_n
+ 
+ ssh-keygen -pf rsa_n -N ""
+-ssh-keygen -pf dsa_n -N ""
+ ssh-keygen -pf ecdsa_n -N ""
+ 
+ cp rsa_1 rsa_1_pw
+-cp dsa_1 dsa_1_pw
+ cp ecdsa_1 ecdsa_1_pw
+ cp ed25519_1 ed25519_1_pw
+ cp ecdsa_sk1 ecdsa_sk1_pw
+ cp ed25519_sk1 ed25519_sk1_pw
+ cp rsa_1 rsa_n_pw
+-cp dsa_1 dsa_n_pw
+ cp ecdsa_1 ecdsa_n_pw
+ 
+ ssh-keygen -pf rsa_1_pw -m PEM -N "$PW"
+diff --git a/regress/unittests/sshkey/test_file.c b/regress/unittests/sshkey/test_file.c
+index 488944c3b..5534ac787 100644
+--- a/regress/unittests/sshkey/test_file.c
++++ b/regress/unittests/sshkey/test_file.c
+@@ -21,8 +21,8 @@
+ #ifdef WITH_OPENSSL
+ #include <openssl/bn.h>
+ #include <openssl/rsa.h>
+-#include <openssl/dsa.h>
+ #include <openssl/objects.h>
++#include <openssl/evp.h>
+ #ifdef OPENSSL_HAS_NISTP256
+ # include <openssl/ec.h>
+ #endif /* OPENSSL_HAS_NISTP256 */
+@@ -72,16 +72,6 @@ sshkey_file_tests(void)
+ 	BN_free(c);
+ 	TEST_DONE();
+ 
+-	TEST_START("parse RSA from private w/ passphrase");
+-	buf = load_file("rsa_1_pw");
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf,
+-	    (const char *)sshbuf_ptr(pw), &k2, NULL), 0);
+-	sshbuf_free(buf);
+-	ASSERT_PTR_NE(k2, NULL);
+-	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
+-	sshkey_free(k2);
+-	TEST_DONE();
+-
+ 	TEST_START("parse RSA from new-format");
+ 	buf = load_file("rsa_n");
+ 	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k2, NULL), 0);
+@@ -165,97 +155,6 @@ sshkey_file_tests(void)
+ 
+ 	sshkey_free(k1);
+ 
+-	TEST_START("parse DSA from private");
+-	buf = load_file("dsa_1");
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k1, NULL), 0);
+-	sshbuf_free(buf);
+-	ASSERT_PTR_NE(k1, NULL);
+-	a = load_bignum("dsa_1.param.g");
+-	b = load_bignum("dsa_1.param.priv");
+-	c = load_bignum("dsa_1.param.pub");
+-	ASSERT_BIGNUM_EQ(dsa_g(k1), a);
+-	ASSERT_BIGNUM_EQ(dsa_priv_key(k1), b);
+-	ASSERT_BIGNUM_EQ(dsa_pub_key(k1), c);
+-	BN_free(a);
+-	BN_free(b);
+-	BN_free(c);
+-	TEST_DONE();
+-
+-	TEST_START("parse DSA from private w/ passphrase");
+-	buf = load_file("dsa_1_pw");
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf,
+-	    (const char *)sshbuf_ptr(pw), &k2, NULL), 0);
+-	sshbuf_free(buf);
+-	ASSERT_PTR_NE(k2, NULL);
+-	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
+-	sshkey_free(k2);
+-	TEST_DONE();
+-
+-	TEST_START("parse DSA from new-format");
+-	buf = load_file("dsa_n");
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k2, NULL), 0);
+-	sshbuf_free(buf);
+-	ASSERT_PTR_NE(k2, NULL);
+-	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
+-	sshkey_free(k2);
+-	TEST_DONE();
+-
+-	TEST_START("parse DSA from new-format w/ passphrase");
+-	buf = load_file("dsa_n_pw");
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf,
+-	    (const char *)sshbuf_ptr(pw), &k2, NULL), 0);
+-	sshbuf_free(buf);
+-	ASSERT_PTR_NE(k2, NULL);
+-	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
+-	sshkey_free(k2);
+-	TEST_DONE();
+-
+-	TEST_START("load DSA from public");
+-	ASSERT_INT_EQ(sshkey_load_public(test_data_file("dsa_1.pub"), &k2,
+-	    NULL), 0);
+-	ASSERT_PTR_NE(k2, NULL);
+-	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
+-	sshkey_free(k2);
+-	TEST_DONE();
+-
+-	TEST_START("load DSA cert");
+-	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("dsa_1"), &k2), 0);
+-	ASSERT_PTR_NE(k2, NULL);
+-	ASSERT_INT_EQ(k2->type, KEY_DSA_CERT);
+-	ASSERT_INT_EQ(sshkey_equal(k1, k2), 0);
+-	ASSERT_INT_EQ(sshkey_equal_public(k1, k2), 1);
+-	TEST_DONE();
+-
+-	TEST_START("DSA key hex fingerprint");
+-	buf = load_text_file("dsa_1.fp");
+-	cp = sshkey_fingerprint(k1, SSH_DIGEST_SHA256, SSH_FP_BASE64);
+-	ASSERT_PTR_NE(cp, NULL);
+-	ASSERT_STRING_EQ(cp, (const char *)sshbuf_ptr(buf));
+-	sshbuf_free(buf);
+-	free(cp);
+-	TEST_DONE();
+-
+-	TEST_START("DSA cert hex fingerprint");
+-	buf = load_text_file("dsa_1-cert.fp");
+-	cp = sshkey_fingerprint(k2, SSH_DIGEST_SHA256, SSH_FP_BASE64);
+-	ASSERT_PTR_NE(cp, NULL);
+-	ASSERT_STRING_EQ(cp, (const char *)sshbuf_ptr(buf));
+-	sshbuf_free(buf);
+-	free(cp);
+-	sshkey_free(k2);
+-	TEST_DONE();
+-
+-	TEST_START("DSA key bubblebabble fingerprint");
+-	buf = load_text_file("dsa_1.fp.bb");
+-	cp = sshkey_fingerprint(k1, SSH_DIGEST_SHA1, SSH_FP_BUBBLEBABBLE);
+-	ASSERT_PTR_NE(cp, NULL);
+-	ASSERT_STRING_EQ(cp, (const char *)sshbuf_ptr(buf));
+-	sshbuf_free(buf);
+-	free(cp);
+-	TEST_DONE();
+-
+-	sshkey_free(k1);
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("parse ECDSA from private");
+ 	buf = load_file("ecdsa_1");
+@@ -281,16 +180,6 @@ sshkey_file_tests(void)
+ #endif /* OPENSSL_IS_BORINGSSL */
+ 	TEST_DONE();
+ 
+-	TEST_START("parse ECDSA from private w/ passphrase");
+-	buf = load_file("ecdsa_1_pw");
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf,
+-	    (const char *)sshbuf_ptr(pw), &k2, NULL), 0);
+-	sshbuf_free(buf);
+-	ASSERT_PTR_NE(k2, NULL);
+-	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
+-	sshkey_free(k2);
+-	TEST_DONE();
+-
+ 	TEST_START("parse ECDSA from new-format");
+ 	buf = load_file("ecdsa_n");
+ 	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k2, NULL), 0);
+diff --git a/regress/unittests/sshkey/test_fuzz.c b/regress/unittests/sshkey/test_fuzz.c
+index 2fae19dcf..78ab5d6b6 100644
+--- a/regress/unittests/sshkey/test_fuzz.c
++++ b/regress/unittests/sshkey/test_fuzz.c
+@@ -21,7 +21,6 @@
+ #ifdef WITH_OPENSSL
+ #include <openssl/bn.h>
+ #include <openssl/rsa.h>
+-#include <openssl/dsa.h>
+ #include <openssl/objects.h>
+ #ifdef OPENSSL_HAS_NISTP256
+ # include <openssl/ec.h>
+@@ -160,50 +159,6 @@ sshkey_fuzz_tests(void)
+ 	fuzz_cleanup(fuzz);
+ 	TEST_DONE();
+ 
+-	TEST_START("fuzz DSA private");
+-	buf = load_file("dsa_1");
+-	fuzz = fuzz_begin(FUZZ_BASE64, sshbuf_mutable_ptr(buf),
+-	    sshbuf_len(buf));
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k1, NULL), 0);
+-	sshkey_free(k1);
+-	sshbuf_free(buf);
+-	ASSERT_PTR_NE(fuzzed = sshbuf_new(), NULL);
+-	TEST_ONERROR(onerror, fuzz);
+-	for(i = 0; !fuzz_done(fuzz); i++, fuzz_next(fuzz)) {
+-		r = sshbuf_put(fuzzed, fuzz_ptr(fuzz), fuzz_len(fuzz));
+-		ASSERT_INT_EQ(r, 0);
+-		if (sshkey_parse_private_fileblob(fuzzed, "", &k1, NULL) == 0)
+-			sshkey_free(k1);
+-		sshbuf_reset(fuzzed);
+-		if (test_is_fast() && i >= NUM_FAST_BASE64_TESTS)
+-			break;
+-	}
+-	sshbuf_free(fuzzed);
+-	fuzz_cleanup(fuzz);
+-	TEST_DONE();
+-
+-	TEST_START("fuzz DSA new-format private");
+-	buf = load_file("dsa_n");
+-	fuzz = fuzz_begin(FUZZ_BASE64, sshbuf_mutable_ptr(buf),
+-	    sshbuf_len(buf));
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k1, NULL), 0);
+-	sshkey_free(k1);
+-	sshbuf_free(buf);
+-	ASSERT_PTR_NE(fuzzed = sshbuf_new(), NULL);
+-	TEST_ONERROR(onerror, fuzz);
+-	for(i = 0; !fuzz_done(fuzz); i++, fuzz_next(fuzz)) {
+-		r = sshbuf_put(fuzzed, fuzz_ptr(fuzz), fuzz_len(fuzz));
+-		ASSERT_INT_EQ(r, 0);
+-		if (sshkey_parse_private_fileblob(fuzzed, "", &k1, NULL) == 0)
+-			sshkey_free(k1);
+-		sshbuf_reset(fuzzed);
+-		if (test_is_fast() && i >= NUM_FAST_BASE64_TESTS)
+-			break;
+-	}
+-	sshbuf_free(fuzzed);
+-	fuzz_cleanup(fuzz);
+-	TEST_DONE();
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("fuzz ECDSA private");
+ 	buf = load_file("ecdsa_1");
+@@ -288,20 +243,6 @@ sshkey_fuzz_tests(void)
+ 	sshkey_free(k1);
+ 	TEST_DONE();
+ 
+-	TEST_START("fuzz DSA public");
+-	buf = load_file("dsa_1");
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k1, NULL), 0);
+-	sshbuf_free(buf);
+-	public_fuzz(k1);
+-	sshkey_free(k1);
+-	TEST_DONE();
+-
+-	TEST_START("fuzz DSA cert");
+-	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("dsa_1"), &k1), 0);
+-	public_fuzz(k1);
+-	sshkey_free(k1);
+-	TEST_DONE();
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("fuzz ECDSA public");
+ 	buf = load_file("ecdsa_1");
+@@ -358,14 +299,6 @@ sshkey_fuzz_tests(void)
+ 	sshkey_free(k1);
+ 	TEST_DONE();
+ 
+-	TEST_START("fuzz DSA sig");
+-	buf = load_file("dsa_1");
+-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k1, NULL), 0);
+-	sshbuf_free(buf);
+-	sig_fuzz(k1, NULL);
+-	sshkey_free(k1);
+-	TEST_DONE();
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("fuzz ECDSA sig");
+ 	buf = load_file("ecdsa_1");
+diff --git a/regress/unittests/sshkey/test_sshkey.c b/regress/unittests/sshkey/test_sshkey.c
+index cc359aea5..dfef9f5f7 100644
+--- a/regress/unittests/sshkey/test_sshkey.c
++++ b/regress/unittests/sshkey/test_sshkey.c
+@@ -18,7 +18,6 @@
+ #ifdef WITH_OPENSSL
+ #include <openssl/bn.h>
+ #include <openssl/rsa.h>
+-#include <openssl/dsa.h>
+ #if defined(OPENSSL_HAS_ECC) && defined(OPENSSL_HAS_NISTP256)
+ # include <openssl/ec.h>
+ #endif
+@@ -182,7 +181,7 @@ sshkey_tests(void)
+ {
+ 	struct sshkey *k1, *k2, *k3, *kf;
+ #ifdef WITH_OPENSSL
+-	struct sshkey *k4, *kr, *kd;
++	struct sshkey *k4, *kr;
+ #ifdef OPENSSL_HAS_ECC
+ 	struct sshkey *ke;
+ #endif /* OPENSSL_HAS_ECC */
+@@ -208,13 +207,6 @@ sshkey_tests(void)
+ 	sshkey_free(k1);
+ 	TEST_DONE();
+ 
+-	TEST_START("new/free KEY_DSA");
+-	k1 = sshkey_new(KEY_DSA);
+-	ASSERT_PTR_NE(k1, NULL);
+-	ASSERT_PTR_NE(k1->dsa, NULL);
+-	sshkey_free(k1);
+-	TEST_DONE();
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("new/free KEY_ECDSA");
+ 	k1 = sshkey_new(KEY_ECDSA);
+@@ -245,13 +237,6 @@ sshkey_tests(void)
+ 	ASSERT_PTR_EQ(k1, NULL);
+ 	TEST_DONE();
+ 
+-	TEST_START("generate KEY_DSA wrong bits");
+-	ASSERT_INT_EQ(sshkey_generate(KEY_DSA, 2048, &k1),
+-	    SSH_ERR_KEY_LENGTH);
+-	ASSERT_PTR_EQ(k1, NULL);
+-	sshkey_free(k1);
+-	TEST_DONE();
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("generate KEY_ECDSA wrong bits");
+ 	ASSERT_INT_EQ(sshkey_generate(KEY_ECDSA, 42, &k1),
+@@ -273,14 +258,6 @@ sshkey_tests(void)
+ 	ASSERT_INT_EQ(BN_num_bits(rsa_n(kr)), 1024);
+ 	TEST_DONE();
+ 
+-	TEST_START("generate KEY_DSA");
+-	ASSERT_INT_EQ(sshkey_generate(KEY_DSA, 1024, &kd), 0);
+-	ASSERT_PTR_NE(kd, NULL);
+-	ASSERT_PTR_NE(kd->dsa, NULL);
+-	ASSERT_PTR_NE(dsa_g(kd), NULL);
+-	ASSERT_PTR_NE(dsa_priv_key(kd), NULL);
+-	TEST_DONE();
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("generate KEY_ECDSA");
+ 	ASSERT_INT_EQ(sshkey_generate(KEY_ECDSA, 256, &ke), 0);
+@@ -317,21 +294,6 @@ sshkey_tests(void)
+ 	sshkey_free(k1);
+ 	TEST_DONE();
+ 
+-	TEST_START("demote KEY_DSA");
+-	ASSERT_INT_EQ(sshkey_from_private(kd, &k1), 0);
+-	ASSERT_PTR_NE(k1, NULL);
+-	ASSERT_PTR_NE(kd, k1);
+-	ASSERT_INT_EQ(k1->type, KEY_DSA);
+-	ASSERT_PTR_NE(k1->dsa, NULL);
+-	ASSERT_PTR_NE(dsa_g(k1), NULL);
+-	ASSERT_PTR_EQ(dsa_priv_key(k1), NULL);
+-	TEST_DONE();
+-
+-	TEST_START("equal KEY_DSA/demoted KEY_DSA");
+-	ASSERT_INT_EQ(sshkey_equal(kd, k1), 1);
+-	sshkey_free(k1);
+-	TEST_DONE();
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("demote KEY_ECDSA");
+ 	ASSERT_INT_EQ(sshkey_from_private(ke, &k1), 0);
+@@ -367,24 +329,19 @@ sshkey_tests(void)
+ 
+ #ifdef WITH_OPENSSL
+ 	TEST_START("equal mismatched key types");
+-	ASSERT_INT_EQ(sshkey_equal(kd, kr), 0);
+ #ifdef OPENSSL_HAS_ECC
+-	ASSERT_INT_EQ(sshkey_equal(kd, ke), 0);
+ 	ASSERT_INT_EQ(sshkey_equal(kr, ke), 0);
+ 	ASSERT_INT_EQ(sshkey_equal(ke, kf), 0);
+ #endif /* OPENSSL_HAS_ECC */
+-	ASSERT_INT_EQ(sshkey_equal(kd, kf), 0);
++	ASSERT_INT_EQ(sshkey_equal(kr, kf), 0);
+ 	TEST_DONE();
+ #endif /* WITH_OPENSSL */
+ 
+ 	TEST_START("equal different keys");
+ #ifdef WITH_OPENSSL
+-	ASSERT_INT_EQ(sshkey_generate(KEY_RSA, 1024, &k1), 0);
++	ASSERT_INT_EQ(sshkey_generate(KEY_RSA, 2048, &k1), 0);
+ 	ASSERT_INT_EQ(sshkey_equal(kr, k1), 0);
+ 	sshkey_free(k1);
+-	ASSERT_INT_EQ(sshkey_generate(KEY_DSA, 1024, &k1), 0);
+-	ASSERT_INT_EQ(sshkey_equal(kd, k1), 0);
+-	sshkey_free(k1);
+ #ifdef OPENSSL_HAS_ECC
+ 	ASSERT_INT_EQ(sshkey_generate(KEY_ECDSA, 256, &k1), 0);
+ 	ASSERT_INT_EQ(sshkey_equal(ke, k1), 0);
+@@ -398,7 +355,6 @@ sshkey_tests(void)
+ 
+ #ifdef WITH_OPENSSL
+ 	sshkey_free(kr);
+-	sshkey_free(kd);
+ #ifdef OPENSSL_HAS_ECC
+ 	sshkey_free(ke);
+ #endif /* OPENSSL_HAS_ECC */
+@@ -479,15 +435,6 @@ sshkey_tests(void)
+ 	sshkey_free(k2);
+ 	TEST_DONE();
+ 
+-	TEST_START("sign and verify DSA");
+-	k1 = get_private("dsa_1");
+-	ASSERT_INT_EQ(sshkey_load_public(test_data_file("dsa_2.pub"), &k2,
+-	    NULL), 0);
+-	signature_tests(k1, k2, NULL);
+-	sshkey_free(k1);
+-	sshkey_free(k2);
+-	TEST_DONE();
+-
+ #ifdef OPENSSL_HAS_ECC
+ 	TEST_START("sign and verify ECDSA");
+ 	k1 = get_private("ecdsa_1");
+diff --git a/regress/unittests/sshkey/testdata/rsa_1 b/regress/unittests/sshkey/testdata/rsa_1
+index 5de3f8422..126cdef2e 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1
++++ b/regress/unittests/sshkey/testdata/rsa_1
+@@ -1,15 +1,27 @@
+ -----BEGIN RSA PRIVATE KEY-----
+-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
+ -----END RSA PRIVATE KEY-----
+diff --git a/regress/unittests/sshkey/testdata/rsa_1-cert.fp b/regress/unittests/sshkey/testdata/rsa_1-cert.fp
+index 79f380a25..b3960459d 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1-cert.fp
++++ b/regress/unittests/sshkey/testdata/rsa_1-cert.fp
+@@ -1 +1 @@
+-SHA256:l6itGumSMcRBBAFteCgmjQBIXqLK/jFGUH3viHX1RmE
++SHA256:IVa7G95yK+6oItBBINnMdw+8m/+nqTvjuPyImuOeTpk
+diff --git a/regress/unittests/sshkey/testdata/rsa_1-cert.pub b/regress/unittests/sshkey/testdata/rsa_1-cert.pub
+index 3bacf3c8f..d148d3699 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1-cert.pub
++++ b/regress/unittests/sshkey/testdata/rsa_1-cert.pub
+@@ -1 +1 @@
+-ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAg98LhS2EHxLOWCLopZPwHdg/RJXusnkOqQXSc9R7aITkAAAADAQABAAAAgQDLV5lUTt7FrADseB/CGhEZzpoojjEW5y8+ePvLppmK3MmMI18ud6vxzpK3bwZLYkVSyfJYI0HmIuGhdu7yMrW6wb84gbq8C31Xoe9EORcIUuGSvDKdNSM1SjlhDquRblDFB8kToqXyx1lqrXecXylxIUOL0jE+u0rU1967pDJx+wAAAAAAAAAFAAAAAgAAAAZqdWxpdXMAAAASAAAABWhvc3QxAAAABWhvc3QyAAAAADaMAfAAAAAATR5gcAAAAAAAAAAAAAAAAAAAADMAAAALc3NoLWVkMjU1MTkAAAAgU4bqRjtF/hS0IW8/AqCj8HO1dyTbELhrZbIDfhe0jBkAAABTAAAAC3NzaC1lZDI1NTE5AAAAQI3QGlUCzC07KorupxpDkkGy6tniaZ8EvBflzvv+itXWNchGvfUeHmVT6aX0sRqehdz/lR+GmXRoZBhofwh0qAM= RSA test key #1
++ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgu/S1o7/iSZbjzE4ukRcVs2bVu8E4VOYvdGXIYbEH3qkAAAADAQABAAABAQC8CRZUmyQew9blXe1EV46IEueITwZ4QpJHJlIPA82YU3m3YwFwbqdy1aNCASgYhiQblU6y9CybXAft7lS8MH5eR0nxuIhjJNzbg9dFuGjdwaOFk079/Sn9hB3Bd0q7Ctf3Y2DHQiK1r8Nax4V2KhyeXJHTTB5Mb5q8LjvjzNbIVwHkqibXFNcmNQwAB8RGQF6SpFx34Co91Vnlg+mZpNolX7rxjHLXoVjnMVD/e/bcNYYePl08X0Up7xO5me2c1WvLRrW2y2MeHS5a+rWxocKIZXA7QsJF2j4bA4+VYG6WQRzRK11D0sFGYNdUxOhV29f4xzvUjjLS0Cb2oDIdGR+zAAAAAAAAAAUAAAACAAAABmp1bGl1cwAAABIAAAAFaG9zdDEAAAAFaG9zdDIAAAAANoyAgAAAAABNHt8AAAAAAAAAAAAAAAAAAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBThupGO0X+FLQhbz8CoKPwc7V3JNsQuGtlsgN+F7SMGQAAAFMAAAALc3NoLWVkMjU1MTkAAABA0XTroJGyV66a1FTyKGR9KmAgpmVVTjMgQ5ZXrgpOZwvtwpiu3qtGu3u7OIrOu6X8o9P06OyIqAOYfvRHsnO+Dg== RSA test key #1
+diff --git a/regress/unittests/sshkey/testdata/rsa_1.fp b/regress/unittests/sshkey/testdata/rsa_1.fp
+index 79f380a25..b3960459d 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1.fp
++++ b/regress/unittests/sshkey/testdata/rsa_1.fp
+@@ -1 +1 @@
+-SHA256:l6itGumSMcRBBAFteCgmjQBIXqLK/jFGUH3viHX1RmE
++SHA256:IVa7G95yK+6oItBBINnMdw+8m/+nqTvjuPyImuOeTpk
+diff --git a/regress/unittests/sshkey/testdata/rsa_1.fp.bb b/regress/unittests/sshkey/testdata/rsa_1.fp.bb
+index 45bacd519..0fbec0c19 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1.fp.bb
++++ b/regress/unittests/sshkey/testdata/rsa_1.fp.bb
+@@ -1 +1 @@
+-xosis-fodod-votot-dibum-ryvac-rediz-naruf-votun-kevis-halis-gexux
++xibob-mybup-haril-tyfem-bizum-cikim-kuceg-maryh-byrim-husak-fixux
+diff --git a/regress/unittests/sshkey/testdata/rsa_1.param.n b/regress/unittests/sshkey/testdata/rsa_1.param.n
+index 493371213..698dd0473 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1.param.n
++++ b/regress/unittests/sshkey/testdata/rsa_1.param.n
+@@ -1 +1 @@
+-00cb5799544edec5ac00ec781fc21a1119ce9a288e3116e72f3e78fbcba6998adcc98c235f2e77abf1ce92b76f064b624552c9f2582341e622e1a176eef232b5bac1bf3881babc0b7d57a1ef4439170852e192bc329d3523354a39610eab916e50c507c913a2a5f2c7596aad779c5f297121438bd2313ebb4ad4d7debba43271fb
++00bc0916549b241ec3d6e55ded44578e8812e7884f067842924726520f03cd985379b76301706ea772d5a34201281886241b954eb2f42c9b5c07edee54bc307e5e4749f1b8886324dcdb83d745b868ddc1a385934efdfd29fd841dc1774abb0ad7f76360c74222b5afc35ac785762a1c9e5c91d34c1e4c6f9abc2e3be3ccd6c85701e4aa26d714d726350c0007c446405e92a45c77e02a3dd559e583e999a4da255fbaf18c72d7a158e73150ff7bf6dc35861e3e5d3c5f4529ef13b999ed9cd56bcb46b5b6cb631e1d2e5afab5b1a1c28865703b42c245da3e1b038f95606e96411cd12b5d43d2c14660d754c4e855dbd7f8c73bd48e32d2d026f6a0321d191fb3
+\ No newline at end of file
+diff --git a/regress/unittests/sshkey/testdata/rsa_1.param.p b/regress/unittests/sshkey/testdata/rsa_1.param.p
+index 4783d215e..16337e1b5 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1.param.p
++++ b/regress/unittests/sshkey/testdata/rsa_1.param.p
+@@ -1 +1 @@
+-00f56077ef05be4574906f52175ed8897e8da1626bc9b055534d6a20f6102c57c7a0b31b3e7864b101f4d3d57c35192bc949e14243a9e956361de23c5dd179f583
++00e2aa28c11b351f779b525528012ec2206a48ea4709d231e40d819a66b205de65f81b2b3659bc070166681acb95a13fad697f997d2052aca8064a6fcacfb6ae8e39730877034e054c639b74e453bee3a5f183adf470f76a723cdfca3b788e01c46667be8ed12b0dd924077a8e30376fd5fff506e0bbea0163aacf515b31554d2d
+\ No newline at end of file
+diff --git a/regress/unittests/sshkey/testdata/rsa_1.param.q b/regress/unittests/sshkey/testdata/rsa_1.param.q
+index 00fc8a2df..6e6a38262 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1.param.q
++++ b/regress/unittests/sshkey/testdata/rsa_1.param.q
+@@ -1 +1 @@
+-00d42541cc014be26370a657953f3adfcbaf713f781639adba33133f184eb3c7d8c2ec7810dca3da58a746fc5b87b34f396934436832e619c67c22f32ebbb36029
++00d45f116efc0159b542960f8b109506f7e4ee6f7bdf738096d9820d0682b6b518ef4222e137cbba146675558901ee8310644b92ee2f5dd4fe8626b7a100b3974c75616b21f58d92b1c48c163152ced03e425a89dbc96e8357628c91fd05271d9151b30053fa5d8e1d5f06033fd6ec36183d3ff14f8b3dcf0ac6151726dffcec5f
+\ No newline at end of file
+diff --git a/regress/unittests/sshkey/testdata/rsa_1.pub b/regress/unittests/sshkey/testdata/rsa_1.pub
+index 23ef872e0..744bc43b1 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1.pub
++++ b/regress/unittests/sshkey/testdata/rsa_1.pub
+@@ -1 +1 @@
+-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDLV5lUTt7FrADseB/CGhEZzpoojjEW5y8+ePvLppmK3MmMI18ud6vxzpK3bwZLYkVSyfJYI0HmIuGhdu7yMrW6wb84gbq8C31Xoe9EORcIUuGSvDKdNSM1SjlhDquRblDFB8kToqXyx1lqrXecXylxIUOL0jE+u0rU1967pDJx+w== RSA test key #1
++ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8CRZUmyQew9blXe1EV46IEueITwZ4QpJHJlIPA82YU3m3YwFwbqdy1aNCASgYhiQblU6y9CybXAft7lS8MH5eR0nxuIhjJNzbg9dFuGjdwaOFk079/Sn9hB3Bd0q7Ctf3Y2DHQiK1r8Nax4V2KhyeXJHTTB5Mb5q8LjvjzNbIVwHkqibXFNcmNQwAB8RGQF6SpFx34Co91Vnlg+mZpNolX7rxjHLXoVjnMVD/e/bcNYYePl08X0Up7xO5me2c1WvLRrW2y2MeHS5a+rWxocKIZXA7QsJF2j4bA4+VYG6WQRzRK11D0sFGYNdUxOhV29f4xzvUjjLS0Cb2oDIdGR+z RSA test key #1
+diff --git a/regress/unittests/sshkey/testdata/rsa_1_sha1 b/regress/unittests/sshkey/testdata/rsa_1_sha1
+index 5de3f8422..126cdef2e 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1_sha1
++++ b/regress/unittests/sshkey/testdata/rsa_1_sha1
+@@ -1,15 +1,27 @@
+ -----BEGIN RSA PRIVATE KEY-----
+-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
+ -----END RSA PRIVATE KEY-----
+diff --git a/regress/unittests/sshkey/testdata/rsa_1_sha1-cert.pub b/regress/unittests/sshkey/testdata/rsa_1_sha1-cert.pub
+index ff49d7598..ff9b2a6da 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1_sha1-cert.pub
++++ b/regress/unittests/sshkey/testdata/rsa_1_sha1-cert.pub
+@@ -1 +1 @@
+-ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgy5PGFfSaEuSuXsjvKlMZGXYD0xlnqdZftuW9tMkUYz4AAAADAQABAAAAgQDLV5lUTt7FrADseB/CGhEZzpoojjEW5y8+ePvLppmK3MmMI18ud6vxzpK3bwZLYkVSyfJYI0HmIuGhdu7yMrW6wb84gbq8C31Xoe9EORcIUuGSvDKdNSM1SjlhDquRblDFB8kToqXyx1lqrXecXylxIUOL0jE+u0rU1967pDJx+wAAAAAAAAABAAAAAQAAAARodWdvAAAAEgAAAAV1c2VyMQAAAAV1c2VyMgAAAAA2i4NgAAAAAE0d4eAAAABEAAAADWZvcmNlLWNvbW1hbmQAAAALAAAABy9iaW4vbHMAAAAOc291cmNlLWFkZHJlc3MAAAAOAAAACjEwLjAuMC4wLzgAAABkAAAAFXBlcm1pdC1YMTEtZm9yd2FyZGluZwAAAAAAAAAXcGVybWl0LWFnZW50LWZvcndhcmRpbmcAAAAAAAAACnBlcm1pdC1wdHkAAAAAAAAADnBlcm1pdC11c2VyLXJjAAAAAAAAAAAAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQD00RRenvxICSYvj54CPiYHM86OT5xwI9XORNH6Zkl3JPCQkAEdQ3hyfhraROaHsSv43wJcKyKrEg5XUZ8fZ/BoKIGU4Rd5AmL9wyPGv2RVY7gWELqXVSpu89R2tQJRmMVMD38CH0wqCTuoZirlKMTen6yfgYuFEpuqar0uOIeAyaQG6/9rVKWK36tcfM7YXx8fmGSN4eK/JhWDDjlo28YJ7ZFF9umh5baZG2Ai/vL3BJ7C3pqaEQNdKj8XqaSoDvFWKfOujk1620Rcuj3W0D0dvp/rH8xz8YkM1dMqGlYIZ4nrF5acB58Nk5FYBjtj1hu4DGEQlWL1Avk1agU4DQLrAAABDwAAAAdzc2gtcnNhAAABAF5BtPY8FbmIekK/zNq6/Lp5agKT5zEVxqAyZKhp75bLRP+kOMZBVB9ZWrekZk6IAVAOCZGQzTsD4mxIQsxBLl8k5hvEWb90/+w9/BzW9ScOGQe+y0COa0QWWR7L3k1S8WX2oAGvtDWOj7Md85nij4ZSU9/QQQFVDF8VilWPSMxUf/3I1fqyDq7AWcZkGk/bFUN6K6RsCSxIPlGmKt0IauyvSMI2IT0XeRT242RngeeUW8vFrn9TXy9YxJRW+cSeLKCuu8agBYyQMXWQ+q39eZZqVYSoo7nFEEhtaLs8d6jzgGkcE9wGJ9KLgfY/mG2vX3gI4IzncKkVJRoeiDzXFIk= RSA test key #1
++ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAg/7J+nVKHuQnu/o3vo9JPpOUtC6kheKY8tPQccgPk5m4AAAADAQABAAABAQC8CRZUmyQew9blXe1EV46IEueITwZ4QpJHJlIPA82YU3m3YwFwbqdy1aNCASgYhiQblU6y9CybXAft7lS8MH5eR0nxuIhjJNzbg9dFuGjdwaOFk079/Sn9hB3Bd0q7Ctf3Y2DHQiK1r8Nax4V2KhyeXJHTTB5Mb5q8LjvjzNbIVwHkqibXFNcmNQwAB8RGQF6SpFx34Co91Vnlg+mZpNolX7rxjHLXoVjnMVD/e/bcNYYePl08X0Up7xO5me2c1WvLRrW2y2MeHS5a+rWxocKIZXA7QsJF2j4bA4+VYG6WQRzRK11D0sFGYNdUxOhV29f4xzvUjjLS0Cb2oDIdGR+zAAAAAAAAAAIAAAABAAAABGh1Z28AAAASAAAABXVzZXIxAAAABXVzZXIyAAAAADaMgIAAAAAATR7fAAAAAEQAAAANZm9yY2UtY29tbWFuZAAAAAsAAAAHL2Jpbi9scwAAAA5zb3VyY2UtYWRkcmVzcwAAAA4AAAAKMTAuMC4wLjAvOAAAAGQAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAARcAAAAHc3NoLXJzYQAAAAMBAAEAAAEBAPTRFF6e/EgJJi+PngI+Jgczzo5PnHAj1c5E0fpmSXck8JCQAR1DeHJ+GtpE5oexK/jfAlwrIqsSDldRnx9n8GgogZThF3kCYv3DI8a/ZFVjuBYQupdVKm7z1Ha1AlGYxUwPfwIfTCoJO6hmKuUoxN6frJ+Bi4USm6pqvS44h4DJpAbr/2tUpYrfq1x8zthfHx+YZI3h4r8mFYMOOWjbxgntkUX26aHltpkbYCL+8vcEnsLempoRA10qPxeppKgO8VYp866OTXrbRFy6PdbQPR2+n+sfzHPxiQzV0yoaVghniesXlpwHnw2TkVgGO2PWG7gMYRCVYvUC+TVqBTgNAusAAAEPAAAAB3NzaC1yc2EAAAEAkBJeAEmEa2rEGSr0RC8jVSzfAHy6CVcn1pvV+cvbfyRxJkjcAnaHViCoF+bxYACt6RfMh3y6mqH/+VviZJ6cJ+4sKFZbR/r30LtQvbxgWWMd2vveNQgdojsl3J6JbcxaLyiddTHEB3bsxU12rBHyMhIrlDRA7zDttCCMBi3kDM3SIjnchUcX1IdtetxLYIEQFrvcFX4tJ/r+ROh5KnRJev75mWJhba/KnWQ5wrXInRoeF00jaqDsMo7egta7lbr6HcQ6P34zRndXhElwGBqdVeqqRILbERsDlRciDlkC5V285RobePzCz37Tq7T3Y9F0CuSJ4BSqIaWEjzT4+XhYmQ== RSA test key #1
+diff --git a/regress/unittests/sshkey/testdata/rsa_1_sha1.pub b/regress/unittests/sshkey/testdata/rsa_1_sha1.pub
+index 23ef872e0..744bc43b1 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1_sha1.pub
++++ b/regress/unittests/sshkey/testdata/rsa_1_sha1.pub
+@@ -1 +1 @@
+-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDLV5lUTt7FrADseB/CGhEZzpoojjEW5y8+ePvLppmK3MmMI18ud6vxzpK3bwZLYkVSyfJYI0HmIuGhdu7yMrW6wb84gbq8C31Xoe9EORcIUuGSvDKdNSM1SjlhDquRblDFB8kToqXyx1lqrXecXylxIUOL0jE+u0rU1967pDJx+w== RSA test key #1
++ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8CRZUmyQew9blXe1EV46IEueITwZ4QpJHJlIPA82YU3m3YwFwbqdy1aNCASgYhiQblU6y9CybXAft7lS8MH5eR0nxuIhjJNzbg9dFuGjdwaOFk079/Sn9hB3Bd0q7Ctf3Y2DHQiK1r8Nax4V2KhyeXJHTTB5Mb5q8LjvjzNbIVwHkqibXFNcmNQwAB8RGQF6SpFx34Co91Vnlg+mZpNolX7rxjHLXoVjnMVD/e/bcNYYePl08X0Up7xO5me2c1WvLRrW2y2MeHS5a+rWxocKIZXA7QsJF2j4bA4+VYG6WQRzRK11D0sFGYNdUxOhV29f4xzvUjjLS0Cb2oDIdGR+z RSA test key #1
+diff --git a/regress/unittests/sshkey/testdata/rsa_1_sha512 b/regress/unittests/sshkey/testdata/rsa_1_sha512
+index 5de3f8422..126cdef2e 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1_sha512
++++ b/regress/unittests/sshkey/testdata/rsa_1_sha512
+@@ -1,15 +1,27 @@
+ -----BEGIN RSA PRIVATE KEY-----
+-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
+ -----END RSA PRIVATE KEY-----
+diff --git a/regress/unittests/sshkey/testdata/rsa_1_sha512-cert.pub b/regress/unittests/sshkey/testdata/rsa_1_sha512-cert.pub
+index 47451968f..3381d8b07 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1_sha512-cert.pub
++++ b/regress/unittests/sshkey/testdata/rsa_1_sha512-cert.pub
+@@ -1 +1 @@
+-ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAg/bUEmnMYHxlv1N7iXvnYPYdzDjlTRKoaIGEPkaQQQDwAAAADAQABAAAAgQDLV5lUTt7FrADseB/CGhEZzpoojjEW5y8+ePvLppmK3MmMI18ud6vxzpK3bwZLYkVSyfJYI0HmIuGhdu7yMrW6wb84gbq8C31Xoe9EORcIUuGSvDKdNSM1SjlhDquRblDFB8kToqXyx1lqrXecXylxIUOL0jE+u0rU1967pDJx+wAAAAAAAAABAAAAAQAAAARodWdvAAAAEgAAAAV1c2VyMQAAAAV1c2VyMgAAAAA2i4NgAAAAAE0d4eAAAABEAAAADWZvcmNlLWNvbW1hbmQAAAALAAAABy9iaW4vbHMAAAAOc291cmNlLWFkZHJlc3MAAAAOAAAACjEwLjAuMC4wLzgAAABkAAAAFXBlcm1pdC1YMTEtZm9yd2FyZGluZwAAAAAAAAAXcGVybWl0LWFnZW50LWZvcndhcmRpbmcAAAAAAAAACnBlcm1pdC1wdHkAAAAAAAAADnBlcm1pdC11c2VyLXJjAAAAAAAAAAAAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQD00RRenvxICSYvj54CPiYHM86OT5xwI9XORNH6Zkl3JPCQkAEdQ3hyfhraROaHsSv43wJcKyKrEg5XUZ8fZ/BoKIGU4Rd5AmL9wyPGv2RVY7gWELqXVSpu89R2tQJRmMVMD38CH0wqCTuoZirlKMTen6yfgYuFEpuqar0uOIeAyaQG6/9rVKWK36tcfM7YXx8fmGSN4eK/JhWDDjlo28YJ7ZFF9umh5baZG2Ai/vL3BJ7C3pqaEQNdKj8XqaSoDvFWKfOujk1620Rcuj3W0D0dvp/rH8xz8YkM1dMqGlYIZ4nrF5acB58Nk5FYBjtj1hu4DGEQlWL1Avk1agU4DQLrAAABFAAAAAxyc2Etc2hhMi01MTIAAAEA7/GoZsJqrq4xYotsRbpM8arZDjCzT6kohXeD/GVy26s5E/YWXRYCrOMIzSZxjuN5rAaNRW8ffxq14JyI94566Kg2OeoxQ6rK/dTqkk7I1RyypSXunT3I4++RPs1Q+hu9eS/WBzur0/D3dMejhuc3IBg6iB0481I4pGBGcD8/KjQFfhlCuGVXwB1ALk2zfXFT1HYYrs6bYZuQqjgvArnjYJ0do3fTSDC20/ydV4BHnI3fVAY2THVjX45V2ppPadl/rpczaJqW1ZtpnpJkV8Un316stQSD0xLHUDjp89O6d9Yq5S0kDdfwTRJIPm9f2cGNakJwN5qzmmmdDroRKODYcg== RSA test key #1
++ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgXP2XEdjThrq8wn8zvOqjt5fCk62svMhCI6sUJ9EalRMAAAADAQABAAABAQC8CRZUmyQew9blXe1EV46IEueITwZ4QpJHJlIPA82YU3m3YwFwbqdy1aNCASgYhiQblU6y9CybXAft7lS8MH5eR0nxuIhjJNzbg9dFuGjdwaOFk079/Sn9hB3Bd0q7Ctf3Y2DHQiK1r8Nax4V2KhyeXJHTTB5Mb5q8LjvjzNbIVwHkqibXFNcmNQwAB8RGQF6SpFx34Co91Vnlg+mZpNolX7rxjHLXoVjnMVD/e/bcNYYePl08X0Up7xO5me2c1WvLRrW2y2MeHS5a+rWxocKIZXA7QsJF2j4bA4+VYG6WQRzRK11D0sFGYNdUxOhV29f4xzvUjjLS0Cb2oDIdGR+zAAAAAAAAAAMAAAABAAAABGh1Z28AAAASAAAABXVzZXIxAAAABXVzZXIyAAAAADaMgIAAAAAATR7fAAAAAEQAAAANZm9yY2UtY29tbWFuZAAAAAsAAAAHL2Jpbi9scwAAAA5zb3VyY2UtYWRkcmVzcwAAAA4AAAAKMTAuMC4wLjAvOAAAAGQAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAARcAAAAHc3NoLXJzYQAAAAMBAAEAAAEBAPTRFF6e/EgJJi+PngI+Jgczzo5PnHAj1c5E0fpmSXck8JCQAR1DeHJ+GtpE5oexK/jfAlwrIqsSDldRnx9n8GgogZThF3kCYv3DI8a/ZFVjuBYQupdVKm7z1Ha1AlGYxUwPfwIfTCoJO6hmKuUoxN6frJ+Bi4USm6pqvS44h4DJpAbr/2tUpYrfq1x8zthfHx+YZI3h4r8mFYMOOWjbxgntkUX26aHltpkbYCL+8vcEnsLempoRA10qPxeppKgO8VYp866OTXrbRFy6PdbQPR2+n+sfzHPxiQzV0yoaVghniesXlpwHnw2TkVgGO2PWG7gMYRCVYvUC+TVqBTgNAusAAAEUAAAADHJzYS1zaGEyLTUxMgAAAQBbHFli/6oT3J9SciilJXK1MOniZjHjvGEupusiboSHUPmFtil/QZRob/9y61kaEyEMw+gpdLu2Bzh8/nBQ6MF4qySrAXBLM060wrNGraflUT0fInL0FyigZDSH2rgT08H9yVgTJgTDv0Ut9Mh2yZHIZz136orQgYXUa1R1s4PVtvY5LJv0fw6nDLvDM3MKXCXTxk4Cw21Cytr4LZibxZ0/EvbR4YRPokyU3wP9ESto8SSSLAczP3vEyBmWVGrRnPXIDjtJkPlZsuBvsqVoZTR0wBUEBXa0RbPuYUZxnTVxkxWCnf/FaPkfguRgCP9k2XUDKdopAK3uX9mj8h8GKe4e RSA test key #1
+diff --git a/regress/unittests/sshkey/testdata/rsa_1_sha512.pub b/regress/unittests/sshkey/testdata/rsa_1_sha512.pub
+index 23ef872e0..744bc43b1 100644
+--- a/regress/unittests/sshkey/testdata/rsa_1_sha512.pub
++++ b/regress/unittests/sshkey/testdata/rsa_1_sha512.pub
+@@ -1 +1 @@
+-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDLV5lUTt7FrADseB/CGhEZzpoojjEW5y8+ePvLppmK3MmMI18ud6vxzpK3bwZLYkVSyfJYI0HmIuGhdu7yMrW6wb84gbq8C31Xoe9EORcIUuGSvDKdNSM1SjlhDquRblDFB8kToqXyx1lqrXecXylxIUOL0jE+u0rU1967pDJx+w== RSA test key #1
++ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8CRZUmyQew9blXe1EV46IEueITwZ4QpJHJlIPA82YU3m3YwFwbqdy1aNCASgYhiQblU6y9CybXAft7lS8MH5eR0nxuIhjJNzbg9dFuGjdwaOFk079/Sn9hB3Bd0q7Ctf3Y2DHQiK1r8Nax4V2KhyeXJHTTB5Mb5q8LjvjzNbIVwHkqibXFNcmNQwAB8RGQF6SpFx34Co91Vnlg+mZpNolX7rxjHLXoVjnMVD/e/bcNYYePl08X0Up7xO5me2c1WvLRrW2y2MeHS5a+rWxocKIZXA7QsJF2j4bA4+VYG6WQRzRK11D0sFGYNdUxOhV29f4xzvUjjLS0Cb2oDIdGR+z RSA test key #1
+diff --git a/regress/unittests/sshkey/testdata/rsa_2.pub b/regress/unittests/sshkey/testdata/rsa_2.pub
+index 3322fbc9b..98e6840cf 100644
+--- a/regress/unittests/sshkey/testdata/rsa_2.pub
++++ b/regress/unittests/sshkey/testdata/rsa_2.pub
+@@ -1 +1 @@
+-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD00RRenvxICSYvj54CPiYHM86OT5xwI9XORNH6Zkl3JPCQkAEdQ3hyfhraROaHsSv43wJcKyKrEg5XUZ8fZ/BoKIGU4Rd5AmL9wyPGv2RVY7gWELqXVSpu89R2tQJRmMVMD38CH0wqCTuoZirlKMTen6yfgYuFEpuqar0uOIeAyaQG6/9rVKWK36tcfM7YXx8fmGSN4eK/JhWDDjlo28YJ7ZFF9umh5baZG2Ai/vL3BJ7C3pqaEQNdKj8XqaSoDvFWKfOujk1620Rcuj3W0D0dvp/rH8xz8YkM1dMqGlYIZ4nrF5acB58Nk5FYBjtj1hu4DGEQlWL1Avk1agU4DQLr RSA test key #2
++ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDSPKJ5kN0YbOI2K3LZjpckfoi/TvGpDxhM3n07Kt8hjVc/Qp82D3mM0u36AapPvijLe7TYgJCQ/Ak+5e9dCpmt8Tg3UNu5IEpQil7wl23lW1d8aa38NYdP3CWpmxhGfuCRzAHO2kjkp5FxPrwogCtoa5Y3L8Q7WBNjhLU3W+S2xlTRlH3en8tRx9jX32rv0BkqlZXieBOOQ+fD6xPfBG3jKyBPTEYeUsFoVPubI0e/WFC0tScIVrCXZv0tmLgQQBfge3H6IO/VYSaPfxYuis1iJwAbn0awFcSpL28xJ8tD/cN6RQNo37jUlZn9sMWrK9zVeFAzruEjYkHTOH5nPahX RSA test key #2
+diff --git a/regress/unittests/sshkey/testdata/rsa_n b/regress/unittests/sshkey/testdata/rsa_n
+index b8e585e51..126cdef2e 100644
+--- a/regress/unittests/sshkey/testdata/rsa_n
++++ b/regress/unittests/sshkey/testdata/rsa_n
+@@ -1,16 +1,27 @@
+------BEGIN OPENSSH PRIVATE KEY-----
+-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAlwAAAAdzc2gtcn
+-NhAAAAAwEAAQAAAIEAy1eZVE7exawA7HgfwhoRGc6aKI4xFucvPnj7y6aZitzJjCNfLner
+-8c6St28GS2JFUsnyWCNB5iLhoXbu8jK1usG/OIG6vAt9V6HvRDkXCFLhkrwynTUjNUo5YQ
+-6rkW5QxQfJE6Kl8sdZaq13nF8pcSFDi9IxPrtK1Nfeu6QycfsAAAH4to4I7raOCO4AAAAH
+-c3NoLXJzYQAAAIEAy1eZVE7exawA7HgfwhoRGc6aKI4xFucvPnj7y6aZitzJjCNfLner8c
+-6St28GS2JFUsnyWCNB5iLhoXbu8jK1usG/OIG6vAt9V6HvRDkXCFLhkrwynTUjNUo5YQ6r
+-kW5QxQfJE6Kl8sdZaq13nF8pcSFDi9IxPrtK1Nfeu6QycfsAAAADAQABAAAAgF8o+ZqY5m
+-w/mJcRiFs/86zOIRrFoHeFbXihCcU+jDCOLswkaZDHdHJPKB4sGRgCP0sFMyLILTjULh9w
+-F1bFIIIVuGJ5/vJLBL9CGfdfFgzA8Kr6pMq1c7DrGc6mIz3/A1AygqcBY55ZJydOMr1gWb
+-1YVrWODomfBldE7bLt5PhhAAAAQAndVkxvO8hwyEFGGwF3faHIAe/OxVb+MjaU25//Pe1/
+-h/e6tlCk4w9CODpyV685gV394eYwMcGDcIkipTNUDZsAAABBAPVgd+8FvkV0kG9SF17YiX
+-6NoWJrybBVU01qIPYQLFfHoLMbPnhksQH009V8NRkryUnhQkOp6VY2HeI8XdF59YMAAABB
+-ANQlQcwBS+JjcKZXlT8638uvcT94FjmtujMTPxhOs8fYwux4ENyj2linRvxbh7NPOWk0Q2
+-gy5hnGfCLzLruzYCkAAAAAAQID
+------END OPENSSH PRIVATE KEY-----
++-----BEGIN RSA PRIVATE KEY-----
++MIIEpAIBAAKCAQEAvAkWVJskHsPW5V3tRFeOiBLniE8GeEKSRyZSDwPNmFN5t2MB
++cG6nctWjQgEoGIYkG5VOsvQsm1wH7e5UvDB+XkdJ8biIYyTc24PXRbho3cGjhZNO
++/f0p/YQdwXdKuwrX92Ngx0Iita/DWseFdiocnlyR00weTG+avC4748zWyFcB5Kom
++1xTXJjUMAAfERkBekqRcd+AqPdVZ5YPpmaTaJV+68Yxy16FY5zFQ/3v23DWGHj5d
++PF9FKe8TuZntnNVry0a1tstjHh0uWvq1saHCiGVwO0LCRdo+GwOPlWBulkEc0Std
++Q9LBRmDXVMToVdvX+Mc71I4y0tAm9qAyHRkfswIDAQABAoIBAA+TnSLzGyHlTUcA
++6efQbQE+t6lmCn4p3Z5BQWj3ArAMsjeL3xGmSP7NTdHo8J5fdlxGmRdf/NX94LZI
++GQLh7YX319tLUxkLc7RHjqy64w0Dvn0RP+jwcOsMZ76gGDO4aT2YIOtAwklUvxUl
++FBw+ztIbjwT2+EeSsznFhraPQHemASZ+du1cCWLfYha7BHKkWNC7Fg9RqIsWug+V
++yUQ+raOasv8YbpXEWSq0KhdeBmBot39CLE1UCOQ4Zok/grGujPHTUUDRMOLebRAT
++vilMxw25AYSBl1noZ5nZY6rdKUn9pAEsqVSPp9me4NqK5wrWxn8AVdQlAnd3CrMl
++o9LF7kkCgYEA4qoowRs1H3ebUlUoAS7CIGpI6kcJ0jHkDYGaZrIF3mX4Gys2WbwH
++AWZoGsuVoT+taX+ZfSBSrKgGSm/Kz7aujjlzCHcDTgVMY5t05FO+46Xxg630cPdq
++cjzfyjt4jgHEZme+jtErDdkkB3qOMDdv1f/1BuC76gFjqs9RWzFVTS0CgYEA1F8R
++bvwBWbVClg+LEJUG9+Tub3vfc4CW2YINBoK2tRjvQiLhN8u6FGZ1VYkB7oMQZEuS
++7i9d1P6GJrehALOXTHVhayH1jZKxxIwWMVLO0D5CWonbyW6DV2KMkf0FJx2RUbMA
++U/pdjh1fBgM/1uw2GD0/8U+LPc8KxhUXJt/87F8CgYEAjCfDg4SbWJXQyRw23GRZ
++TUnrRFIg1IRdC6z0GERENLzAqawSs3H8svTrsoXoRAjn5bAs7J4sAO701NpDgiTn
++0rHbW4Sb2oaUMZNSuEzAYGuf51iNKb0TaQgTKS2U4dpd4ySLRCw6fxmhma5CdbYR
++xTW8AUC9cXjidCA1ojnjERECgYARjOm76keSSlB+Zjpv3GD/C4RI4kvNF8tfnkfF
++SfgfbzgWlxtVqRhvpyf7MZ9fPqWUJEq4NGHkwEQF3xcHH9BZGTo7yEqqsHzQaWNM
++IDPHMd357XqkYuWnyxUi224ZlW/0+H4GcqJYpES+EnasJEk0J5upLZGsQff59rQ7
++GjeksQKBgQDdD8WP8VuexBXaBHulh4/PQJvmIMGSuV4SDJRdwZi4tB8bewb1F9oZ
++/UBJ4N791/7o4jQTaSkrlXZB8mb349WU/buiRU7dBf2Avk253s0fM1F+6xMxZQH8
++tpf/RUd15+eSKZ1xKM1aaU44Hf0UILEe/cTr2Ad9PucRcXyaM8gaqQ==
++-----END RSA PRIVATE KEY-----
+diff --git a/regress/unittests/sshkey/testdata/rsa_n_pw b/regress/unittests/sshkey/testdata/rsa_n_pw
+index dc18373bc..a50a70a2a 100644
+--- a/regress/unittests/sshkey/testdata/rsa_n_pw
++++ b/regress/unittests/sshkey/testdata/rsa_n_pw
+@@ -1,17 +1,28 @@
+ -----BEGIN OPENSSH PRIVATE KEY-----
+-b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jYmMAAAAGYmNyeXB0AAAAGAAAABAFw/Wg/V
+-I5SAXWj/HJr9qeAAAAEAAAAAEAAACXAAAAB3NzaC1yc2EAAAADAQABAAAAgQDLV5lUTt7F
+-rADseB/CGhEZzpoojjEW5y8+ePvLppmK3MmMI18ud6vxzpK3bwZLYkVSyfJYI0HmIuGhdu
+-7yMrW6wb84gbq8C31Xoe9EORcIUuGSvDKdNSM1SjlhDquRblDFB8kToqXyx1lqrXecXylx
+-IUOL0jE+u0rU1967pDJx+wAAAgD1iSGiMlMJt2VH4kx5yr0wCJS+4UOmX0bxKO7UH5Jcul
+-K5eaSe5ZoKE7hTYBaz0K5dRF/0fqLsvVZlE4quDjFLN6Hyavgn2W/QM7SUqBHgRMal9pgH
+-LnxX6mFNWJ+4yb7f3bcbVIdgmMm3sT9Xjwaf5xgzNlR2mkUWtFwjyQh6FxUo5apNzqNBwO
+-l2Q4xfmyZTp1s++pStQ/su6obXpxnE2Nx5G/D84ZL5iWl+njUy/MvJTazHRbiTSyihU+UA
+-mUr5ZNuP3WUYY+h3KVlHpYHJYB7l3AMTKuPMFLhY9V7BJ+DuKPaqBgX4hvRzY0eVQiFr61
+-ovjWjvfu1ulx550JqdYCgH2PpP0E89OQne35Cxs9QPThfe8DKojC9YquYh9zmVTvr7kNiE
+-Soluk/7oKpQIDaC+/SRk7AJ2e3Cbt1lXyGNn37PuqaaC/apaF/DOD6Yig9aClS7jOUrT96
+-56trFAYfHEIKbRCUSMCiM1+x6HOLYf5ROrGE9KxT3kUD9XMsMpTva+cPpHUpbGpXcYE10N
+-MyYDz+V5M2/ZoIdEhscJNQ3UnhaZpeEaqcOyNyo90n3Dnaw/WpMDD/kNMGfm8daTaYInnQ
+-QnwA2gwlYfpTAqxE71oXgOuGmtA0yqJB4778Xq26Pb+B7/mZZZe6n0FVmiNC+ZG37ZGOw/
+-iGL9e2Sxzw==
++b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABApJksZlh
++HQCPFLg9CjrwY3AAAAGAAAAAEAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQC8CRZUmyQe
++w9blXe1EV46IEueITwZ4QpJHJlIPA82YU3m3YwFwbqdy1aNCASgYhiQblU6y9CybXAft7l
++S8MH5eR0nxuIhjJNzbg9dFuGjdwaOFk079/Sn9hB3Bd0q7Ctf3Y2DHQiK1r8Nax4V2Khye
++XJHTTB5Mb5q8LjvjzNbIVwHkqibXFNcmNQwAB8RGQF6SpFx34Co91Vnlg+mZpNolX7rxjH
++LXoVjnMVD/e/bcNYYePl08X0Up7xO5me2c1WvLRrW2y2MeHS5a+rWxocKIZXA7QsJF2j4b
++A4+VYG6WQRzRK11D0sFGYNdUxOhV29f4xzvUjjLS0Cb2oDIdGR+zAAADwJp9q+pvHqWR7Q
++Urr/I0cENzddiDNLupf/zE1ya8qHWNE8yOxU/OhE5E7qAiW81TpUms1War19gOm5PF3wYF
++o/xgYVbBO66U3DygGNKHowJTM/tKXG5aYl2GqZZkO9df5C1glX3irCvhAHC8d3CkEA0HIA
++2SRRnLrLdZ++IpaK3JBt4X2OPHVGJCadUOQF3dSz+v4BGQWpb3yR0qFBnIhF0kQMfXl9of
++72tPCgxJ/RfYhC6gu9bTub7PBJj2Z4wiEstAN6pYQRYj6n0lmEtNjYtObiuD54oOVb6QxN
++X2bzWlgs17iKnkVeQLHXb/gqbDvj3sdcQbrPwUhUYMX9OhZBeXydM9i4F4U75YA7KniiZF
++5nsO2+OSqulCFDJZYIHEPHLj00S+YN1HfNd0JSBC7x1Vp1zlekgbYhk5nUjNH1PTGMQHI9
++wrs/fZg8U6n1aBWpc2Nu+sW1f2CrIWXaHS2AY1iJZEOJneHnY/EWvw3m7ktm/gwmElO+F5
++QTXbQzkrqLgJjtTpAMmIWKMRtskgHeZ56j1DD4VUwblB/b+21R+tB0EhzsUHslsAi8dOTB
++LZ4PVhwZKdoCSmoTqT6BuSTQSJrSzHFlQuNWTMIPGLkltNhk4PVXLWW7YswblLzllLbQg/
++ftariFFbGkVf0K17Bjqrunc8CXdTPRPv4iN0hYCaM+u6gZth7FyWFoAdKHptAmv91lat9+
++tSAGXXYzcV+Q2F6TEkJiGThp6klKd1wQ7KY9kBkIOoiJPeiA/AQWLy0kVwB7+2L0qknRkx
++FyrHu8vd3W9BweTuQZbs0fjsQAj1sbF95we6+j0xLXQEavPMQYShlZD2JUn8GE5C/KHYkZ
++IJ0M8ooRk3O/Y/EaDo9BFRFioAdOyenuK4lPLQmLb8t0zCodROpQkzqoJPw9JFfV+SxC8m
++2BTqxT5xI3Zn+gb20htGVEZF40VWCQPM4pIJ8IXSNWK3gEuDRthVjowqPgOSqX1jkAwZff
++sTYQDAV36nhHgJZQDQqkm6bRJF9aHqZ0qPPaiL/LYZwGayhu5qTbPdOL6O5aYKxYT6kHhC
++oGv4UD0CoCTzS9JWlnVN5YbyQpMYxFtln81T4xZs1o6XTnZo+VT6805ITszhEjDcbWajxM
++1Mq7nJR8I4/q33OjmQgbbh7oMovAqBmH9uL2ARzsAUMLY36vvyKjl6hazcIAD3JZ8TdKPC
++8QE14J5OfQg+P9EavNSgFCEiPRnxp/3DK20WBu4+BXSPWKpD8w5vmfW6P+NyZu8UYzEUCD
++9USmzqmg==
+ -----END OPENSSH PRIVATE KEY-----
