@@ -525,3 +525,15 @@ index 356a153..a8836cc 100644
 -- 
 2.34.1
 
+diff --git a/include/jwt-cpp/base.h b/include/jwt-cpp/base.h
+index 4177ed6..6132de8 100644
+--- a/include/jwt-cpp/base.h
++++ b/include/jwt-cpp/base.h
+@@ -4,6 +4,7 @@
+ #include <array>
+ #include <stdexcept>
+ #include <string>
++#include <cstdint>
+ 
+ #ifdef __has_cpp_attribute
+ #if __has_cpp_attribute(fallthrough)
