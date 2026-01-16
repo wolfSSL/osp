@@ -9,7 +9,11 @@ enabled by an application post-SCP03-authentication.
 
 ## Applying the Patch
 
-This patch will apply cleanly on top of the SE05x Middleware version v04.02.00:
+Two patch variants are provided:
+- `simw-top-v040200.patch` for SE05x Middleware v04.02.00
+- `simw-top-v040701.patch` for SE05x Middleware v04.07.01
+
+Example for v04.02.00:
 
 ```
 $ unzip SE05x_MW.zip -d se_mw
@@ -17,8 +21,19 @@ $ ls se_mw
 se05x_mw_v04.02.00_20220701_151557
 
 $ cd se_mw/se05x_mw_v04.02.00_20220701_151557/simw-top
-$ cp <path/to/simw-top.patch> ./
-$ patch -p1 < simw-top.patch
+$ cp <path/to/simw-top-v040200.patch> ./
+$ patch -p1 -l < simw-top-v040200.patch
+```
+
+Example for v04.07.01:
+```
+$ unzip SE05x_MW.zip -d se_mw
+$ ls se_mw
+se05x_mw_v04.07.01_YYYYMMDD_HHMMSS
+
+$ cd se_mw/se05x_mw_v04.07.01_YYYYMMDD_HHMMSS/simw-top
+$ cp <path/to/simw-top-v040701.patch> ./
+$ patch -p1 -l < simw-top-v040701.patch
 ```
 
 For more complete wolfSSL SE050 documentation, refer to
@@ -123,4 +138,3 @@ For examples of wolfSSL on SE050, see the [wolfssl-examples repo](https://github
 ## Support
 
 For support, please contact wolfSSL at support@wolfssl.com.
-
