@@ -1,0 +1,256 @@
+diff --git a/grpc_ssl.t b/grpc_ssl.t
+index 256fe3e..23374ff 100644
+--- a/grpc_ssl.t
++++ b/grpc_ssl.t
+@@ -9,7 +9,6 @@
+
+ use warnings;
+ use strict;
+-
+ use Test::More;
+
+ BEGIN { use FindBin; chdir($FindBin::Bin); }
+@@ -18,6 +17,11 @@ use lib 'lib';
+ use Test::Nginx;
+ use Test::Nginx::HTTP2;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/http_listen.t b/http_listen.t
+index 2b20f33..b9e38c8 100644
+--- a/http_listen.t
++++ b/http_listen.t
+@@ -17,6 +17,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/mail_ssl.t b/mail_ssl.t
+index 8fd68b9..e67e06f 100644
+--- a/mail_ssl.t
++++ b/mail_ssl.t
+@@ -20,6 +20,11 @@ use Test::Nginx::IMAP;
+ use Test::Nginx::POP3;
+ use Test::Nginx::SMTP;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/proxy_ssl_certificate.t b/proxy_ssl_certificate.t
+index 5a2ce63..e08de06 100644
+--- a/proxy_ssl_certificate.t
++++ b/proxy_ssl_certificate.t
+@@ -18,6 +18,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/proxy_ssl_certificate_cache.t b/proxy_ssl_certificate_cache.t
+index c737c5e..e1218c5 100644
+--- a/proxy_ssl_certificate_cache.t
++++ b/proxy_ssl_certificate_cache.t
+@@ -17,6 +17,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/proxy_ssl_certificate_vars.t b/proxy_ssl_certificate_vars.t
+index aff71ff..04da887 100644
+--- a/proxy_ssl_certificate_vars.t
++++ b/proxy_ssl_certificate_vars.t
+@@ -17,6 +17,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/ssl_certificate.t b/ssl_certificate.t
+index b07cea5..953b05b 100644
+--- a/ssl_certificate.t
++++ b/ssl_certificate.t
+@@ -19,6 +19,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx qw/ :DEFAULT http_end /;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/ssl_password_file.t b/ssl_password_file.t
+index 281b524..1daf721 100644
+--- a/ssl_password_file.t
++++ b/ssl_password_file.t
+@@ -20,6 +20,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/stream_proxy_ssl_certificate.t b/stream_proxy_ssl_certificate.t
+index 973f08a..bf9e321 100644
+--- a/stream_proxy_ssl_certificate.t
++++ b/stream_proxy_ssl_certificate.t
+@@ -18,6 +18,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/stream_proxy_ssl_certificate_cache.t b/stream_proxy_ssl_certificate_cache.t
+index c8b80ac..382a09f 100644
+--- a/stream_proxy_ssl_certificate_cache.t
++++ b/stream_proxy_ssl_certificate_cache.t
+@@ -17,6 +17,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/stream_proxy_ssl_certificate_vars.t b/stream_proxy_ssl_certificate_vars.t
+index 8d198ac..c0a336d 100644
+--- a/stream_proxy_ssl_certificate_vars.t
++++ b/stream_proxy_ssl_certificate_vars.t
+@@ -17,6 +17,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/stream_ssl.t b/stream_ssl.t
+index 787bdfe..8c9ee99 100644
+--- a/stream_ssl.t
++++ b/stream_ssl.t
+@@ -9,7 +9,6 @@
+
+ use warnings;
+ use strict;
+-
+ use Test::More;
+
+ use POSIX qw/ mkfifo /;
+@@ -21,6 +20,11 @@ use lib 'lib';
+ use Test::Nginx;
+ use Test::Nginx::Stream qw/ stream /;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/stream_ssl_certificate.t b/stream_ssl_certificate.t
+index ed0a831..174baa7 100644
+--- a/stream_ssl_certificate.t
++++ b/stream_ssl_certificate.t
+@@ -18,6 +18,11 @@ use lib 'lib';
+ use Test::Nginx;
+ use Test::Nginx::Stream qw/ stream /;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/uwsgi_ssl_certificate.t b/uwsgi_ssl_certificate.t
+index fbb9750..0654b36 100644
+--- a/uwsgi_ssl_certificate.t
++++ b/uwsgi_ssl_certificate.t
+@@ -18,6 +18,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
+diff --git a/uwsgi_ssl_certificate_vars.t b/uwsgi_ssl_certificate_vars.t
+index c51e5f5..85566f1 100644
+--- a/uwsgi_ssl_certificate_vars.t
++++ b/uwsgi_ssl_certificate_vars.t
+@@ -17,6 +17,11 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
+ use lib 'lib';
+ use Test::Nginx;
+
++# Skip test in FIPS mode
++if ($ENV{WOLFSSL_ISFIPS} eq '1') {
++    plan(skip_all => 'SSL tests disabled in FIPS mode');
++}
++
+ ###############################################################################
+
+ select STDERR; $| = 1;
