@@ -1,8 +1,8 @@
 diff --git a/Lib/ssl.py b/Lib/ssl.py
-index 42ebb8e..849bdb0 100644
+index 42ebb8ed384..849bdb0916f 100644
 --- a/Lib/ssl.py
 +++ b/Lib/ssl.py
-@@ -119,6 +119,7 @@ from _ssl import (
+@@ -119,6 +119,7 @@
      HAS_TLSv1_1, HAS_TLSv1_2, HAS_TLSv1_3
  )
  from _ssl import _DEFAULT_CIPHERS, _OPENSSL_API_VERSION
@@ -12,7 +12,7 @@ index 42ebb8e..849bdb0 100644
      '_SSLMethod', __name__,
 diff --git a/Lib/test/certdata/capath-2048-plus/5ed36f99.0 b/Lib/test/certdata/capath-2048-plus/5ed36f99.0
 new file mode 100644
-index 0000000..e7dfc82
+index 00000000000..e7dfc82947e
 --- /dev/null
 +++ b/Lib/test/certdata/capath-2048-plus/5ed36f99.0
 @@ -0,0 +1,41 @@
@@ -59,7 +59,7 @@ index 0000000..e7dfc82
 +-----END CERTIFICATE-----
 diff --git a/Lib/test/certdata/capath-2048-plus/99d0fa06.0 b/Lib/test/certdata/capath-2048-plus/99d0fa06.0
 new file mode 100644
-index 0000000..e7dfc82
+index 00000000000..e7dfc82947e
 --- /dev/null
 +++ b/Lib/test/certdata/capath-2048-plus/99d0fa06.0
 @@ -0,0 +1,41 @@
@@ -106,7 +106,7 @@ index 0000000..e7dfc82
 +-----END CERTIFICATE-----
 diff --git a/Lib/test/certdata/capath-2048-plus/b1930218.0 b/Lib/test/certdata/capath-2048-plus/b1930218.0
 new file mode 100644
-index 0000000..941d791
+index 00000000000..941d7919f80
 --- /dev/null
 +++ b/Lib/test/certdata/capath-2048-plus/b1930218.0
 @@ -0,0 +1,26 @@
@@ -138,7 +138,7 @@ index 0000000..941d791
 +-----END CERTIFICATE-----
 diff --git a/Lib/test/certdata/capath-2048-plus/ceff1710.0 b/Lib/test/certdata/capath-2048-plus/ceff1710.0
 new file mode 100644
-index 0000000..941d791
+index 00000000000..941d7919f80
 --- /dev/null
 +++ b/Lib/test/certdata/capath-2048-plus/ceff1710.0
 @@ -0,0 +1,26 @@
@@ -169,10 +169,10 @@ index 0000000..941d791
 +dQSZaZrliAoQAnSJ7HWERIBI38H36TfOzpKSXIkiCHMf
 +-----END CERTIFICATE-----
 diff --git a/Lib/test/support/__init__.py b/Lib/test/support/__init__.py
-index c899347..d240e2c 100644
+index c8993476240..d240e2c59e9 100644
 --- a/Lib/test/support/__init__.py
 +++ b/Lib/test/support/__init__.py
-@@ -445,7 +445,8 @@ def system_must_validate_cert(f):
+@@ -445,7 +445,8 @@ def dec(*args, **kwargs):
          try:
              f(*args, **kwargs)
          except OSError as e:
@@ -183,10 +183,10 @@ index c899347..d240e2c 100644
                                          "necessary certificates")
              raise
 diff --git a/Lib/test/test_asyncio/test_events.py b/Lib/test/test_asyncio/test_events.py
-index abf425f..d181b1f 100644
+index abf425f5ef0..d181b1f94ed 100644
 --- a/Lib/test/test_asyncio/test_events.py
 +++ b/Lib/test/test_asyncio/test_events.py
-@@ -633,7 +633,10 @@ class EventLoopTestsMixin:
+@@ -633,7 +633,10 @@ def _dummy_ssl_create_context(purpose=ssl.Purpose.SERVER_AUTH, *,
                  self._basetest_create_ssl_connection(conn_fut, check_sockname,
                                                       peername)
  
@@ -198,7 +198,7 @@ index abf425f..d181b1f 100644
  
      @unittest.skipIf(ssl is None, 'No ssl module')
      def test_create_ssl_connection(self):
-@@ -1068,9 +1071,14 @@ class EventLoopTestsMixin:
+@@ -1068,9 +1071,14 @@ def test_create_server_ssl_verify_failed(self):
                                            ssl=sslcontext_client)
          with mock.patch.object(self.loop, 'call_exception_handler'):
              with test_utils.disable_logger():
@@ -216,7 +216,7 @@ index abf425f..d181b1f 100644
  
              # execute the loop to log the connection error
              test_utils.run_briefly(self.loop)
-@@ -1098,9 +1106,14 @@ class EventLoopTestsMixin:
+@@ -1098,9 +1106,14 @@ def test_create_unix_server_ssl_verify_failed(self):
                                                 server_hostname='invalid')
          with mock.patch.object(self.loop, 'call_exception_handler'):
              with test_utils.disable_logger():
@@ -234,7 +234,7 @@ index abf425f..d181b1f 100644
  
              # execute the loop to log the connection error
              test_utils.run_briefly(self.loop)
-@@ -1131,11 +1144,13 @@ class EventLoopTestsMixin:
+@@ -1131,11 +1144,13 @@ def test_create_server_ssl_match_failed(self):
          regex = re.compile(r"""(
              IP address mismatch, certificate is not valid for '127.0.0.1'   # OpenSSL
              |
@@ -250,10 +250,10 @@ index abf425f..d181b1f 100644
  
          # close connection
 diff --git a/Lib/test/test_asyncio/test_ssl.py b/Lib/test/test_asyncio/test_ssl.py
-index e4ab5a9..a17fe37 100644
+index e4ab5a9024c..a17fe375825 100644
 --- a/Lib/test/test_asyncio/test_ssl.py
 +++ b/Lib/test/test_asyncio/test_ssl.py
-@@ -1351,8 +1351,10 @@ class TestSSL(test_utils.TestCase):
+@@ -1351,8 +1351,10 @@ def server(sock):
              time.sleep(0.2)  # wait for the peer to fill its backlog
  
              # send close_notify but don't wait for response
@@ -265,7 +265,7 @@ index e4ab5a9..a17fe37 100644
              sock.send(outgoing.read())
  
              # should receive all data
-@@ -1369,7 +1371,8 @@ class TestSSL(test_utils.TestCase):
+@@ -1369,7 +1371,8 @@ def server(sock):
              self.assertEqual(data_len, CHUNK * SIZE)
  
              # verify that close_notify is received
@@ -275,7 +275,7 @@ index e4ab5a9..a17fe37 100644
  
              sock.close()
  
-@@ -1482,8 +1485,10 @@ class TestSSL(test_utils.TestCase):
+@@ -1482,8 +1485,10 @@ def server(sock):
              time.sleep(0.2)  # wait for the peer to fill its backlog
  
              # send close_notify but don't wait for response
@@ -287,7 +287,7 @@ index e4ab5a9..a17fe37 100644
              sock.send(outgoing.read())
  
              # should receive all data
-@@ -1500,7 +1505,8 @@ class TestSSL(test_utils.TestCase):
+@@ -1500,7 +1505,8 @@ def server(sock):
              self.assertEqual(data_len, CHUNK * SIZE*2)
  
              # verify that close_notify is received
@@ -298,10 +298,10 @@ index e4ab5a9..a17fe37 100644
              sock.close()
  
 diff --git a/Lib/test/test_httplib.py b/Lib/test/test_httplib.py
-index 01f5a10..e7c3984 100644
+index 01f5a101901..e7c39848508 100644
 --- a/Lib/test/test_httplib.py
 +++ b/Lib/test/test_httplib.py
-@@ -7,6 +7,7 @@ import os
+@@ -7,6 +7,7 @@
  import array
  import re
  import socket
@@ -309,7 +309,7 @@ index 01f5a10..e7c3984 100644
  import threading
  
  import unittest
-@@ -1941,7 +1942,10 @@ class HTTPSTest(TestCase):
+@@ -1941,7 +1942,10 @@ def test_networked(self):
              h = client.HTTPSConnection('self-signed.pythontest.net', 443)
              with self.assertRaises(ssl.SSLError) as exc_info:
                  h.request('GET', '/')
@@ -321,7 +321,7 @@ index 01f5a10..e7c3984 100644
  
      def test_networked_noverification(self):
          # Switch off cert verification
-@@ -1970,6 +1974,8 @@ class HTTPSTest(TestCase):
+@@ -1970,6 +1974,8 @@ def test_networked_trusted_by_default_cert(self):
              h.close()
              self.assertIn('text/html', content_type)
  
@@ -330,7 +330,7 @@ index 01f5a10..e7c3984 100644
      def test_networked_good_cert(self):
          # We feed the server's cert as a validating cert
          import ssl
-@@ -2014,7 +2020,10 @@ class HTTPSTest(TestCase):
+@@ -2014,7 +2020,10 @@ def test_networked_bad_cert(self):
              h = client.HTTPSConnection('self-signed.pythontest.net', 443, context=context)
              with self.assertRaises(ssl.SSLError) as exc_info:
                  h.request('GET', '/')
@@ -342,7 +342,7 @@ index 01f5a10..e7c3984 100644
  
      def test_local_unknown_cert(self):
          # The custom cert isn't known to the default trust bundle
-@@ -2023,7 +2032,10 @@ class HTTPSTest(TestCase):
+@@ -2023,7 +2032,10 @@ def test_local_unknown_cert(self):
          h = client.HTTPSConnection('localhost', server.port)
          with self.assertRaises(ssl.SSLError) as exc_info:
              h.request('GET', '/')
@@ -355,10 +355,10 @@ index 01f5a10..e7c3984 100644
      def test_local_good_hostname(self):
          # The (valid) cert validates the HTTPS hostname
 diff --git a/Lib/test/test_imaplib.py b/Lib/test/test_imaplib.py
-index 4429a90..14767a3 100644
+index 4429a90050a..14767a3e557 100644
 --- a/Lib/test/test_imaplib.py
 +++ b/Lib/test/test_imaplib.py
-@@ -558,9 +558,11 @@ class NewIMAPSSLTests(NewIMAPTestsMixin, unittest.TestCase):
+@@ -558,9 +558,11 @@ def test_ssl_raises(self):
          regex = re.compile(r"""(
              IP address mismatch, certificate is not valid for '127.0.0.1'   # OpenSSL
              |
@@ -371,7 +371,7 @@ index 4429a90..14767a3 100644
              _, server = self._setup(SimpleIMAPHandler, connect=False)
              client = self.imap_class(*server.server_address,
                                       ssl_context=ssl_context)
-@@ -971,9 +973,11 @@ class ThreadedNetworkedTestsSSL(ThreadedNetworkedTests):
+@@ -971,9 +973,11 @@ def test_ssl_verified(self):
          regex = re.compile(r"""(
              IP address mismatch, certificate is not valid for '127.0.0.1'   # OpenSSL
              |
@@ -385,10 +385,10 @@ index 4429a90..14767a3 100644
                  client = self.imap_class(*server.server_address,
                                           ssl_context=ssl_context)
 diff --git a/Lib/test/test_poplib.py b/Lib/test/test_poplib.py
-index f1ebbea..f58b1f5 100644
+index f1ebbeafe0c..f58b1f51d34 100644
 --- a/Lib/test/test_poplib.py
 +++ b/Lib/test/test_poplib.py
-@@ -185,7 +185,8 @@ class DummyPOP3Handler(asynchat.async_chat):
+@@ -185,7 +185,8 @@ def _do_tls_handshake(self):
                      return self.handle_close()
                  # TODO: SSLError does not expose alert information
                  elif ("SSLV3_ALERT_BAD_CERTIFICATE" in err.args[1] or
@@ -398,7 +398,7 @@ index f1ebbea..f58b1f5 100644
                      return self.handle_close()
                  raise
              except OSError as err:
-@@ -413,7 +414,7 @@ class TestPOP3Class(TestCase):
+@@ -413,7 +414,7 @@ def test_stls_context(self):
          ctx.load_verify_locations(CAFILE)
          self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
          self.assertEqual(ctx.check_hostname, True)
@@ -408,10 +408,10 @@ index f1ebbea..f58b1f5 100644
          self.client = poplib.POP3("localhost", self.server.port,
                                    timeout=test_support.LOOPBACK_TIMEOUT)
 diff --git a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
-index b13e37d..28f0021 100644
+index b13e37d0cd1..6ca981aac04 100644
 --- a/Lib/test/test_ssl.py
 +++ b/Lib/test/test_ssl.py
-@@ -77,9 +77,17 @@ BYTES_ONLYKEY = os.fsencode(ONLYKEY)
+@@ -77,9 +77,17 @@ def data_file(*name):
  CERTFILE_PROTECTED = data_file("keycert.passwd.pem")
  ONLYKEY_PROTECTED = data_file("ssl_key.passwd.pem")
  KEY_PASSWORD = "somepass"
@@ -431,7 +431,7 @@ index b13e37d..28f0021 100644
  CAFILE_CACERT = data_file("capath", "5ed36f99.0")
  
  CERTFILE_INFO = {
-@@ -410,6 +418,7 @@ class BasicSocketTests(unittest.TestCase):
+@@ -410,6 +418,7 @@ def test_parse_cert(self):
              ssl._ssl._test_decode_cert(CERTFILE),
              CERTFILE_INFO
          )
@@ -439,7 +439,7 @@ index b13e37d..28f0021 100644
          self.assertEqual(
              ssl._ssl._test_decode_cert(SIGNED_CERTFILE),
              SIGNED_CERTFILE_INFO
-@@ -420,7 +429,13 @@ class BasicSocketTests(unittest.TestCase):
+@@ -420,7 +429,13 @@ def test_parse_cert(self):
          p = ssl._ssl._test_decode_cert(NOKIACERT)
          if support.verbose:
              sys.stdout.write("\n" + pprint.pformat(p) + "\n")
@@ -454,7 +454,7 @@ index b13e37d..28f0021 100644
                           (('DNS', 'projects.developer.nokia.com'),
                            ('DNS', 'projects.forum.nokia.com'))
                          )
-@@ -465,7 +480,14 @@ class BasicSocketTests(unittest.TestCase):
+@@ -465,7 +480,14 @@ def test_parse_cert_CVE_2013_4238(self):
                     (('emailAddress', 'python-dev@python.org'),))
          self.assertEqual(p['subject'], subject)
          self.assertEqual(p['issuer'], subject)
@@ -470,7 +470,7 @@ index b13e37d..28f0021 100644
              san = (('DNS', 'altnull.python.org\x00example.com'),
                     ('email', 'null@python.org\x00user@example.org'),
                     ('URI', 'http://null.python.org\x00http://example.org'),
-@@ -483,7 +505,29 @@ class BasicSocketTests(unittest.TestCase):
+@@ -483,7 +505,29 @@ def test_parse_cert_CVE_2013_4238(self):
  
      def test_parse_all_sans(self):
          p = ssl._ssl._test_decode_cert(ALLSANFILE)
@@ -480,7 +480,7 @@ index b13e37d..28f0021 100644
 +            # entries are listed in struct
 +            self.assertEqual(p['subjectAltName'],
 +            (
-+                ('Registered ID', 'surname'),
++                ('Registered ID', '1.2.3.4.5'),
 +                ('IP Address', '0:0:0:0:0:0:0:1'),
 +                ('IP Address', '127.0.0.1'),
 +                ('URI', 'https://www.python.org/'),
@@ -501,7 +501,7 @@ index b13e37d..28f0021 100644
              (
                  ('DNS', 'allsans'),
                  ('othername', '<unsupported>'),
-@@ -500,7 +544,7 @@ class BasicSocketTests(unittest.TestCase):
+@@ -500,7 +544,7 @@ def test_parse_all_sans(self):
                  ('IP Address', '0:0:0:0:0:0:0:1'),
                  ('Registered ID', '1.2.3.4.5')
              )
@@ -510,7 +510,7 @@ index b13e37d..28f0021 100644
  
      def test_DER_to_PEM(self):
          with open(CAFILE_CACERT, 'r') as f:
-@@ -544,9 +588,10 @@ class BasicSocketTests(unittest.TestCase):
+@@ -544,9 +588,10 @@ def test_openssl_version(self):
              openssl_ver = f"OpenSSL {major:d}.{minor:d}.{patch:d}"
          else:
              openssl_ver = f"OpenSSL {major:d}.{minor:d}.{fix:d}"
@@ -524,7 +524,7 @@ index b13e37d..28f0021 100644
          )
  
      @support.cpython_only
-@@ -699,6 +744,7 @@ class BasicSocketTests(unittest.TestCase):
+@@ -699,6 +744,7 @@ def test_dealloc_warn(self):
              support.gc_collect()
          self.assertIn(r, str(cm.warning.args[0]))
  
@@ -532,7 +532,7 @@ index b13e37d..28f0021 100644
      def test_get_default_verify_paths(self):
          paths = ssl.get_default_verify_paths()
          self.assertEqual(len(paths), 6)
-@@ -752,34 +798,49 @@ class BasicSocketTests(unittest.TestCase):
+@@ -752,34 +798,49 @@ def test_enum_crls(self):
  
  
      def test_asn1object(self):
@@ -597,7 +597,7 @@ index b13e37d..28f0021 100644
  
          val = ssl._ASN1Object.fromname('TLS Web Server Authentication')
          self.assertEqual(val, expected)
-@@ -794,7 +855,10 @@ class BasicSocketTests(unittest.TestCase):
+@@ -794,7 +855,10 @@ def test_purpose_enum(self):
          val = ssl._ASN1Object('1.3.6.1.5.5.7.3.1')
          self.assertIsInstance(ssl.Purpose.SERVER_AUTH, ssl._ASN1Object)
          self.assertEqual(ssl.Purpose.SERVER_AUTH, val)
@@ -609,7 +609,7 @@ index b13e37d..28f0021 100644
          self.assertEqual(ssl.Purpose.SERVER_AUTH.shortname, 'serverAuth')
          self.assertEqual(ssl.Purpose.SERVER_AUTH.oid,
                                '1.3.6.1.5.5.7.3.1')
-@@ -802,7 +866,10 @@ class BasicSocketTests(unittest.TestCase):
+@@ -802,7 +866,10 @@ def test_purpose_enum(self):
          val = ssl._ASN1Object('1.3.6.1.5.5.7.3.2')
          self.assertIsInstance(ssl.Purpose.CLIENT_AUTH, ssl._ASN1Object)
          self.assertEqual(ssl.Purpose.CLIENT_AUTH, val)
@@ -621,7 +621,7 @@ index b13e37d..28f0021 100644
          self.assertEqual(ssl.Purpose.CLIENT_AUTH.shortname, 'clientAuth')
          self.assertEqual(ssl.Purpose.CLIENT_AUTH.oid,
                                '1.3.6.1.5.5.7.3.2')
-@@ -945,6 +1012,8 @@ class ContextTests(unittest.TestCase):
+@@ -945,6 +1012,8 @@ def test_python_ciphers(self):
              self.assertNotIn("RC4", name)
              self.assertNotIn("3DES", name)
  
@@ -630,7 +630,7 @@ index b13e37d..28f0021 100644
      def test_get_ciphers(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          ctx.set_ciphers('AESGCM')
-@@ -969,6 +1038,9 @@ class ContextTests(unittest.TestCase):
+@@ -969,6 +1038,9 @@ def test_options(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          # OP_ALL | OP_NO_SSLv2 | OP_NO_SSLv3 is the default value
          default = (ssl.OP_ALL | ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3)
@@ -640,7 +640,7 @@ index b13e37d..28f0021 100644
          # SSLContext also enables these by default
          default |= (OP_NO_COMPRESSION | OP_CIPHER_SERVER_PREFERENCE |
                      OP_SINGLE_DH_USE | OP_SINGLE_ECDH_USE |
-@@ -987,8 +1059,10 @@ class ContextTests(unittest.TestCase):
+@@ -987,8 +1059,10 @@ def test_options(self):
  
          # clear all options
          ctx.options = 0
@@ -653,7 +653,7 @@ index b13e37d..28f0021 100644
  
          # invalid options
          with self.assertRaises(OverflowError):
-@@ -1052,7 +1126,7 @@ class ContextTests(unittest.TestCase):
+@@ -1052,7 +1126,7 @@ def test_min_max_version(self):
          maximum_range = {
              # stock OpenSSL
              ssl.TLSVersion.MAXIMUM_SUPPORTED,
@@ -662,7 +662,7 @@ index b13e37d..28f0021 100644
              ssl.TLSVersion.TLSv1_3
          }
  
-@@ -1107,9 +1181,10 @@ class ContextTests(unittest.TestCase):
+@@ -1107,9 +1181,10 @@ def test_min_max_version(self):
              self.assertIn(
                  ctx.minimum_version, minimum_range
              )
@@ -675,7 +675,7 @@ index b13e37d..28f0021 100644
              with self.assertRaises(ValueError):
                  ctx.minimum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
              with self.assertRaises(ValueError):
-@@ -1163,20 +1238,20 @@ class ContextTests(unittest.TestCase):
+@@ -1163,20 +1238,20 @@ def test_load_cert_chain(self):
          with self.assertRaises(OSError) as cm:
              ctx.load_cert_chain(NONEXISTINGCERT)
          self.assertEqual(cm.exception.errno, errno.ENOENT)
@@ -701,7 +701,7 @@ index b13e37d..28f0021 100644
              ctx.load_cert_chain(certfile=ONLYKEY, keyfile=ONLYCERT)
          # Mismatching key and cert
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-@@ -1184,6 +1259,8 @@ class ContextTests(unittest.TestCase):
+@@ -1184,6 +1259,8 @@ def test_load_cert_chain(self):
          regex = re.compile(r"""(
              key values mismatch         # OpenSSL
              |
@@ -710,7 +710,7 @@ index b13e37d..28f0021 100644
              KEY_VALUES_MISMATCH         # AWS-LC
          )""", re.X)
          with self.assertRaisesRegex(ssl.SSLError, regex):
-@@ -1254,7 +1331,7 @@ class ContextTests(unittest.TestCase):
+@@ -1254,7 +1331,7 @@ def test_load_verify_locations(self):
          with self.assertRaises(OSError) as cm:
              ctx.load_verify_locations(NONEXISTINGCERT)
          self.assertEqual(cm.exception.errno, errno.ENOENT)
@@ -719,7 +719,7 @@ index b13e37d..28f0021 100644
              ctx.load_verify_locations(BADCERT)
          ctx.load_verify_locations(CERTFILE, CAPATH)
          ctx.load_verify_locations(CERTFILE, capath=BYTES_CAPATH)
-@@ -1296,19 +1373,21 @@ class ContextTests(unittest.TestCase):
+@@ -1296,19 +1373,21 @@ def test_load_verify_cadata(self):
          self.assertEqual(ctx.cert_store_stats()["x509_ca"], 2)
  
          # test DER
@@ -754,7 +754,7 @@ index b13e37d..28f0021 100644
  
          # error cases
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-@@ -1324,8 +1403,10 @@ class ContextTests(unittest.TestCase):
+@@ -1324,8 +1403,10 @@ def test_load_verify_cadata(self):
              "not enough data: cadata does not contain a certificate"
          ):
              ctx.load_verify_locations(cadata=b"broken")
@@ -767,7 +767,7 @@ index b13e37d..28f0021 100644
  
      def test_load_dh_params(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-@@ -1462,6 +1543,7 @@ class ContextTests(unittest.TestCase):
+@@ -1462,6 +1543,7 @@ def test_load_default_certs(self):
          self.assertRaises(TypeError, ctx.load_default_certs, 'SERVER_AUTH')
  
      @unittest.skipIf(sys.platform == "win32", "not-Windows specific")
@@ -775,7 +775,7 @@ index b13e37d..28f0021 100644
      def test_load_default_certs_env(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          with os_helper.EnvironmentVarGuard() as env:
-@@ -1617,6 +1699,10 @@ class ContextTests(unittest.TestCase):
+@@ -1617,6 +1699,10 @@ class MySSLObject(ssl.SSLObject):
              pass
  
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -786,7 +786,7 @@ index b13e37d..28f0021 100644
          ctx.sslsocket_class = MySSLSocket
          ctx.sslobject_class = MySSLObject
  
-@@ -1627,7 +1713,11 @@ class ContextTests(unittest.TestCase):
+@@ -1627,7 +1713,11 @@ class MySSLObject(ssl.SSLObject):
  
      def test_num_tickest(self):
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -799,7 +799,7 @@ index b13e37d..28f0021 100644
          ctx.num_tickets = 1
          self.assertEqual(ctx.num_tickets, 1)
          ctx.num_tickets = 0
-@@ -1638,7 +1728,10 @@ class ContextTests(unittest.TestCase):
+@@ -1638,7 +1728,10 @@ def test_num_tickest(self):
              ctx.num_tickets = None
  
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -811,7 +811,7 @@ index b13e37d..28f0021 100644
          with self.assertRaises(ValueError):
              ctx.num_tickets = 1
  
-@@ -1776,6 +1869,7 @@ class SSLObjectTests(unittest.TestCase):
+@@ -1776,6 +1869,7 @@ def test_private_init(self):
          with self.assertRaisesRegex(TypeError, "public constructor"):
              ssl.SSLObject(bio, bio)
  
@@ -819,7 +819,7 @@ index b13e37d..28f0021 100644
      def test_unwrap(self):
          client_ctx, server_ctx, hostname = testing_context()
          c_in = ssl.MemoryBIO()
-@@ -1854,6 +1948,8 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -1854,6 +1948,8 @@ def test_connect_fail(self):
          regex = re.compile(r"""(
              certificate verify failed   # OpenSSL
              |
@@ -828,7 +828,7 @@ index b13e37d..28f0021 100644
              CERTIFICATE_VERIFY_FAILED   # AWS-LC
          )""", re.X)
          self.assertRaisesRegex(ssl.SSLError, regex,
-@@ -1928,6 +2024,8 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -1928,6 +2024,8 @@ def test_connect_with_context_fail(self):
          regex = re.compile(r"""(
              certificate verify failed   # OpenSSL
              |
@@ -837,7 +837,7 @@ index b13e37d..28f0021 100644
              CERTIFICATE_VERIFY_FAILED   # AWS-LC
          )""", re.X)
          self.assertRaisesRegex(ssl.SSLError, regex,
-@@ -2073,13 +2171,22 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -2073,13 +2171,22 @@ def test_get_ca_certs_capath(self):
          # capath certs are loaded on request
          ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          ctx.load_verify_locations(capath=CAPATH)
@@ -862,7 +862,7 @@ index b13e37d..28f0021 100644
  
      def test_context_setget(self):
          # Check that the context of a connected socket can be replaced.
-@@ -2143,9 +2250,12 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -2143,9 +2250,12 @@ def test_bio_handshake(self):
          sslobj = ctx.wrap_bio(incoming, outgoing, False,
                                SIGNED_CERTFILE_HOSTNAME)
          self.assertIs(sslobj._sslobj.owner, sslobj)
@@ -878,7 +878,7 @@ index b13e37d..28f0021 100644
          self.assertRaises(ValueError, sslobj.getpeercert)
          # tls-unique is not defined for TLSv1.3
          # https://datatracker.ietf.org/doc/html/rfc8446#appendix-C.5
-@@ -2164,7 +2274,10 @@ class SimpleBackgroundTests(unittest.TestCase):
+@@ -2164,7 +2274,10 @@ def test_bio_handshake(self):
              # If the server shuts down the TCP connection without sending a
              # secure shutdown message, this is reported as SSL_ERROR_SYSCALL
              pass
@@ -890,7 +890,7 @@ index b13e37d..28f0021 100644
  
      def test_bio_read_write_data(self):
          sock = socket.socket(socket.AF_INET)
-@@ -2900,6 +3013,8 @@ class ThreadedTests(unittest.TestCase):
+@@ -2900,6 +3013,8 @@ def test_crl_check(self):
          regex = re.compile(r"""(
              certificate verify failed   # OpenSSL
              |
@@ -899,7 +899,7 @@ index b13e37d..28f0021 100644
              CERTIFICATE_VERIFY_FAILED   # AWS-LC
          )""", re.X)
          with server:
-@@ -2940,6 +3055,8 @@ class ThreadedTests(unittest.TestCase):
+@@ -2940,6 +3055,8 @@ def test_check_hostname(self):
          regex = re.compile(r"""(
              certificate verify failed   # OpenSSL
              |
@@ -908,7 +908,7 @@ index b13e37d..28f0021 100644
              CERTIFICATE_VERIFY_FAILED   # AWS-LC
          )""", re.X)
          with server:
-@@ -2983,7 +3100,9 @@ class ThreadedTests(unittest.TestCase):
+@@ -2983,7 +3100,9 @@ def test_hostname_checks_common_name(self):
      def test_ecc_cert(self):
          client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
          client_context.load_verify_locations(SIGNING_CA)
@@ -919,7 +919,7 @@ index b13e37d..28f0021 100644
          hostname = SIGNED_CERTFILE_ECC_HOSTNAME
  
          server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-@@ -3008,13 +3127,19 @@ class ThreadedTests(unittest.TestCase):
+@@ -3008,13 +3127,19 @@ def test_dual_rsa_ecc(self):
          #       algorithms.
          client_context.maximum_version = ssl.TLSVersion.TLSv1_2
          # only ECDSA certs
@@ -941,43 +941,16 @@ index b13e37d..28f0021 100644
  
          # correct hostname should verify
          server = ThreadedEchoServer(context=server_context, chatty=True)
-@@ -3146,16 +3271,25 @@ class ThreadedTests(unittest.TestCase):
-              client_context.wrap_socket(socket.socket(),
-                                         server_hostname=hostname,
-                                         suppress_ragged_eofs=False) as s:
--            s.connect((HOST, server.port))
--            with self.assertRaisesRegex(
--                ssl.SSLError,
+@@ -3149,7 +3274,7 @@ def test_wrong_cert_tls13(self):
+             s.connect((HOST, server.port))
+             with self.assertRaisesRegex(
+                 ssl.SSLError,
 -                'alert unknown ca|EOF occurred|TLSV1_ALERT_UNKNOWN_CA'
--            ):
--                # TLS 1.3 perform client cert exchange after handshake
--                s.write(b'data')
--                s.read(1000)
--                s.write(b'should have failed already')
--                s.read(1000)
-+            if ssl.IS_WOLFSSL:
-+                # with post handshake auth not set wolfSSL verifies during
-+                # TLS 1.3 handshake
-+                with self.assertRaisesRegex(
-+                    ssl.SSLError,
-+                    'error state on socket|ASN_SELF_SIGNED_E'
-+                ):
-+                    s.connect((HOST, server.port))
-+            else:
-+                s.connect((HOST, server.port))
-+                with self.assertRaisesRegex(
-+                    ssl.SSLError,
-+                    'alert unknown ca|EOF occurred|TLSV1_ALERT_UNKNOWN_CA'
-+                ):
-+                    # TLS 1.3 perform client cert exchange after handshake
-+                    s.write(b'data')
-+                    s.read(1000)
-+                    s.write(b'should have failed already')
-+                    s.read(1000)
- 
-     def test_rude_shutdown(self):
-         """A brutal shutdown of an SSL server should raise an OSError
-@@ -3215,16 +3349,24 @@ class ThreadedTests(unittest.TestCase):
++                'alert unknown ca|EOF occurred|TLSV1_ALERT_UNKNOWN_CA|ALERT_FATAL_ERROR'
+             ):
+                 # TLS 1.3 perform client cert exchange after handshake
+                 s.write(b'data')
+@@ -3215,16 +3340,24 @@ def test_ssl_cert_verify_error(self):
                      s.connect((HOST, server.port))
                      self.fail("Expected connection failure")
                  except ssl.SSLError as e:
@@ -1005,7 +978,7 @@ index b13e37d..28f0021 100644
                          CERTIFICATE_VERIFY_FAILED   # AWS-LC
                      )""", re.X)
                      self.assertRegex(repr(e), regex)
-@@ -3752,8 +3894,12 @@ class ThreadedTests(unittest.TestCase):
+@@ -3752,8 +3885,12 @@ def test_no_shared_ciphers(self):
          # OpenSSL enables all TLS 1.3 ciphers, enforce TLS 1.2 for test
          client_context.maximum_version = ssl.TLSVersion.TLSv1_2
          # Force different suites on client and server
@@ -1020,7 +993,7 @@ index b13e37d..28f0021 100644
          with ThreadedEchoServer(context=server_context) as server:
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
-@@ -3911,7 +4057,11 @@ class ThreadedTests(unittest.TestCase):
+@@ -3911,7 +4048,11 @@ def test_tls_unique_channel_binding(self):
                  # check if it is sane
                  self.assertIsNotNone(cb_data)
                  if s.version() == 'TLSv1.3':
@@ -1033,7 +1006,7 @@ index b13e37d..28f0021 100644
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
  
-@@ -3936,7 +4086,11 @@ class ThreadedTests(unittest.TestCase):
+@@ -3936,7 +4077,11 @@ def test_tls_unique_channel_binding(self):
                  self.assertNotEqual(cb_data, new_cb_data)
                  self.assertIsNotNone(cb_data)
                  if s.version() == 'TLSv1.3':
@@ -1046,7 +1019,7 @@ index b13e37d..28f0021 100644
                  else:
                      self.assertEqual(len(cb_data), 12)  # True for TLSv1
                  s.write(b"CB tls-unique\n")
-@@ -3993,6 +4147,8 @@ class ThreadedTests(unittest.TestCase):
+@@ -3993,6 +4138,8 @@ def test_dh_params(self):
          except RuntimeError:
              if Py_DEBUG_WIN32:
                  self.skipTest("not supported on Win32 debug build")
@@ -1055,7 +1028,7 @@ index b13e37d..28f0021 100644
              raise
          server_context.set_ciphers("kEDH")
          server_context.maximum_version = ssl.TLSVersion.TLSv1_2
-@@ -4153,7 +4309,10 @@ class ThreadedTests(unittest.TestCase):
+@@ -4153,7 +4300,10 @@ def cb_returning_alert(ssl_sock, server_name, initial_context):
              stats = server_params_test(client_context, server_context,
                                         chatty=False,
                                         sni_name='supermessage')
@@ -1067,7 +1040,7 @@ index b13e37d..28f0021 100644
  
      def test_sni_callback_raising(self):
          # Raising fails the connection with a TLS handshake failure alert.
-@@ -4170,7 +4329,7 @@ class ThreadedTests(unittest.TestCase):
+@@ -4170,7 +4320,7 @@ def cb_raising(ssl_sock, server_name, initial_context):
                                             sni_name='supermessage')
  
              # Allow for flexible libssl error messages.
@@ -1076,7 +1049,7 @@ index b13e37d..28f0021 100644
              self.assertRegex(cm.exception.reason, regex)
              self.assertEqual(catch.unraisable.exc_type, ZeroDivisionError)
  
-@@ -4190,15 +4349,20 @@ class ThreadedTests(unittest.TestCase):
+@@ -4190,15 +4340,20 @@ def cb_wrong_return_type(ssl_sock, server_name, initial_context):
                                             sni_name='supermessage')
  
  
@@ -1101,7 +1074,7 @@ index b13e37d..28f0021 100644
              # TLS 1.3 ciphers are always enabled
              "TLS_CHACHA20", "TLS_AES",
          ]
-@@ -4251,19 +4415,24 @@ class ThreadedTests(unittest.TestCase):
+@@ -4251,19 +4406,24 @@ def test_session(self):
          self.assertTrue(session.id)
          self.assertGreater(session.time, 0)
          self.assertGreater(session.timeout, 0)
@@ -1131,7 +1104,7 @@ index b13e37d..28f0021 100644
          self.assertTrue(stats['session_reused'])
          session2 = stats['session']
          self.assertEqual(session2.id, session.id)
-@@ -4280,8 +4449,10 @@ class ThreadedTests(unittest.TestCase):
+@@ -4280,8 +4440,10 @@ def test_session(self):
          self.assertNotEqual(session3.id, session.id)
          self.assertNotEqual(session3, session)
          sess_stat = server_context.session_stats()
@@ -1144,7 +1117,7 @@ index b13e37d..28f0021 100644
  
          # reuse session again
          stats = server_params_test(client_context, server_context,
-@@ -4293,8 +4464,10 @@ class ThreadedTests(unittest.TestCase):
+@@ -4293,8 +4455,10 @@ def test_session(self):
          self.assertGreaterEqual(session4.time, session.time)
          self.assertGreaterEqual(session4.timeout, session.timeout)
          sess_stat = server_context.session_stats()
@@ -1157,7 +1130,7 @@ index b13e37d..28f0021 100644
  
      def test_session_handling(self):
          client_context, server_context, hostname = testing_context()
-@@ -4423,7 +4596,7 @@ class TestPostHandshakeAuth(unittest.TestCase):
+@@ -4423,7 +4587,7 @@ def msg_cb(conn, direction, version, content_type, msg_type, data):
                  # server aborts connection with an error.
                  with self.assertRaisesRegex(
                      ssl.SSLError,
@@ -1166,7 +1139,7 @@ index b13e37d..28f0021 100644
                  ):
                      # receive CertificateRequest
                      data = s.recv(1024)
-@@ -4492,10 +4665,17 @@ class TestPostHandshakeAuth(unittest.TestCase):
+@@ -4492,10 +4656,17 @@ def test_pha_no_pha_client(self):
              with client_context.wrap_socket(socket.socket(),
                                              server_hostname=hostname) as s:
                  s.connect((HOST, server.port))
@@ -1188,7 +1161,7 @@ index b13e37d..28f0021 100644
  
      def test_pha_no_pha_server(self):
          # server doesn't have PHA enabled, cert is requested in handshake
-@@ -4598,9 +4778,10 @@ class TestPostHandshakeAuth(unittest.TestCase):
+@@ -4598,9 +4769,10 @@ def test_internal_chain_client(self):
                  self.assertIsInstance(pem, str)
                  self.assertIn("-----BEGIN CERTIFICATE-----", pem)
                  self.assertIsInstance(der, bytes)
@@ -1202,7 +1175,7 @@ index b13e37d..28f0021 100644
  
      def test_internal_chain_server(self):
          client_context, server_context, hostname = testing_context()
-@@ -4620,7 +4801,10 @@ class TestPostHandshakeAuth(unittest.TestCase):
+@@ -4620,7 +4792,10 @@ def test_internal_chain_server(self):
                  self.assertEqual(res, b'\x02\n')
                  s.write(b'UNVERIFIEDCHAIN\n')
                  res = s.recv(1024)
@@ -1214,47 +1187,8 @@ index b13e37d..28f0021 100644
  
  
  HAS_KEYLOG = hasattr(ssl.SSLContext, 'keylog_filename')
-@@ -4679,7 +4863,11 @@ class TestSSLDebug(unittest.TestCase):
-                                             server_hostname=hostname) as s:
-                 s.connect((HOST, server.port))
-         # header, 5 lines for TLS 1.3
--        self.assertEqual(self.keylog_lines(), 6)
-+        if ssl.IS_WOLFSSL:
-+            # wolfSSL does not include EXPORTER_SECRET value in keylog output
-+            self.assertEqual(self.keylog_lines(), 5)
-+        else:
-+            self.assertEqual(self.keylog_lines(), 6)
- 
-         client_context.keylog_filename = None
-         server_context.keylog_filename = os_helper.TESTFN
-@@ -4688,7 +4876,11 @@ class TestSSLDebug(unittest.TestCase):
-             with client_context.wrap_socket(socket.socket(),
-                                             server_hostname=hostname) as s:
-                 s.connect((HOST, server.port))
--        self.assertGreaterEqual(self.keylog_lines(), 11)
-+        if ssl.IS_WOLFSSL:
-+            # wolfSSL does not include EXPORTER_SECRET value in keylog output
-+            self.assertEqual(self.keylog_lines(), 9)
-+        else:
-+            self.assertGreaterEqual(self.keylog_lines(), 11)
- 
-         client_context.keylog_filename = os_helper.TESTFN
-         server_context.keylog_filename = os_helper.TESTFN
-@@ -4697,7 +4889,11 @@ class TestSSLDebug(unittest.TestCase):
-             with client_context.wrap_socket(socket.socket(),
-                                             server_hostname=hostname) as s:
-                 s.connect((HOST, server.port))
--        self.assertGreaterEqual(self.keylog_lines(), 21)
-+        if ssl.IS_WOLFSSL:
-+            # wolfSSL does not include EXPORTER_SECRET value in keylog output
-+            self.assertEqual(self.keylog_lines(), 17)
-+        else:
-+            self.assertGreaterEqual(self.keylog_lines(), 21)
- 
-         client_context.keylog_filename = None
-         server_context.keylog_filename = None
 diff --git a/Makefile.pre.in b/Makefile.pre.in
-index 7ca3dc6..f117778 100644
+index 7ca3dc62c01..f117778a25f 100644
 --- a/Makefile.pre.in
 +++ b/Makefile.pre.in
 @@ -2124,6 +2124,7 @@ TESTSUBDIRS=	idlelib/idle_test \
@@ -1266,7 +1200,7 @@ index 7ca3dc6..f117778 100644
  		test/crashers \
  		test/configdata \
 diff --git a/Modules/_hashopenssl.c b/Modules/_hashopenssl.c
-index 41ec164..8a93b61 100644
+index 41ec16426b0..8a93b61551a 100644
 --- a/Modules/_hashopenssl.c
 +++ b/Modules/_hashopenssl.c
 @@ -30,6 +30,11 @@
@@ -1293,7 +1227,7 @@ index 41ec164..8a93b61 100644
  /* LCOV_EXCL_START */
  
 diff --git a/Modules/_ssl.c b/Modules/_ssl.c
-index 0b8cf0b..7e3454b 100644
+index 0b8cf0b6df3..7e3454bc434 100644
 --- a/Modules/_ssl.c
 +++ b/Modules/_ssl.c
 @@ -69,7 +69,21 @@
@@ -1656,7 +1590,7 @@ index 0b8cf0b..7e3454b 100644
      return PyModuleDef_Init(&_sslmodule_def);
  }
 diff --git a/Modules/_ssl.h b/Modules/_ssl.h
-index 22d93dd..7a75e19 100644
+index 22d93ddcc6d..7a75e196d9b 100644
 --- a/Modules/_ssl.h
 +++ b/Modules/_ssl.h
 @@ -2,6 +2,10 @@
@@ -1671,7 +1605,7 @@ index 22d93dd..7a75e19 100644
  #include "openssl/x509.h"
  
 diff --git a/Modules/_ssl_data.h b/Modules/_ssl_data.h
-index 8f2994f..3df336a 100644
+index 8f2994f52df..3df336aabac 100644
 --- a/Modules/_ssl_data.h
 +++ b/Modules/_ssl_data.h
 @@ -79,6 +79,9 @@ static struct py_ssl_library_code library_codes[] = {
@@ -1724,7 +1658,7 @@ index 8f2994f..3df336a 100644
      { NULL }
  };
 diff --git a/configure.ac b/configure.ac
-index 1a02d19..1ee816c 100644
+index 1a02d19f1b2..1ee816c3952 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -7046,8 +7046,48 @@ WITH_SAVE_ENV([
