@@ -1,4 +1,4 @@
-From 39d5aa465096da4e1178a1fe027b2cb909083b47 Mon Sep 17 00:00:00 2001
+From ba72b5621601dc494d3dd412c9df8c8d7c333171 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Mon, 23 Feb 2026 16:50:00 +0100
 Subject: [PATCH] Patch for wolfSSL
@@ -20,13 +20,13 @@ All tests should pass:
   make check
 ---
  Makefile.am                                  |  3 ---
- configure.ac                                 |  8 +++++++-
+ configure.ac                                 |  7 ++++++-
  src/external/test_ca.m4                      | 14 ++++++++++++--
  src/lib/certmap/sss_cert_content_crypto.c    |  4 ++++
  src/p11_child/p11_child_openssl.c            |  4 ++++
  src/tests/cmocka/test_certmap.c              |  4 ++++
  src/util/crypto/libcrypto/crypto_hmac_sha1.c |  1 +
- 7 files changed, 32 insertions(+), 6 deletions(-)
+ 7 files changed, 31 insertions(+), 6 deletions(-)
 
 diff --git a/Makefile.am b/Makefile.am
 index e8552c6b29..6236be4f23 100644
@@ -57,21 +57,27 @@ index e8552c6b29..6236be4f23 100644
      src/tests/krb5_proxy_check_test_data.conf \
      $(NULL)
 diff --git a/configure.ac b/configure.ac
-index 90cb1f3ece..633b385c14 100644
+index 90cb1f3ece..25e9ef9cd8 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -428,7 +428,13 @@ AS_IF([test x$syslog = xjournald], [
-     AM_CHECK_JOURNALD
- ])
+@@ -144,6 +144,12 @@ AC_ARG_ENABLE([nfsidmaplibdir], [AS_HELP_STRING([--enable-nfsidmaplibdir],
+               [nfsidmaplibdir=$libdir/libnfsidmap])
+ AC_SUBST(nfsidmaplibdir)
  
--AM_CHECK_LIBCRYPTO
-+
 +AS_IF([test -z $WOLFSSL_INSTALL_DIR || test ! -d $WOLFSSL_INSTALL_DIR ], [
 +    WOLFSSL_INSTALL_DIR=/usr/local
 +])
 +CFLAGS="$CFLAGS -I$WOLFSSL_INSTALL_DIR/include -I$WOLFSSL_INSTALL_DIR/include/wolfssl -DEXTERNAL_OPTS_OPENVPN"
 +LIBS="$LIBS -lwolfssl -L$WOLFSSL_INSTALL_DIR/lib"
 +
+ #Include here cause WITH_INIT_DIR requires $osname set in platform.m4
+ m4_include([src/external/platform.m4])
+ 
+@@ -428,7 +434,6 @@ AS_IF([test x$syslog = xjournald], [
+     AM_CHECK_JOURNALD
+ ])
+ 
+-AM_CHECK_LIBCRYPTO
  m4_include([src/external/p11-kit.m4])
  
  AM_CHECK_INOTIFY
@@ -186,5 +192,5 @@ index 9b072ad9b5..580c272549 100644
  
  #include "util/util.h"
 -- 
-2.51.2
+2.43.0
 
