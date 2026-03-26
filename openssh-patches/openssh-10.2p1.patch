@@ -1,0 +1,608 @@
+From 362721ed1982880420aa5d5905249ef55641c3e4 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Thu, 26 Mar 2026 17:57:48 +0100
+Subject: [PATCH] 10.2p1 patch for wolfSSL
+
+This patch was implemented and tested on OpenSSH version 10.2p1.
+
+Compile wolfSSL with:
+    ./configure --enable-openssh
+    make
+    make install
+
+Compile OpenSSH with
+    patch -p1 < <path/to/this/patch>
+    autoreconf
+    ./configure --with-wolfssl
+    make
+
+Running the OpenSSH tests requires wolfSSL to be configured using
+    ./configure --enable-openssh --enable-dsa --with-max-rsa-bits=8192
+and it is recommended to configure OpenSSH with
+    ./configure --with-wolfssl --with-rpath='-Wl,-rpath='
+to resolve issues with missing library paths. With the above modifications
+OpenSSH should pass all tests run with:
+```
+make tests
+```
+---
+ Makefile.in                                 |   1 +
+ cipher-aesctr.h                             |   2 -
+ cipher.c                                    |   3 +-
+ config.h.in                                 |  41 +++-
+ configure.ac                                | 212 +++++++++++++++++++-
+ includes.h                                  |   6 +
+ log.c                                       |  46 +++++
+ openbsd-compat/openssl-compat.c             |   3 +
+ regress/unittests/test_helper/test_helper.c |   5 +
+ 9 files changed, 313 insertions(+), 6 deletions(-)
+
+diff --git a/Makefile.in b/Makefile.in
+index ba17a79f0..f56d207fa 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -792,6 +792,7 @@ interop-tests t-exec file-tests extra-tests: regress-prep regress-binaries $(TAR
+ 		.CURDIR="$(abs_top_srcdir)/regress" \
+ 		.OBJDIR="$(BUILDDIR)/regress" \
+ 		BUILDDIR="$(BUILDDIR)" \
++		ENABLE_WOLFSSL="@ENABLE_WOLFSSL@" \
+ 		OBJ="$(BUILDDIR)/regress" \
+ 		PATH="$(BUILDDIR):$${PATH}" \
+ 		TEST_ENV=MALLOC_OPTIONS="@TEST_MALLOC_OPTIONS@" \
+diff --git a/cipher-aesctr.h b/cipher-aesctr.h
+index 85d55bba2..d12d7802d 100644
+--- a/cipher-aesctr.h
++++ b/cipher-aesctr.h
+@@ -20,8 +20,6 @@
+ 
+ #include "rijndael.h"
+ 
+-#define AES_BLOCK_SIZE 16
+-
+ typedef struct aesctr_ctx {
+ 	int	rounds;				/* keylen-dependent #rounds */
+ 	u32	ek[4*(AES_MAXROUNDS + 1)];	/* encrypt key schedule */
+diff --git a/cipher.c b/cipher.c
+index 5e096cebf..ebf00655b 100644
+--- a/cipher.c
++++ b/cipher.c
+@@ -379,7 +379,8 @@ cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr, u_char *dest,
+ 		return SSH_ERR_INVALID_ARGUMENT;
+ 	if (EVP_Cipher(cc->evp, dest + aadlen, (u_char *)src + aadlen,
+ 	    len) < 0)
+-		return SSH_ERR_LIBCRYPTO_ERROR;
++        return cc->encrypt ?
++            SSH_ERR_LIBCRYPTO_ERROR : SSH_ERR_MAC_INVALID;
+ 	if (authlen) {
+ 		/* compute tag (on encrypt) or verify tag (on decrypt) */
+ 		if (EVP_Cipher(cc->evp, NULL, NULL, 0) < 0)
+diff --git a/config.h.in b/config.h.in
+index eeb1466ff..09520e45e 100644
+--- a/config.h.in
++++ b/config.h.in
+@@ -519,6 +519,9 @@
+ /* Define to 1 if you have the `EVP_chacha20' function. */
+ #undef HAVE_EVP_CHACHA20
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_EVP_CIPHER_CTX_CTRL
++
+ /* Define to 1 if you have the `EVP_CIPHER_CTX_get_iv' function. */
+ #undef HAVE_EVP_CIPHER_CTX_GET_IV
+ 
+@@ -555,12 +558,18 @@
+ /* Define to 1 if you have the `EVP_MD_CTX_init' function. */
+ #undef HAVE_EVP_MD_CTX_INIT
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_EVP_PKEY_GET0_RSA
++
+ /* Define to 1 if you have the `EVP_PKEY_get_raw_private_key' function. */
+ #undef HAVE_EVP_PKEY_GET_RAW_PRIVATE_KEY
+ 
+ /* Define to 1 if you have the `EVP_PKEY_get_raw_public_key' function. */
+ #undef HAVE_EVP_PKEY_GET_RAW_PUBLIC_KEY
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_EVP_RIPEMD160
++
+ /* Define to 1 if you have the `EVP_sha256' function. */
+ #undef HAVE_EVP_SHA256
+ 
+@@ -1167,6 +1176,21 @@
+ /* Define to 1 if you have the `RSA_get_default_method' function. */
+ #undef HAVE_RSA_GET_DEFAULT_METHOD
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_FINISH
++
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_PRIV_DEC
++
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_PRIV_ENC
++
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_PUB_DEC
++
++/* Defined if using WolfSSL */
++#undef HAVE_RSA_METH_SET_PUB_ENC
++
+ /* Define to 1 if you have the <sandbox.h> header file. */
+ #undef HAVE_SANDBOX_H
+ 
+@@ -1269,6 +1293,9 @@
+ /* Define to 1 if you have the `SHA256Update' function. */
+ #undef HAVE_SHA256UPDATE
+ 
++/* Defined if using WolfSSL */
++#undef HAVE_SHA256_UPDATE
++
+ /* Define to 1 if you have the <sha2.h> header file. */
+ #undef HAVE_SHA2_H
+ 
+@@ -1819,6 +1846,9 @@
+ /* libcrypto has NID_secp521r1 */
+ #undef OPENSSL_HAS_NISTP521
+ 
++/* Defined if using WolfSSL */
++#undef OPENSSL_HAVE_EVPCTR
++
+ /* libcrypto is missing AES 192 and 256 bit functions */
+ #undef OPENSSL_LOBOTOMISED_AES
+ 
+@@ -1979,6 +2009,9 @@
+ /* Support passwords > 8 chars */
+ #undef UNIXWARE_LONG_PASSWORDS
+ 
++/* Defined if using WolfSSL */
++#undef UNSUPPORTED_POSIX_THREADS_HACK
++
+ /* Specify default $PATH */
+ #undef USER_PATH
+ 
+@@ -2018,6 +2051,12 @@
+ /* Use libwtmpdb for sshd */
+ #undef USE_WTMPDB
+ 
++/* Defined if using WolfSSL */
++#undef USING_WOLFSSL
++
++/* Defined if using wolfSSL FIPS */
++#undef USING_WOLFSSL_FIPS
++
+ /* compiler variable declarations after code */
+ #undef VARIABLE_DECLARATION_AFTER_CODE
+ 
+@@ -2043,7 +2082,7 @@
+ /* Define if you want IRIX project management */
+ #undef WITH_IRIX_PROJECT
+ 
+-/* use libcrypto for cryptography */
++/* Defined if using WolfSSL */
+ #undef WITH_OPENSSL
+ 
+ /* Define if you want SELinux support. */
+diff --git a/configure.ac b/configure.ac
+index db5211013..56dfda531 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -657,6 +657,8 @@ SHLIBEXT=".so"
+ need_pledge_inet=""
+ 
+ # Check for some target-specific stuff
++APPLE_SANDBOX_MSG="no"
++WOLFSSL_ADD_LIBPTHREAD_SSHD=0
+ case "$host" in
+ *-*-aix*)
+ 	# Some versions of VAC won't allow macro redefinitions at
+@@ -785,6 +787,12 @@ case "$host" in
+ 	AC_DEFINE([BROKEN_SETREGID])
+ 	;;
+ *-*-darwin*)
++	case $host in
++	*-apple-darwin*)
++		CPPFLAGS="$CPPFLAGS -DAPPLE_SANDBOX_NAMED_EXTERNAL"
++        APPLE_SANDBOX_MSG="yes"
++		;;
++	esac
+ 	use_pie=auto
+ 	AC_MSG_CHECKING([if we have working getaddrinfo])
+ 	AC_RUN_IFELSE([AC_LANG_SOURCE([[
+@@ -939,6 +947,7 @@ int main(void) { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
+ 	no_dev_ptmx=1
+ 	use_pie=auto
+ 	check_for_openpty_ctty_bug=1
++	WOLFSSL_ADD_LIBPTHREAD_SSHD=1
+ 	dnl Target SUSv3/POSIX.1-2001 plus BSD specifics.
+ 	dnl _DEFAULT_SOURCE is the new name for _BSD_SOURCE
+ 	dnl _GNU_SOURCE is needed for setres*id prototypes.
+@@ -2038,6 +2047,10 @@ AC_CHECK_FUNCS([ \
+ 	Blowfish_expandstate \
+ 	Blowfish_expand0state \
+ 	Blowfish_stream2word \
++	arc4random \
++	arc4random_buf \
++	arc4random_stir \
++	arc4random_uniform \
+ 	SHA256Update \
+ 	SHA384Update \
+ 	SHA512Update \
+@@ -2884,7 +2897,162 @@ AC_CHECK_FUNCS([getpgrp],[
+ 	)
+ ])
+ 
++WOLFSSL_URL="https://www.wolfssl.com/download/"
++ENABLE_WOLFSSL="no"
++AC_ARG_WITH(wolfssl,
++	[  --with-wolfssl=PATH      PATH to wolfssl install (default /usr/local) ],
++	[
++	wolfssl_install_dir=/usr/local
++	
++	if test "x${withval}" != "xyes" ; then
++		wolfssl_install_dir=${withval}
++	fi
++	
++	if test -d "${wolfssl_install_dir}/lib"; then
++		if test -n "${rpath_opt}"; then
++			LDFLAGS="-L${wolfssl_install_dir}/lib ${rpath_opt}${wolfssl_install_dir}/lib ${LDFLAGS}"
++		else
++			LDFLAGS="-L${wolfssl_install_dir}/lib ${LDFLAGS}"
++		fi
++	else
++		AC_MSG_ERROR([wolfSSL: lib directory not found at ${wolfssl_install_dir}])
++	fi
++	if test -d "${wolfssl_install_dir}/include"; then
++		if test -d "${wolfssl_install_dir}/include/wolfssl"; then
++			CPPFLAGS="$CPPFLAGS -I${wolfssl_install_dir}/include -I${wolfssl_install_dir}/include/wolfssl"
++		else
++			AC_MSG_ERROR([wolfSSL: include/wolfssl directory not found at ${wolfssl_install_dir}])
++		fi
++	else
++		AC_MSG_ERROR([wolfSSL: include directory not found at ${wolfssl_install_dir}])
++	fi
++
++	AC_MSG_CHECKING([for wolfSSL])
++	LIBS="$LIBS -lwolfssl"
++
++	AC_TRY_LINK_FUNC([wolfSSL_Init], ,
++		[
++			AC_MSG_ERROR([wolfSSL isn't found.  You can get it from $WOLFSSL_URL
++	
++		If it's already installed, specify its path using --with-wolfssl=/dir/])
++		]
++	)
++
++	AC_MSG_RESULT([yes])
++	ENABLE_WOLFSSL="yes"
++	DIGEST_SSL="digest-wolfssl.o"
++	SSL_COMPAT="wolfssl-compat.o"
++	RAND_MSG="WolfSSL Internal"
++	AC_DEFINE([USING_WOLFSSL], [1], [Defined if using WolfSSL])
++	AC_DEFINE([WITH_OPENSSL], [1], [Defined if using WolfSSL])
++	AC_DEFINE([UNSUPPORTED_POSIX_THREADS_HACK], [1], [Defined if using WolfSSL])
++	# OpenSSL tests for these. Just assume these are present for wolfSSL.
++	AC_DEFINE([HAVE_BN_IS_PRIME_EX], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_SHA256_UPDATE], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_CRYPT], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_DES_CRYPT], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_DSA_GENERATE_PARAMETERS_EX], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_DIGESTFINAL_EX], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_DIGESTINIT_EX], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_MD_CTX_CLEANUP], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_MD_CTX_INIT], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_SHA256], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_HMAC_CTX_INIT], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_RSA_GENERATE_KEY_EX], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_RSA_GET_DEFAULT_METHOD], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_OPENSSL_VERSION], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_CIPHER_CTX_CTRL], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_CIPHER_CTX_SET_IV], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_RIPEMD160], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_SHA384], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_SHA512], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_OPENSSL_VERSION_NUM], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_CIPHER_CTX_GET_IV], [1], [Defined if using WolfSSL])
++
++	# Dummy RSA method functions
++	AC_DEFINE([HAVE_RSA_METH_SET_PRIV_ENC], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_RSA_METH_SET_PRIV_DEC], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_RSA_METH_SET_PUB_ENC], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_RSA_METH_SET_PUB_DEC], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_RSA_METH_SET_FINISH], [1], [Defined if using WolfSSL])
++	AC_DEFINE([HAVE_EVP_PKEY_GET0_RSA], [1], [Defined if using WolfSSL])
++
++	AC_DEFINE([OPENSSL_HAS_NISTP256], [1], [Defined if using WolfSSL])
++	AC_DEFINE([OPENSSL_HAS_NISTP384], [1], [Defined if using WolfSSL])
++	AC_DEFINE([OPENSSL_HAS_NISTP521], [1], [Defined if using WolfSSL])
++	AC_DEFINE([OPENSSL_HAVE_EVPCTR], [1], [Defined if using WolfSSL])
++
++
++	AC_MSG_CHECKING([is wolfSSL FIPS])
++	AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
++	#include <wolfssl/options.h>
++	#ifndef HAVE_FIPS
++	# error macro not defined
++	#endif
++	]])], [ wolfssl_fips=yes ], [ wolfssl_fips=no ])
++	if test "x$wolfssl_fips" == "xyes" ; then
++		AC_DEFINE([USING_WOLFSSL_FIPS], [1], [Defined if using wolfSSL FIPS])
++		AC_MSG_RESULT([yes])
++
++		AC_MSG_CHECKING([is wolfSSL FIPS >= 5.2])
++		AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
++		#include <wolfssl/options.h>
++		#include <wolfssl/wolfcrypt/settings.h>
++		#if defined(FIPS_VERSION_GE) && FIPS_VERSION_GE(5,2)
++		# error macro not defined
++		#endif
++		]])], [ wolfssl_fips_gt_52=no ], [ wolfssl_fips_gt_52=yes ])
++		if test "x$wolfssl_fips_gt_52" == "xyes" ; then
++			AC_DEFINE([OPENSSL_HAS_ECC], [1], [Defined if using wolfSSL (FIPS >= 5.2)])
++			AC_MSG_RESULT([yes])
++		else
++			AC_MSG_RESULT([no])
++		fi
++	else
++		AC_MSG_RESULT([no])
++		AC_DEFINE([OPENSSL_HAS_ECC], [1], [Defined if using wolfSSL (non-FIPS)])
++	fi
++
++	# Leave in place in case we use this in the future, AC_COMPILE_IFELSE works
++	# for now.
++	#AC_CHECK_LIB([wolfssl], [wc_wolfHasAesni], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
++	AC_MSG_CHECKING([is wolfssl configured with aesni])
++	AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
++	#include <wolfssl/options.h>
++	#ifndef WOLFSSL_AESNI
++	# error macro not defined
++	#endif
++	]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
++
++	if test "x$wolf_has_aesni" == "xyes" ; then
++		AC_MSG_RESULT([yes])
++		AC_MSG_CHECKING([is gcc compiler detected])
++		if test "$GCC" = "yes"
++		then
++			AC_MSG_RESULT([yes])
++			AC_MSG_CHECKING([is compiler set to icc])
++			if test "$CC" != "icc"
++			then
++				AC_MSG_RESULT([not icc, add flags -maes and -msse4])
++				CFLAGS="$CFLAGS -maes -msse4"
++			else
++				AC_MSG_RESULT([using icc compiler. Do not add -maes and -msse4])
++			fi
++		else
++		    AC_MSG_RESULT([no gcc])
++		fi
++	else
++		AC_MSG_RESULT([no])
++	fi
++])
++
++AC_SUBST([ENABLE_WOLFSSL])
++
++if test "x$ENABLE_WOLFSSL" = "xno"; then
++
+ # Search for OpenSSL
++DIGEST_SSL="digest-openssl.o"
++SSL_COMPAT="openssl-compat.o"
+ saved_CPPFLAGS="$CPPFLAGS"
+ saved_LDFLAGS="$LDFLAGS"
+ openssl_bin_PATH="$PATH"
+@@ -3373,6 +3541,13 @@ if test "x$openssl" = "xyes" ; then
+ 		]
+ 	)
+ fi
++LIBS="$nocrypto_saved_LIBS"
++
++else
++    AC_CHECK_LIB([crypt], [crypt], [LIBS="$LIBS -lcrypt"])
++    AC_CHECK_FUNCS([crypt])
++fi # ENABLE_WOLFSSL endif
++
+ 
+ # PKCS11/U2F depend on OpenSSL and dlopen().
+ enable_pkcs11=yes
+@@ -3383,6 +3558,15 @@ AC_CHECK_DECL([OPENSSL_IS_AWSLC],
+ 	[],
+ 	[#include <openssl/base.h>]
+ )
++if test "x$ENABLE_WOLFSSL" = "xyes" && test "x$wolfssl_fips" = "xyes" ; then
++       enable_sk="disabled; wolfSSL FIPS doesn't support all needed OpenSSL functions"
++fi
++if test "x$openssl" != "xyes" && test "x$ENABLE_WOLFSSL" != "xyes" ; then
++	enable_pkcs11="disabled; missing libcrypto"
++fi
++if test "x$ENABLE_WOLFSSL" = "xyes" ; then
++	enable_pkcs11="disabled; wolfSSL doesn't support the METH API used to implement PKCS#11"
++fi
+ if test "x$ac_cv_func_dlopen" != "xyes" ; then
+ 	enable_pkcs11="disabled; missing dlopen(3)"
+ 	enable_sk="disabled; missing dlopen(3)"
+@@ -3601,12 +3785,13 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
+ 	AC_DEFINE([OPENSSL_PRNG_ONLY], [1],
+ 		[Define if you want the OpenSSL internally seeded PRNG only])
+ 	RAND_MSG="OpenSSL internal ONLY"
+-elif test "x$openssl" = "xno" ; then
++elif test "x$ENABLE_WOLFSSL" = "xyes"; then
++    AC_MSG_WARN([OpenSSH will use /dev/urandom or /dev/random as a source of random numbers. It will fail if both devices are not supported or accessible])
++elif test "x$openssl" = "xno"; then
+ 	AC_MSG_WARN([OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible])
+ else
+ 	AC_MSG_ERROR([OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options])
+ fi
+-LIBS="$nocrypto_saved_LIBS"
+ 
+ saved_LIBS="$LIBS"
+ AC_CHECK_LIB([iaf], [ia_openinfo], [
+@@ -3648,6 +3833,9 @@ AC_ARG_WITH([pam],
+ 			PAM_MSG="yes"
+ 
+ 			SSHDLIBS="$SSHDLIBS -lpam"
++			if test "x$WOLFSSL_ADD_LIBPTHREAD_SSHD" = "x1" ; then
++				SSHDLIBS="$SSHDLIBS -lpthread"
++			fi
+ 			AC_DEFINE([USE_PAM], [1],
+ 				[Define if you want to enable PAM support])
+ 
+@@ -5798,6 +5986,8 @@ AC_SUBST([TEST_SSH_UTF8], [$TEST_SSH_UTF8])
+ AC_SUBST([TEST_MALLOC_OPTIONS], [$TEST_MALLOC_OPTIONS])
+ AC_SUBST([UNSUPPORTED_ALGORITHMS], [$unsupported_algorithms])
+ AC_SUBST([DEPEND], [$(cat $srcdir/.depend)])
++AC_SUBST([SSL_COMPAT])
++AC_SUBST([DIGEST_SSL])
+ 
+ # Binaries for interop tests.
+ AC_PATH_PROG([PLINK], [plink])
+@@ -5872,6 +6062,7 @@ echo "         Solaris privilege support: $SPP_MSG"
+ echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
+ echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
+ echo "                  BSD Auth support: $BSD_AUTH_MSG"
++echo "                   WolfSSL support: $ENABLE_WOLFSSL"
+ echo "              Random number source: $RAND_MSG"
+ echo "             Privsep sandbox style: $SANDBOX_STYLE"
+ echo "                   PKCS#11 support: $enable_pkcs11"
+@@ -5924,3 +6115,20 @@ if test "$AUDIT_MODULE" = "bsm" ; then
+ 	echo "WARNING: BSM audit support is currently considered EXPERIMENTAL."
+ 	echo "See the Solaris section in README.platform for details."
+ fi
++
++if test "x$ENABLE_WOLFSSL" = "xyes" && test "x$APPLE_SANDBOX_MSG" = "xyes"
++then
++    echo ""
++    echo "---"
++    echo "WARNING : The OS X sandbox for renderer processes does not allow "
++    echo "/dev/urandom to be opened. wolfSSL relies on /dev/urandom for entropy"
++    echo ", including the generation of keys used for the peer-to-peer SSH "
++    echo "negotiation/session establishment. If you would use the sandboxing "
++    echo "mechanism, you must enable the access on /dev/urandom by adding "
++    echo "the two lines below at the end of the OS X system file "
++    echo "/System/Library/Sandbox/Profiles/org.openssh.sshd.sb :"
++    echo "(allow file-read* (literal \"/dev/random\")"
++    echo "                  (literal \"/dev/urandom\"))"
++    echo "---"
++    echo ""
++fi
+diff --git a/includes.h b/includes.h
+index 96cddbc26..6ef628f24 100644
+--- a/includes.h
++++ b/includes.h
+@@ -169,6 +169,12 @@
+ # endif
+ #endif
+ 
++#ifdef USING_WOLFSSL
++#include <wolfssl/options.h>
++#include <wolfssl/openssl/ssl.h>
++#include <wolfssl/openssl/evp.h>
++#endif
++
+ #ifdef WITH_OPENSSL
+ #include <openssl/opensslv.h> /* For OPENSSL_VERSION_NUMBER */
+ #endif
+diff --git a/log.c b/log.c
+index 5969c4a16..6639c92c5 100644
+--- a/log.c
++++ b/log.c
+@@ -188,6 +188,40 @@ log_verbose_reset(void)
+ 	nlog_verbose = 0;
+ }
+ 
++static void Logging_cb(const int logLevel, const char *const logMessage) {
++    debug("wolfSSL: %s", logMessage);
++}
++
++#ifdef WC_RNG_SEED_CB
++#include <sys/random.h>
++static int wolf_seed(OS_Seed* os, byte* output, word32 sz)
++{
++    int ret = 0;
++    (void)os;
++
++    while (sz) {
++        int len;
++
++        errno = 0;
++        len = (int)getrandom(output, sz, 0);
++        if (len == -1) {
++            if (errno == EINTR) {
++                /* interrupted, call getrandom again */
++                continue;
++            }
++            else {
++                ret = READ_RAN_E;
++            }
++            break;
++        }
++
++        sz     -= len;
++        output += len;
++    }
++    return ret;
++}
++#endif
++
+ /*
+  * Initialize the log.
+  */
+@@ -202,6 +236,18 @@ log_init(const char *av0, LogLevel level, SyslogFacility facility,
+ 
+ 	argv0 = av0;
+ 
++	/* hijack log init callback since every ssh program calls it
++     * to make sure wolfssl is inited and has a seed callback registered */
++#ifdef USING_WOLFSSL
++    wolfSSL_Debugging_ON();
++    wolfSSL_SetLoggingCb(Logging_cb);
++    wolfSSL_Init();
++#ifndef WC_RNG_SEED_CB
++#error wolfSSL needs to be built with WC_RNG_SEED_CB
++#endif
++    wc_SetSeed_Cb(wolf_seed);
++#endif
++
+ 	if (log_change_level(level) != 0) {
+ 		fprintf(stderr, "Unrecognized internal syslog level code %d\n",
+ 		    (int) level);
+diff --git a/openbsd-compat/openssl-compat.c b/openbsd-compat/openssl-compat.c
+index 48938920c..c302a743d 100644
+--- a/openbsd-compat/openssl-compat.c
++++ b/openbsd-compat/openssl-compat.c
+@@ -72,6 +72,9 @@ ssh_compatible_openssl(long headerver, long libver)
+ void
+ ssh_libcrypto_init(void)
+ {
++#ifdef USING_WOLFSSL
++	wolfSSL_Init();
++#endif
+ #if defined(HAVE_OPENSSL_INIT_CRYPTO) && \
+       defined(OPENSSL_INIT_ADD_ALL_CIPHERS) && \
+       defined(OPENSSL_INIT_ADD_ALL_DIGESTS)
+diff --git a/regress/unittests/test_helper/test_helper.c b/regress/unittests/test_helper/test_helper.c
+index 51b80119b..9072fb34a 100644
+--- a/regress/unittests/test_helper/test_helper.c
++++ b/regress/unittests/test_helper/test_helper.c
+@@ -39,6 +39,7 @@
+ #ifdef WITH_OPENSSL
+ #include <openssl/bn.h>
+ #include <openssl/err.h>
++#include <openssl/ssl.h>
+ #endif
+ 
+ #if defined(HAVE_STRNVIS) && defined(HAVE_VIS_H) && !defined(BROKEN_STRNVIS)
+@@ -149,6 +150,10 @@ main(int argc, char **argv)
+ {
+ 	int ch;
+ 
++#ifdef USING_WOLFSSL
++    wolfSSL_Debugging_ON();
++#endif
++
+ 	seed_rng();
+ #ifdef WITH_OPENSSL
+ 	ERR_load_crypto_strings();
+-- 
+2.53.0
+
