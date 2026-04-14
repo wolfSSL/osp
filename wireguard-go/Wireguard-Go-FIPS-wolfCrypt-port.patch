@@ -1,4 +1,4 @@
-From 039ca05b51a12ba0d6651ef3c8348f6a8f71958d Mon Sep 17 00:00:00 2001
+From 29b52bd89ab6e25c896c3526367459ff66e8fd35 Mon Sep 17 00:00:00 2001
 From: Lealem Amedie <lealem@wolfssl.com>
 Date: Tue, 9 Sep 2025 16:28:34 -0600
 Subject: [PATCH] FIPS wolfCrypt port
@@ -51,7 +51,7 @@ index 3f6e407..09e19ef 100644
  
  .PHONY: all clean test install generate-version-and-build
 diff --git a/device/cookie.go b/device/cookie.go
-index 876f05d..01fd512 100644
+index a093c8b..7488211 100644
 --- a/device/cookie.go
 +++ b/device/cookie.go
 @@ -6,38 +6,36 @@
@@ -391,7 +391,7 @@ index 876f05d..01fd512 100644
 +        }()
  }
 diff --git a/device/cookie_test.go b/device/cookie_test.go
-index 4f1e50a..20a57dc 100644
+index c937290..cd905c9 100644
 --- a/device/cookie_test.go
 +++ b/device/cookie_test.go
 @@ -70,13 +70,6 @@ func TestCookieMAC1(t *testing.T) {
@@ -409,7 +409,7 @@ index 4f1e50a..20a57dc 100644
  
  	func() {
 diff --git a/device/device_test.go b/device/device_test.go
-index fff172b..8c63de9 100644
+index 0091e20..fc2028f 100644
 --- a/device/device_test.go
 +++ b/device/device_test.go
 @@ -51,12 +51,11 @@ func uapiCfg(cfg ...string) string {
@@ -429,7 +429,7 @@ index fff172b..8c63de9 100644
  		tb.Errorf("unable to generate private key random bytes: %v", err)
  	}
 diff --git a/device/indextable.go b/device/indextable.go
-index 00ade7d..bde3544 100644
+index 2460fa6..3336650 100644
 --- a/device/indextable.go
 +++ b/device/indextable.go
 @@ -6,9 +6,11 @@
@@ -466,7 +466,7 @@ index 00ade7d..bde3544 100644
  }
  
 diff --git a/device/kdf_test.go b/device/kdf_test.go
-index f9c76d6..d330128 100644
+index 325db59..4231cd8 100644
 --- a/device/kdf_test.go
 +++ b/device/kdf_test.go
 @@ -8,8 +8,7 @@ package device
@@ -547,7 +547,7 @@ index f9c76d6..d330128 100644
  		assertEquals(t, t0s, test.t0)
  	}
 diff --git a/device/keypair.go b/device/keypair.go
-index e3540d7..4062e01 100644
+index 0b72e19..8cac762 100644
 --- a/device/keypair.go
 +++ b/device/keypair.go
 @@ -6,7 +6,6 @@
@@ -570,7 +570,7 @@ index e3540d7..4062e01 100644
  	isInitiator  bool
  	created      time.Time
 diff --git a/device/noise-helpers.go b/device/noise-helpers.go
-index c2f356b..43d0aab 100644
+index 35dd907..c9794f4 100644
 --- a/device/noise-helpers.go
 +++ b/device/noise-helpers.go
 @@ -6,56 +6,52 @@
@@ -795,10 +795,10 @@ index c2f356b..43d0aab 100644
  }
 +
 diff --git a/device/noise-protocol.go b/device/noise-protocol.go
-index e8f6145..984e09d 100644
+index 5cf1702..6262baf 100644
 --- a/device/noise-protocol.go
 +++ b/device/noise-protocol.go
-@@ -10,10 +10,9 @@ import (
+@@ -11,10 +11,9 @@ import (
  	"fmt"
  	"sync"
  	"time"
@@ -811,7 +811,7 @@ index e8f6145..984e09d 100644
  
  	"golang.zx2c4.com/wireguard/tai64n"
  )
-@@ -46,8 +45,8 @@ func (hs handshakeState) String() string {
+@@ -47,8 +46,8 @@ func (hs handshakeState) String() string {
  }
  
  const (
@@ -822,7 +822,7 @@ index e8f6145..984e09d 100644
  	WGLabelMAC1       = "mac1----"
  	WGLabelCookie     = "cookie--"
  )
-@@ -60,11 +59,11 @@ const (
+@@ -61,11 +60,11 @@ const (
  )
  
  const (
@@ -838,7 +838,7 @@ index e8f6145..984e09d 100644
  	MessageKeepaliveSize       = MessageTransportSize                          // size of keepalive
  	MessageHandshakeSize       = MessageInitiationSize                         // size of largest handshake related message
  )
-@@ -85,10 +84,10 @@ type MessageInitiation struct {
+@@ -86,10 +85,10 @@ type MessageInitiation struct {
  	Type      uint32
  	Sender    uint32
  	Ephemeral NoisePublicKey
@@ -853,7 +853,7 @@ index e8f6145..984e09d 100644
  }
  
  type MessageResponse struct {
-@@ -96,9 +95,9 @@ type MessageResponse struct {
+@@ -97,9 +96,9 @@ type MessageResponse struct {
  	Sender    uint32
  	Receiver  uint32
  	Ephemeral NoisePublicKey
@@ -866,7 +866,7 @@ index e8f6145..984e09d 100644
  }
  
  type MessageTransport struct {
-@@ -111,43 +110,44 @@ type MessageTransport struct {
+@@ -112,8 +111,8 @@ type MessageTransport struct {
  type MessageCookieReply struct {
  	Type     uint32
  	Receiver uint32
@@ -876,6 +876,8 @@ index e8f6145..984e09d 100644
 +	Cookie   [wolfSSL.WC_SHA256_DIGEST_SIZE + wolfSSL.AES_BLOCK_SIZE]byte
  }
  
+ var errMessageLengthMismatch = errors.New("message length mismatch")
+@@ -211,36 +210,37 @@ func (msg *MessageCookieReply) marshal(b []byte) error {
  type Handshake struct {
  	state                     handshakeState
  	mutex                     sync.RWMutex
@@ -927,7 +929,7 @@ index e8f6145..984e09d 100644
  }
  
  func (h *Handshake) Clear() {
-@@ -160,18 +160,26 @@ func (h *Handshake) Clear() {
+@@ -253,18 +253,26 @@ func (h *Handshake) Clear() {
  }
  
  func (h *Handshake) mixHash(data []byte) {
@@ -958,7 +960,7 @@ index e8f6145..984e09d 100644
  }
  
  func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, error) {
-@@ -206,15 +214,20 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
+@@ -299,15 +307,20 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
  	if err != nil {
  		return nil, err
  	}
@@ -984,7 +986,7 @@ index e8f6145..984e09d 100644
  	handshake.mixHash(msg.Static[:])
  
  	// encrypt timestamp
-@@ -222,16 +235,20 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
+@@ -315,16 +328,20 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
  		return nil, errInvalidPublicKey
  	}
  	KDF2(
@@ -1011,7 +1013,7 @@ index e8f6145..984e09d 100644
  	device.indexTable.Delete(handshake.localIndex)
  	msg.Sender, err = device.indexTable.NewIndexForHandshake(peer, handshake)
  	if err != nil {
-@@ -246,8 +263,8 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
+@@ -339,8 +356,8 @@ func (device *Device) CreateMessageInitiation(peer *Peer) (*MessageInitiation, e
  
  func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
  	var (
@@ -1022,7 +1024,7 @@ index e8f6145..984e09d 100644
  	)
  
  	if msg.Type != MessageInitiationType {
-@@ -257,24 +274,25 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
+@@ -350,24 +367,25 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
  	device.staticIdentity.RLock()
  	defer device.staticIdentity.RUnlock()
  
@@ -1059,7 +1061,7 @@ index e8f6145..984e09d 100644
  
  	// lookup peer
  
-@@ -296,18 +314,22 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
+@@ -389,18 +407,22 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation) *Peer {
  		return nil
  	}
  	KDF2(
@@ -1088,7 +1090,7 @@ index e8f6145..984e09d 100644
  
  	// protect against replay & flood
  
-@@ -394,21 +416,26 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
+@@ -487,21 +509,26 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
  
  	// add preshared key
  
@@ -1122,7 +1124,7 @@ index e8f6145..984e09d 100644
  	handshake.mixHash(msg.Empty[:])
  
  	handshake.state = handshakeResponseCreated
-@@ -430,8 +457,8 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
+@@ -523,8 +550,8 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
  	}
  
  	var (
@@ -1133,7 +1135,7 @@ index e8f6145..984e09d 100644
  	)
  
  	ok := func() bool {
-@@ -451,44 +478,50 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
+@@ -544,44 +571,50 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
  
  		// finish 3-way DH
  
@@ -1199,7 +1201,7 @@ index e8f6145..984e09d 100644
  		return true
  	}()
  
-@@ -525,21 +558,21 @@ func (peer *Peer) BeginSymmetricSession() error {
+@@ -618,21 +651,21 @@ func (peer *Peer) BeginSymmetricSession() error {
  	// derive keys
  
  	var isInitiator bool
@@ -1227,7 +1229,7 @@ index e8f6145..984e09d 100644
  			handshake.chainKey[:],
  			nil,
  		)
-@@ -558,13 +591,13 @@ func (peer *Peer) BeginSymmetricSession() error {
+@@ -651,13 +684,13 @@ func (peer *Peer) BeginSymmetricSession() error {
  	// create AEAD instances
  
  	keypair := new(Keypair)
@@ -1246,7 +1248,7 @@ index e8f6145..984e09d 100644
  	keypair.isInitiator = isInitiator
  	keypair.localIndex = peer.handshake.localIndex
 diff --git a/device/noise-types.go b/device/noise-types.go
-index e850359..fa2450a 100644
+index 41c944e..92fc1b4 100644
 --- a/device/noise-types.go
 +++ b/device/noise-types.go
 @@ -6,13 +6,13 @@
@@ -1297,7 +1299,7 @@ index e850359..fa2450a 100644
  
  func (key *NoisePresharedKey) FromHex(src string) error {
 diff --git a/device/noise_test.go b/device/noise_test.go
-index 2dd5324..defb692 100644
+index f0928ac..2a0693b 100644
 --- a/device/noise_test.go
 +++ b/device/noise_test.go
 @@ -10,6 +10,7 @@ import (
@@ -1381,10 +1383,10 @@ index 2dd5324..defb692 100644
  	}()
  }
 diff --git a/device/receive.go b/device/receive.go
-index 1ab3e29..bcf679a 100644
+index 1392957..f53b3b0 100644
 --- a/device/receive.go
 +++ b/device/receive.go
-@@ -13,7 +13,7 @@ import (
+@@ -12,7 +12,7 @@ import (
  	"sync"
  	"time"
  
@@ -1393,7 +1395,7 @@ index 1ab3e29..bcf679a 100644
  	"golang.org/x/net/ipv4"
  	"golang.org/x/net/ipv6"
  	"golang.zx2c4.com/wireguard/conn"
-@@ -237,7 +237,7 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
+@@ -236,7 +236,7 @@ func (device *Device) RoutineReceiveIncoming(maxBatchSize int, recv conn.Receive
  }
  
  func (device *Device) RoutineDecryption(id int) {
@@ -1402,7 +1404,7 @@ index 1ab3e29..bcf679a 100644
  
  	defer device.log.Verbosef("Routine: decryption worker %d - stopped", id)
  	device.log.Verbosef("Routine: decryption worker %d - started", id)
-@@ -249,20 +249,24 @@ func (device *Device) RoutineDecryption(id int) {
+@@ -248,20 +248,24 @@ func (device *Device) RoutineDecryption(id int) {
  			content := elem.packet[MessageTransportOffsetContent:]
  
  			// decrypt and release to consumer
@@ -1438,10 +1440,10 @@ index 1ab3e29..bcf679a 100644
  	}
  }
 diff --git a/device/send.go b/device/send.go
-index 769720a..45c2382 100644
+index ff8f7da..c15811f 100644
 --- a/device/send.go
 +++ b/device/send.go
-@@ -14,7 +14,7 @@ import (
+@@ -13,7 +13,7 @@ import (
  	"sync"
  	"time"
  
@@ -1450,7 +1452,7 @@ index 769720a..45c2382 100644
  	"golang.org/x/net/ipv4"
  	"golang.org/x/net/ipv6"
  	"golang.zx2c4.com/wireguard/conn"
-@@ -443,7 +443,7 @@ func calculatePaddingSize(packetSize, mtu int) int {
+@@ -438,7 +438,7 @@ func calculatePaddingSize(packetSize, mtu int) int {
   */
  func (device *Device) RoutineEncryption(id int) {
  	var paddingZeros [PaddingMultiple]byte
@@ -1459,7 +1461,7 @@ index 769720a..45c2382 100644
  
  	defer device.log.Verbosef("Routine: encryption worker %d - stopped", id)
  	device.log.Verbosef("Routine: encryption worker %d - started", id)
-@@ -468,13 +468,16 @@ func (device *Device) RoutineEncryption(id int) {
+@@ -463,13 +463,16 @@ func (device *Device) RoutineEncryption(id int) {
  			// encrypt content and release to consumer
  
  			binary.LittleEndian.PutUint64(nonce[4:], elem.nonce)
@@ -1484,7 +1486,7 @@ index 769720a..45c2382 100644
  	}
  }
 diff --git a/device/uapi.go b/device/uapi.go
-index d81dae3..c866804 100644
+index cc69488..8e34a5e 100644
 --- a/device/uapi.go
 +++ b/device/uapi.go
 @@ -59,7 +59,7 @@ func (device *Device) IpcGetOperation(w io.Writer) error {
@@ -1527,7 +1529,7 @@ index d81dae3..c866804 100644
  			sendf("protocol_version=1")
  			peer.endpoint.Lock()
 diff --git a/main.go b/main.go
-index e016116..5ed21b8 100644
+index b6989e2..d78fe92 100644
 --- a/main.go
 +++ b/main.go
 @@ -59,7 +59,7 @@ func warning() {
@@ -1549,7 +1551,7 @@ index e016116..5ed21b8 100644
  	if err != nil {
  		logger.Errorf("Failed to create TUN device: %v", err)
 diff --git a/main_windows.go b/main_windows.go
-index a4dc46f..7bc6b6b 100644
+index 67036cf..494e8e2 100644
 --- a/main_windows.go
 +++ b/main_windows.go
 @@ -36,7 +36,7 @@ func main() {
@@ -1562,5 +1564,5 @@ index a4dc46f..7bc6b6b 100644
  	tun, err := tun.CreateTUN(interfaceName, 0)
  	if err == nil {
 -- 
-2.53.0
+2.47.3
 

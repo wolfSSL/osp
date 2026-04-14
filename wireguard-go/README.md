@@ -18,7 +18,7 @@ make
 sudo make install
 ```
 
-Then clone wireguard-go and apply the `Wireguard-Go-FIPS-wolfCrypt-port.patch` patch. This patch was developed and tested on top of the following wireguard-go commit https://github.com/WireGuard/wireguard-go/commit/12269c2761734b1.
+Then clone wireguard-go and apply the `Wireguard-Go-FIPS-wolfCrypt-port.patch` patch. This patch was tested against wireguard-go tag `0.0.20250522` https://github.com/WireGuard/wireguard-go/releases/tag/0.0.20250522
 ```
 git clone https://github.com/WireGuard/wireguard-go.git
 cd wireguard-go
