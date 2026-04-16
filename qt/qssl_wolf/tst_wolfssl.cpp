@@ -822,6 +822,12 @@ void tst_QSslWolfSSL::peerCertificateChainToWWWpQTpIO()
         n++;
     }
 
+    n = 0;
+    for (n = 0; n < certChain.count(); n++) {
+        qDebug() << "certChain[" << n << "] : " << certChain.at(n).
+            subjectInfo(QSslCertificate::CommonName).first();
+    }
+
     QCOMPARE(certChain.count(), ch_cert_names.length());
     n = 0;
     for (const auto& cmn : ch_cert_names) {
@@ -1338,8 +1344,18 @@ void tst_QSslWolfSSL::localCertificateChain()
 
 void tst_QSslWolfSSL::setLocalCertificateChain()
 {
-    if (skip_setLocalCertificateChain)
+    #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 10)
+        skip_setLocalCertificateChain = true;
+    #endif
+
+    if (skip_setLocalCertificateChain) {
+        #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 10)
+            qInfo("Key size is large than SP maximum supported key size");
+            qInfo("It needs to enable `fastmash` option and"
+                 " sets FP_MAX_BITS=16384 MAX_X509_SIZE=4096");
+        #endif
         QSKIP("setLocalCertificateChain");
+    }
 
 #ifdef Q_OS_WINRT
     QSKIP("Server-side encryption is not implemented on WinRT.");

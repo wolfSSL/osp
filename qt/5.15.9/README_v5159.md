@@ -1,12 +1,12 @@
 # Patch for Qt 5.15.9
 
 ## Apply Qt 5.15.2 and 5.15.8 patchs
-Please see [README](https://github.com/wolfSSL/osp/blob/master/qt/5.15.8/README_v5158.md)
+Please see [README](../5.15.8/README_v5158.md)
 
 ## Apply Qt 5.15.9 patch and Build
 
 ### Building wolfSSL
-Please follow [README](https://github.com/wolfSSL/osp/blob/master/qt/README_v515.md).
+Please follow [README](../README_v5159.md).
 
 ### Building Qt 5.15.9 with wolfSSL
 1. Prepare Qt 5.15.9
@@ -27,12 +27,12 @@ $v5159_path.sh
 4. Add unit test program(Optional)
 
 
-Please see [README](https://github.com/wolfSSL/osp/blob/master/qt/5.15.8/README_v5158.md) for unit test patch.
+Please see [README](../5.15.8/README_v5158.md) for unit test patch.
 
 5. Configure build and install
 
 
-Please follow [README](https://github.com/wolfSSL/osp/blob/master/qt/README_v515.md)
+Please follow [README](../README_v5159.md)
 
 
 Note1: <strong>For wolfSSL configuration, you need to add `-DALLOW_INVALID_CERTSIGN` for CFLAG Option to make `qsslcertificate` tests passed. </strong>
@@ -50,4 +50,4 @@ comments from asn.c
 Note2: <strong>For wolfSSL configuration, you need to add `-DWOLFSSL_NO_ASN_STRICT` for CFLAG Option to make `qsslcertificate` and `qssl_wolf` tests passed. </strong> This needs because wolfSSL treates Serial number of 0 of certificate as an error. There are some certificates which are serial number of 0 in Qt repo.
 
 ## Running tests
-Please see [README](https://github.com/wolfSSL/osp/blob/master/qt/README_v515.md)
+Please see [README](../README_v5159.md)
