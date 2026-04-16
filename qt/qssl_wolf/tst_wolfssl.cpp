@@ -1350,8 +1350,8 @@ void tst_QSslWolfSSL::setLocalCertificateChain()
 
     if (skip_setLocalCertificateChain) {
         #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 10)
-            qInfo("Key size is large than SP maximum supported key size");
-            qInfo("It needs to enable `fastmash` option and"
+            qInfo("Key size is larger than SP maximum supported key size");
+            qInfo("It needs to enable `fastmath` option and"
                  " sets FP_MAX_BITS=16384 MAX_X509_SIZE=4096");
         #endif
         QSKIP("setLocalCertificateChain");

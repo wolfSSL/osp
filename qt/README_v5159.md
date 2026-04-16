@@ -33,8 +33,8 @@ export WOLFSSL_LIBS="-L/path/to/wolfssl-install/lib -lwolfssl"
 
 5. Add wolfSSL install path to LD_LIBRARY_PATH
 ```
-Depending on the environment, adding wolfSSL install path to LD_LIBRARY_PATH
-LD_LIBRARY_PATH=/path/to/wolfssl\install/lib:$LD_LIBRARY_PATH
+Depending on the environment, add the wolfSSL install path to LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/path/to/wolfssl\install/lib:$LD_LIBRARY_PATH
 ```
 
 ### Building Qt 5.15 with wolfSSL
@@ -52,9 +52,9 @@ cd qt5
 
 3. Apply patch to Qt5
 ```
-wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/wolfssl-qt-515.patch
+wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/wolfssl-qt-5159.patch
 cd qtbase
-git apply -v ../wolfssl-qt-515.patch
+git apply -v ../wolfssl-qt-5159.patch
 ```
 4. Add unit test program(Optional):
 
@@ -65,7 +65,7 @@ git apply -v ../wolfssl-qt-515.patch
    4-2. Download patch and get unit test program
    ```
    cd /path/to/qt5
-   wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/wolfssl-qt-515-unit-test.patch
+   wget https://raw.githubusercontent.com/wolfSSL/osp/master/qt/wolfssl-qt-5159-unit-test.patch
    ```
    4-3. Apply patch
    ```
