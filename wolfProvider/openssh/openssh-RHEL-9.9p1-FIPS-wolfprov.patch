@@ -21,8 +21,8 @@ test still runs and exercises SSHKDF.
 Affected files:
 
   regress/Makefile
-    - REGRESS_TARGETS: drop t4 (MD5), t6 (DSA), t8 (DSA keygen),
-      t10, t12 (Ed25519 keygen).
+    - REGRESS_TARGETS: drop t1 (RSA-1024 fixture rejected in FIPS),
+      t4 (MD5), t6 (DSA), t8 (DSA keygen), t10, t12 (Ed25519 keygen).
     - unit: skip test_sshkey, test_sshsig, test_authopt, test_hostkeys.
       Their testdata/ uses Ed25519/DSA keys that FIPS refuses.
 
@@ -45,7 +45,7 @@ diff --git a/regress/Makefile b/regress/Makefile
  tests:		prep file-tests t-exec unit
 
 -REGRESS_TARGETS=	t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
-+REGRESS_TARGETS=	t1 t2 t3 t5 t7 t9 t11
++REGRESS_TARGETS=	t2 t3 t5 t7 t9 t11
 
  # File based tests
  file-tests: $(REGRESS_TARGETS)
