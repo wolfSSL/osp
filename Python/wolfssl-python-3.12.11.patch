@@ -454,22 +454,20 @@ index b13e37d0cd1..6ca981aac04 100644
                           (('DNS', 'projects.developer.nokia.com'),
                            ('DNS', 'projects.forum.nokia.com'))
                          )
-@@ -465,7 +480,14 @@ def test_parse_cert_CVE_2013_4238(self):
-                    (('emailAddress', 'python-dev@python.org'),))
-         self.assertEqual(p['subject'], subject)
-         self.assertEqual(p['issuer'], subject)
--        if ssl._OPENSSL_API_VERSION >= (0, 9, 8):
+@@ -453,6 +468,13 @@ def test_parse_cert_CVE_2019_5010(self):
+         )
+ 
+     def test_parse_cert_CVE_2013_4238(self):
 +        if ssl.IS_WOLFSSL:
-+            # location of email in list is different
-+            san = (('IP Address', '2001:DB8:0:0:0:0:0:1'),
-+                   ('IP Address', '192.0.2.1'),
-+                   ('URI', 'http://null.python.org\x00http://example.org'),
-+                   ('DNS', 'altnull.python.org\x00example.com'),
-+                   ('email', 'null@python.org\x00user@example.org'))
-+        elif ssl._OPENSSL_API_VERSION >= (0, 9, 8):
-             san = (('DNS', 'altnull.python.org\x00example.com'),
-                    ('email', 'null@python.org\x00user@example.org'),
-                    ('URI', 'http://null.python.org\x00http://example.org'),
++            # wolfSSL rejects NUL bytes in dNSName/rfc822Name/URI SAN entries
++            # during ASN.1 decoding (RFC 5280 4.2.1.6); the cert fails to parse
++            # rather than returning entries with the embedded NULs intact.
++            self.assertRaises(ssl.SSLError,
++                ssl._ssl._test_decode_cert, NULLBYTECERT)
++            return
+         p = ssl._ssl._test_decode_cert(NULLBYTECERT)
+         if support.verbose:
+             sys.stdout.write("\n" + pprint.pformat(p) + "\n")
 @@ -483,7 +505,29 @@ def test_parse_cert_CVE_2013_4238(self):
  
      def test_parse_all_sans(self):
