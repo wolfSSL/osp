@@ -1,0 +1,3 @@
+#!/bin/bash
+cd zfs || exit 1
+./scripts/zfs-tests.sh -vx -r sanity
