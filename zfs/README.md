@@ -115,6 +115,11 @@ Patched ZFS will need to link to wolfssl both in userspace and kernelspace.
 Before proceeding, update `kernel_src` in `scripts/wolfssl/build_wolfssl_ko`
 to point to your extracted and built kernel source tree.
 
+Clone wolfSSL:
+```
+git clone https://github.com/wolfSSL/wolfssl.git
+```
+
 1. Build `libwolfssl.so` userspace lib first:
 ```
 ./scripts/wolfssl/build_wolfssl_so
@@ -132,6 +137,9 @@ libwolfssl           1056768  0
 ```
 
 ## Build wolfZFS (patched OpenZFS)
+
+Before proceeding, update `wolf_src` in `scripts/zfs/build_wolfzfs`
+to point to your wolfssl src tree.
 
 1. First, clone ZFS:
 ```

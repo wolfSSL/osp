@@ -16,7 +16,14 @@ if [ ! -f configure ]; then
   ./autogen.sh || err_and_die "autogen"
 fi
 
-./configure --with-wolfssl-source=/home/jordan/private-examples/wolfzfs/wolfssl/ \
+# Update this to point to your wolfssl source tree.
+wolf_src=""
+
+if [ -z $wolf_src ]; then
+  err_and_die "wolf_src not set"
+fi
+
+./configure --with-wolfssl-source=$wolf_src \
   || err_and_die "configure"
 make || err_and_die "make"
 sudo make install || err_and_die "sudo make install"

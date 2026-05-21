@@ -5,12 +5,12 @@ err_and_die()
   exit 1
 }
 
-sudo rm -r /usr/local/lib/libwolfssl.*
-sudo rm -r /usr/local/include/wolfssl/
-
 cd wolfssl || exit 1
 
-rm configure
+# extra work, but just to be safe
+if [ -f configure ]; then
+  rm configure;
+fi
 
 if [ ! -f configure ]; then
   ./autogen.sh || err_and_die "conf"

@@ -20,8 +20,7 @@ if [ ! -f configure ]; then
 fi
 
 # Update this to point to your extracted and fully built kernel tree.
-kernel_src=/home/jordan/kernelsrc/
-#kernel_src=""
+kernel_src=""
 
 if [ -z $kernel_src ]; then
   err_and_die "kernel_src not set"
