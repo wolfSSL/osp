@@ -1,0 +1,41 @@
+#!/bin/bash
+err_and_die()
+{
+  echo "err: $1"
+  exit 1
+}
+
+cd wolfssl || exit 1
+
+# remove libwolfssl if already installed
+sudo rmmod libwolfssl
+
+# extra work, but just to be safe
+if [ -f configure ]; then
+  rm configure;
+fi
+
+if [ ! -f configure ]; then
+  ./autogen.sh || err_and_die "conf"
+fi
+
+# Update this to point to your extracted and fully built kernel tree.
+kernel_src=/home/jordan/kernelsrc/
+#kernel_src=""
+
+if [ -z $kernel_src ]; then
+  err_and_die "kernel_src not set"
+fi
+
+./configure \
+  --enable-linuxkm --with-linux-source=$kernel_src \
+  --enable-wolfzfs="kernel" --with-linux-arch=x86 \
+  --enable-aesni \
+  --enable-cryptonly \
+  || err_and_die "configure linuxkm"
+
+make || err_and_die "make"
+sudo make modules_install || err_and_die "install"
+sudo modprobe libwolfssl || err_and_die "modprobe libwolfssl"
+
+lsmod -v  | grep libwolfssl

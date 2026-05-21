@@ -1,0 +1,26 @@
+#!/bin/bash
+err_and_die()
+{
+  echo "err: $1"
+  exit 1
+}
+
+sudo rm -r /usr/local/lib/libwolfssl.*
+sudo rm -r /usr/local/include/wolfssl/
+
+cd wolfssl || exit 1
+
+rm configure
+
+if [ ! -f configure ]; then
+  ./autogen.sh || err_and_die "conf"
+fi
+
+./configure \
+  --enable-wolfzfs \
+  --enable-intelasm --enable-aesni \
+  || err_and_die "configure wolfzfs"
+
+make || err_and_die "make"
+sudo make install || err_and_die "sudo make install"
+sudo ldconfig; sudo depmod
