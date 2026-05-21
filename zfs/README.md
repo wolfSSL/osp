@@ -18,6 +18,8 @@ $ git diff --stat | tail -n1
  38 files changed, 821 insertions(+), 28583 deletions(-)
 ```
 
+![wolfZFS Architecture Diagram](doc/wolfzfs_diagram.png)
+
 ### License
 The `ZFS_META_LICENSE` conflicts with the GPL-only libwolfssl.ko symbols
 in a GPL build, causing modpost to fail. To resolve the conflict, either:
