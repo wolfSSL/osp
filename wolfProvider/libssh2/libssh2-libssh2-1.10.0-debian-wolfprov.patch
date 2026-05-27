@@ -24,6 +24,19 @@ index dc9e108..03b90a1 100644
  or public/private key.
  .SH SEE ALSO
  .BR libssh2_session_init_ex(3)
+diff --git a/tests/mansyntax.sh b/tests/mansyntax.sh
+index dd4aa77..c589431 100755
+--- a/tests/mansyntax.sh
++++ b/tests/mansyntax.sh
+@@ -26,7 +26,7 @@ ln -sf "$mandir" "$dstdir/man3"
+ 
+ for manpage in $mandir/libssh2_*.*; do
+   echo "$manpage"
+-  warnings=$(LANG=en_US.UTF-8 MANWIDTH=80 man -M "$dstdir" --warnings \
++  warnings=$(LANG=C.UTF-8 MANWIDTH=80 man -M "$dstdir" --warnings \
+     -E UTF-8 -l "$manpage" 2>&1 >/dev/null)
+   if [ -n "$warnings" ]; then
+     echo "$warnings"
 diff --git a/tests/ssh2.c b/tests/ssh2.c
 index f903e07..3105c15 100644
 --- a/tests/ssh2.c
