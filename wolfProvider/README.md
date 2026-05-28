@@ -5,12 +5,19 @@ hostap, etc.) to test cleanly against `wolfProvider` (FIPS and non-FIPS).
 
 ## Naming convention
 
-Each project subdirectory holds one or more patches:
+Every patch follows exactly one pattern (no exceptions):
 
-    <project>/<project>-<projver>-wolfprov.patch          (universal, non-FIPS)
-    <project>/<project>-<projver>-wolfprov-fips.patch     (universal, FIPS)
-    <project>/<project>-<projver>-wolfssl-X.Y.Z-wolfprov.patch       (snapshot)
-    <project>/<project>-<projver>-wolfssl-X.Y.Z-wolfprov-fips.patch  (snapshot)
+    <project>/<project>-<projver>-wolfprov.patch          (non-FIPS)
+    <project>/<project>-<projver>-wolfprov-fips.patch     (FIPS)
+    <project>/<project>-<projver>-wolfssl-X.Y.Z-wolfprov.patch       (pinned snapshot)
+    <project>/<project>-<projver>-wolfssl-X.Y.Z-wolfprov-fips.patch  (pinned snapshot)
+
+Rules:
+- FIPS is always the `-fips` suffix before `.patch` (never an
+  uppercase `-FIPS-` infix).
+- The provider segment is always `-wolfprov` (never `-wolfprovider`).
+- `<projver>` is the upstream version ref the patch targets and may be
+  empty for version-agnostic patches.
 
 - **Universal** name (no `-wolfssl-X.Y.Z-` infix) is the **latest**
   patch content. By default a patch should be universal — it tracks
@@ -37,6 +44,7 @@ an older line:
 | `v5.9.X-stable`     | `-wolfssl-5.9.1-` then universal           |
 | `master` / other    | universal only                             |
 
-The helper also handles both FIPS naming conventions in use here
-(`-wolfprov-fips.patch` suffix and `-FIPS-<projver>-wolfprov.patch`
-infix), and the `opensc` `-wolfprovider` suffix.
+For FIPS, the helper tries `-wolfprov-fips.patch` and falls back to the
+non-FIPS patch when no FIPS-specific one exists. Because the naming is
+uniform, the helper stays simple — one pattern, no per-project special
+cases.

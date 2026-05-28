@@ -1,4 +1,4 @@
-`liboauth2-FIPS-v1.4.5.4-wolfprov.patch` adds testing support for liboauth2 
+`liboauth2-v1.4.5.4-wolfprov-fips.patch` adds testing support for liboauth2 
 `v1.4.5.4` with FIPS wolfprovider. To use this patch make sure to configure liboauth2 
 with `--enable-wolfprov-fips`. This will disable problematic tests in Docker/valgrind.
 
