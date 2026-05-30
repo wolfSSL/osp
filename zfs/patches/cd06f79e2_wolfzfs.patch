@@ -1,6 +1,6 @@
-From efdf1d2d5eb068edfc0414321751ce7775ca4bb1 Mon Sep 17 00:00:00 2001
+From 3d1426e3587ed997a60802f1f93be291d9c15e97 Mon Sep 17 00:00:00 2001
 From: jordan <jordan@wolfssl.com>
-Date: Fri, 15 May 2026 16:09:27 -0500
+Date: Sat, 30 May 2026 00:40:49 -0500
 Subject: [PATCH] wolfzfs patch: cd06f79e2
 
 ---
@@ -21,7 +21,7 @@ Subject: [PATCH] wolfzfs patch: cd06f79e2
  module/icp/algs/aes/aes_impl_x86-64.c      |   64 -
  module/icp/algs/aes/aes_modes.c            |   50 +-
  module/icp/algs/modes/ccm.c                |  916 +---
- module/icp/algs/modes/gcm.c                | 1655 +------
+ module/icp/algs/modes/gcm.c                | 1658 +------
  module/icp/algs/modes/gcm_generic.c        |   84 -
  module/icp/algs/modes/modes.c              |   49 +-
  module/icp/algs/sha2/sha256_impl.c         |  156 -
@@ -42,12 +42,12 @@ Subject: [PATCH] wolfzfs patch: cd06f79e2
  module/icp/include/modes/gcm_impl.h        |    6 -
  module/icp/include/modes/modes.h           |   64 +-
  module/icp/include/sha2/sha2_impl.h        |    2 -
- module/icp/io/aes.c                        |   64 +-
+ module/icp/io/aes.c                        |   68 +-
  module/icp/io/sha2_mod.c                   |   21 +
  module/os/linux/zfs/zfs_ioctl_os.c         |    8 +
  module/zfs/hkdf.c                          |  160 +-
- tests/zfs-tests/cmd/crypto_test.c          |   36 +-
- 43 files changed, 834 insertions(+), 28589 deletions(-)
+ tests/zfs-tests/cmd/crypto_test.c          |   27 +-
+ 43 files changed, 827 insertions(+), 28594 deletions(-)
  delete mode 100644 module/icp/algs/aes/aes_impl_generic.c
  delete mode 100644 module/icp/algs/aes/aes_impl_x86-64.c
  delete mode 100644 module/icp/algs/modes/gcm_generic.c
@@ -3168,7 +3168,7 @@ index 0a7a5091f..9eaba550d 100644
  }
  
 diff --git a/module/icp/algs/modes/gcm.c b/module/icp/algs/modes/gcm.c
-index 7d92b208f..407182984 100644
+index 7d92b208f..bf84ce28b 100644
 --- a/module/icp/algs/modes/gcm.c
 +++ b/module/icp/algs/modes/gcm.c
 @@ -32,15 +32,7 @@
@@ -3898,7 +3898,7 @@ index 7d92b208f..407182984 100644
  
  	if (param != NULL) {
  		gcm_param = (CK_AES_GCM_PARAMS *)(void *)param;
-@@ -617,79 +341,46 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
+@@ -617,79 +341,49 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
  
  		gcm_ctx->gcm_tag_len = tag_len;
  		gcm_ctx->gcm_processed_data_len = 0;
@@ -3908,6 +3908,9 @@ index 7d92b208f..407182984 100644
 -		    = htonll(CRYPTO_BYTES2BITS(gcm_param->ulAADLen));
 +		gcm_ctx->gcm_saved = 0;
 +		memcpy(&gcm_ctx->gcm_wc_aes, sched_aes, sizeof(Aes));
++		#if defined(WOLFSSL_AESGCM_STREAM) && defined(WOLFSSL_SMALL_STACK) && !defined(WOLFSSL_AESNI)
++		gcm_ctx->gcm_wc_aes.streamData = NULL;
++		#endif
  	} else {
 -		return (CRYPTO_MECHANISM_PARAM_INVALID);
 +		rc = (CRYPTO_MECHANISM_PARAM_INVALID);
@@ -4012,7 +4015,7 @@ index 7d92b208f..407182984 100644
  
  	return (rv);
  }
-@@ -711,12 +402,21 @@ static gcm_impl_ops_t gcm_fastest_impl = {
+@@ -711,12 +405,21 @@ static gcm_impl_ops_t gcm_fastest_impl = {
  	.name = "fastest"
  };
  
@@ -4038,7 +4041,7 @@ index 7d92b208f..407182984 100644
  };
  
  /* Indicate that benchmark has been completed */
-@@ -734,49 +434,10 @@ static gcm_impl_ops_t *gcm_supp_impl[ARRAY_SIZE(gcm_all_impl)];
+@@ -734,49 +437,10 @@ static gcm_impl_ops_t *gcm_supp_impl[ARRAY_SIZE(gcm_all_impl)];
  const gcm_impl_ops_t *
  gcm_impl_get_ops(void)
  {
@@ -4092,7 +4095,7 @@ index 7d92b208f..407182984 100644
  }
  
  /*
-@@ -787,6 +448,7 @@ gcm_impl_init(void)
+@@ -787,6 +451,7 @@ gcm_impl_init(void)
  {
  	gcm_impl_ops_t *curr_impl;
  	int i, c;
@@ -4100,7 +4103,7 @@ index 7d92b208f..407182984 100644
  
  	/* Move supported implementations into gcm_supp_impls */
  	for (i = 0, c = 0; i < ARRAY_SIZE(gcm_all_impl); i++) {
-@@ -801,42 +463,11 @@ gcm_impl_init(void)
+@@ -801,42 +466,11 @@ gcm_impl_init(void)
  	 * Set the fastest implementation given the assumption that the
  	 * hardware accelerated version is the fastest.
  	 */
@@ -4145,7 +4148,7 @@ index 7d92b208f..407182984 100644
  	/* Finish initialization */
  	atomic_swap_32(&icp_gcm_impl, user_sel_impl);
  	gcm_impl_initialized = B_TRUE;
-@@ -872,6 +503,11 @@ gcm_impl_set(const char *val)
+@@ -872,6 +506,11 @@ gcm_impl_set(const char *val)
  	char req_name[GCM_IMPL_NAME_MAX];
  	uint32_t impl = GCM_IMPL_READ(user_sel_impl);
  	size_t i;
@@ -4157,7 +4160,7 @@ index 7d92b208f..407182984 100644
  
  	/* sanitize input */
  	i = strnlen(val, GCM_IMPL_NAME_MAX);
-@@ -885,18 +521,6 @@ gcm_impl_set(const char *val)
+@@ -885,18 +524,6 @@ gcm_impl_set(const char *val)
  
  	/* Check mandatory options */
  	for (i = 0; i < ARRAY_SIZE(gcm_impl_opts); i++) {
@@ -4176,7 +4179,7 @@ index 7d92b208f..407182984 100644
  		if (strcmp(req_name, gcm_impl_opts[i].name) == 0) {
  			impl = gcm_impl_opts[i].sel;
  			err = 0;
-@@ -915,24 +539,6 @@ gcm_impl_set(const char *val)
+@@ -915,24 +542,6 @@ gcm_impl_set(const char *val)
  			}
  		}
  	}
@@ -4201,7 +4204,7 @@ index 7d92b208f..407182984 100644
  
  	if (err == 0) {
  		if (gcm_impl_initialized)
-@@ -949,6 +555,7 @@ gcm_impl_set(const char *val)
+@@ -949,6 +558,7 @@ gcm_impl_set(const char *val)
  static int
  icp_gcm_impl_set(const char *val, zfs_kernel_param_t *kp)
  {
@@ -4209,7 +4212,7 @@ index 7d92b208f..407182984 100644
  	return (gcm_impl_set(val));
  }
  
-@@ -958,21 +565,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
+@@ -958,21 +568,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
  	int i, cnt = 0;
  	char *fmt;
  	const uint32_t impl = GCM_IMPL_READ(icp_gcm_impl);
@@ -4232,7 +4235,7 @@ index 7d92b208f..407182984 100644
  		fmt = (impl == gcm_impl_opts[i].sel) ? "[%s] " : "%s ";
  		cnt += kmem_scnprintf(buffer + cnt, PAGE_SIZE - cnt, fmt,
  		    gcm_impl_opts[i].name);
-@@ -992,746 +588,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
+@@ -992,746 +591,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
      NULL, 0644);
  MODULE_PARM_DESC(icp_gcm_impl, "Select gcm implementation.");
  #endif /* defined(__KERNEL) */
@@ -30131,7 +30134,7 @@ index 2f516ec0e..68e144ec9 100644
  } sha512_ops_t;
  
 diff --git a/module/icp/io/aes.c b/module/icp/io/aes.c
-index ca586eaf9..42fc834d1 100644
+index ca586eaf9..556beca3a 100644
 --- a/module/icp/io/aes.c
 +++ b/module/icp/io/aes.c
 @@ -151,8 +151,9 @@ aes_check_mech_param(crypto_mechanism_t *mechanism, aes_ctx_t **ctx)
@@ -30156,6 +30159,15 @@ index ca586eaf9..42fc834d1 100644
  }
  
  /*
+@@ -190,7 +191,7 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
+ 	ret = aes_common_init_ctx(&aes_ctx, template, mechanism, key,
+ 	    KM_SLEEP, B_TRUE);
+ 	if (ret != CRYPTO_SUCCESS)
+-		return (ret);
++		goto out;
+ 
+ 	switch (mechanism->cm_type) {
+ 	case AES_CCM_MECH_INFO_TYPE:
 @@ -232,15 +233,13 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
  	if (ret == CRYPTO_SUCCESS) {
  		if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
@@ -30191,6 +30203,15 @@ index ca586eaf9..42fc834d1 100644
  		gcm_clear_ctx((gcm_ctx_t *)&aes_ctx);
  	}
  	return (ret);
+@@ -289,7 +291,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
+ 	ret = aes_common_init_ctx(&aes_ctx, template, mechanism, key,
+ 	    KM_SLEEP, B_FALSE);
+ 	if (ret != CRYPTO_SUCCESS)
+-		return (ret);
++		goto out;
+ 
+ 	switch (mechanism->cm_type) {
+ 	case AES_CCM_MECH_INFO_TYPE:
 @@ -335,8 +337,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
  			ASSERT(aes_ctx.ac_processed_mac_len
  			    == aes_ctx.ac_mac_len);
@@ -30292,8 +30313,8 @@ index ca586eaf9..42fc834d1 100644
  		if (aes_ctx->ac_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
 -			memset(keysched, 0, size);
 -			kmem_free(keysched, size);
-+			aes_free_keysched(keysched, size);
-+			keysched = NULL;
++			aes_free_keysched(aes_ctx->ac_keysched, size);
++			aes_ctx->ac_keysched = NULL;
  		}
  	}
  
@@ -30549,13 +30570,16 @@ index bc2830b16..3938f38d4 100644
  	return (0);
  }
 diff --git a/tests/zfs-tests/cmd/crypto_test.c b/tests/zfs-tests/cmd/crypto_test.c
-index c8d8622c7..86d9f448c 100644
+index c8d8622c7..8f3942642 100644
 --- a/tests/zfs-tests/cmd/crypto_test.c
 +++ b/tests/zfs-tests/cmd/crypto_test.c
-@@ -518,19 +518,23 @@ static const char *aes_impl[] = {
- 	"generic",
- 	"x86_64",
- 	"aesni",
+@@ -515,22 +515,11 @@ err:
+  * valid combinations.
+  */
+ static const char *aes_impl[] = {
+-	"generic",
+-	"x86_64",
+-	"aesni",
 +	"wolfcrypt",
  };
  
@@ -30570,23 +30594,11 @@ index c8d8622c7..86d9f448c 100644
 -	{ "aesni",   "avx" },
 -	{ "x86_64",  "avx2" },
 -	{ "aesni",   "avx2" },
-+	{ "generic",   "generic" },
-+	{ "x86_64",    "generic" },
-+	{ "aesni",     "generic" },
-+	{ "generic",   "pclmulqdq" },
-+	{ "x86_64",    "pclmulqdq" },
-+	{ "aesni",     "pclmulqdq" },
-+	{ "x86_64",    "avx" },
-+	{ "aesni",     "avx" },
-+	{ "x86_64",    "avx2" },
-+	{ "aesni",     "avx2" },
-+	{ "x86_64",    "wolfcrypt" },
-+	{ "aesni",     "wolfcrypt" },
 +	{ "wolfcrypt", "wolfcrypt" },
  };
  
  /* signature of function to call after setting implementation params */
-@@ -560,6 +564,7 @@ static void
+@@ -560,6 +549,7 @@ static void
  foreach_aes_gcm(alg_cb_t cb, void *arg, crypto_test_outmode_t outmode)
  {
  	char alginfo[64];
@@ -30594,7 +30606,7 @@ index c8d8622c7..86d9f448c 100644
  
  	for (int i = 0; i < ARRAY_SIZE(aes_gcm_impl); i++) {
  		const char *aes_impl = aes_gcm_impl[i][0];
-@@ -569,13 +574,13 @@ foreach_aes_gcm(alg_cb_t cb, void *arg, crypto_test_outmode_t outmode)
+@@ -569,13 +559,13 @@ foreach_aes_gcm(alg_cb_t cb, void *arg, crypto_test_outmode_t outmode)
  		    aes_impl, gcm_impl);
  
  		int err = -aes_impl_set(aes_impl);
@@ -30610,7 +30622,7 @@ index c8d8622c7..86d9f448c 100644
  				printf("W: %s couldn't enable "
  				    "GCM impl '%s': %s\n",
  				    alginfo, gcm_impl, strerror(err));
-@@ -980,8 +985,13 @@ run_tests(const char *alginfo, const crypto_test_t *tests,
+@@ -980,8 +970,13 @@ run_tests(const char *alginfo, const crypto_test_t *tests,
  
  		/* consider results and if it passed, count it */
  		if (test_result(test, encrypt_rv, encrypt_buf,
