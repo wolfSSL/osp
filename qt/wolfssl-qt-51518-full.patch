@@ -515,7 +515,19 @@ index fb268228943..7db754c42d7 100644
  class tst_QSslCertificate : public QObject
  {
      Q_OBJECT
-@@ -1081,7 +1085,9 @@ void tst_QSslCertificate::multipleCommonNames()
+@@ -992,6 +996,11 @@ void tst_QSslCertificate::nulInSan()
+ #endif
+     QList<QSslCertificate> certList =
+         QSslCertificate::fromPath(testDataDir + "more-certificates/badguy-nul-san.crt", QSsl::Pem, QSslCertificate::PatternSyntax::FixedString);
++#ifndef QT_NO_WOLFSSL
++    // wolfSSL (PR#10279) rejects certificates with embedded NUL bytes in SAN DNS entries at parse time
++    if (certList.isEmpty())
++        QSKIP("wolfSSL rejects certificates with embedded NUL bytes in SAN DNS entries");
++#endif
+     QCOMPARE(certList.size(), 1);
+
+     const QSslCertificate &cert = certList.at(0);
+@@ -1081,7 +1090,9 @@ void tst_QSslCertificate::multipleCommonNames()
      QList<QSslCertificate> certList =
          QSslCertificate::fromPath(testDataDir + "more-certificates/test-cn-two-cns-cert.pem", QSsl::Pem, QSslCertificate::PatternSyntax::FixedString);
      QVERIFY(certList.count() > 0);
