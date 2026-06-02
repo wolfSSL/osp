@@ -3,7 +3,7 @@ Author: Kareem <kareem@wolfssl.com>
 Date:   Thu Mar 5 16:34:26 2026 -0700
 
     Add wolfSSL support to hitch.
-    
+
     To use it, build wolfSSL with:
     ./autogen.sh
     ./configure --enable-hitch
@@ -162,6 +162,18 @@ index e95e213..fc88cbe 100644
  
  SH_TESTS="$(cd $srcdir/src && echo tests/test*.sh)"
  AC_SUBST(SH_TESTS)
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 9051f4c..e1bc366 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -50,6 +50,7 @@ libcfg_a_SOURCES = \
+ 	cfg_parser.y
+ 
+ libcfg_a_CFLAGS = \
++	$(HITCH_CFLAGS) \
+ 	$(SSL_CFLAGS)
+ 
+ libforeign_a_SOURCES = \
 diff --git a/src/hitch.c b/src/hitch.c
 index a499c98..8f4da3a 100644
 --- a/src/hitch.c
