@@ -1,6 +1,6 @@
-From 3d1426e3587ed997a60802f1f93be291d9c15e97 Mon Sep 17 00:00:00 2001
+From 457f3cc1f52734a05c4c2f09bd7ff03a0124f365 Mon Sep 17 00:00:00 2001
 From: jordan <jordan@wolfssl.com>
-Date: Sat, 30 May 2026 00:40:49 -0500
+Date: Tue, 2 Jun 2026 22:42:47 -0500
 Subject: [PATCH] wolfzfs patch: cd06f79e2
 
 ---
@@ -20,8 +20,8 @@ Subject: [PATCH] wolfzfs patch: cd06f79e2
  module/icp/algs/aes/aes_impl_generic.c     | 1243 -----
  module/icp/algs/aes/aes_impl_x86-64.c      |   64 -
  module/icp/algs/aes/aes_modes.c            |   50 +-
- module/icp/algs/modes/ccm.c                |  916 +---
- module/icp/algs/modes/gcm.c                | 1658 +------
+ module/icp/algs/modes/ccm.c                |  914 +---
+ module/icp/algs/modes/gcm.c                | 1656 +------
  module/icp/algs/modes/gcm_generic.c        |   84 -
  module/icp/algs/modes/modes.c              |   49 +-
  module/icp/algs/sha2/sha256_impl.c         |  156 -
@@ -47,7 +47,7 @@ Subject: [PATCH] wolfzfs patch: cd06f79e2
  module/os/linux/zfs/zfs_ioctl_os.c         |    8 +
  module/zfs/hkdf.c                          |  160 +-
  tests/zfs-tests/cmd/crypto_test.c          |   27 +-
- 43 files changed, 827 insertions(+), 28594 deletions(-)
+ 43 files changed, 823 insertions(+), 28594 deletions(-)
  delete mode 100644 module/icp/algs/aes/aes_impl_generic.c
  delete mode 100644 module/icp/algs/aes/aes_impl_x86-64.c
  delete mode 100644 module/icp/algs/modes/gcm_generic.c
@@ -2159,7 +2159,7 @@ index b2ddf4451..17bb8dce3 100644
  		__builtin_unreachable();
  	return (rv);
 diff --git a/module/icp/algs/modes/ccm.c b/module/icp/algs/modes/ccm.c
-index 0a7a5091f..9eaba550d 100644
+index 0a7a5091f..2fd3c2f95 100644
 --- a/module/icp/algs/modes/ccm.c
 +++ b/module/icp/algs/modes/ccm.c
 @@ -28,12 +28,53 @@
@@ -2422,7 +2422,7 @@ index 0a7a5091f..9eaba550d 100644
  		return (CRYPTO_DATA_LEN_RANGE);
  	}
  
-@@ -215,124 +145,42 @@ ccm_encrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -215,124 +145,41 @@ ccm_encrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
  	 */
  	if ((ctx->ccm_processed_data_len + ctx->ccm_remainder_len)
  	    != (ctx->ccm_data_len)) {
@@ -2555,7 +2555,6 @@ index 0a7a5091f..9eaba550d 100644
 +                          ctx->ccm_work, ctx->ccm_data_len, ctx->nonce,
 +                          ctx->nonce_len, auth_tag, ctx->ccm_mac_len,
 +                          ctx->ccm_auth, ctx->auth_alloc_len);
-+    wc_AesFree(&ctx->ccm_wc_aes);
 +    if (rc != 0) {
 +        ERR_LOG("error: wc_AesCcmEncrypt: %d\n", rc);
 +        return -1;
@@ -2580,7 +2579,7 @@ index 0a7a5091f..9eaba550d 100644
  }
  
  /*
-@@ -348,170 +196,51 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
+@@ -348,170 +195,51 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
      void (*xor_block)(uint8_t *, uint8_t *))
  {
  	(void) out;
@@ -2796,7 +2795,7 @@ index 0a7a5091f..9eaba550d 100644
  }
  
  int
-@@ -520,9 +249,7 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -520,9 +248,7 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
      void (*copy_block)(uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
  {
@@ -2807,7 +2806,7 @@ index 0a7a5091f..9eaba550d 100644
  
  	pt_len = ctx->ccm_data_len;
  
-@@ -531,42 +258,49 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -531,42 +257,48 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
  		return (CRYPTO_DATA_LEN_RANGE);
  	}
  
@@ -2871,7 +2870,6 @@ index 0a7a5091f..9eaba550d 100644
 +			      ctx->nonce, ctx->nonce_len,
 +			      auth_tag, ctx->ccm_mac_len,
 +                              ctx->ccm_auth, ctx->auth_alloc_len);
-+        wc_AesFree(&ctx->ccm_wc_aes);
 +        if (rc != 0) {
 +            DEBUG_LOG("error: wc_AesCcmDecrypt: %d\n", rc);
 +            return -1;
@@ -2887,7 +2885,7 @@ index 0a7a5091f..9eaba550d 100644
  	return (CRYPTO_SUCCESS);
  }
  
-@@ -620,225 +354,6 @@ ccm_validate_args(CK_AES_CCM_PARAMS *ccm_param, boolean_t is_encrypt_init)
+@@ -620,225 +352,6 @@ ccm_validate_args(CK_AES_CCM_PARAMS *ccm_param, boolean_t is_encrypt_init)
  	return (CRYPTO_SUCCESS);
  }
  
@@ -3113,7 +3111,7 @@ index 0a7a5091f..9eaba550d 100644
  /*
   * The following function should be call at encrypt or decrypt init time
   * for AES CCM mode.
-@@ -851,6 +366,8 @@ ccm_init_ctx(ccm_ctx_t *ccm_ctx, char *param, int kmflag,
+@@ -851,6 +364,8 @@ ccm_init_ctx(ccm_ctx_t *ccm_ctx, char *param, int kmflag,
  {
  	int rv;
  	CK_AES_CCM_PARAMS *ccm_param;
@@ -3122,7 +3120,7 @@ index 0a7a5091f..9eaba550d 100644
  
  	if (param != NULL) {
  		ccm_param = (CK_AES_CCM_PARAMS *)param;
-@@ -875,19 +392,34 @@ ccm_init_ctx(ccm_ctx_t *ccm_ctx, char *param, int kmflag,
+@@ -875,19 +390,34 @@ ccm_init_ctx(ccm_ctx_t *ccm_ctx, char *param, int kmflag,
  		return (CRYPTO_MECHANISM_PARAM_INVALID);
  	}
  
@@ -3168,7 +3166,7 @@ index 0a7a5091f..9eaba550d 100644
  }
  
 diff --git a/module/icp/algs/modes/gcm.c b/module/icp/algs/modes/gcm.c
-index 7d92b208f..bf84ce28b 100644
+index 7d92b208f..ae05e4f94 100644
 --- a/module/icp/algs/modes/gcm.c
 +++ b/module/icp/algs/modes/gcm.c
 @@ -32,15 +32,7 @@
@@ -3408,7 +3406,7 @@ index 7d92b208f..bf84ce28b 100644
  	return (CRYPTO_SUCCESS);
  }
  
-@@ -210,122 +144,30 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -210,122 +144,29 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
      void (*xor_block)(uint8_t *, uint8_t *))
  {
  	(void) copy_block;
@@ -3495,7 +3493,6 @@ index 7d92b208f..bf84ce28b 100644
 +        rc = wc_AesGcmEncryptFinal(&ctx->gcm_wc_aes, auth_tag,
 +                                   ctx->gcm_tag_len);
 +        GCM_DUMP_DATA("auth_tag", auth_tag, ctx->gcm_tag_len);
-+        wc_AesFree(&ctx->gcm_wc_aes);
 +        if (rc != 0) {
 +            ERR_LOG("error: wc_AesGcmEncryptFinal: %d\n", rc);
 +            return -1;
@@ -3554,7 +3551,7 @@ index 7d92b208f..bf84ce28b 100644
  }
  
  int
-@@ -337,38 +179,42 @@ gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
+@@ -337,38 +178,42 @@ gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
  {
  	(void) out, (void) block_size, (void) encrypt_block, (void) copy_block,
  	    (void) xor_block;
@@ -3629,7 +3626,7 @@ index 7d92b208f..bf84ce28b 100644
  }
  
  int
-@@ -376,82 +222,59 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -376,82 +221,58 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
      int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
  {
@@ -3674,7 +3671,6 @@ index 7d92b208f..bf84ce28b 100644
 +        rc = wc_AesGcmDecryptFinal(&ctx->gcm_wc_aes,
 +                                   ctx->gcm_work + work_len,
 +                                   ctx->gcm_tag_len);
-+        wc_AesFree(&ctx->gcm_wc_aes);
 +        if (rc != 0) {
 +            DEBUG_LOG("error: wc_AesGcmDecryptFinal: %d\n", rc);
 +            return (CRYPTO_INVALID_MAC);
@@ -3763,7 +3759,7 @@ index 7d92b208f..bf84ce28b 100644
  }
  
  static int
-@@ -482,118 +305,11 @@ gcm_validate_args(CK_AES_GCM_PARAMS *gcm_param)
+@@ -482,118 +303,11 @@ gcm_validate_args(CK_AES_GCM_PARAMS *gcm_param)
  	return (CRYPTO_SUCCESS);
  }
  
@@ -3883,7 +3879,7 @@ index 7d92b208f..bf84ce28b 100644
      size_t block_size, int (*encrypt_block)(const void *, const uint8_t *,
      uint8_t *), void (*copy_block)(uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
-@@ -601,6 +317,14 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
+@@ -601,6 +315,14 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
  	CK_AES_GCM_PARAMS *gcm_param;
  	int rv = CRYPTO_SUCCESS;
  	size_t tag_len, iv_len;
@@ -3898,7 +3894,7 @@ index 7d92b208f..bf84ce28b 100644
  
  	if (param != NULL) {
  		gcm_param = (CK_AES_GCM_PARAMS *)(void *)param;
-@@ -617,79 +341,49 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
+@@ -617,79 +339,49 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
  
  		gcm_ctx->gcm_tag_len = tag_len;
  		gcm_ctx->gcm_processed_data_len = 0;
@@ -4015,7 +4011,7 @@ index 7d92b208f..bf84ce28b 100644
  
  	return (rv);
  }
-@@ -711,12 +405,21 @@ static gcm_impl_ops_t gcm_fastest_impl = {
+@@ -711,12 +403,21 @@ static gcm_impl_ops_t gcm_fastest_impl = {
  	.name = "fastest"
  };
  
@@ -4041,7 +4037,7 @@ index 7d92b208f..bf84ce28b 100644
  };
  
  /* Indicate that benchmark has been completed */
-@@ -734,49 +437,10 @@ static gcm_impl_ops_t *gcm_supp_impl[ARRAY_SIZE(gcm_all_impl)];
+@@ -734,49 +435,10 @@ static gcm_impl_ops_t *gcm_supp_impl[ARRAY_SIZE(gcm_all_impl)];
  const gcm_impl_ops_t *
  gcm_impl_get_ops(void)
  {
@@ -4095,7 +4091,7 @@ index 7d92b208f..bf84ce28b 100644
  }
  
  /*
-@@ -787,6 +451,7 @@ gcm_impl_init(void)
+@@ -787,6 +449,7 @@ gcm_impl_init(void)
  {
  	gcm_impl_ops_t *curr_impl;
  	int i, c;
@@ -4103,7 +4099,7 @@ index 7d92b208f..bf84ce28b 100644
  
  	/* Move supported implementations into gcm_supp_impls */
  	for (i = 0, c = 0; i < ARRAY_SIZE(gcm_all_impl); i++) {
-@@ -801,42 +466,11 @@ gcm_impl_init(void)
+@@ -801,42 +464,11 @@ gcm_impl_init(void)
  	 * Set the fastest implementation given the assumption that the
  	 * hardware accelerated version is the fastest.
  	 */
@@ -4148,7 +4144,7 @@ index 7d92b208f..bf84ce28b 100644
  	/* Finish initialization */
  	atomic_swap_32(&icp_gcm_impl, user_sel_impl);
  	gcm_impl_initialized = B_TRUE;
-@@ -872,6 +506,11 @@ gcm_impl_set(const char *val)
+@@ -872,6 +504,11 @@ gcm_impl_set(const char *val)
  	char req_name[GCM_IMPL_NAME_MAX];
  	uint32_t impl = GCM_IMPL_READ(user_sel_impl);
  	size_t i;
@@ -4160,7 +4156,7 @@ index 7d92b208f..bf84ce28b 100644
  
  	/* sanitize input */
  	i = strnlen(val, GCM_IMPL_NAME_MAX);
-@@ -885,18 +524,6 @@ gcm_impl_set(const char *val)
+@@ -885,18 +522,6 @@ gcm_impl_set(const char *val)
  
  	/* Check mandatory options */
  	for (i = 0; i < ARRAY_SIZE(gcm_impl_opts); i++) {
@@ -4179,7 +4175,7 @@ index 7d92b208f..bf84ce28b 100644
  		if (strcmp(req_name, gcm_impl_opts[i].name) == 0) {
  			impl = gcm_impl_opts[i].sel;
  			err = 0;
-@@ -915,24 +542,6 @@ gcm_impl_set(const char *val)
+@@ -915,24 +540,6 @@ gcm_impl_set(const char *val)
  			}
  		}
  	}
@@ -4204,7 +4200,7 @@ index 7d92b208f..bf84ce28b 100644
  
  	if (err == 0) {
  		if (gcm_impl_initialized)
-@@ -949,6 +558,7 @@ gcm_impl_set(const char *val)
+@@ -949,6 +556,7 @@ gcm_impl_set(const char *val)
  static int
  icp_gcm_impl_set(const char *val, zfs_kernel_param_t *kp)
  {
@@ -4212,7 +4208,7 @@ index 7d92b208f..bf84ce28b 100644
  	return (gcm_impl_set(val));
  }
  
-@@ -958,21 +568,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
+@@ -958,21 +566,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
  	int i, cnt = 0;
  	char *fmt;
  	const uint32_t impl = GCM_IMPL_READ(icp_gcm_impl);
@@ -4235,7 +4231,7 @@ index 7d92b208f..bf84ce28b 100644
  		fmt = (impl == gcm_impl_opts[i].sel) ? "[%s] " : "%s ";
  		cnt += kmem_scnprintf(buffer + cnt, PAGE_SIZE - cnt, fmt,
  		    gcm_impl_opts[i].name);
-@@ -992,746 +591,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
+@@ -992,746 +589,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
      NULL, 0644);
  MODULE_PARM_DESC(icp_gcm_impl, "Select gcm implementation.");
  #endif /* defined(__KERNEL) */
