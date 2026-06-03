@@ -1,0 +1,32 @@
+#!/bin/bash
+err_and_die()
+{
+  echo "err: $1"
+  exit 1
+}
+
+cd zfs || exit 1
+
+# extra work, but just to be safe
+if [ -f configure ]; then
+  rm configure;
+fi
+
+if [ ! -f configure ]; then
+  ./autogen.sh || err_and_die "autogen"
+fi
+
+# Update this to point to your wolfssl source tree.
+wolf_src=""
+
+if [ -z $wolf_src ]; then
+  err_and_die "wolf_src not set"
+fi
+
+./configure --with-wolfssl-source=$wolf_src \
+  || err_and_die "configure"
+make || err_and_die "make"
+sudo make install || err_and_die "sudo make install"
+sudo ldconfig; sudo depmod
+sudo modprobe spl
+sudo modprobe zfs
