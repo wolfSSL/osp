@@ -1613,19 +1613,6 @@ index 8c3317fe4..c5b3230a4 100644
  
  TESTDEPS=t_test.o $(KRB5_BASE_DEPLIBS)
  TESTLIBS=t_test.o $(KRB5_BASE_LIBS)
-diff --git a/src/lib/krb5/krb/Makefile.in b/src/lib/krb5/krb/Makefile.in
-index e4b560fb8..4c25b9d42 100644
---- a/src/lib/krb5/krb/Makefile.in
-+++ b/src/lib/krb5/krb/Makefile.in
-@@ -361,7 +361,7 @@ SRCS=	$(srcdir)/addr_comp.c	\
- 	$(srcdir)/t_parse_host_string.c	\
- 	$(srcdir)/t_princ.c	\
- 	$(srcdir)/t_etypes.c    \
--	$(srcdir)/t_expire_warn.c \
-+	#$(srcdir)/t_expire_warn.c \
- 	$(srcdir)/t_authdata.c	\
- 	$(srcdir)/t_cc_config.c	\
- 	$(srcdir)/t_copy_context.c \
 diff --git a/src/lib/krb5/krb/t_expire_warn.py b/src/lib/krb5/krb/t_expire_warn.py
 index e163cc7..2b56d8f 100755
 --- a/src/lib/krb5/krb/t_expire_warn.py

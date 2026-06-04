@@ -41,11 +41,10 @@ diff --git a/tests/ssh2.c b/tests/ssh2.c
 index f903e07..3105c15 100644
 --- a/tests/ssh2.c
 +++ b/tests/ssh2.c
-@@ -28,6 +28,8 @@
+@@ -28,6 +28,7 @@
  #include <errno.h>
  #include <stdio.h>
  #include <stdlib.h>
-+#include <stdio.h>
 +#include <pwd.h>
  #include <ctype.h>
  
@@ -123,11 +122,11 @@ index 07795bb..657fb4b 100755
 +# Create a 'user' account if it doesn't exist (for SSH authentication)
 +if ! id "user" &>/dev/null; then
 +    # Create user account without home directory and shell
-+    useradd -r -s /bin/false user 2>/dev/null || true
++    useradd -r -s /bin/false user 2>/dev/null || sudo useradd -r -s /bin/false user 2>/dev/null || true
 +    # Unlock the account for SSH authentication
-+    passwd -u user 2>/dev/null || true
++    passwd -u user 2>/dev/null || sudo passwd -u user 2>/dev/null || true
 +    # Alternative: set empty password to unlock
-+    passwd -d user 2>/dev/null || true
++    passwd -d user 2>/dev/null || sudo passwd -d user 2>/dev/null || true
 +fi
 +
 +# Set the wrapper script to load the system ossl for sshd
@@ -159,16 +158,19 @@ new file mode 100755
 index 0000000..5652e18
 --- /dev/null
 +++ b/tests/sshd-wrapper.sh
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,15 @@
 +#!/bin/sh
 +# Sets a clean env for sshd(openssh) so we can use system ossl
++sshd_bin=$(command -v sshd 2>/dev/null || echo /usr/sbin/sshd)
++libdir=/usr/lib/$(uname -m)-linux-gnu
++[ -d "$libdir" ] || libdir=/usr/lib/x86_64-linux-gnu
 +exec env -i \
 +  PATH=/usr/sbin:/usr/bin:/bin \
 +  LC_ALL=C LANG=C \
-+  LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
++  LD_LIBRARY_PATH=$libdir \
 +  OPENSSL_CONF= \
 +  OPENSSL_MODULES= \
 +  PKG_CONFIG_PATH= \
 +  LDFLAGS= \
 +  CPPFLAGS= \
-+  /usr/sbin/sshd "$@"
++  "$sshd_bin" "$@"
