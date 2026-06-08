@@ -1,33 +1,13 @@
-## How to setup wolfSSL support for standard Zephyr TLS Sockets and RNG
+## wolfSSL support for standard Zephyr TLS Sockets and RNG
 
-wolfSSL can also be used as the underlying implementation for the default Zephyr TLS socket interface.
-With this enabled, all existing applications using the Zephyr TLS sockets will now use wolfSSL inside
-for all TLS operations. This will also enable wolfSSL as the default RNG implementation. To enable this
-feature, first ensure wolfSSL has been added to the west manifest using the instructions from the
-README.md here: https://github.com/wolfSSL/wolfssl/tree/master/zephyr
+This directory contains the patches that enable wolfSSL as the underlying
+implementation for Zephyr's default TLS socket interface, organized by
+Zephyr release.
 
-Once the west manifest has been updated, run west update, then run the following command to patch the sources
+| Zephyr version | Patch and instructions                     |
+|----------------|--------------------------------------------|
+| 3.7            | [3.7/README.md](3.7/README.md)             |
+| 4.3            | [4.3/README.md](4.3/README.md)             |
 
-```
-patch -p1 < /path/to/your/osp/zephyr/zephyr-tls-{PATCH_VERSION}.patch
-```
-
-Where PATCH_VERSION is the appropriate patch version.
-
-### Run Zephyr TLS samples
-
-```
-west build -b <your_board> samples/net/sockets/echo_server -DEXTRA_CONF_FILE=overlay-wolfssl.conf
-```
-
-### Run Zephyr TLS tests
-
-```
-west build -b <your_board> tests/net/socket/tls_ext/ -DEXTRA_CONF_FILE=overlay-wolfssl.conf
-```
-
-```
-west build -b <your_board> tests/net/socket/tls/ -DEXTRA_CONF_FILE=overlay-wolfssl.conf
-```
-
-
+For general information on wolfSSL as a Zephyr module, see
+https://github.com/wolfSSL/wolfssl/tree/master/zephyr.
