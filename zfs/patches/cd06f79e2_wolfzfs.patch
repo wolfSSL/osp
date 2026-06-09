@@ -1,4 +1,4 @@
-From 457f3cc1f52734a05c4c2f09bd7ff03a0124f365 Mon Sep 17 00:00:00 2001
+From 8cad7b1183fb8a16fa2461f6a5a6c57004c014b3 Mon Sep 17 00:00:00 2001
 From: jordan <jordan@wolfssl.com>
 Date: Tue, 2 Jun 2026 22:42:47 -0500
 Subject: [PATCH] wolfzfs patch: cd06f79e2
@@ -45,9 +45,9 @@ Subject: [PATCH] wolfzfs patch: cd06f79e2
  module/icp/io/aes.c                        |   68 +-
  module/icp/io/sha2_mod.c                   |   21 +
  module/os/linux/zfs/zfs_ioctl_os.c         |    8 +
- module/zfs/hkdf.c                          |  160 +-
+ module/zfs/hkdf.c                          |  166 +-
  tests/zfs-tests/cmd/crypto_test.c          |   27 +-
- 43 files changed, 823 insertions(+), 28594 deletions(-)
+ 43 files changed, 830 insertions(+), 28593 deletions(-)
  delete mode 100644 module/icp/algs/aes/aes_impl_generic.c
  delete mode 100644 module/icp/algs/aes/aes_impl_x86-64.c
  delete mode 100644 module/icp/algs/modes/gcm_generic.c
@@ -30389,7 +30389,7 @@ index ce6092be1..c9ca1d946 100644
  MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);
 +MODULE_IMPORT_NS(WOLFSSL);
 diff --git a/module/zfs/hkdf.c b/module/zfs/hkdf.c
-index bc2830b16..3938f38d4 100644
+index bc2830b16..1bbfbf964 100644
 --- a/module/zfs/hkdf.c
 +++ b/module/zfs/hkdf.c
 @@ -22,124 +22,30 @@
@@ -30541,7 +30541,7 @@ index bc2830b16..3938f38d4 100644
  
  /*
   * HKDF is designed to be a relatively fast function for deriving keys from a
-@@ -154,17 +60,11 @@ hkdf_sha512(uint8_t *key_material, uint_t km_len, uint8_t *salt,
+@@ -154,17 +60,19 @@ hkdf_sha512(uint8_t *key_material, uint_t km_len, uint8_t *salt,
      uint_t out_len)
  {
  	int ret;
@@ -30556,9 +30556,16 @@ index bc2830b16..3938f38d4 100644
 -	    out_len);
 -	if (ret != 0)
 -		return (ret);
--
+ 
++	/*
++	 * FIPS 140-3: KDF output is keying material (a CSP); the wolfCrypt
++	 * FIPS module gates KDF services behind the operator private-key-read
++	 * lock. Raise it around the call (no-op in non-FIPS builds).
++	 */
++	PRIVATE_KEY_UNLOCK();
 +	ret = wc_HKDF(WC_SHA512, key_material, km_len, salt, salt_len,
 +		      info, info_len, output_key, out_len);
++	PRIVATE_KEY_LOCK();
 +	if (ret) {
 +		ERR_LOG("error: wc_HKDF: %d\n", ret);
 +		return (SET_ERROR(EIO));
@@ -30634,5 +30641,5 @@ index c8d8622c7..8f3942642 100644
  
  	printf("%s: tests=%d: passed=%d failed=%d\n",
 -- 
-2.47.3
+2.43.0
 
