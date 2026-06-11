@@ -10,10 +10,20 @@ This integration depends on new Kconfig options added to the wolfSSL Zephyr modu
 revision that includes the PR adding Zephyr 4.3 default TLS support (`WOLFSSL_SESSION_EXPORT`,
 `WOLFSSL_KEEP_PEER_CERT`, `WOLFSSL_ALWAYS_VERIFY_CB`, and the `native_sim` timer gate extension).
 
-Once the west manifest has been updated, run west update, then run the following command to patch the sources
+Once the west manifest has been updated, run west update, then patch the Zephyr tree (run inside the
+`zephyr` directory). The integration ships as two patches:
+
+- **`zephyr-tls-4.3.0.patch`** — the core wolfSSL backend (the BSD-sockets TLS layer and the
+  RNG/CSPRNG). This is all that is required to use wolfSSL for TLS sockets.
+- **`zephyr-tls-4.3.0-tests.patch`** — the wolfSSL twister test scenarios and the echo_server
+  sample overlay. Apply it only if you want to run the test suite yourself; it is not needed to
+  use the integration. It depends on the core patch, so apply the core patch first.
 
 ```
+# required:
 patch -p1 < /path/to/your/osp/zephyr/4.3/zephyr-tls-4.3.0.patch
+# optional, only to run the tests:
+patch -p1 < /path/to/your/osp/zephyr/4.3/zephyr-tls-4.3.0-tests.patch
 ```
 
 ### Minimum prj.conf
