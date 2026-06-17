@@ -12,7 +12,7 @@ wolfSSL can provide several advantages over using the default SSL/TLS implementa
 * Current protocol support, up to [TLS 1.3](https://www.wolfssl.com/tls13) and [DTLS 1.3](https://www.wolfssl.com/whats-new-dtls-1-3/)
 * Progressive algorithm support (ChaCha20, Poly1305, Curve/Ed25519, etc)
 * [Commercial support](https://www.wolfssl.com/products/support-and-maintenance/) available direct from wolfSSL engineers
-* [Commercial licenses](https://www.wolfssl.com/license/) available (in addition to standard GPLv2)
+* [Commercial licenses](https://www.wolfssl.com/license/) available (in addition to standard GPLv2 or later)
 
 For a full list of features, please visit the [wolfSSL product page](https://www.wolfssl.com/products/wolfssl/).
 
@@ -60,7 +60,7 @@ Each project port included in this repository is contained in its own subdirecto
 
 # Licensing
 
-wolfSSL and wolfCrypt are either licensed for use under the GPLv2 (or at your option any later version) or a standard commercial license. For users who cannot use wolfSSL under GPLv2 (or any later version), a commercial license to wolfSSL and wolfCrypt is available. For license inquiries, please contact wolfSSL Inc. directly at licensing@wolfssl.com.
+wolfSSL and wolfCrypt are either licensed for use under the GPLv2 or later or a standard commercial license. For users who cannot use wolfSSL under GPLv2 or later, a commercial license to wolfSSL and wolfCrypt is available. For license inquiries, please contact wolfSSL Inc. directly at licensing@wolfssl.com.
 
 All non-wolfSSL projects in this repository are licensed under their respective project licenses.
 
