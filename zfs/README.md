@@ -56,7 +56,8 @@ sudo apt update
 sudo apt install \
   build-essential git dpkg-dev libncurses-dev \
   libssl-dev libelf-dev bison flex make clang \
-  bc libudev-dev perl tar xz-utils dwarves gawk vim
+  bc libudev-dev perl tar xz-utils dwarves gawk vim \
+  uuid-dev autoconf automake libtool
 ```
 
 1. Install linux source and headers
