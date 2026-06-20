@@ -46,9 +46,9 @@ uname -a
 Linux debian 6.12.43+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.43-1 (2025-08-27) x86_64 GNU/Linux
 ```
 
-## Build kernel
-
-This requires an extracted and built kernel source tree.
+### Install Debian packages
+Update and install essential packages for building the kernel, libwolfssl,
+and zfs:
 
 ```
 sudo apt update
@@ -57,8 +57,13 @@ sudo apt install \
   build-essential git dpkg-dev libncurses-dev \
   libssl-dev libelf-dev bison flex make clang \
   bc libudev-dev perl tar xz-utils dwarves gawk vim \
-  uuid-dev autoconf automake libtool
+  uuid-dev autoconf automake libtool libblkid-dev \
+  libtirpc-dev
 ```
+
+## Build kernel
+
+This requires an extracted and built kernel source tree.
 
 1. Install linux source and headers
 ```
