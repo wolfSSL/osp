@@ -48,7 +48,7 @@ Linux debian 6.12.43+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.43-1 (2025-0
 
 ### Install Debian packages
 Update and install essential packages for building the kernel, libwolfssl,
-and zfs:
+zfs, and running the zfs test-suite:
 
 ```
 sudo apt update
@@ -58,7 +58,8 @@ sudo apt install \
   libssl-dev libelf-dev bison flex make clang \
   bc libudev-dev perl tar xz-utils dwarves gawk vim \
   uuid-dev autoconf automake libtool libblkid-dev \
-  libtirpc-dev
+  libtirpc-dev ksh attr xxhash acl zstd python3-dev \
+  curl
 ```
 
 ## Build kernel
