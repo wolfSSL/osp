@@ -1,0 +1,227 @@
+diff --git a/.gitignore b/.gitignore
+index b064303ce..bc4b814ee 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -6,3 +6,4 @@ wpaspy/build
+ **/parallel-vm.log
+ tags
+ build/
++*.a
+diff --git a/src/crypto/Makefile b/src/crypto/Makefile
+index ce0997091..2320cbdf2 100644
+--- a/src/crypto/Makefile
++++ b/src/crypto/Makefile
+@@ -1,7 +1,3 @@
+-CFLAGS += -DCONFIG_CRYPTO_INTERNAL
+-CFLAGS += -DCONFIG_TLS_INTERNAL_CLIENT
+-CFLAGS += -DCONFIG_TLS_INTERNAL_SERVER
+-#CFLAGS += -DALL_DH_GROUPS
+ CFLAGS += -DCONFIG_SHA256
+ CFLAGS += -DCONFIG_SHA384
+ CFLAGS += -DCONFIG_HMAC_SHA384_KDF
+@@ -14,45 +10,34 @@ LIB_OBJS= \
+ 	aes-eax.o \
+ 	aes-encblock.o \
+ 	aes-gcm.o \
+-	aes-internal.o \
+-	aes-internal-dec.o \
+-	aes-internal-enc.o \
+-	aes-omac1.o \
+-	aes-siv.o \
+-	aes-unwrap.o \
+-	aes-wrap.o \
+-	des-internal.o \
+ 	dh_group5.o \
+ 	dh_groups.o \
+-	md4-internal.o \
+ 	md5.o \
+-	md5-internal.o \
+ 	milenage.o \
+ 	ms_funcs.o \
+-	rc4.o \
+ 	sha1.o \
+-	sha1-internal.o \
+-	sha1-pbkdf2.o \
+ 	sha1-prf.o \
+ 	sha1-tlsprf.o \
+ 	sha1-tprf.o \
+ 	sha256.o \
+ 	sha256-prf.o \
+ 	sha256-tlsprf.o \
+-	sha256-internal.o \
+ 	sha384.o \
+ 	sha384-prf.o \
+-	sha384-internal.o \
+ 	sha512.o \
+ 	sha512-prf.o \
+-	sha512-internal.o
++	md4-internal.o \
++	crypto_openssl.o \
++	crypto_internal-rsa.o \
++	crypto_openssl.o \
++	tls_openssl.o
++
++ifndef CONFIG_TLS_DEFAULT_CIPHERS
++CONFIG_TLS_DEFAULT_CIPHERS = "DEFAULT:!EXP:!LOW"
++endif
++
++CFLAGS += -DTLS_DEFAULT_CIPHERS=\"$(CONFIG_TLS_DEFAULT_CIPHERS)\"
+ 
+-LIB_OBJS += crypto_internal.o
+-LIB_OBJS += crypto_internal-cipher.o
+-LIB_OBJS += crypto_internal-modexp.o
+-LIB_OBJS += crypto_internal-rsa.o
+-LIB_OBJS += tls_internal.o
+-LIB_OBJS += fips_prf_internal.o
+ ifndef TEST_FUZZ
+ LIB_OBJS += random.o
+ endif
+diff --git a/src/cryptowpa b/src/cryptowpa
+new file mode 120000
+index 000000000..2e8fb9de5
+--- /dev/null
++++ b/src/cryptowpa
+@@ -0,0 +1 @@
++crypto
+\ No newline at end of file
+diff --git a/src/lib.rules b/src/lib.rules
+index 947617b07..01e1802a3 100644
+--- a/src/lib.rules
++++ b/src/lib.rules
+@@ -1,5 +1,11 @@
+ _LIBMK := $(lastword $(wordlist 1,$(shell expr $(words $(MAKEFILE_LIST)) - 1),$(MAKEFILE_LIST)))
+ _LIBNAME := $(notdir $(patsubst %/,%,$(dir $(abspath $(_LIBMK)))))
++
++# hack to rename the 'crypto' library to 'cryptowpa' to avoid conflicts
++ifeq ($(_LIBNAME),crypto)
++  _LIBNAME := $(_LIBNAME)wpa
++endif
++
+ ALL := $(OUT)lib$(_LIBNAME).a
+ LIB_RULES := $(lastword $(MAKEFILE_LIST))
+ include $(dir $(LIB_RULES))build.rules
+diff --git a/tests/Makefile b/tests/Makefile
+index 8ec154bb3..3fc700044 100644
+--- a/tests/Makefile
++++ b/tests/Makefile
+@@ -27,11 +27,12 @@ CFLAGS += -DCONFIG_TDLS
+ 
+ CFLAGS += -I../src
+ CFLAGS += -I../src/utils
++CFLAGS += -g
+ 
+ SLIBS = ../src/utils/libutils.a
+ 
+-DLIBS = ../src/crypto/libcrypto.a \
+-	../src/tls/libtls.a
++DLIBS = ../src/cryptowpa/libcryptowpa.a \
++       ../src/tls/libtls.a
+ 
+ _OBJS_VAR := LLIBS
+ include ../src/objs.mk
+@@ -46,6 +47,10 @@ LLIBS = -Wl,--start-group $(DLIBS) -Wl,--end-group $(SLIBS)
+ # glibc < 2.17 needs -lrt for clock_gettime()
+ LLIBS += -lrt
+ 
++# need to append our libs to the end of the list, so LDFLAGS is not sufficient
++# for the linker to find them
++LLIBS += $(LIBS_EXTRA)
++
+ test-aes: $(call BUILDOBJ,test-aes.o) $(LIBS)
+ 	$(LDO) $(LDFLAGS) -o $@ $^ $(LLIBS)
+ 
+@@ -84,7 +89,7 @@ test-x509v3: $(call BUILDOBJ,test-x509v3.o) $(LIBS)
+ 
+ 
+ # We could cut this down more by enabling fewer options (above)
+-ELIBS += $(SRC)/crypto/libcrypto.a
++ELIBS += $(SRC)/cryptowpa/libcryptowpa.a
+ ELIBS += $(SRC)/tls/libtls.a
+ 
+ WPAS_SRC=../wpa_supplicant
+@@ -138,7 +143,7 @@ include ../src/objs.mk
+ LIBS=$(SLIBS) $(DLIBS) $(WPA_LIBS) $(ELIBS)
+ 
+ test-bss: $(call BUILDOBJ,test-bss.o) $(WPA_OBJS) $(LIBS)
+-	$(LDO) $(LDFLAGS) -o $@ $< $(LLIBS) $(WPA_CFLAGS) $(WPA_OBJS) $(LIBS)
++	$(LDO) $(LDFLAGS) -o $@ $< $(WPA_CFLAGS) $(WPA_OBJS) $(LIBS) $(LLIBS)
+ 
+ run-tests: $(ALL)
+ 	./test-aes
+diff --git a/tests/test-https.c b/tests/test-https.c
+index a72e56f9d..930c47c84 100644
+--- a/tests/test-https.c
++++ b/tests/test-https.c
+@@ -12,7 +12,6 @@
+ #include "common.h"
+ #include "crypto/tls.h"
+ 
+-
+ static void https_tls_event_cb(void *ctx, enum tls_event ev,
+ 			       union tls_event_data *data)
+ {
+@@ -75,7 +74,7 @@ static int https_client(int s, const char *path)
+ 	struct tls_connection *conn;
+ 	struct wpabuf *in, *out, *appl;
+ 	int res = -1;
+-	int need_more_data;
++	int need_more_data = 0;
+ 
+ 	os_memset(&conf, 0, sizeof(conf));
+ 	conf.event_cb = https_tls_event_cb;
+@@ -93,8 +92,7 @@ static int https_client(int s, const char *path)
+ 
+ 	for (;;) {
+ 		appl = NULL;
+-		out = tls_connection_handshake2(tls, conn, in, &appl,
+-						&need_more_data);
++		out = tls_connection_handshake(tls, conn, in, &appl);
+ 		wpabuf_free(in);
+ 		in = NULL;
+ 		if (out == NULL) {
+@@ -152,11 +150,11 @@ static int https_client(int s, const char *path)
+ 
+ 	wpa_printf(MSG_INFO, "Reading HTTP response");
+ 	for (;;) {
+-		int need_more_data;
++		int need_more_data = 0;
+ 		in = https_recv(s);
+ 		if (in == NULL)
+ 			goto done;
+-		out = tls_connection_decrypt2(tls, conn, in, &need_more_data);
++		out = tls_connection_decrypt(tls, conn, in);
+ 		if (need_more_data)
+ 			wpa_printf(MSG_DEBUG, "HTTP: Need more data");
+ 		wpabuf_free(in);
+diff --git a/tests/test-https_server.c b/tests/test-https_server.c
+index 33b448682..67b6aaabf 100644
+--- a/tests/test-https_server.c
++++ b/tests/test-https_server.c
+@@ -11,6 +11,12 @@
+ #include "common.h"
+ #include "crypto/tls.h"
+ 
++void tls_connection_set_log_cb(struct tls_connection *conn,
++	void (*log_cb)(void *ctx, const char *msg),
++	void *ctx)
++{
++}
++
+ 
+ static void https_tls_event_cb(void *ctx, enum tls_event ev,
+ 			       union tls_event_data *data)
+@@ -147,12 +153,12 @@ static int https_server(int s)
+ 
+ 	wpa_printf(MSG_INFO, "Reading HTTP request");
+ 	for (;;) {
+-		int need_more_data;
++		int need_more_data = 0;
+ 
+ 		in = https_recv(s, 5000);
+ 		if (!in)
+ 			goto done;
+-		out = tls_connection_decrypt2(tls, conn, in, &need_more_data);
++		out = tls_connection_decrypt(tls, conn, in);
+ 		wpabuf_free(in);
+ 		in = NULL;
+ 		if (need_more_data) {
