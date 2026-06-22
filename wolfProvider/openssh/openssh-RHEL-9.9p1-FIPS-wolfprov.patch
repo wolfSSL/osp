@@ -1,0 +1,120 @@
+From: wolfSSL Inc.
+Subject: OpenSSH RHEL 9.9p1 FIPS mode test adjustments for wolfProvider
+Upstream-Status: Inappropriate [wolfSSL-specific FIPS testing for RHEL openssh]
+
+Adjusts the regress test suite of RHEL/CentOS Stream 10's patched
+openssh-9.9p1 (RHEL ships ~78 patches on top of upstream 9.9p1) for
+FIPS-mode compatibility with wolfProvider. Run-time FIPS enforcement,
+whether RHEL's own FIPS_mode() policy layer or a FIPS-restricted
+OpenSSL such as the wolfProvider fips-baseline build, refuses
+operations that several of openssh's own tests deliberately exercise:
+MD5 fingerprints, Ed25519/DSA keys, small RSA, curve25519 kex, SHA1
+MACs, chacha20, SHA1-signed DH, and post-quantum kex (MLKEM, sntrup761).
+
+These are test-fixture decisions, not defects in the code under test.
+Patch philosophy follows the existing openssh-V_9_6_P1-FIPS-wolfprov
+patch: skip aggressively, re-enable selectively if a specific test
+proves useful. For test_kex the approach pins a FIPS-compliant
+cipher/MAC proposal and drops non-FIPS key/kex types, so the unit
+test still runs and exercises SSHKDF.
+
+Affected files:
+
+  regress/Makefile
+    - REGRESS_TARGETS: drop t1 (RSA-1024 fixture rejected in FIPS),
+      t4 (MD5), t6 (DSA), t8 (DSA keygen), t10, t12 (Ed25519 keygen).
+    - unit: skip test_sshkey, test_sshsig, test_authopt, test_hostkeys.
+      Their testdata/ uses Ed25519/DSA keys that FIPS refuses.
+
+  regress/unittests/kex/test_kex.c
+    - do_kex_with_key: pin FIPS-compliant cipher and MAC proposals
+      (AES-CTR/GCM, HMAC-SHA2) so negotiation does not try chacha20
+      or SHA1 MACs.
+    - do_kex: drop KEY_DSA and KEY_ED25519 host-key variants.
+    - kex_tests: drop curve25519, DH-SHA1, sntrup761, and MLKEM kex
+      invocations. (RHEL's crypto-policies activate the PQ entries
+      that upstream 9.9p1 leaves dormant; the strip is RHEL-specific.)
+
+Signed-off-by: wolfSSL Inc.
+
+diff --git a/regress/Makefile b/regress/Makefile
+--- a/regress/Makefile
++++ b/regress/Makefile
+@@ -2,7 +2,7 @@
+
+ tests:		prep file-tests t-exec unit
+
+-REGRESS_TARGETS=	t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
++REGRESS_TARGETS=	t2 t3 t5 t7 t9 t11
+
+ # File based tests
+ file-tests: $(REGRESS_TARGETS)
+@@ -300,16 +300,8 @@ unit:
+ 		    V=${.CURDIR}/valgrind-unit.sh ; \
+ 		$$V ${.OBJDIR}/unittests/pkcs11/test_pkcs11 ; \
+ 		$$V ${.OBJDIR}/unittests/sshbuf/test_sshbuf ; \
+-		$$V ${.OBJDIR}/unittests/sshkey/test_sshkey \
+-			-d ${.CURDIR}/unittests/sshkey/testdata ; \
+-		$$V ${.OBJDIR}/unittests/sshsig/test_sshsig \
+-			-d ${.CURDIR}/unittests/sshsig/testdata ; \
+-		$$V ${.OBJDIR}/unittests/authopt/test_authopt \
+-			-d ${.CURDIR}/unittests/authopt/testdata ; \
+ 		$$V ${.OBJDIR}/unittests/bitmap/test_bitmap ; \
+ 		$$V ${.OBJDIR}/unittests/conversion/test_conversion ; \
+ 		$$V ${.OBJDIR}/unittests/kex/test_kex ; \
+-		$$V ${.OBJDIR}/unittests/hostkeys/test_hostkeys \
+-			-d ${.CURDIR}/unittests/hostkeys/testdata ; \
+ 		$$V ${.OBJDIR}/unittests/match/test_match ; \
+ 		$$V ${.OBJDIR}/unittests/misc/test_misc ; \
+diff --git a/regress/unittests/kex/test_kex.c b/regress/unittests/kex/test_kex.c
+--- a/regress/unittests/kex/test_kex.c
++++ b/regress/unittests/kex/test_kex.c
+@@ -97,6 +97,10 @@
+ 	memcpy(kex_params.proposal, myproposal, sizeof(myproposal));
+ 	if (kex != NULL)
+ 		kex_params.proposal[PROPOSAL_KEX_ALGS] = kex;
++	kex_params.proposal[PROPOSAL_ENC_ALGS_CTOS] = "aes128-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com";
++	kex_params.proposal[PROPOSAL_ENC_ALGS_STOC] = "aes128-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com";
++	kex_params.proposal[PROPOSAL_MAC_ALGS_CTOS] = "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512";
++	kex_params.proposal[PROPOSAL_MAC_ALGS_STOC] = "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512";
+ 	keyname = (strcmp(sshkey_ssh_name(private), "ssh-rsa")) ?
+ 		strdup(sshkey_ssh_name(private)) : strdup("rsa-sha2-256");
+ 	ASSERT_PTR_NE(keyname, NULL);
+@@ -187,20 +191,15 @@
+ #endif
+ #ifdef WITH_OPENSSL
+ 	do_kex_with_key(kex, KEY_RSA, 2048);
+-#ifdef WITH_DSA
+-	do_kex_with_key(kex, KEY_DSA, 1024);
+-#endif
+ #ifdef OPENSSL_HAS_ECC
+ 	do_kex_with_key(kex, KEY_ECDSA, 256);
+ #endif /* OPENSSL_HAS_ECC */
+ #endif /* WITH_OPENSSL */
+-	do_kex_with_key(kex, KEY_ED25519, 256);
+ }
+
+ void
+ kex_tests(void)
+ {
+-	do_kex("curve25519-sha256@libssh.org");
+ #ifdef WITH_OPENSSL
+ #ifdef OPENSSL_HAS_ECC
+ 	do_kex("ecdh-sha2-nistp256");
+@@ -208,16 +207,5 @@
+ 	do_kex("ecdh-sha2-nistp521");
+ #endif /* OPENSSL_HAS_ECC */
+ 	do_kex("diffie-hellman-group-exchange-sha256");
+-	do_kex("diffie-hellman-group-exchange-sha1");
+-	do_kex("diffie-hellman-group14-sha1");
+-	do_kex("diffie-hellman-group1-sha1");
+-# ifdef USE_MLKEM768X25519
+-	do_kex("mlkem768x25519-sha256");
+-	do_kex("mlkem768nistp256-sha256");
+-	do_kex("mlkem1024nistp384-sha384");
+-# endif /* USE_MLKEM768X25519 */
+-# ifdef USE_SNTRUP761X25519
+-	do_kex("sntrup761x25519-sha512@openssh.com");
+-# endif /* USE_SNTRUP761X25519 */
+ #endif /* WITH_OPENSSL */
+ }
