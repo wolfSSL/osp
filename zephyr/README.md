@@ -8,6 +8,7 @@ Zephyr release.
 |----------------|--------------------------------------------|
 | 3.7            | [3.7/README.md](3.7/README.md)             |
 | 4.3            | [4.3/README.md](4.3/README.md)             |
+| 4.4            | [4.4/README.md](4.4/README.md)             |
 
 For general information on wolfSSL as a Zephyr module, see
 https://github.com/wolfSSL/wolfssl/tree/master/zephyr.
