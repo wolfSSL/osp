@@ -1,32 +1,51 @@
-From 457f3cc1f52734a05c4c2f09bd7ff03a0124f365 Mon Sep 17 00:00:00 2001
-From: jordan <jordan@wolfssl.com>
-Date: Tue, 2 Jun 2026 22:42:47 -0500
-Subject: [PATCH] wolfzfs patch: cd06f79e2
+From 986369557b3ac4cfda652d44f7ea97bd7f89aec9 Mon Sep 17 00:00:00 2001
+From: Colton Willey <colton@wolfssl.com>
+Date: Tue, 23 Jun 2026 20:20:29 +0000
+Subject: [PATCH] wolfzfs patch: zfs-2.4.2
 
+wolfCrypt port of OpenZFS 2.4.2 (tag zfs-2.4.2). Routes the linux ICP
+(AES/GCM/CCM/SHA2) to wolfCrypt and removes the native implementations,
+rebased from the cd06f79e2 port to 2.4.2 and extended:
+
+- hkdf.c: PRIVATE_KEY_UNLOCK bracket fixes FIPS_PRIVATE_KEY_LOCKED_E (-287)
+  on encrypted dataset creation under wolfCrypt FIPS (was PR #341).
+- zio_crypt.c: rely on the kernel's native random_get_bytes() for all key
+  and IV material. With the CRNG kernel patch installed, random_get_bytes()
+  IS the wolfCrypt FIPS DRBG, so no in-module wolfCrypt RNG plumbing is
+  needed. The only net change vs vanilla ZFS is upgrading the two GCM IV
+  sites from random_get_pseudo_bytes() (xorshift, not FIPS-approved) to
+  random_get_bytes() (approved DRBG): the wrapping IV (key load) and the
+  per-block data IV.
+- userspace key-derivation uses provider-native EVP_KDF PBKDF2 + RAND_bytes
+  salt (libzfs), routing through an OpenSSL 3.x provider.
+- link the userspace ICP checksum test programs (sha2_test, blake3_test)
+  against libwolfssl; they pull in the wolfCrypt-routed ICP via libicp.la.
+- MODULE_IMPORT_NS("WOLFSSL") quoted for kernel >= 6.13.
+
+Validated on Proxmox VE 9.2 (zfs-2.4.2-pve1, kernel 7.0.12-1-pve) and the
+OpenZFS test suite (run_sanity, all failures within the known vanilla-ZFS
+environmental baseline, zero regressions).
 ---
  Makefile.am                                |    2 +
- cmd/zdb/zdb.c                              |    3 +-
- config/user-libcrypto.m4                   |    6 +-
+ config/user-libcrypto.m4                   |    2 +-
  configure.ac                               |   10 +
- contrib/pam_zfs_key/pam_zfs_key.c          |    3 +-
  include/sys/sha2.h                         |   24 +-
  lib/libicp/Makefile.am                     |   30 +-
- lib/libzdb/libzdb.c                        |    3 +-
  lib/libzfs/Makefile.am                     |    2 +-
- lib/libzfs/libzfs_crypto.c                 |    3 +-
+ lib/libzfs/libzfs_crypto.c                 |   82 +-
  lib/libzpool/Makefile.am                   |    2 +-
- module/Kbuild.in                           |   30 +-
+ module/Kbuild.in                           |   31 +-
  module/icp/algs/aes/aes_impl.c             |  296 +-
  module/icp/algs/aes/aes_impl_generic.c     | 1243 -----
  module/icp/algs/aes/aes_impl_x86-64.c      |   64 -
  module/icp/algs/aes/aes_modes.c            |   50 +-
  module/icp/algs/modes/ccm.c                |  914 +---
- module/icp/algs/modes/gcm.c                | 1656 +------
+ module/icp/algs/modes/gcm.c                | 1660 +------
  module/icp/algs/modes/gcm_generic.c        |   84 -
  module/icp/algs/modes/modes.c              |   49 +-
  module/icp/algs/sha2/sha256_impl.c         |  156 -
- module/icp/algs/sha2/sha2_generic.c        |  452 +-
- module/icp/algs/sha2/sha512_impl.c         |  141 -
+ module/icp/algs/sha2/sha2_generic.c        |  458 +-
+ module/icp/algs/sha2/sha512_impl.c         |  124 -
  module/icp/asm-aarch64/sha2/sha256-armv8.S | 2013 --------
  module/icp/asm-aarch64/sha2/sha512-armv8.S | 1571 ------
  module/icp/asm-arm/sha2/sha256-armv7.S     | 2775 -----------
@@ -44,10 +63,12 @@ Subject: [PATCH] wolfzfs patch: cd06f79e2
  module/icp/include/sha2/sha2_impl.h        |    2 -
  module/icp/io/aes.c                        |   68 +-
  module/icp/io/sha2_mod.c                   |   21 +
- module/os/linux/zfs/zfs_ioctl_os.c         |    8 +
- module/zfs/hkdf.c                          |  160 +-
+ module/os/linux/zfs/zfs_ioctl_os.c         |   10 +-
+ module/os/linux/zfs/zio_crypt.c            |    4 +-
+ module/zfs/hkdf.c                          |  166 +-
+ tests/zfs-tests/cmd/Makefile.am            |    4 +-
  tests/zfs-tests/cmd/crypto_test.c          |   27 +-
- 43 files changed, 823 insertions(+), 28594 deletions(-)
+ 42 files changed, 885 insertions(+), 28608 deletions(-)
  delete mode 100644 module/icp/algs/aes/aes_impl_generic.c
  delete mode 100644 module/icp/algs/aes/aes_impl_x86-64.c
  delete mode 100644 module/icp/algs/modes/gcm_generic.c
@@ -64,7 +85,7 @@ Subject: [PATCH] wolfzfs patch: cd06f79e2
  delete mode 100644 module/icp/asm-x86_64/sha2/sha256-x86_64.S
 
 diff --git a/Makefile.am b/Makefile.am
-index 73382f86e..9547983af 100644
+index f78c38edc..2fd258e97 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -60,6 +60,8 @@ dist_noinst_DATA += module/os/linux/spl/THIRDPARTYLICENSE.gplv2.descrip
@@ -76,36 +97,18 @@ index 73382f86e..9547983af 100644
  @CODE_COVERAGE_RULES@
  
  GITREV = include/zfs_gitrev.h
-diff --git a/cmd/zdb/zdb.c b/cmd/zdb/zdb.c
-index 68c9696a8..1a840d5a7 100644
---- a/cmd/zdb/zdb.c
-+++ b/cmd/zdb/zdb.c
-@@ -44,7 +44,8 @@
- #include <stdlib.h>
- #include <ctype.h>
- #include <getopt.h>
--#include <openssl/evp.h>
-+#include <wolfssl/options.h>
-+#include <wolfssl/openssl/evp.h>
- #include <sys/zfs_context.h>
- #include <sys/spa.h>
- #include <sys/spa_impl.h>
 diff --git a/config/user-libcrypto.m4 b/config/user-libcrypto.m4
-index 49bba7155..b1f8cf38e 100644
+index 49bba7155..fa5651204 100644
 --- a/config/user-libcrypto.m4
 +++ b/config/user-libcrypto.m4
-@@ -1,9 +1,9 @@
- dnl # SPDX-License-Identifier: CDDL-1.0
- dnl #
--dnl # Check for libcrypto. Used for userspace password derivation via PBKDF2.
-+dnl # Check for libwolfssl. Used for userspace password derivation via PBKDF2.
+@@ -3,7 +3,7 @@ dnl #
+ dnl # Check for libcrypto. Used for userspace password derivation via PBKDF2.
  dnl #
  AC_DEFUN([ZFS_AC_CONFIG_USER_LIBCRYPTO], [
 -	ZFS_AC_FIND_SYSTEM_LIBRARY(LIBCRYPTO, [libcrypto], [openssl/evp.h], [], [crypto], [PKCS5_PBKDF2_HMAC_SHA1], [], [
-+	ZFS_AC_FIND_SYSTEM_LIBRARY(LIBCRYPTO, [wolfssl], [wolfssl/openssl/evp.h], [], [wolfssl], [wolfSSL_PKCS5_PBKDF2_HMAC_SHA1], [], [
++	ZFS_AC_FIND_SYSTEM_LIBRARY(LIBCRYPTO, [libcrypto], [openssl/evp.h], [], [crypto], [EVP_KDF_fetch], [], [
  		AC_MSG_FAILURE([
--		*** evp.h missing, libssl-devel package required])])
-+		*** evp.h missing, libwolfssl required])])
+ 		*** evp.h missing, libssl-devel package required])])
  ])
 diff --git a/configure.ac b/configure.ac
 index 3757b5e2c..9ded4e6f5 100644
@@ -128,20 +131,6 @@ index 3757b5e2c..9ded4e6f5 100644
  AC_CONFIG_FILES([
  	contrib/debian/rules
  	contrib/debian/changelog
-diff --git a/contrib/pam_zfs_key/pam_zfs_key.c b/contrib/pam_zfs_key/pam_zfs_key.c
-index d5513b7a4..a3514f3a9 100644
---- a/contrib/pam_zfs_key/pam_zfs_key.c
-+++ b/contrib/pam_zfs_key/pam_zfs_key.c
-@@ -33,7 +33,8 @@
- #include <syslog.h>
- 
- #include <sys/zio_crypt.h>
--#include <openssl/evp.h>
-+#include <wolfssl/options.h>
-+#include <wolfssl/openssl/evp.h>
- 
- #define	PAM_SM_AUTH
- #define	PAM_SM_PASSWORD
 diff --git a/include/sys/sha2.h b/include/sys/sha2.h
 index 22e86028e..1e0a66423 100644
 --- a/include/sys/sha2.h
@@ -189,10 +178,10 @@ index 22e86028e..1e0a66423 100644
  
  /* SHA2 context */
 diff --git a/lib/libicp/Makefile.am b/lib/libicp/Makefile.am
-index f390b0b5d..d28d886d6 100644
+index 10c791ba2..12154122c 100644
 --- a/lib/libicp/Makefile.am
 +++ b/lib/libicp/Makefile.am
-@@ -12,9 +12,6 @@ nodist_libicp_la_SOURCES = \
+@@ -9,9 +9,6 @@ nodist_libicp_la_SOURCES = \
  	module/icp/api/kcf_ctxops.c \
  	module/icp/api/kcf_cipher.c \
  	module/icp/api/kcf_mac.c \
@@ -202,7 +191,7 @@ index f390b0b5d..d28d886d6 100644
  	module/icp/algs/aes/aes_impl.c \
  	module/icp/algs/aes/aes_modes.c \
  	module/icp/algs/blake3/blake3.c \
-@@ -22,8 +19,6 @@ nodist_libicp_la_SOURCES = \
+@@ -19,8 +16,6 @@ nodist_libicp_la_SOURCES = \
  	module/icp/algs/blake3/blake3_impl.c \
  	module/icp/algs/edonr/edonr.c \
  	module/icp/algs/modes/modes.c \
@@ -211,7 +200,7 @@ index f390b0b5d..d28d886d6 100644
  	module/icp/algs/modes/gcm.c \
  	module/icp/algs/modes/ccm.c \
  	module/icp/algs/sha2/sha2_generic.c \
-@@ -44,41 +39,20 @@ nodist_libicp_la_SOURCES = \
+@@ -42,41 +37,20 @@ nodist_libicp_la_SOURCES = \
  if TARGET_CPU_AARCH64
  nodist_libicp_la_SOURCES += \
  	module/icp/asm-aarch64/blake3/b3_aarch64_sse2.S \
@@ -255,27 +244,13 @@ index f390b0b5d..d28d886d6 100644
  	module/icp/asm-x86_64/blake3/blake3_sse41.S
  endif
 -
-diff --git a/lib/libzdb/libzdb.c b/lib/libzdb/libzdb.c
-index c7766766f..bfd21763e 100644
---- a/lib/libzdb/libzdb.c
-+++ b/lib/libzdb/libzdb.c
-@@ -3,7 +3,8 @@
- #include <stdlib.h>
- #include <ctype.h>
- #include <getopt.h>
--#include <openssl/evp.h>
-+#include <wolfssl/options.h>
-+#include <wolfssl/openssl/evp.h>
- #include <sys/zfs_context.h>
- #include <sys/spa.h>
- #include <sys/spa_impl.h>
 diff --git a/lib/libzfs/Makefile.am b/lib/libzfs/Makefile.am
-index 450c50155..086e31ff2 100644
+index 5ac6c0bca..e1ab726db 100644
 --- a/lib/libzfs/Makefile.am
 +++ b/lib/libzfs/Makefile.am
-@@ -74,7 +74,7 @@ libzfs_la_LIBADD = \
- 	libnvpair.la \
- 	libzutil.la
+@@ -59,7 +59,7 @@ libzfs_la_LIBADD = \
+ 	libzutil.la \
+ 	libuutil.la
  
 -libzfs_la_LIBADD += -lrt -lm $(LIBCRYPTO_LIBS) $(ZLIB_LIBS) $(LIBFETCH_LIBS) $(LTLIBINTL)
 +libzfs_la_LIBADD += -lrt -lm $(LIBCRYPTO_LIBS) $(ZLIB_LIBS) $(LIBFETCH_LIBS) $(LTLIBINTL) -lwolfssl
@@ -283,24 +258,133 @@ index 450c50155..086e31ff2 100644
  libzfs_la_LDFLAGS = -pthread
  
 diff --git a/lib/libzfs/libzfs_crypto.c b/lib/libzfs/libzfs_crypto.c
-index b302718ed..83732fe97 100644
+index f7cc1e84f..d7464e896 100644
 --- a/lib/libzfs/libzfs_crypto.c
 +++ b/lib/libzfs/libzfs_crypto.c
-@@ -26,7 +26,8 @@
- #include <termios.h>
+@@ -27,6 +27,9 @@
  #include <signal.h>
  #include <errno.h>
--#include <openssl/evp.h>
-+#include <wolfssl/options.h>
-+#include <wolfssl/openssl/evp.h>
+ #include <openssl/evp.h>
++#include <openssl/kdf.h>
++#include <openssl/core_names.h>
++#include <openssl/rand.h>
  #if LIBFETCH_DYNAMIC
  #include <dlfcn.h>
  #endif
+@@ -81,29 +84,6 @@ static zfs_uri_handler_t uri_handlers[] = {
+ 	{ NULL, NULL }
+ };
+ 
+-static int
+-pkcs11_get_urandom(uint8_t *buf, size_t bytes)
+-{
+-	int rand;
+-	ssize_t bytes_read = 0;
+-
+-	rand = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+-
+-	if (rand < 0)
+-		return (rand);
+-
+-	while (bytes_read < bytes) {
+-		ssize_t rc = read(rand, buf + bytes_read, bytes - bytes_read);
+-		if (rc < 0)
+-			break;
+-		bytes_read += rc;
+-	}
+-
+-	(void) close(rand);
+-
+-	return (bytes_read);
+-}
+-
+ static int
+ zfs_prop_parse_keylocation(libzfs_handle_t *restrict hdl, const char *str,
+     zfs_keylocation_t *restrict locp, char **restrict schemep)
+@@ -801,12 +781,54 @@ derive_key(libzfs_handle_t *hdl, zfs_keyformat_t format, uint64_t iters,
+ 			goto error;
+ 		}
+ 		break;
+-	case ZFS_KEYFORMAT_PASSPHRASE:
++	case ZFS_KEYFORMAT_PASSPHRASE: {
++		/*
++		 * Derive the wrapping key from the passphrase via PBKDF2.
++		 * We use the OpenSSL 3.x provider-native EVP_KDF "PBKDF2"
++		 * implementation (digest SHA1) so the work routes through
++		 * wolfProvider when it is loaded. The digest, salt, and
++		 * iteration count are kept identical to the historical
++		 * SHA1-based PBKDF2 derivation so that the on-disk key
++		 * format is unchanged and existing datasets still unlock.
++		 */
++		EVP_KDF *kdf;
++		EVP_KDF_CTX *kctx;
++		OSSL_PARAM params[5], *p = params;
++		unsigned int kdf_iters = (unsigned int)iters;
++		char digest[] = "SHA1";
++
+ 		salt = LE_64(salt);
+ 
+-		ret = PKCS5_PBKDF2_HMAC_SHA1((char *)key_material,
+-		    strlen((char *)key_material), ((uint8_t *)&salt),
+-		    sizeof (uint64_t), iters, WRAPPING_KEY_LEN, key);
++		kdf = EVP_KDF_fetch(NULL, "PBKDF2", NULL);
++		if (kdf == NULL) {
++			ret = EIO;
++			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
++			    "Failed to fetch PBKDF2 implementation."));
++			goto error;
++		}
++
++		kctx = EVP_KDF_CTX_new(kdf);
++		EVP_KDF_free(kdf);
++		if (kctx == NULL) {
++			ret = EIO;
++			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
++			    "Failed to create PBKDF2 context."));
++			goto error;
++		}
++
++		*p++ = OSSL_PARAM_construct_utf8_string(
++		    OSSL_KDF_PARAM_DIGEST, digest, 0);
++		*p++ = OSSL_PARAM_construct_octet_string(
++		    OSSL_KDF_PARAM_PASSWORD, key_material,
++		    strlen((char *)key_material));
++		*p++ = OSSL_PARAM_construct_octet_string(
++		    OSSL_KDF_PARAM_SALT, &salt, sizeof (uint64_t));
++		*p++ = OSSL_PARAM_construct_uint(
++		    OSSL_KDF_PARAM_ITER, &kdf_iters);
++		*p = OSSL_PARAM_construct_end();
++
++		ret = EVP_KDF_derive(kctx, key, WRAPPING_KEY_LEN, params);
++		EVP_KDF_CTX_free(kctx);
+ 		if (ret != 1) {
+ 			ret = EIO;
+ 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+@@ -814,6 +836,7 @@ derive_key(libzfs_handle_t *hdl, zfs_keyformat_t format, uint64_t iters,
+ 			goto error;
+ 		}
+ 		break;
++	}
+ 	default:
+ 		ret = EINVAL;
+ 		goto error;
+@@ -872,8 +895,9 @@ populate_create_encryption_params_nvlists(libzfs_handle_t *hdl,
+ 	/* passphrase formats require a salt and pbkdf2 iters property */
+ 	if (keyformat == ZFS_KEYFORMAT_PASSPHRASE) {
+ 		/* always generate a new salt */
+-		ret = pkcs11_get_urandom((uint8_t *)&salt, sizeof (uint64_t));
+-		if (ret != sizeof (uint64_t)) {
++		ret = RAND_bytes((uint8_t *)&salt, sizeof (uint64_t));
++		if (ret != 1) {
++			ret = EIO;
+ 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+ 			    "Failed to generate salt."));
+ 			goto error;
 diff --git a/lib/libzpool/Makefile.am b/lib/libzpool/Makefile.am
-index 819255307..21587e8b2 100644
+index fb1255711..c91ff6957 100644
 --- a/lib/libzpool/Makefile.am
 +++ b/lib/libzpool/Makefile.am
-@@ -210,7 +210,7 @@ libzpool_la_LIBADD = \
+@@ -201,7 +201,7 @@ libzpool_la_LIBADD = \
  	libzstd.la \
  	libzutil.la
  
@@ -310,18 +394,19 @@ index 819255307..21587e8b2 100644
  libzpool_la_LDFLAGS = -pthread
  
 diff --git a/module/Kbuild.in b/module/Kbuild.in
-index 47e739ea4..b6ada1e22 100644
+index 28381a3cd..92ad8f5ed 100644
 --- a/module/Kbuild.in
 +++ b/module/Kbuild.in
-@@ -23,6 +23,7 @@ ZFS_MODULE_CFLAGS += -include $(zfs_include)/zfs_config.h
- ZFS_MODULE_CFLAGS += -include $(zfs_include)/sys/simd_config.h
+@@ -21,6 +21,8 @@ zstd_include = $(src)/zstd/include
+ ZFS_MODULE_CFLAGS += -include $(zfs_include)/zfs_config.h
  endif
  
 +ZFS_MODULE_CFLAGS += -I$(WOLFSSL_ROOT)
++ZFS_MODULE_CFLAGS += -isystem /usr/lib/gcc/x86_64-linux-gnu/14/include
  ZFS_MODULE_CFLAGS += -I$(zfs_include)/os/linux/kernel
  ZFS_MODULE_CFLAGS += -I$(zfs_include)/os/linux/spl
  ZFS_MODULE_CFLAGS += -I$(zfs_include)/os/linux/zfs
-@@ -62,6 +63,8 @@ ifneq ($(KBUILD_EXTMOD),)
+@@ -60,6 +62,8 @@ ifneq ($(KBUILD_EXTMOD),)
  @CONFIG_QAT_TRUE@KBUILD_EXTRA_SYMBOLS += @QAT_SYMBOLS@
  endif
  
@@ -330,7 +415,7 @@ index 47e739ea4..b6ada1e22 100644
  asflags-y := $(ZFS_MODULE_CFLAGS) $(ZFS_MODULE_CPPFLAGS)
  ccflags-y := $(ZFS_MODULE_CFLAGS) $(ZFS_MODULE_CPPFLAGS)
  
-@@ -104,7 +107,6 @@ zfs-objs += avl/avl.o
+@@ -102,7 +106,6 @@ zfs-objs += avl/avl.o
  
  ICP_OBJS := \
  	algs/aes/aes_impl.o \
@@ -338,7 +423,7 @@ index 47e739ea4..b6ada1e22 100644
  	algs/aes/aes_modes.o \
  	algs/blake3/blake3.o \
  	algs/blake3/blake3_generic.o \
-@@ -112,7 +114,6 @@ ICP_OBJS := \
+@@ -110,7 +113,6 @@ ICP_OBJS := \
  	algs/edonr/edonr.o \
  	algs/modes/ccm.o \
  	algs/modes/gcm.o \
@@ -346,7 +431,7 @@ index 47e739ea4..b6ada1e22 100644
  	algs/modes/modes.o \
  	algs/sha2/sha2_generic.o \
  	algs/sha2/sha256_impl.o \
-@@ -134,42 +135,21 @@ ICP_OBJS := \
+@@ -132,42 +134,21 @@ ICP_OBJS := \
  	spi/kcf_spi.o
  
  ICP_OBJS_X86_64 := \
@@ -392,7 +477,7 @@ index 47e739ea4..b6ada1e22 100644
  zfs-objs             += $(addprefix icp/,$(ICP_OBJS))
  zfs-$(CONFIG_X86)    += $(addprefix icp/,$(ICP_OBJS_X86))
 diff --git a/module/icp/algs/aes/aes_impl.c b/module/icp/algs/aes/aes_impl.c
-index fff672bc4..ab690a903 100644
+index b652c8c72..ab690a903 100644
 --- a/module/icp/algs/aes/aes_impl.c
 +++ b/module/icp/algs/aes/aes_impl.c
 @@ -28,8 +28,29 @@
@@ -667,7 +752,7 @@ index fff672bc4..ab690a903 100644
 -#if defined(__x86_64)
 -	&aes_x86_64_impl,
 -#endif
--#if defined(__x86_64) && HAVE_SIMD(AES)
+-#if defined(__x86_64) && defined(HAVE_AES)
 -	&aes_aesni_impl,
 -#endif
 +	&aes_wolfcrypt_impl,
@@ -730,7 +815,7 @@ index fff672bc4..ab690a903 100644
 -	 * hardware accelerated version is the fastest.
 -	 */
 -#if defined(__x86_64)
--#if HAVE_SIMD(AES)
+-#if defined(HAVE_AES)
 -	if (aes_aesni_impl.is_supported()) {
 -		memcpy(&aes_fastest_impl, &aes_aesni_impl,
 -		    sizeof (aes_fastest_impl));
@@ -3166,7 +3251,7 @@ index 0a7a5091f..2fd3c2f95 100644
  }
  
 diff --git a/module/icp/algs/modes/gcm.c b/module/icp/algs/modes/gcm.c
-index 7d92b208f..ae05e4f94 100644
+index ab2c5a49f..a9d607c5f 100644
 --- a/module/icp/algs/modes/gcm.c
 +++ b/module/icp/algs/modes/gcm.c
 @@ -32,15 +32,7 @@
@@ -4030,7 +4115,7 @@ index 7d92b208f..ae05e4f94 100644
  /* All compiled in implementations */
  static const gcm_impl_ops_t *gcm_all_impl[] = {
 -	&gcm_generic_impl,
--#if defined(__x86_64) && HAVE_SIMD(PCLMULQDQ)
+-#if defined(__x86_64) && defined(HAVE_PCLMULQDQ)
 -	&gcm_pclmulqdq_impl,
 -#endif
 +	&gcm_wolfcrypt_impl,
@@ -4099,11 +4184,15 @@ index 7d92b208f..ae05e4f94 100644
  
  	/* Move supported implementations into gcm_supp_impls */
  	for (i = 0, c = 0; i < ARRAY_SIZE(gcm_all_impl); i++) {
-@@ -801,42 +464,11 @@ gcm_impl_init(void)
- 	 * Set the fastest implementation given the assumption that the
- 	 * hardware accelerated version is the fastest.
- 	 */
--#if defined(__x86_64) && HAVE_SIMD(PCLMULQDQ)
+@@ -797,46 +460,11 @@ gcm_impl_init(void)
+ 	}
+ 	gcm_supp_impl_cnt = c;
+ 
+-	/*
+-	 * Set the fastest implementation given the assumption that the
+-	 * hardware accelerated version is the fastest.
+-	 */
+-#if defined(__x86_64) && defined(HAVE_PCLMULQDQ)
 -	if (gcm_pclmulqdq_impl.is_supported()) {
 -		memcpy(&gcm_fastest_impl, &gcm_pclmulqdq_impl,
 -		    sizeof (gcm_fastest_impl));
@@ -4131,7 +4220,7 @@ index 7d92b208f..ae05e4f94 100644
 -	} else
 -#endif
 -	if (gcm_avx_will_work()) {
--#if HAVE_SIMD(MOVBE)
+-#ifdef HAVE_MOVBE
 -		if (zfs_movbe_available() == B_TRUE) {
 -			atomic_swap_32(&gcm_avx_can_use_movbe, B_TRUE);
 -		}
@@ -4144,7 +4233,7 @@ index 7d92b208f..ae05e4f94 100644
  	/* Finish initialization */
  	atomic_swap_32(&icp_gcm_impl, user_sel_impl);
  	gcm_impl_initialized = B_TRUE;
-@@ -872,6 +504,11 @@ gcm_impl_set(const char *val)
+@@ -872,6 +500,11 @@ gcm_impl_set(const char *val)
  	char req_name[GCM_IMPL_NAME_MAX];
  	uint32_t impl = GCM_IMPL_READ(user_sel_impl);
  	size_t i;
@@ -4156,7 +4245,7 @@ index 7d92b208f..ae05e4f94 100644
  
  	/* sanitize input */
  	i = strnlen(val, GCM_IMPL_NAME_MAX);
-@@ -885,18 +522,6 @@ gcm_impl_set(const char *val)
+@@ -885,18 +518,6 @@ gcm_impl_set(const char *val)
  
  	/* Check mandatory options */
  	for (i = 0; i < ARRAY_SIZE(gcm_impl_opts); i++) {
@@ -4175,7 +4264,7 @@ index 7d92b208f..ae05e4f94 100644
  		if (strcmp(req_name, gcm_impl_opts[i].name) == 0) {
  			impl = gcm_impl_opts[i].sel;
  			err = 0;
-@@ -915,24 +540,6 @@ gcm_impl_set(const char *val)
+@@ -915,24 +536,6 @@ gcm_impl_set(const char *val)
  			}
  		}
  	}
@@ -4200,7 +4289,7 @@ index 7d92b208f..ae05e4f94 100644
  
  	if (err == 0) {
  		if (gcm_impl_initialized)
-@@ -949,6 +556,7 @@ gcm_impl_set(const char *val)
+@@ -949,6 +552,7 @@ gcm_impl_set(const char *val)
  static int
  icp_gcm_impl_set(const char *val, zfs_kernel_param_t *kp)
  {
@@ -4208,7 +4297,7 @@ index 7d92b208f..ae05e4f94 100644
  	return (gcm_impl_set(val));
  }
  
-@@ -958,21 +566,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
+@@ -958,21 +562,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
  	int i, cnt = 0;
  	char *fmt;
  	const uint32_t impl = GCM_IMPL_READ(icp_gcm_impl);
@@ -4231,7 +4320,7 @@ index 7d92b208f..ae05e4f94 100644
  		fmt = (impl == gcm_impl_opts[i].sel) ? "[%s] " : "%s ";
  		cnt += kmem_scnprintf(buffer + cnt, PAGE_SIZE - cnt, fmt,
  		    gcm_impl_opts[i].name);
-@@ -992,746 +589,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
+@@ -992,746 +585,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
      NULL, 0644);
  MODULE_PARM_DESC(icp_gcm_impl, "Select gcm implementation.");
  #endif /* defined(__KERNEL) */
@@ -5142,7 +5231,7 @@ index ef3c1806e..05d8da311 100644
 -	explicit_memset(ctx->gcm_tmp, 0, sizeof (ctx->gcm_tmp));
  }
 diff --git a/module/icp/algs/sha2/sha256_impl.c b/module/icp/algs/sha2/sha256_impl.c
-index a6a4a0d9a..eebc700ec 100644
+index dcb0a391d..eebc700ec 100644
 --- a/module/icp/algs/sha2/sha256_impl.c
 +++ b/module/icp/algs/sha2/sha256_impl.c
 @@ -47,168 +47,12 @@ static inline boolean_t sha2_is_supported(void)
@@ -5167,7 +5256,7 @@ index a6a4a0d9a..eebc700ec 100644
 -	.name = "x64"
 -};
 -
--#if HAVE_SIMD(SSSE3)
+-#if defined(HAVE_SSSE3)
 -static boolean_t sha2_have_ssse3(void)
 -{
 -	return (kfpu_allowed() && zfs_ssse3_available());
@@ -5181,7 +5270,7 @@ index a6a4a0d9a..eebc700ec 100644
 -};
 -#endif
 -
--#if HAVE_SIMD(AVX)
+-#if defined(HAVE_AVX)
 -static boolean_t sha2_have_avx(void)
 -{
 -	return (kfpu_allowed() && zfs_avx_available());
@@ -5195,7 +5284,7 @@ index a6a4a0d9a..eebc700ec 100644
 -};
 -#endif
 -
--#if HAVE_SIMD(AVX2)
+-#if defined(HAVE_AVX2)
 -static boolean_t sha2_have_avx2(void)
 -{
 -	return (kfpu_allowed() && zfs_avx2_available());
@@ -5209,7 +5298,7 @@ index a6a4a0d9a..eebc700ec 100644
 -};
 -#endif
 -
--#if HAVE_SIMD(SSE4_1)
+-#if defined(HAVE_SSE4_1)
 -static boolean_t sha2_have_shani(void)
 -{
 -	return (kfpu_allowed() && zfs_sse4_1_available() && \
@@ -5288,16 +5377,16 @@ index a6a4a0d9a..eebc700ec 100644
 -#if defined(__x86_64)
 -	&sha256_x64_impl,
 -#endif
--#if defined(__x86_64) && HAVE_SIMD(SSSE3)
+-#if defined(__x86_64) && defined(HAVE_SSSE3)
 -	&sha256_ssse3_impl,
 -#endif
--#if defined(__x86_64) && HAVE_SIMD(AVX)
+-#if defined(__x86_64) && defined(HAVE_AVX)
 -	&sha256_avx_impl,
 -#endif
--#if defined(__x86_64) && HAVE_SIMD(AVX2)
+-#if defined(__x86_64) && defined(HAVE_AVX2)
 -	&sha256_avx2_impl,
 -#endif
--#if defined(__x86_64) && HAVE_SIMD(SSE4_1)
+-#if defined(__x86_64) && defined(HAVE_SSE4_1)
 -	&sha256_shani_impl,
 -#endif
 -#if defined(__aarch64__) || defined(__arm__)
@@ -5315,7 +5404,7 @@ index a6a4a0d9a..eebc700ec 100644
  
  /* use the generic implementation functions */
 diff --git a/module/icp/algs/sha2/sha2_generic.c b/module/icp/algs/sha2/sha2_generic.c
-index ad707341e..162d1cb71 100644
+index ad707341e..82c8d4f94 100644
 --- a/module/icp/algs/sha2/sha2_generic.c
 +++ b/module/icp/algs/sha2/sha2_generic.c
 @@ -31,381 +31,36 @@
@@ -5724,7 +5813,7 @@ index ad707341e..162d1cb71 100644
  
  	ASSERT3S(algotype, >=, SHA512_HMAC_MECH_INFO_TYPE);
  	ASSERT3S(algotype, <=, SHA512_256);
-@@ -414,43 +69,17 @@ SHA2Init(int algotype, SHA2_CTX *ctx)
+@@ -414,44 +69,20 @@ SHA2Init(int algotype, SHA2_CTX *ctx)
  	ctx->algotype = algotype;
  	switch (ctx->algotype) {
  		case SHA256:
@@ -5757,6 +5846,7 @@ index ad707341e..162d1cb71 100644
 +			rc = wc_InitSha512(&ctx->sha512.wc_sha512);
 +			(void)rc;
  			break;
++#ifndef WOLFSSL_NOSHA512_256
  		case SHA512_256:
 -			ctx512->state[0] = 0x22312194fc2bf72cULL;
 -			ctx512->state[1] = 0x9f555fa3c84c64c2ULL;
@@ -5772,9 +5862,11 @@ index ad707341e..162d1cb71 100644
 +			rc = wc_InitSha512_256(&ctx->sha512.wc_sha512);
 +			(void)rc;
  			break;
++#endif
  	}
  }
-@@ -467,14 +96,14 @@ SHA2Update(SHA2_CTX *ctx, const void *data, size_t len)
+ 
+@@ -467,15 +98,17 @@ SHA2Update(SHA2_CTX *ctx, const void *data, size_t len)
  
  	switch (ctx->algotype) {
  		case SHA256:
@@ -5786,13 +5878,16 @@ index ad707341e..162d1cb71 100644
 -			icp_sha512_update(&ctx->sha512, data, len);
 +			(void)wc_Sha512Update(&ctx->sha512.wc_sha512, data, len);
  			break;
++#ifndef WOLFSSL_NOSHA512_256
  		case SHA512_256:
 -			icp_sha512_update(&ctx->sha512, data, len);
 +			(void)wc_Sha512_256Update(&ctx->sha512.wc_sha512, data, len);
  			break;
++#endif
  	}
  }
-@@ -485,14 +114,17 @@ SHA2Final(void *digest, SHA2_CTX *ctx)
+ 
+@@ -485,15 +118,20 @@ SHA2Final(void *digest, SHA2_CTX *ctx)
  {
  	switch (ctx->algotype) {
  		case SHA256:
@@ -5806,14 +5901,17 @@ index ad707341e..162d1cb71 100644
 +			(void)wc_Sha512Final(&ctx->sha512.wc_sha512, digest);
 +			wc_Sha512Free(&ctx->sha512.wc_sha512);
  			break;
++#ifndef WOLFSSL_NOSHA512_256
  		case SHA512_256:
 -			icp_sha512_final(&ctx->sha512, digest, 256);
 +			(void)wc_Sha512_256Final(&ctx->sha512.wc_sha512, digest);
 +			wc_Sha512_256Free(&ctx->sha512.wc_sha512);
  			break;
++#endif
  	}
  }
-@@ -505,13 +137,11 @@ icp_sha2_is_supported(void)
+ 
+@@ -505,13 +143,11 @@ icp_sha2_is_supported(void)
  }
  
  const sha256_ops_t sha256_generic_impl = {
@@ -5830,10 +5928,10 @@ index ad707341e..162d1cb71 100644
  	.is_supported = icp_sha2_is_supported
  };
 diff --git a/module/icp/algs/sha2/sha512_impl.c b/module/icp/algs/sha2/sha512_impl.c
-index 19f9a8cca..1cf0321fa 100644
+index a85a71a83..1c4ed9ebe 100644
 --- a/module/icp/algs/sha2/sha512_impl.c
 +++ b/module/icp/algs/sha2/sha512_impl.c
-@@ -48,153 +48,12 @@ static inline boolean_t sha2_is_supported(void)
+@@ -47,136 +47,12 @@ static inline boolean_t sha2_is_supported(void)
  }
  #endif
  
@@ -5854,7 +5952,7 @@ index 19f9a8cca..1cf0321fa 100644
 -	.name = "x64"
 -};
 -
--#if HAVE_SIMD(AVX)
+-#if defined(HAVE_AVX)
 -static boolean_t sha2_have_avx(void)
 -{
 -	return (kfpu_allowed() && zfs_avx_available());
@@ -5868,7 +5966,7 @@ index 19f9a8cca..1cf0321fa 100644
 -};
 -#endif
 -
--#if HAVE_SIMD(AVX2)
+-#if defined(HAVE_AVX2)
 -static boolean_t sha2_have_avx2(void)
 -{
 -	return (kfpu_allowed() && zfs_avx2_available());
@@ -5879,20 +5977,6 @@ index 19f9a8cca..1cf0321fa 100644
 -	.is_supported = sha2_have_avx2,
 -	.transform = tf_sha512_avx2,
 -	.name = "avx2"
--};
--#endif
--
--#if HAVE_SIMD(SHA512EXT)
--static boolean_t sha2_have_sha512ext(void)
--{
--	return (kfpu_allowed() && zfs_sha512ext_available());
--}
--
--TF(zfs_sha512_transform_sha512ext, tf_sha512_sha512ext);
--const sha512_ops_t sha512_sha512ext_impl = {
--	.is_supported = sha2_have_sha512ext,
--	.transform = tf_sha512_sha512ext,
--	.name = "sha512ext"
 -};
 -#endif
 -
@@ -5962,14 +6046,11 @@ index 19f9a8cca..1cf0321fa 100644
 -#if defined(__x86_64)
 -	&sha512_x64_impl,
 -#endif
--#if defined(__x86_64) && HAVE_SIMD(AVX)
+-#if defined(__x86_64) && defined(HAVE_AVX)
 -	&sha512_avx_impl,
 -#endif
--#if defined(__x86_64) && HAVE_SIMD(AVX2)
+-#if defined(__x86_64) && defined(HAVE_AVX2)
 -	&sha512_avx2_impl,
--#endif
--#if defined(__x86_64) && HAVE_SIMD(SHA512EXT)
--	&sha512_sha512ext_impl,
 -#endif
 -#if defined(__aarch64__) || defined(__arm__)
 -	&sha512_armv7_impl,
@@ -29799,7 +29880,7 @@ index 5976f7acf..000000000
 -#endif
 -#endif
 diff --git a/module/icp/include/aes/aes_impl.h b/module/icp/include/aes/aes_impl.h
-index 4b7d13312..0918b62d1 100644
+index 17cbbac18..0918b62d1 100644
 --- a/module/icp/include/aes/aes_impl.h
 +++ b/module/icp/include/aes/aes_impl.h
 @@ -38,6 +38,9 @@ extern "C" {
@@ -29930,7 +30011,7 @@ index 4b7d13312..0918b62d1 100644
 -extern ASMABI void aes_decrypt_amd64(const uint32_t rk[], int Nr,
 -	const uint32_t ct[4], uint32_t pt[4]);
 -#endif
--#if defined(__x86_64) && HAVE_SIMD(AES)
+-#if defined(__x86_64) && defined(HAVE_AES)
 -extern const aes_impl_ops_t aes_aesni_impl;
 -#endif
  
@@ -29948,7 +30029,7 @@ index 4b7d13312..0918b62d1 100644
  }
  #endif
 diff --git a/module/icp/include/modes/gcm_impl.h b/module/icp/include/modes/gcm_impl.h
-index 0bc1567da..c654eb8e0 100644
+index 238a4e27f..c654eb8e0 100644
 --- a/module/icp/include/modes/gcm_impl.h
 +++ b/module/icp/include/modes/gcm_impl.h
 @@ -49,16 +49,10 @@ typedef boolean_t	(*gcm_will_work_f)(void);
@@ -29961,7 +30042,7 @@ index 0bc1567da..c654eb8e0 100644
  } gcm_impl_ops_t;
  
 -extern const gcm_impl_ops_t gcm_generic_impl;
--#if defined(__x86_64) && HAVE_SIMD(PCLMULQDQ)
+-#if defined(__x86_64) && defined(HAVE_PCLMULQDQ)
 -extern const gcm_impl_ops_t gcm_pclmulqdq_impl;
 -#endif
 -
@@ -29969,7 +30050,7 @@ index 0bc1567da..c654eb8e0 100644
   * Initializes fastest implementation
   */
 diff --git a/module/icp/include/modes/modes.h b/module/icp/include/modes/modes.h
-index 66fa11712..01105724e 100644
+index de11d9eaf..b90504b39 100644
 --- a/module/icp/include/modes/modes.h
 +++ b/module/icp/include/modes/modes.h
 @@ -34,6 +34,9 @@ extern "C" {
@@ -30364,10 +30445,10 @@ index 8322d82e2..dafe2e14e 100644
  		sha2_hmac_ctx.hc_mech_type = mechanism->cm_type;
  		/* no context template, initialize context */
 diff --git a/module/os/linux/zfs/zfs_ioctl_os.c b/module/os/linux/zfs/zfs_ioctl_os.c
-index ce6092be1..c9ca1d946 100644
+index 5421a441b..c01dfe6eb 100644
 --- a/module/os/linux/zfs/zfs_ioctl_os.c
 +++ b/module/os/linux/zfs/zfs_ioctl_os.c
-@@ -293,6 +293,7 @@ static int
+@@ -289,6 +289,7 @@ static int
  openzfs_init_os(void)
  {
  	int error;
@@ -30375,21 +30456,44 @@ index ce6092be1..c9ca1d946 100644
  
  	if ((error = zfs_kmod_init()) != 0) {
  		printk(KERN_NOTICE "ZFS: Failed to Load ZFS Filesystem v%s-%s%s"
-@@ -386,5 +387,12 @@ MODULE_DESCRIPTION("ZFS");
+@@ -382,5 +383,12 @@ MODULE_DESCRIPTION("ZFS");
  MODULE_AUTHOR(ZFS_META_AUTHOR);
  MODULE_LICENSE("Dual MIT/GPL"); /* lua */
  MODULE_LICENSE("Dual BSD/GPL"); /* zstd / misc */
+-MODULE_LICENSE(ZFS_META_LICENSE);
 +/**
 + * note: ZFS_META_LICENSE conflicts with the GPL-only libwolfssl.ko symbols
 + * in a GPL build, causing modpost to fail. To resolve the conflict, either:
 + *   1. obtain commercial licensing, or
 + *   2. comment out the license, and use this for educational purposes only.
 + **/
- MODULE_LICENSE(ZFS_META_LICENSE);
++/* MODULE_LICENSE(ZFS_META_LICENSE); */ /* wolfZFS demo: avoid modpost GPL conflict with libwolfssl.ko */
  MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);
-+MODULE_IMPORT_NS(WOLFSSL);
++MODULE_IMPORT_NS("WOLFSSL");
+diff --git a/module/os/linux/zfs/zio_crypt.c b/module/os/linux/zfs/zio_crypt.c
+index 28f91ceba..13c14ef98 100644
+--- a/module/os/linux/zfs/zio_crypt.c
++++ b/module/os/linux/zfs/zio_crypt.c
+@@ -501,7 +501,7 @@ zio_crypt_key_wrap(crypto_key_t *cwkey, zio_crypt_key_t *key, uint8_t *iv,
+ 	keydata_len = zio_crypt_table[crypt].ci_keylen;
+ 
+ 	/* generate iv for wrapping the master and hmac key */
+-	ret = random_get_pseudo_bytes(iv, WRAPPING_IV_LEN);
++	ret = random_get_bytes(iv, WRAPPING_IV_LEN);
+ 	if (ret != 0)
+ 		goto error;
+ 
+@@ -663,7 +663,7 @@ zio_crypt_generate_iv(uint8_t *ivbuf)
+ 	int ret;
+ 
+ 	/* randomly generate the IV */
+-	ret = random_get_pseudo_bytes(ivbuf, ZIO_DATA_IV_LEN);
++	ret = random_get_bytes(ivbuf, ZIO_DATA_IV_LEN);
+ 	if (ret != 0)
+ 		goto error;
+ 
 diff --git a/module/zfs/hkdf.c b/module/zfs/hkdf.c
-index bc2830b16..3938f38d4 100644
+index bc2830b16..1bbfbf964 100644
 --- a/module/zfs/hkdf.c
 +++ b/module/zfs/hkdf.c
 @@ -22,124 +22,30 @@
@@ -30541,7 +30645,7 @@ index bc2830b16..3938f38d4 100644
  
  /*
   * HKDF is designed to be a relatively fast function for deriving keys from a
-@@ -154,17 +60,11 @@ hkdf_sha512(uint8_t *key_material, uint_t km_len, uint8_t *salt,
+@@ -154,17 +60,19 @@ hkdf_sha512(uint8_t *key_material, uint_t km_len, uint8_t *salt,
      uint_t out_len)
  {
  	int ret;
@@ -30556,15 +30660,38 @@ index bc2830b16..3938f38d4 100644
 -	    out_len);
 -	if (ret != 0)
 -		return (ret);
--
+ 
++	/*
++	 * FIPS 140-3: KDF output is keying material (a CSP); the wolfCrypt
++	 * FIPS module gates KDF services behind the operator private-key-read
++	 * lock. Raise it around the call (no-op in non-FIPS builds).
++	 */
++	PRIVATE_KEY_UNLOCK();
 +	ret = wc_HKDF(WC_SHA512, key_material, km_len, salt, salt_len,
 +		      info, info_len, output_key, out_len);
++	PRIVATE_KEY_LOCK();
 +	if (ret) {
 +		ERR_LOG("error: wc_HKDF: %d\n", ret);
 +		return (SET_ERROR(EIO));
 +	}
  	return (0);
  }
+diff --git a/tests/zfs-tests/cmd/Makefile.am b/tests/zfs-tests/cmd/Makefile.am
+index 9cd526d65..2ceba4935 100644
+--- a/tests/zfs-tests/cmd/Makefile.am
++++ b/tests/zfs-tests/cmd/Makefile.am
+@@ -123,9 +123,9 @@ scripts_zfs_tests_bin_PROGRAMS += %D%/edonr_test %D%/skein_test \
+ 	libicp.la \
+ 	libspl.la \
+ 	libspl_assert.la
+-%C%_sha2_test_LDADD  = $(%C%_skein_test_LDADD)
++%C%_sha2_test_LDADD  = $(%C%_skein_test_LDADD) -lwolfssl
+ %C%_edonr_test_LDADD = $(%C%_skein_test_LDADD)
+-%C%_blake3_test_LDADD = $(%C%_skein_test_LDADD)
++%C%_blake3_test_LDADD = $(%C%_skein_test_LDADD) -lwolfssl
+ 
+ if BUILD_LINUX
+ scripts_zfs_tests_bin_PROGRAMS += %D%/getversion
 diff --git a/tests/zfs-tests/cmd/crypto_test.c b/tests/zfs-tests/cmd/crypto_test.c
 index c8d8622c7..8f3942642 100644
 --- a/tests/zfs-tests/cmd/crypto_test.c
