@@ -1,0 +1,209 @@
+diff --git a/test/Makefile.am b/test/Makefile.am
+index f843065..99aae3e 100644
+--- a/test/Makefile.am
++++ b/test/Makefile.am
+@@ -92,7 +92,8 @@ runtest_SOURCES += implementations/openssl/3/run_app_tests.c \
+                    implementations/openssl/3/test_iut_kdf108.c \
+                    implementations/openssl/3/test_iut_kdf135_ssh.c \
+                    implementations/openssl/3/test_iut_kts_ifc.c \
+-                   implementations/openssl/3/test_iut_pbkdf.c
++                   implementations/openssl/3/test_iut_pbkdf.c \
++                   implementations/openssl/3/test_iut_pqc.c
+ 
+ APP_LINK += ../app/implementations/openssl/3/acvp_app-iut.o \
+             ../app/implementations/openssl/3/acvp_app-iut_utils.o \
+diff --git a/test/implementations/openssl/3/run_app_tests.c b/test/implementations/openssl/3/run_app_tests.c
+index 99d0a6f..3a1e8c1 100644
+--- a/test/implementations/openssl/3/run_app_tests.c
++++ b/test/implementations/openssl/3/run_app_tests.c
+@@ -236,6 +236,12 @@ TEST_GROUP_RUNNER(APP_TLS13_KDF_HANDLER) {
+     RUN_TEST_CASE(APP_TLS13_KDF_HANDLER, unallocated_ans_bufs);
+ }
+ 
++TEST_GROUP_RUNNER(APP_PQC_HANDLER) {
++    RUN_TEST_CASE(APP_PQC_HANDLER, ml_kem_round_trip);
++    RUN_TEST_CASE(APP_PQC_HANDLER, ml_dsa_round_trip);
++    RUN_TEST_CASE(APP_PQC_HANDLER, slh_dsa_round_trip);
++}
++
+ // Function to run all APP tests
+ void run_app_tests(void) {
+     RUN_TEST_GROUP(APP_AES_AEAD_HANDLER);
+@@ -262,4 +268,5 @@ void run_app_tests(void) {
+     RUN_TEST_GROUP(APP_SAFE_PRIMES_HANDLER);
+     RUN_TEST_GROUP(APP_SHA_HANDLER);
+     RUN_TEST_GROUP(APP_TLS13_KDF_HANDLER);
++    RUN_TEST_GROUP(APP_PQC_HANDLER);
+ }
+diff --git a/test/implementations/openssl/3/test_iut_pqc.c b/test/implementations/openssl/3/test_iut_pqc.c
+new file mode 100644
+index 0000000..aefb99b
+--- /dev/null
++++ b/test/implementations/openssl/3/test_iut_pqc.c
+@@ -0,0 +1,166 @@
++/** @file */
++/*
++ * Copyright (C) 2026 wolfSSL Inc.
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include "ut_common.h"
++#include "app_common.h"
++#include "iut_common.h"
++#include "acvp/acvp_lcl.h"
++
++#define PQC_BUF_SIZE 50000
++
++TEST_GROUP(APP_PQC_HANDLER);
++
++TEST_SETUP(APP_PQC_HANDLER)
++{
++}
++
++TEST_TEAR_DOWN(APP_PQC_HANDLER)
++{
++}
++
++TEST(APP_PQC_HANDLER, ml_kem_round_trip)
++{
++    static const ACVP_ML_KEM_PARAM_SET params[] = {
++        ACVP_ML_KEM_PARAM_SET_ML_KEM_512,
++        ACVP_ML_KEM_PARAM_SET_ML_KEM_768,
++        ACVP_ML_KEM_PARAM_SET_ML_KEM_1024
++    };
++    unsigned char d[32] = { 1 };
++    unsigned char z[32] = { 2 };
++    unsigned char m[32] = { 3 };
++    unsigned char dk[PQC_BUF_SIZE];
++    unsigned char ek[PQC_BUF_SIZE];
++    unsigned char ciphertext[PQC_BUF_SIZE];
++    unsigned char enc_secret[32];
++    unsigned char dec_secret[32];
++    ACVP_TEST_CASE test_case;
++    ACVP_ML_KEM_TC tc;
++    size_t i;
++
++    for (i = 0; i < sizeof(params) / sizeof(params[0]); i++) {
++        memset(&test_case, 0, sizeof(test_case));
++        memset(&tc, 0, sizeof(tc));
++        tc.cipher = ACVP_ML_KEM_KEYGEN;
++        tc.param_set = params[i];
++        tc.d = d;
++        tc.d_len = sizeof(d);
++        tc.z = z;
++        tc.z_len = sizeof(z);
++        tc.dk = dk;
++        tc.ek = ek;
++        test_case.tc.ml_kem = &tc;
++        TEST_ASSERT_EQUAL_INT(0, app_ml_kem_handler(&test_case));
++        TEST_ASSERT_GREATER_THAN(0, tc.dk_len);
++        TEST_ASSERT_GREATER_THAN(0, tc.ek_len);
++
++        tc.cipher = ACVP_ML_KEM_XCAP;
++        tc.function = ACVP_ML_KEM_FUNCTION_ENCAPSULATE;
++        tc.m = m;
++        tc.m_len = sizeof(m);
++        tc.c = ciphertext;
++        tc.k = enc_secret;
++        TEST_ASSERT_EQUAL_INT(0, app_ml_kem_handler(&test_case));
++        TEST_ASSERT_GREATER_THAN(0, tc.c_len);
++        TEST_ASSERT_EQUAL_INT(sizeof(enc_secret), tc.k_len);
++
++        tc.function = ACVP_ML_KEM_FUNCTION_DECAPSULATE;
++        tc.k = dec_secret;
++        TEST_ASSERT_EQUAL_INT(0, app_ml_kem_handler(&test_case));
++        TEST_ASSERT_EQUAL_INT(sizeof(dec_secret), tc.k_len);
++        TEST_ASSERT_EQUAL_UINT8_ARRAY(enc_secret, dec_secret,
++            sizeof(enc_secret));
++    }
++}
++
++TEST(APP_PQC_HANDLER, ml_dsa_round_trip)
++{
++    static const ACVP_ML_DSA_PARAM_SET params[] = {
++        ACVP_ML_DSA_PARAM_SET_ML_DSA_44,
++        ACVP_ML_DSA_PARAM_SET_ML_DSA_65,
++        ACVP_ML_DSA_PARAM_SET_ML_DSA_87
++    };
++    unsigned char seed[32] = { 4 };
++    unsigned char msg[] = "libacvp ML-DSA provider test";
++    unsigned char secret_key[PQC_BUF_SIZE];
++    unsigned char pub_key[PQC_BUF_SIZE];
++    unsigned char sig[PQC_BUF_SIZE];
++    ACVP_TEST_CASE test_case;
++    ACVP_ML_DSA_TC tc;
++    size_t i;
++
++    for (i = 0; i < sizeof(params) / sizeof(params[0]); i++) {
++        memset(&test_case, 0, sizeof(test_case));
++        memset(&tc, 0, sizeof(tc));
++        tc.cipher = ACVP_ML_DSA_KEYGEN;
++        tc.param_set = params[i];
++        tc.seed = seed;
++        tc.seed_len = sizeof(seed);
++        tc.secret_key = secret_key;
++        tc.pub_key = pub_key;
++        test_case.tc.ml_dsa = &tc;
++        TEST_ASSERT_EQUAL_INT(0, app_ml_dsa_handler(&test_case));
++        TEST_ASSERT_GREATER_THAN(0, tc.secret_key_len);
++        TEST_ASSERT_GREATER_THAN(0, tc.pub_key_len);
++
++        tc.cipher = ACVP_ML_DSA_SIGGEN;
++        tc.is_deterministic = 1;
++        tc.msg = msg;
++        tc.msg_len = sizeof(msg) - 1;
++        tc.sig = sig;
++        TEST_ASSERT_EQUAL_INT(0, app_ml_dsa_handler(&test_case));
++        TEST_ASSERT_GREATER_THAN(0, tc.sig_len);
++
++        tc.cipher = ACVP_ML_DSA_SIGVER;
++        TEST_ASSERT_EQUAL_INT(0, app_ml_dsa_handler(&test_case));
++        TEST_ASSERT_EQUAL_INT(ACVP_TEST_DISPOSITION_PASS,
++            tc.ver_disposition);
++    }
++}
++
++TEST(APP_PQC_HANDLER, slh_dsa_round_trip)
++{
++    unsigned char secret_seed[16] = { 5 };
++    unsigned char secret_prf[16] = { 6 };
++    unsigned char pub_seed[16] = { 7 };
++    unsigned char msg[] = "libacvp SLH-DSA provider test";
++    unsigned char secret_key[PQC_BUF_SIZE];
++    unsigned char pub_key[PQC_BUF_SIZE];
++    unsigned char sig[PQC_BUF_SIZE];
++    ACVP_TEST_CASE test_case;
++    ACVP_SLH_DSA_TC tc;
++
++    memset(&test_case, 0, sizeof(test_case));
++    memset(&tc, 0, sizeof(tc));
++    tc.cipher = ACVP_SLH_DSA_KEYGEN;
++    tc.param_set = ACVP_SLH_DSA_PARAM_SET_SLH_DSA_SHA2_128F;
++    tc.secret_seed = secret_seed;
++    tc.secret_seed_len = sizeof(secret_seed);
++    tc.secret_prf = secret_prf;
++    tc.secret_prf_len = sizeof(secret_prf);
++    tc.pub_seed = pub_seed;
++    tc.pub_seed_len = sizeof(pub_seed);
++    tc.secret_key = secret_key;
++    tc.pub_key = pub_key;
++    test_case.tc.slh_dsa = &tc;
++    TEST_ASSERT_EQUAL_INT(0, app_slh_dsa_handler(&test_case));
++    TEST_ASSERT_GREATER_THAN(0, tc.secret_key_len);
++    TEST_ASSERT_GREATER_THAN(0, tc.pub_key_len);
++
++    tc.cipher = ACVP_SLH_DSA_SIGGEN;
++    tc.is_deterministic = 1;
++    tc.sig_interface = ACVP_SIG_INTERFACE_EXTERNAL;
++    tc.msg = msg;
++    tc.msg_len = sizeof(msg) - 1;
++    tc.sig = sig;
++    TEST_ASSERT_EQUAL_INT(0, app_slh_dsa_handler(&test_case));
++    TEST_ASSERT_GREATER_THAN(0, tc.sig_len);
++
++    tc.cipher = ACVP_SLH_DSA_SIGVER;
++    TEST_ASSERT_EQUAL_INT(0, app_slh_dsa_handler(&test_case));
++    TEST_ASSERT_EQUAL_INT(ACVP_TEST_DISPOSITION_PASS,
++        tc.ver_disposition);
++}
