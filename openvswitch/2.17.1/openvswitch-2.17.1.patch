@@ -1,0 +1,252 @@
+diff --git a/Documentation/intro/install/general.rst b/Documentation/intro/install/general.rst
+index a297aadac..745ca4aea 100644
+--- a/Documentation/intro/install/general.rst
++++ b/Documentation/intro/install/general.rst
+@@ -85,6 +85,10 @@ need the following software:
+   an OpenFlow controller. If libssl is installed, then Open vSwitch will
+   automatically build with support for it.
+ 
++- libwolfssl, from wolfSSL, is optional and can be used instead of openssl to
++  provide commercial open source library for TLS and Crypto. Enabled using
++  --with-wolfssl. See details in ./Documentation/intro/install/wolfssl.rst.
++
+ - libcap-ng, written by Steve Grubb, is optional but recommended. It is
+   required to run OVS daemons as a non-root user with dropped root privileges.
+   If libcap-ng is installed, then Open vSwitch will automatically build with
+diff --git a/configure.ac b/configure.ac
+index f14ba7db4..b3afbb7b4 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -90,6 +90,7 @@ OVS_CHECK_COVERAGE
+ OVS_CHECK_NDEBUG
+ OVS_CHECK_USDT
+ OVS_CHECK_NETLINK
++OVS_CHECK_WOLFSSL
+ OVS_CHECK_OPENSSL
+ OVS_CHECK_LIBCAPNG
+ OVS_CHECK_LOGDIR
+diff --git a/lib/dhparams.h b/lib/dhparams.h
+index 0eca99a6f..96b839f12 100644
+--- a/lib/dhparams.h
++++ b/lib/dhparams.h
+@@ -18,6 +18,9 @@
+ #define DHPARAMS_H 1
+ 
+ #include <inttypes.h>
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#endif
+ #include <openssl/dh.h>
+ 
+ DH *get_dh2048(void);
+diff --git a/lib/stream-ssl.c b/lib/stream-ssl.c
+index f4fe3432e..60159b3fa 100644
+--- a/lib/stream-ssl.c
++++ b/lib/stream-ssl.c
+@@ -24,6 +24,10 @@
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <netinet/tcp.h>
++#ifdef HAVE_WOLFSSL
++#include <wolfssl/options.h>
++#include <openssl/pem.h>
++#endif
+ #include <openssl/err.h>
+ #include <openssl/rand.h>
+ #include <openssl/ssl.h>
+@@ -185,6 +189,10 @@ static unsigned int next_session_nr;
+  * quite a bit. */
+ static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(10, 25);
+ 
++#ifdef HAVE_WOLFSSL
++static const char *peer_ca_cert_file = NULL;
++#endif
++
+ static int ssl_init(void);
+ static int do_ssl_init(void);
+ static bool ssl_wants_io(int ssl_error);
+@@ -197,6 +205,7 @@ static DH *tmp_dh_callback(SSL *ssl, int is_export OVS_UNUSED, int keylength);
+ static void log_ca_cert(const char *file_name, X509 *cert);
+ static void stream_ssl_set_ca_cert_file__(const char *file_name,
+                                           bool bootstrap, bool force);
++static void stream_ssl_set_peer_ca_cert_file__(const char *file_name);
+ static void ssl_protocol_cb(int write_p, int version, int content_type,
+                             const void *, size_t, SSL *, void *sslv_);
+ static bool update_ssl_config(struct ssl_config_file *, const char *file_name);
+@@ -1004,6 +1013,15 @@ ssl_init(void)
+     return init_status;
+ }
+ 
++#if defined(HAVE_WOLFSSL) && defined(DEBUG_WOLFSSL)
++static void wolfssl_debug_cb(const int log_level, const char *const log_message)
++{
++    (void)log_level;
++
++    VLOG_DBG("wolfSSL debug: %s", log_message);
++}
++#endif
++
+ static int
+ do_ssl_init(void)
+ {
+@@ -1017,6 +1035,10 @@ do_ssl_init(void)
+     SSL_library_init();
+     SSL_load_error_strings();
+ #endif
++#if defined(HAVE_WOLFSSL) && defined(DEBUG_WOLFSSL)
++    wolfSSL_Debugging_ON();
++    wolfSSL_SetLoggingCb(wolfssl_debug_cb);
++#endif
+ 
+     if (!RAND_status()) {
+         /* We occasionally see OpenSSL fail to seed its random number generator
+@@ -1354,13 +1376,8 @@ read_cert_file(const char *file_name, X509 ***certs, size_t *n_certs)
+     return 0;
+ }
+ 
+-
+-/* Sets 'file_name' as the name of a file containing one or more X509
+- * certificates to send to the peer.  Typical use in OpenFlow is to send the CA
+- * certificate to the peer, which enables a switch to pick up the controller's
+- * CA certificate on its first connection. */
+ void
+-stream_ssl_set_peer_ca_cert_file(const char *file_name)
++stream_ssl_set_peer_ca_cert_file__(const char *file_name)
+ {
+     X509 **certs;
+     size_t n_certs;
+@@ -1381,6 +1398,20 @@ stream_ssl_set_peer_ca_cert_file(const char *file_name)
+     }
+ }
+ 
++/* Sets 'file_name' as the name of a file containing one or more X509
++ * certificates to send to the peer.  Typical use in OpenFlow is to send the CA
++ * certificate to the peer, which enables a switch to pick up the controller's
++ * CA certificate on its first connection. */
++void
++stream_ssl_set_peer_ca_cert_file(const char *file_name)
++{
++#ifdef HAVE_WOLFSSL
++    peer_ca_cert_file = file_name;
++#else
++    stream_ssl_set_peer_ca_cert_file__(file_name);
++#endif /* HAVE_WOLFSSL */
++}
++
+ /* Logs fingerprint of CA certificate 'cert' obtained from 'file_name'. */
+ static void
+ log_ca_cert(const char *file_name, X509 *cert)
+@@ -1447,6 +1478,19 @@ stream_ssl_set_ca_cert_file__(const char *file_name,
+         }
+     }
+     ca_cert.read = true;
++
++    /*
++     * With wolfSSL, we can't just call stream_ssl_set_peer_ca_cert_file
++     * before setting the leaf cert with stream_ssl_set_ca_cert_file because
++     * stream_ssl_set_ca_cert_file will wipe out the peer CA cert. So, we set
++     * the peer CA cert *after* the leaf cert here instead. This allows the
++     * cert bootstrapping strategy to work with wolfSSL.
++     */
++#ifdef HAVE_WOLFSSL
++    if (peer_ca_cert_file != NULL) {
++        stream_ssl_set_peer_ca_cert_file__(peer_ca_cert_file);
++    }
++#endif
+ }
+ 
+ /* Sets 'file_name' as the name of the file from which to read the CA
+diff --git a/m4/openvswitch.m4 b/m4/openvswitch.m4
+index 4c3bace6e..595b7b343 100644
+--- a/m4/openvswitch.m4
++++ b/m4/openvswitch.m4
+@@ -259,6 +259,56 @@ AC_DEFUN([OVS_CHECK_LIBCAPNG],
+       AC_SUBST([CAPNG_LDADD])
+    fi])
+ 
++
++dnl Checks for wolfSSL
++AC_DEFUN([OVS_CHECK_WOLFSSL], [
++  WOLFSSL_URL="http://www.wolfssl.com/download.html"
++  HAVE_WOLFSSL=no
++  AC_ARG_WITH(wolfssl,
++    [AC_HELP_STRING([--with-wolfssl=PATH], [PATH to wolfssl install])],
++    [
++      AC_MSG_CHECKING([whether compiling and linking against wolfSSL works])
++      if test "x$withval" != "xno" ; then
++        if test -d "$withval/lib"; then
++          LDFLAGS="$LDFLAGS -L${withval}/lib"
++        fi
++        if test -d "$withval/include"; then
++          CPPFLAGS="-I${withval}/include -I${withval}/include/wolfssl $CPPFLAGS"
++        fi
++      fi
++      if test "x$withval" = "xyes" ; then
++        LDFLAGS="$LDFLAGS -L/usr/local/lib"
++        CPPFLAGS="-I/usr/local/include -I/usr/local/include/wolfssl $CPPFLAGS"
++      fi
++      LIBS="$LIBS -lwolfssl"
++      CPPFLAGS="$CPPFLAGS -DHAVE_WOLFSSL"
++
++      AC_LINK_IFELSE(
++        [AC_LANG_PROGRAM([#include <wolfssl/ssl.h>],
++            [wolfSSL_Init();])],
++            [wolfssl_linked=yes],
++            [wolfssl_linked=no]
++      )
++
++      if test "x$wolfssl_linked" = "xno" ; then
++        AC_MSG_ERROR([WolfSSL isn't found.  You can get it from $WOLFSSL_URL
++          If it's already installed, specify its path using --with-wolfssl=/dir/])
++      fi
++
++      AC_MSG_RESULT([yes])
++      HAVE_WOLFSSL=yes
++      HAVE_OPENSSL=yes
++      ssl=true
++    ], [
++      AC_MSG_RESULT([no])
++      ssl=no
++  ])
++
++  AC_SUBST([HAVE_WOLFSSL])
++  AM_CONDITIONAL([HAVE_WOLFSSL], [test "$HAVE_WOLFSSL" = yes])
++])
++
++
+ dnl Checks for OpenSSL.
+ AC_DEFUN([OVS_CHECK_OPENSSL],
+   [AC_ARG_ENABLE(
+@@ -271,7 +321,7 @@ AC_DEFUN([OVS_CHECK_OPENSSL],
+       esac],
+      [ssl=check])
+ 
+-   if test "$ssl" != false; then
++   if test "$ssl" != false && test "$HAVE_WOLFSSL" = "no"; then
+        AX_CHECK_OPENSSL(
+          [HAVE_OPENSSL=yes],
+          [HAVE_OPENSSL=no
+@@ -286,7 +336,9 @@ OpenFlow connections over SSL will not be supported.
+             AC_MSG_ERROR([Cannot find openssl (use --disable-ssl to configure without SSL support)])
+           fi])
+    else
+-       HAVE_OPENSSL=no
++       if test "x$HAVE_WOLFSSL" = "xno"; then
++          HAVE_OPENSSL=no
++       fi
+    fi
+    AC_SUBST([HAVE_OPENSSL])
+    AM_CONDITIONAL([HAVE_OPENSSL], [test "$HAVE_OPENSSL" = yes])
+diff --git a/tests/ovsdb-server.at b/tests/ovsdb-server.at
+index 876cb836c..8eafa4135 100644
+--- a/tests/ovsdb-server.at
++++ b/tests/ovsdb-server.at
+@@ -657,7 +657,7 @@ AT_CHECK_UNQUOTED(
+ # The error message for being unable to negotiate a shared ciphersuite
+ # is 'sslv3 alert handshake failure'. This is not the clearest message.
+ AT_CHECK_UNQUOTED(
+-  [grep "sslv3 alert handshake failure" output], [0],
++  [grep "bad SSL error code -313" output], [0],
+   [stdout],
+   [ignore])
+ OVSDB_SERVER_SHUTDOWN
