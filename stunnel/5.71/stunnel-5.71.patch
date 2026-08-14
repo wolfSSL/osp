@@ -1,8 +1,8 @@
 diff --git a/configure.ac b/configure.ac
-index 5f15917..b0a3de3 100644
+index 5f15917..5d64e9c 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -448,26 +448,74 @@ find_ssl_dir() { :
+@@ -448,26 +448,84 @@ find_ssl_dir() { :
      check_ssl_dir "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-migrator/sdk/MacOSX.sdk/usr"
  }
  
@@ -74,6 +74,16 @@ index 5f15917..b0a3de3 100644
 +then
 +valid_CPPFLAGS="${CPPFLAGS}"; CPPFLAGS="${CPPFLAGS} -I${SSLDIR}/include -I${SSLDIR}/include/wolfssl"
 +valid_LIBS="${LIBS}"; LIBS="${LIBS} -L${SSLDIR}/lib64 -L${SSLDIR}/lib -lwolfssl"
++AC_CHECK_HEADER([wolfssl/options.h], [],
++    [AC_MSG_ERROR([
++wolfssl/options.h not found under ${SSLDIR}/include
++Build wolfSSL with --enable-stunnel, or use --with-ssl to select its prefix
++])])
++AC_CHECK_LIB([wolfssl], [wolfSSL_Init], [],
++    [AC_MSG_ERROR([
++libwolfssl not found under ${SSLDIR}
++Build wolfSSL with --enable-stunnel, or use --with-ssl to select its prefix
++])])
 +else
  valid_CPPFLAGS="${CPPFLAGS}"; CPPFLAGS="${CPPFLAGS} -I${SSLDIR}/include"
  valid_LIBS="${LIBS}"; LIBS="${LIBS} -L${SSLDIR}/lib64 -L${SSLDIR}/lib -lssl -lcrypto"
@@ -863,7 +873,7 @@ index 0000000..601011a
 +])dnl AX_REQUIRE_DEFINED
 +
 diff --git a/src/Makefile.am b/src/Makefile.am
-index eae899b..ea484b7 100644
+index eae899b..cddeab8 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
 @@ -30,12 +30,20 @@ CLEANFILES = stunnel3
@@ -871,7 +881,7 @@ index eae899b..ea484b7 100644
  
  # Additional preprocessor definitions
 +if WOLFSSL
-+stunnel_CPPFLAGS += -I$(SSLDIR)/include/wolfssl -I$(SSLDIR)/include
++stunnel_CPPFLAGS += -I$(SSLDIR)/include -I$(SSLDIR)/include/wolfssl
 +else
  stunnel_CPPFLAGS += -I$(SSLDIR)/include
 +endif
@@ -887,7 +897,7 @@ index eae899b..ea484b7 100644
  
  # Apply substitutions
  edit = sed \
-@@ -55,8 +63,13 @@ libstunnel_la_LDFLAGS = -avoid-version
+@@ -55,11 +63,21 @@ libstunnel_la_LDFLAGS = -avoid-version
  # Win32 executables                                                           #
  ###############################################################################
  
@@ -899,8 +909,16 @@ index eae899b..ea484b7 100644
  	$(MAKE) -f $(srcdir)/mingw.mk srcdir=$(srcdir) win32_arch=win32 win32_targetcpu=i686 win32_mingw=mingw
 +endif
  
++if WOLFSSL
++mingw64:
++	$(MAKE) -f $(srcdir)/mingw_wolfssl.mk srcdir=$(srcdir) win32_arch=win64 win32_targetcpu=x86_64 win32_mingw=mingw64
++else
  mingw64:
  	$(MAKE) -f $(srcdir)/mingw.mk srcdir=$(srcdir) win32_arch=win64 win32_targetcpu=x86_64 win32_mingw=mingw64
++endif
+ 
+ .PHONY: mingw mingw64
+ 
 diff --git a/src/client.c b/src/client.c
 index d9b9f36..c3f311a 100644
 --- a/src/client.c
@@ -922,10 +940,10 @@ index d9b9f36..c3f311a 100644
           * either explicitly with "sni"
           * or implicitly with "protocolHost" or "connect" */
 diff --git a/src/common.h b/src/common.h
-index 8fe50b4..334e9c0 100644
+index 8fe50b4..c04fada 100644
 --- a/src/common.h
 +++ b/src/common.h
-@@ -47,15 +47,22 @@
+@@ -47,7 +47,14 @@
  #define LIBWRAP_CLIENTS 5
  
  /* CPU stack size */
@@ -941,16 +959,6 @@ index 8fe50b4..334e9c0 100644
  /* #define DEBUG_STACK_SIZE */
  
  /* I/O buffer size: 18432 (0x4800) is the maximum size of TLS record payload */
- #define BUFFSIZE 18432
- 
- /* how many bytes of random input to read from files for PRNG */
--/* security margin is huge to compensate for flawed entropy */
--#define RANDOM_BYTES 1024
-+/* OpenSSL likes at least 128 bits, so 64 bytes seems plenty. */
-+#define RANDOM_BYTES 64
- 
- /**************************************** debugging */
- 
 @@ -416,6 +423,21 @@ extern char *sys_errlist[];
  #define S_ISREG(m) (((m)&S_IFMT)==S_IFREG)
  #endif
@@ -1091,7 +1099,7 @@ index 957bf4c..276c55e 100644
  NOEXPORT BN_GENCB *per_day_bn_gencb(void) {
  #if OPENSSL_VERSION_NUMBER>=0x10100000L
 diff --git a/src/ctx.c b/src/ctx.c
-index cdbe8b9..86a85e2 100644
+index cdbe8b9..a32f443 100644
 --- a/src/ctx.c
 +++ b/src/ctx.c
 @@ -63,7 +63,9 @@ NOEXPORT int matches_wildcard(const char *, const char *);
@@ -1113,15 +1121,6 @@ index cdbe8b9..86a85e2 100644
  typedef long unsigned SSL_OPTIONS_TYPE;
  #else
  typedef long SSL_OPTIONS_TYPE;
-@@ -206,7 +208,7 @@ int context_init(SERVICE_OPTIONS *section) { /* init TLS context */
- 
-     /* ciphers */
-     if(section->cipher_list) {
--        s_log(LOG_DEBUG, "Ciphers: %s", section->cipher_list);
-+        s_log(LOG_INFO, "Ciphers: %s", section->cipher_list);
-         if(!SSL_CTX_set_cipher_list(section->ctx, section->cipher_list)) {
-             sslerror("SSL_CTX_set_cipher_list");
-             return 1; /* FAILED */
 @@ -362,8 +364,10 @@ void context_cleanup(SERVICE_OPTIONS *section) {
      ocsp_cleanup(section);
  #endif /* !defined(OPENSSL_NO_OCSP) */
@@ -1142,7 +1141,7 @@ index cdbe8b9..86a85e2 100644
          s_log(LOG_DEBUG, "SNI: no virtual services defined");
          return SSL_TLSEXT_ERR_OK;
      }
-@@ -442,13 +446,22 @@ NOEXPORT int matches_wildcard(const char *servername, const char *pattern) {
+@@ -442,13 +446,36 @@ NOEXPORT int matches_wildcard(const char *servername, const char *pattern) {
  
  #ifndef OPENSSL_NO_DH
  
@@ -1155,18 +1154,32 @@ index cdbe8b9..86a85e2 100644
  
  NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
 +#ifdef WITH_WOLFSSL
++    section->option.dh_temp_params=0; /* disable by default */
++
++    /* check if DH is needed for this section */
++    if(section->option.client) {
++        s_log(LOG_INFO, "DH initialization skipped: client section");
++        return 0; /* OK */
++    }
++
++    if(!section->cert) {
++        s_log(LOG_INFO, "DH initialization skipped: no certificate");
++        return 0; /* OK */
++    }
++
 +    s_log(LOG_DEBUG, "DH initialization");
 +    if(wolfSSL_CTX_SetTmpDH_file(section->ctx, section->cert,
-+               SSL_FILETYPE_ASN1) == SSL_SUCCESS) { /* DH file loading failed */
-+        return 0;
-+     } else {
-+        s_log(LOG_DEBUG, "Error loading DH params from file: %s", section->cert);
++            SSL_FILETYPE_PEM)==SSL_SUCCESS) {
++        s_log(LOG_INFO, "DH parameters loaded from %s", section->cert);
++        return 0; /* OK */
 +    }
++    s_log(LOG_INFO, "No DH parameters found in %s", section->cert);
++    /* fall through to the dynamic DH parameters */
 +#else
      DH *dh=NULL;
      int i, n;
      char description[128];
-@@ -492,6 +505,8 @@ NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
+@@ -492,6 +519,8 @@ NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
          DH_free(dh);
          return 0; /* OK */
      }
@@ -1175,7 +1188,7 @@ index cdbe8b9..86a85e2 100644
      CRYPTO_THREAD_read_lock(stunnel_locks[LOCK_DH]);
      SSL_CTX_set_tmp_dh(section->ctx, dh_params);
      CRYPTO_THREAD_unlock(stunnel_locks[LOCK_DH]);
-@@ -501,6 +516,7 @@ NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
+@@ -501,6 +530,7 @@ NOEXPORT int dh_init(SERVICE_OPTIONS *section) {
      return 0; /* OK */
  }
  
@@ -1183,7 +1196,7 @@ index cdbe8b9..86a85e2 100644
  NOEXPORT DH *dh_read(char *cert) {
      DH *dh;
      BIO *bio;
-@@ -525,6 +541,7 @@ NOEXPORT DH *dh_read(char *cert) {
+@@ -525,6 +555,7 @@ NOEXPORT DH *dh_read(char *cert) {
      s_log(LOG_DEBUG, "Using DH parameters from %s", cert);
      return dh;
  }
@@ -1191,7 +1204,7 @@ index cdbe8b9..86a85e2 100644
  
  #endif /* OPENSSL_NO_DH */
  
-@@ -532,7 +549,7 @@ NOEXPORT DH *dh_read(char *cert) {
+@@ -532,7 +563,7 @@ NOEXPORT DH *dh_read(char *cert) {
  
  #ifndef OPENSSL_NO_ECDH
  
@@ -1200,7 +1213,7 @@ index cdbe8b9..86a85e2 100644
  /* simplified version that only supports a single curve */
  NOEXPORT int SSL_CTX_set1_groups_list(SSL_CTX *ctx, char *list) {
      int nid;
-@@ -556,9 +573,15 @@ NOEXPORT int SSL_CTX_set1_groups_list(SSL_CTX *ctx, char *list) {
+@@ -556,9 +587,15 @@ NOEXPORT int SSL_CTX_set1_groups_list(SSL_CTX *ctx, char *list) {
      EC_KEY_free(ecdh);
      return 1; /* OK */
  }
@@ -1217,7 +1230,7 @@ index cdbe8b9..86a85e2 100644
      s_log(LOG_DEBUG, "ECDH initialization");
      if(!SSL_CTX_set1_groups_list(section->ctx, section->curves)) {
          s_log(LOG_ERR, "Invalid groups list in 'curves'");
-@@ -566,6 +589,7 @@ NOEXPORT int ecdh_init(SERVICE_OPTIONS *section) {
+@@ -566,6 +603,7 @@ NOEXPORT int ecdh_init(SERVICE_OPTIONS *section) {
      }
      s_log(LOG_DEBUG, "ECDH initialized with curves %s", section->curves);
      return 0; /* OK */
@@ -1225,7 +1238,7 @@ index cdbe8b9..86a85e2 100644
  }
  
  #endif /* OPENSSL_NO_ECDH */
-@@ -708,7 +732,7 @@ NOEXPORT unsigned psk_client_callback(SSL *ssl, const char *hint,
+@@ -708,7 +746,7 @@ NOEXPORT unsigned psk_client_callback(SSL *ssl, const char *hint,
  
      (void)hint; /* squash the unused parameter warning */
      c=SSL_get_ex_data(ssl, index_ssl_cli);
@@ -1234,18 +1247,18 @@ index cdbe8b9..86a85e2 100644
          s_log(LOG_ERR, "INTERNAL ERROR: No PSK identity selected");
          return 0;
      }
-@@ -738,6 +762,10 @@ NOEXPORT unsigned psk_server_callback(SSL *ssl, const char *identity,
+@@ -738,6 +776,10 @@ NOEXPORT unsigned psk_server_callback(SSL *ssl, const char *identity,
      PSK_KEYS *found;
  
      c=SSL_get_ex_data(ssl, index_ssl_cli);
 +    if(!c) {
-+        s_log(LOG_INFO, "SSL_get_ex_data returned NULL");
++        s_log(LOG_ERR, "SSL_get_ex_data returned NULL");
 +        return 0;
 +    }
      found=psk_find(&c->opt->psk_sorted, identity);
      if(!found) {
          const char *c=identity;
-@@ -874,7 +902,20 @@ NOEXPORT int load_pkcs12_file(SERVICE_OPTIONS *section) {
+@@ -874,7 +916,23 @@ NOEXPORT int load_pkcs12_file(SERVICE_OPTIONS *section) {
          sslerror("SSL_CTX_use_PrivateKey");
          return 1; /* FAILED */
      }
@@ -1257,6 +1270,9 @@ index cdbe8b9..86a85e2 100644
 +        if(!SSL_CTX_add_extra_chain_cert(section->ctx,
 +                sk_X509_value(ca, i))) {
 +            sslerror("SSL_CTX_add_extra_chain_cert");
++            /* certificates 0..i-1 are owned by the context: free the rest */
++            while(sk_X509_num(ca)>i)
++                X509_free(sk_X509_pop(ca));
 +            sk_X509_free(ca);
 +            return 1; /* FAILED */
 +        }
@@ -1267,7 +1283,7 @@ index cdbe8b9..86a85e2 100644
      if(!SSL_CTX_set0_chain(section->ctx, ca)) {
          sslerror("SSL_CTX_set0_chain");
          return 1; /* FAILED */
-@@ -1043,6 +1084,10 @@ NOEXPORT void set_prompt(const char *name) {
+@@ -1043,6 +1101,10 @@ NOEXPORT void set_prompt(const char *name) {
  }
  
  NOEXPORT int ui_retry() {
@@ -1278,7 +1294,7 @@ index cdbe8b9..86a85e2 100644
      unsigned long err=ERR_peek_error();
  
      switch(ERR_GET_LIB(err)) {
-@@ -1129,6 +1174,7 @@ NOEXPORT int ui_retry() {
+@@ -1129,6 +1191,7 @@ NOEXPORT int ui_retry() {
          s_log(LOG_ERR, "Unhandled error library: %d", ERR_GET_LIB(err));
          return 0;
      }
@@ -1286,7 +1302,7 @@ index cdbe8b9..86a85e2 100644
  }
  
  /**************************************** session tickets */
-@@ -1259,11 +1305,13 @@ NOEXPORT int ssl_tlsext_ticket_key_cb(SSL *ssl, unsigned char *key_name,
+@@ -1259,11 +1322,13 @@ NOEXPORT int ssl_tlsext_ticket_key_cb(SSL *ssl, unsigned char *key_name,
      const EVP_CIPHER *cipher;
      int iv_len;
  
@@ -1301,17 +1317,19 @@ index cdbe8b9..86a85e2 100644
          c->opt->ticket_mac->key_len, EVP_sha256(), NULL)) {
          s_log(LOG_ERR, "HMAC_Init_ex failed");
          return -1;
-@@ -1284,6 +1332,9 @@ NOEXPORT int ssl_tlsext_ticket_key_cb(SSL *ssl, unsigned char *key_name,
+@@ -1284,6 +1349,11 @@ NOEXPORT int ssl_tlsext_ticket_key_cb(SSL *ssl, unsigned char *key_name,
              s_log(LOG_ERR, "EVP_EncryptInit_ex failed");
              return -1;
          }
 +#ifdef WITH_WOLFSSL
-+        XMEMCPY(key_name, "stunnel ticket", sizeof("stunnel ticket"));
++        /* wolfSSL expects the whole WOLFSSL_TICKET_NAME_SZ byte key name */
++        XMEMSET(key_name, 0, WOLFSSL_TICKET_NAME_SZ);
++        XMEMCPY(key_name, "stunnel ticket", sizeof("stunnel ticket")-1);
 +#endif
      } else /* retrieve session */
          if(!EVP_DecryptInit_ex(ctx, cipher, NULL,
              (const unsigned char *)(c->opt->ticket_key->key_val), iv)) {
-@@ -1309,6 +1360,11 @@ NOEXPORT int sess_new_cb(SSL *ssl, SSL_SESSION *sess) {
+@@ -1309,6 +1379,11 @@ NOEXPORT int sess_new_cb(SSL *ssl, SSL_SESSION *sess) {
      s_log(LOG_DEBUG, "New session callback");
      c=SSL_get_ex_data(ssl, index_ssl_cli);
  
@@ -1323,7 +1341,7 @@ index cdbe8b9..86a85e2 100644
      new_chain(c); /* new session -> we may have a new peer certificate chain */
  
      if(c->opt->option.client)
-@@ -1343,6 +1399,46 @@ void print_session_id(SSL_SESSION *sess) {
+@@ -1343,6 +1418,46 @@ void print_session_id(SSL_SESSION *sess) {
  }
  
  NOEXPORT void new_chain(CLI *c) {
@@ -1370,7 +1388,7 @@ index cdbe8b9..86a85e2 100644
      BIO *bio;
      int i, len;
      X509 *peer_cert;
-@@ -1386,6 +1482,7 @@ NOEXPORT void new_chain(CLI *c) {
+@@ -1386,6 +1501,7 @@ NOEXPORT void new_chain(CLI *c) {
      c->opt->chain=chain; /* this race condition is safe to ignore */
      ui_new_chain(c->opt->section_number);
      s_log(LOG_DEBUG, "Peer certificate was cached (%d bytes)", len);
@@ -1378,7 +1396,7 @@ index cdbe8b9..86a85e2 100644
  }
  
  /* cache client sessions */
-@@ -1427,7 +1524,7 @@ NOEXPORT SSL_SESSION *sess_get_cb(SSL *ssl,
+@@ -1427,7 +1543,7 @@ NOEXPORT SSL_SESSION *sess_get_cb(SSL *ssl,
      s_log(LOG_DEBUG, "Get session callback");
      *do_copy=0; /* allow the session to be freed automatically */
      c=SSL_get_ex_data(ssl, index_ssl_cli);
@@ -1387,7 +1405,7 @@ index cdbe8b9..86a85e2 100644
          return cache_get(ssl, key, key_len);
      return NULL; /* no session to resume */
  }
-@@ -1437,7 +1534,7 @@ NOEXPORT void sess_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess) {
+@@ -1437,7 +1553,7 @@ NOEXPORT void sess_remove_cb(SSL_CTX *ctx, SSL_SESSION *sess) {
  
      s_log(LOG_DEBUG, "Remove session callback");
      opt=SSL_CTX_get_ex_data(ctx, index_ssl_ctx_opt);
@@ -1396,7 +1414,7 @@ index cdbe8b9..86a85e2 100644
          cache_remove(ctx, sess);
  }
  
-@@ -1552,6 +1649,13 @@ NOEXPORT void cache_transfer(SSL_CTX *ctx, const u_char type,
+@@ -1552,6 +1668,13 @@ NOEXPORT void cache_transfer(SSL_CTX *ctx, const u_char type,
  
      /* retrieve pointer to the section structure of this ctx */
      section=SSL_CTX_get_ex_data(ctx, index_ssl_ctx_opt);
@@ -1410,7 +1428,7 @@ index cdbe8b9..86a85e2 100644
      if(sendto(s, (void *)packet,
  #ifdef USE_WIN32
              (int)
-@@ -1642,6 +1746,7 @@ NOEXPORT void info_callback(const SSL *ssl, int where, int ret) {
+@@ -1642,6 +1765,7 @@ NOEXPORT void info_callback(const SSL *ssl, int where, int ret) {
      if(where & SSL_CB_ALERT && !strcmp(SSL_alert_type_string(ret), "F"))
          c->fatal_alert=1;
  
@@ -1418,7 +1436,7 @@ index cdbe8b9..86a85e2 100644
          /* log the client certificate request (if received) */
  #ifndef SSL3_ST_CR_CERT_REQ_A
      if(state==TLS_ST_CR_CERT_REQ)
-@@ -1657,6 +1762,7 @@ NOEXPORT void info_callback(const SSL *ssl, int where, int ret) {
+@@ -1657,6 +1781,7 @@ NOEXPORT void info_callback(const SSL *ssl, int where, int ret) {
  #endif
          if(!SSL_get_client_CA_list(ssl))
              s_log(LOG_INFO, "Client certificate not requested");
@@ -1426,7 +1444,7 @@ index cdbe8b9..86a85e2 100644
  
      /* prevent renegotiation DoS attack */
      if((where&SSL_CB_HANDSHAKE_DONE)
-@@ -1694,7 +1800,7 @@ NOEXPORT void info_callback(const SSL *ssl, int where, int ret) {
+@@ -1694,7 +1819,7 @@ NOEXPORT void info_callback(const SSL *ssl, int where, int ret) {
              SSL_alert_type_string_long(ret),
              SSL_alert_desc_string_long(ret));
      } else if(where==SSL_CB_HANDSHAKE_DONE) {
@@ -1436,31 +1454,43 @@ index cdbe8b9..86a85e2 100644
              s_log(LOG_DEBUG, "%6ld client connect(s) requested",
                  SSL_CTX_sess_connect(ctx));
 diff --git a/src/log.c b/src/log.c
-index b6a5ffb..6f24e5a 100644
+index b6a5ffb..566a649 100644
 --- a/src/log.c
 +++ b/src/log.c
-@@ -276,6 +276,13 @@ void log_flush(LOG_MODE new_mode) {
+@@ -276,6 +276,25 @@ void log_flush(LOG_MODE new_mode) {
      CRYPTO_THREAD_unlock(stunnel_locks[LOCK_LOG_MODE]);
  }
  
-+#ifdef WITH_WOLFSSL
-+void wolfSSL_s_log(const int level, const char *const format)
-+{
-+    s_log(level+3, "wolfSSL Logs: %s", format);
++#ifdef WOLFSSL_DEBUG_ON
++/* map the wolfSSL logging levels onto the syslog levels used by stunnel */
++void wolfSSL_s_log(const int level, const char *const msg) {
++    int s_level;
++
++    switch(level) {
++    case ERROR_LOG:
++        s_level=LOG_ERR;
++        break;
++    case INFO_LOG:
++        s_level=LOG_INFO;
++        break;
++    default: /* ENTER_LOG, LEAVE_LOG, OTHER_LOG */
++        s_level=LOG_DEBUG;
++    }
++    s_log(s_level, "wolfSSL: %s", msg);
 +}
-+#endif
++#endif /* WOLFSSL_DEBUG_ON */
 +
  NOEXPORT void log_raw(SERVICE_OPTIONS *opt,
          int level, char *stamp, char *id, char *text) {
      char *line;
 diff --git a/src/mingw_wolfssl.mk b/src/mingw_wolfssl.mk
 new file mode 100644
-index 0000000..7637107
+index 0000000..8da9e2e
 --- /dev/null
 +++ b/src/mingw_wolfssl.mk
-@@ -0,0 +1,70 @@
-+## mingw/mingw64 Makefile
-+# by Michal Trojnara 1998-2020
+@@ -0,0 +1,76 @@
++## mingw/mingw64 Makefile for wolfSSL
++# by Michal Trojnara 1998-2023
 +
 +# 32-bit Windows
 +#win32_arch=win32
@@ -1475,15 +1505,24 @@ index 0000000..7637107
 +bindir = ../bin/$(win32_arch)
 +objdir = ../obj/$(win32_arch)
 +
-+win32_ssl_dir = /opt/wolfssl_dll
++ifeq ($(win32_ssl_dir),)
++win32_ssl_dir := /opt/wolfssl_dll
++endif
 +win32_cppflags = -I$(win32_ssl_dir)/include -I$(win32_ssl_dir)/include/wolfssl
 +win32_cflags = -g -mthreads -O2
-+#win32_cflags += -fstack-protector
-+win32_cflags += -Wall -Wextra -Wpedantic -Wformat=2 -Wconversion -Wno-long-long
++win32_cflags += -fstack-protector
++win32_cflags += -Wall -Wextra -Wpedantic -Wconversion -std=c99
 +win32_cflags += -D_FORTIFY_SOURCE=2 -DUNICODE -D_UNICODE -DWITH_WOLFSSL
-+win32_ldflags = -g -mthreads
-+#win32_ldflags += -fstack-protector
-+# -fstack-protector is broken (at least in x86_64-w64-mingw32-gcc 8.2.0)
++win32_ldflags = -g -mthreads -pipe
++win32_ldflags += -fstack-protector
++win32_ldflags += -Wl,--dynamicbase,--nxcompat,--no-seh,--tsaware,--no-insert-timestamp
++ifeq ($(win32_arch),win64)
++win32_ldflags += -Wl,--high-entropy-va
++else
++win32_ldflags += -Wl,--large-address-aware
++endif
++
++# -fstack-protector was broken in x86_64-w64-mingw32-gcc 8.2.0
 +
 +# compiling with -D_FORTIFY_SOURCE=2 may require linking with -lssp
 +win32_common_libs = -lws2_32 -lkernel32 -lssp
@@ -1493,7 +1532,7 @@ index 0000000..7637107
 +
 +common_headers = common.h prototypes.h version.h
 +win32_common = tls str file client log options protocol network resolver
-+win32_common += ssl ctx verify sthreads fd dhparam cron stunnel
++win32_common += ssl ctx verify ocsp sthreads fd dhparam cron stunnel
 +win32_gui = ui_win_gui resources
 +win32_cli = ui_win_cli
 +win32_common_objs = $(addsuffix .o, $(addprefix $(objdir)/, $(win32_common)))
@@ -1511,12 +1550,9 @@ index 0000000..7637107
 +
 +$(bindir)/stunnel.exe: $(win32_common_objs) $(win32_gui_objs)
 +	$(win32_cc) -mwindows $(win32_ldflags) -o $(bindir)/stunnel.exe $(win32_common_objs) $(win32_gui_objs) $(win32_gui_libs)
-+#	-$(srcdir)/../sign/sign.sh $(bindir)/stunnel.exe
 +
 +$(bindir)/tstunnel.exe: $(win32_common_objs) $(win32_cli_objs)
 +	$(win32_cc) $(win32_ldflags) -o $(bindir)/tstunnel.exe $(win32_common_objs) $(win32_cli_objs) $(win32_cli_libs)
-+# 	-$(srcdir)/../sign/sign.sh $(bindir)/tstunnel.exe
-+	
 +
 +$(objdir)/%.o: $(srcdir)/%.c
 +	$(win32_cc) -c $(win32_cppflags) $(win32_cflags) -o $@ $<
@@ -1530,10 +1566,10 @@ index 0000000..7637107
 +
 +$(objdir)/resources.o: $(srcdir)/version.h
 diff --git a/src/ocsp.c b/src/ocsp.c
-index 5073ded..936a4b2 100644
+index 5073ded..c453988 100644
 --- a/src/ocsp.c
 +++ b/src/ocsp.c
-@@ -39,6 +39,60 @@
+@@ -39,6 +39,65 @@
  
  #ifndef OPENSSL_NO_OCSP
  
@@ -1555,6 +1591,11 @@ index 5073ded..936a4b2 100644
 +            "OCSP: \"OCSP\" and \"OCSPaia\" are mutually exclusive");
 +        return 1; /* FAILED */
 +    }
++    /* wolfSSL drives the responder itself, so these have no effect here */
++    if(section->option.nonce)
++        s_log(LOG_NOTICE, "OCSP: \"OCSPnonce\" is ignored with wolfSSL");
++    if(section->ocsp_flags)
++        s_log(LOG_NOTICE, "OCSP: \"OCSPflag\" is ignored with wolfSSL");
 +    if(section->ocsp_url) {
 +        if(wolfSSL_CTX_SetOCSP_OverrideURL(section->ctx,
 +                section->ocsp_url)!=SSL_SUCCESS) {
@@ -1594,7 +1635,7 @@ index 5073ded..936a4b2 100644
  #define INVALID_TIME ((time_t)-1)
  #ifdef DEFINE_STACK_OF
  /* defined in openssl/safestack.h:
-@@ -906,4 +960,6 @@ NOEXPORT time_t time_t_get_asn1_time(const ASN1_TIME *s) {
+@@ -906,4 +965,6 @@ NOEXPORT time_t time_t_get_asn1_time(const ASN1_TIME *s) {
  }
  #endif /* OpenSSL version 1.1.0 or later */
  
@@ -1602,10 +1643,10 @@ index 5073ded..936a4b2 100644
 +
  #endif /* !defined(OPENSSL_NO_OCSP) */
 diff --git a/src/options.c b/src/options.c
-index 1a88139..2bc51c7 100644
+index 1a88139..de029a0 100644
 --- a/src/options.c
 +++ b/src/options.c
-@@ -326,13 +326,23 @@ static SERVICE_OPTIONS new_service_options;
+@@ -326,10 +326,20 @@ static SERVICE_OPTIONS new_service_options;
  static const char *option_not_found=
      "Specified option name is not valid here";
  
@@ -1625,11 +1666,7 @@ index 1a88139..2bc51c7 100644
 +#endif /* WITH_WOLFSSL */
  
  #ifndef OPENSSL_NO_TLS1_3
--static const char *stunnel_ciphersuites=
-+static char *stunnel_ciphersuites=
-     "TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256";
- #endif /* TLS 1.3 */
- 
+ static const char *stunnel_ciphersuites=
 @@ -1598,7 +1608,7 @@ NOEXPORT const char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr
          break;
      }
@@ -1639,19 +1676,7 @@ index 1a88139..2bc51c7 100644
  
      /* checkEmail */
      switch(cmd) {
-@@ -1759,7 +1769,11 @@ NOEXPORT const char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr
-         }
-         break;
-     case CMD_PRINT_DEFAULTS:
-+    #ifdef WITH_WOLFSSL
-+        s_log(LOG_NOTICE, "wolfSSL will choose the most secure cipher supported by both client and server");
-+    #else
-         s_log(LOG_NOTICE, "%-22s = %s %s", "ciphersuites", stunnel_ciphersuites, "(with TLSv1.3)");
-+    #endif
-         break;
-     case CMD_PRINT_HELP:
-         s_log(LOG_NOTICE, "%-22s = permitted ciphersuites for TLS 1.3", "ciphersuites");
-@@ -3989,6 +4003,8 @@ NOEXPORT const char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr
+@@ -3989,6 +3999,8 @@ NOEXPORT const char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr
              if(endpoints!=1)
                  return "Inetd mode must define one endpoint";
          }
@@ -1660,7 +1685,7 @@ index 1a88139..2bc51c7 100644
  #ifdef SSL_OP_NO_TICKET
          /* disable RFC4507 support introduced in OpenSSL 0.9.8f */
          /* OpenSSL 1.1.1 is required to serialize application data
-@@ -4000,6 +4016,7 @@ NOEXPORT const char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr
+@@ -4000,6 +4012,7 @@ NOEXPORT const char *parse_service_option(CMD cmd, SERVICE_OPTIONS **section_ptr
                  !section->option.connect_before_ssl)
              section->ssl_options_set|=SSL_OP_NO_TICKET;
  #endif /* SSL_OP_NO_TICKET */
@@ -1669,7 +1694,7 @@ index 1a88139..2bc51c7 100644
              return "Failed to initialize TLS context";
          break;
 diff --git a/src/prototypes.h b/src/prototypes.h
-index 40bbc85..8052fc6 100644
+index 40bbc85..7e27d7f 100644
 --- a/src/prototypes.h
 +++ b/src/prototypes.h
 @@ -72,7 +72,9 @@ typedef struct servername_list_struct SERVERNAME_LIST;
@@ -1697,9 +1722,9 @@ index 40bbc85..8052fc6 100644
      ;
  #endif
 +
-+#ifdef WITH_WOLFSSL
-+void wolfSSL_s_log(int , const char *);
-+#endif
++#ifdef WOLFSSL_DEBUG_ON
++void wolfSSL_s_log(int, const char *);
++#endif /* WOLFSSL_DEBUG_ON */
 +
  void s_vlog(int, const char *, va_list);
  char *log_id(CLI *);
@@ -1890,7 +1915,7 @@ index 0e45ad7..fd6fe4b 100644
      int64_t d = (*a)->total - (*b)->total;
      if(d>0)
 diff --git a/src/stunnel.c b/src/stunnel.c
-index e25d5a2..495d19b 100644
+index e25d5a2..9f334b7 100644
 --- a/src/stunnel.c
 +++ b/src/stunnel.c
 @@ -47,7 +47,9 @@
@@ -1903,49 +1928,38 @@ index e25d5a2..495d19b 100644
  
  #ifdef __GNUC__
  #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-@@ -126,6 +128,10 @@ void main_init() { /* one-time initialization */
-         fatal("TLS initialization failed");
-     if(sthreads_init()) /* initialize critical sections & TLS callbacks */
-         fatal("Threads initialization failed");
-+#ifdef WITH_WOLFSSL
-+    if(ssl_init()) /* initialize TLS library */
-+        fatal("TLS initialization failed");
-+#endif
-     options_defaults(); /* initialize defaults */
-     options_apply(); /* apply the defaults */
- #ifndef USE_FORK
 diff --git a/src/ui_unix.c b/src/ui_unix.c
-index 50d325c..0f4f01c 100644
+index 50d325c..a2983e7 100644
 --- a/src/ui_unix.c
 +++ b/src/ui_unix.c
 @@ -71,6 +71,10 @@ NOEXPORT int main_unix(int argc, char* argv[]) {
          fatal("Could not open /dev/null");
  #endif
      main_init();
-+#ifdef WITH_WOLFSSL
++#ifdef WOLFSSL_DEBUG_ON
 +    wolfSSL_Debugging_ON();
 +    wolfSSL_SetLoggingCb(wolfSSL_s_log);
-+#endif
++#endif /* WOLFSSL_DEBUG_ON */
      configure_status=main_configure(argc>1 ? argv[1] : NULL,
          argc>2 ? argv[2] : NULL);
      switch(configure_status) {
 diff --git a/src/ui_win_cli.c b/src/ui_win_cli.c
-index 8824c85..e8a2897 100644
+index 8824c85..190a2d9 100644
 --- a/src/ui_win_cli.c
 +++ b/src/ui_win_cli.c
 @@ -46,6 +46,10 @@ int main(int argc, char *argv[]) {
          return 1;
      resolver_init();
      main_init();
-+#ifdef WITH_WOLFSSL
++#ifdef WOLFSSL_DEBUG_ON
 +    wolfSSL_Debugging_ON();
 +    wolfSSL_SetLoggingCb(wolfSSL_s_log);
-+#endif
++#endif /* WOLFSSL_DEBUG_ON */
      if(!main_configure(argc>1 ? argv[1] : NULL, argc>2 ? argv[2] : NULL))
          daemon_loop();
      main_cleanup();
 diff --git a/src/ui_win_gui.c b/src/ui_win_gui.c
-index 05ddb70..6bcb039 100644
+index 05ddb70..a5cb12b 100644
 --- a/src/ui_win_gui.c
 +++ b/src/ui_win_gui.c
 @@ -91,8 +91,10 @@ NOEXPORT void peer_menu_update(void);
@@ -1963,10 +1977,10 @@ index 05ddb70..6bcb039 100644
      (void)nCmdShow; /* squash the unused parameter warning */
  
      tls_init(); /* initialize thread-local storage */
-+#ifdef WITH_WOLFSSL
++#ifdef WOLFSSL_DEBUG_ON
 +    wolfSSL_Debugging_ON();
 +    wolfSSL_SetLoggingCb(wolfSSL_s_log);
-+#endif
++#endif /* WOLFSSL_DEBUG_ON */
      ghInst=this_instance;
  
      crypto_init(); /* initialize libcrypto */
@@ -1980,7 +1994,7 @@ index 05ddb70..6bcb039 100644
  NOEXPORT int pin_cb(UI *ui, UI_STRING *uis) {
      if(!DialogBox(ghInst, TEXT("PassBox"), hwnd, (DLGPROC)pass_proc))
 diff --git a/src/verify.c b/src/verify.c
-index e59ac49..27f69e2 100644
+index e59ac49..48bb942 100644
 --- a/src/verify.c
 +++ b/src/verify.c
 @@ -50,7 +50,7 @@ NOEXPORT void auth_warnings(SERVICE_OPTIONS *);
@@ -2007,7 +2021,7 @@ index e59ac49..27f69e2 100644
      ca_dn=sk_X509_NAME_new_null();
  
  #ifndef OPENSSL_NO_ENGINE
-@@ -120,6 +128,7 @@ NOEXPORT int init_ca(SERVICE_OPTIONS *section) {
+@@ -120,9 +128,18 @@ NOEXPORT int init_ca(SERVICE_OPTIONS *section) {
          SSL_add_file_cert_subjects_to_stack(ca_dn, section->ca_file);
      if(section->ca_dir)
          SSL_add_dir_cert_subjects_to_stack(ca_dn, section->ca_dir);
@@ -2015,20 +2029,35 @@ index e59ac49..27f69e2 100644
  
      if(!sk_X509_NAME_num(ca_dn)) {
          sk_X509_NAME_pop_free(ca_dn, X509_NAME_free);
-@@ -156,6 +165,12 @@ NOEXPORT int init_crl(SERVICE_OPTIONS *section) {
++#ifdef WITH_WOLFSSL
++        /* wolfSSL cannot enumerate the subjects of a CApath directory, so an
++         * empty list here does not mean that no CA was loaded above */
++        if(section->ca_dir) {
++            s_log(LOG_INFO, "Trusted CA list not available for CApath");
++            return 0; /* OK */
++        }
++#endif /* WITH_WOLFSSL */
+         return 1; /* FAILED */
+     }
+ 
+@@ -156,6 +173,16 @@ NOEXPORT int init_crl(SERVICE_OPTIONS *section) {
          if(add_dir_lookup(store, section->crl_dir))
              return 1; /* FAILED */
      }
 +#ifdef WITH_WOLFSSL
-+    /* adding a CRL implicitly enables WOLFSSL_CRL_CHECKALL, which requires
-+     * a CRL for every certificate of the chain; clear it, so that only the
-+     * X509_V_FLAG_CRL_CHECK requested below is in effect */
++    /* adding a CRL implicitly enables WOLFSSL_CRL_CHECKALL, which requires a
++     * CRL for every certificate of the chain; downgrade it to a leaf-only
++     * check to match X509_V_FLAG_CRL_CHECK */
 +    wolfSSL_CTX_DisableCRL(section->ctx);
++    if(wolfSSL_CTX_EnableCRL(section->ctx, WOLFSSL_CRL_CHECK)!=SSL_SUCCESS) {
++        sslerror("wolfSSL_CTX_EnableCRL");
++        return 1; /* FAILED */
++    }
 +#endif /* WITH_WOLFSSL */
      X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK);
      return 0; /* OK */
  }
-@@ -230,7 +245,7 @@ NOEXPORT void auth_warnings(SERVICE_OPTIONS *section) {
+@@ -230,7 +257,7 @@ NOEXPORT void auth_warnings(SERVICE_OPTIONS *section) {
  /**************************************** verify callback */
  
  NOEXPORT int verify_callback(int preverify_ok, X509_STORE_CTX *callback_ctx) {
@@ -2037,16 +2066,19 @@ index e59ac49..27f69e2 100644
      SSL *ssl;
      CLI *c;
  
-@@ -239,7 +254,7 @@ NOEXPORT int verify_callback(int preverify_ok, X509_STORE_CTX *callback_ctx) {
+@@ -239,6 +266,11 @@ NOEXPORT int verify_callback(int preverify_ok, X509_STORE_CTX *callback_ctx) {
          SSL_get_ex_data_X509_STORE_CTX_idx());
      c=SSL_get_ex_data(ssl, index_ssl_cli);
  
--    if(!c->opt->option.verify_chain && !c->opt->option.verify_peer) {
-+    if(!c || (!c->opt->option.verify_chain && !c->opt->option.verify_peer)) {
++    if(!c) { /* no context: we cannot tell what was configured */
++        s_log(LOG_ERR,
++            "INTERNAL ERROR: verify_callback() called without CLI");
++        return 0; /* reject */
++    }
+     if(!c->opt->option.verify_chain && !c->opt->option.verify_peer) {
          s_log(LOG_INFO, "CERT: Certificate verification disabled");
          return 1; /* accept */
-     }
-@@ -318,10 +333,10 @@ NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
+@@ -318,10 +350,10 @@ NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
      }
  
      if(depth==0) { /* additional peer certificate checks */
@@ -2059,7 +2091,7 @@ index e59ac49..27f69e2 100644
          if(c->opt->option.verify_peer && !cert_check_local(callback_ctx))
              return 0; /* reject */
      }
-@@ -329,7 +344,7 @@ NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
+@@ -329,7 +361,7 @@ NOEXPORT int cert_check(CLI *c, X509_STORE_CTX *callback_ctx,
      return 1; /* accept */
  }
  
@@ -2068,7 +2100,7 @@ index e59ac49..27f69e2 100644
  NOEXPORT int cert_check_subject(CLI *c, X509_STORE_CTX *callback_ctx) {
      X509 *cert=X509_STORE_CTX_get_current_cert(callback_ctx);
      NAME_LIST *ptr;
-@@ -365,7 +380,7 @@ NOEXPORT int cert_check_subject(CLI *c, X509_STORE_CTX *callback_ctx) {
+@@ -365,7 +397,7 @@ NOEXPORT int cert_check_subject(CLI *c, X509_STORE_CTX *callback_ctx) {
      s_log(LOG_WARNING, "CERT: Subject checks failed");
      return 0; /* reject */
  }
@@ -2077,7 +2109,7 @@ index e59ac49..27f69e2 100644
  
  #if OPENSSL_VERSION_NUMBER>=0x10000000L
  /* modern implementation for OpenSSL version >= 1.0.0 */
-@@ -379,7 +394,7 @@ NOEXPORT int cert_check_local(X509_STORE_CTX *callback_ctx) {
+@@ -379,7 +411,7 @@ NOEXPORT int cert_check_local(X509_STORE_CTX *callback_ctx) {
      cert=X509_STORE_CTX_get_current_cert(callback_ctx);
      subject=X509_get_subject_name(cert);
  
@@ -2086,52 +2118,37 @@ index e59ac49..27f69e2 100644
  #define X509_STORE_CTX_get1_certs X509_STORE_get1_certs
  #endif
      /* modern API allows retrieving multiple matching certificates */
-@@ -431,6 +446,44 @@ NOEXPORT int cert_check_local(X509_STORE_CTX *callback_ctx) {
+@@ -431,6 +463,29 @@ NOEXPORT int cert_check_local(X509_STORE_CTX *callback_ctx) {
  #endif /* OPENSSL_VERSION_NUMBER>=0x10000000L */
  
  NOEXPORT int compare_pubkeys(X509 *c1, X509 *c2) {
 +#ifdef WITH_WOLFSSL
-+    int c1Sz;
-+    unsigned char *c1Data;
-+    int c2Sz;
-+    unsigned char *c2Data;
-+    int ret;
++    unsigned char *c1Data=NULL, *c2Data=NULL;
++    int c1Sz=0, c2Sz=0;
++    int ret=0; /* reject */
 +
-+    /* First, call wolfSSL_X509_get_pubkey_buffer with NULL buffer, to get 
-+     * the required buffer size. */
-+    ret = wolfSSL_X509_get_pubkey_buffer(c1, NULL, &c1Sz);
-+    if (ret != WOLFSSL_SUCCESS) {
-+        return 0; /* reject */
++    /* the first call with a NULL buffer only retrieves the required size */
++    if(wolfSSL_X509_get_pubkey_buffer(c1, NULL, &c1Sz)==WOLFSSL_SUCCESS &&
++            wolfSSL_X509_get_pubkey_buffer(c2, NULL, &c2Sz)==WOLFSSL_SUCCESS &&
++            c1Sz>0 && c1Sz==c2Sz) {
++        c1Data=str_alloc((size_t)c1Sz);
++        c2Data=str_alloc((size_t)c2Sz);
++        if(wolfSSL_X509_get_pubkey_buffer(c1, c1Data, &c1Sz)==WOLFSSL_SUCCESS &&
++                wolfSSL_X509_get_pubkey_buffer(c2, c2Data, &c2Sz)==WOLFSSL_SUCCESS &&
++                c1Sz==c2Sz &&
++                !safe_memcmp(c1Data, c2Data, (size_t)c1Sz)) {
++            ret=1; /* accept */
++            s_log(LOG_INFO, "CERT: Locally installed certificate matched");
++        }
 +    }
-+    c1Data = (unsigned char*) malloc((size_t)c1Sz);
-+    
-+    ret = wolfSSL_X509_get_pubkey_buffer(c2, NULL, &c2Sz);
-+    if (ret != WOLFSSL_SUCCESS) {
-+        return 0; /* reject */
-+    }
-+    c2Data = (unsigned char*) malloc((size_t)c2Sz);
-+
-+    if (c1Data == NULL
-+     || c2Data == NULL
-+     || wolfSSL_X509_get_pubkey_buffer(c1, c1Data, &c1Sz) != WOLFSSL_SUCCESS
-+     || wolfSSL_X509_get_pubkey_buffer(c2, c2Data, &c2Sz) != WOLFSSL_SUCCESS
-+     || c1Sz != c2Sz || safe_memcmp(c1Data, c2Data, (size_t)c1Sz)) {
-+        ret = 0; /* reject */
-+    }
-+    else {
-+        ret = 1; /* accept */
-+        s_log(LOG_INFO, "CERT: Locally installed certificate matched");
-+    }
-+
-+    free(c1Data);
-+    free(c2Data);
-+
++    str_free(c1Data);
++    str_free(c2Data);
 +    return ret;
 +#else
      ASN1_BIT_STRING *k1=X509_get0_pubkey_bitstr(c1);
      ASN1_BIT_STRING *k2=X509_get0_pubkey_bitstr(c2);
      if(!k1 || !k2 || k1->length!=k2->length || k1->length<0 ||
-@@ -438,6 +491,7 @@ NOEXPORT int compare_pubkeys(X509 *c1, X509 *c2) {
+@@ -438,6 +493,7 @@ NOEXPORT int compare_pubkeys(X509 *c1, X509 *c2) {
          return 0; /* reject */
      s_log(LOG_INFO, "CERT: Locally installed certificate matched");
      return 1; /* accept */
@@ -2139,23 +2156,33 @@ index e59ac49..27f69e2 100644
  }
  
  #ifndef OPENSSL_NO_ENGINE
-@@ -480,6 +534,15 @@ void print_CA_list(const char *type, const STACK_OF(X509_NAME) *ca_dn) {
+@@ -480,6 +536,25 @@ void print_CA_list(const char *type, const STACK_OF(X509_NAME) *ca_dn) {
  
  char *X509_NAME2text(X509_NAME *name) {
      char *text;
 +#ifdef WITH_WOLFSSL
-+    int sz;
++    int sz, i;
++
 +    sz=wolfSSL_X509_NAME_get_sz(name);
 +    if(sz<=0)
-+        return str_dup("Invalid X509_NAME");
-+    text=str_alloc((size_t)sz+1); /* one byte for '\0' excape */
-+    text=wolfSSL_X509_NAME_oneline(name, text, sz);
++        return str_dup("wolfSSL_X509_NAME_get_sz() failed");
++    text=str_alloc((size_t)sz+1); /* one byte for the terminating '\0' */
++    if(!wolfSSL_X509_NAME_oneline(name, text, sz)) {
++        str_free(text);
++        return str_dup("wolfSSL_X509_NAME_oneline() failed");
++    }
 +    text[sz]='\0';
++    /* wolfSSL_X509_NAME_oneline() does not escape control characters, which a
++     * peer could otherwise use to forge log entries */
++    for(i=0; text[i]; ++i) {
++        if((unsigned char)text[i]<0x20 || (unsigned char)text[i]==0x7f)
++            text[i]='?';
++    }
 +#else
      BIO *bio;
      int n;
  
-@@ -498,6 +561,7 @@ char *X509_NAME2text(X509_NAME *name) {
+@@ -498,6 +573,7 @@ char *X509_NAME2text(X509_NAME *name) {
      }
      text[n]='\0';
      BIO_free(bio);
@@ -2164,7 +2191,7 @@ index e59ac49..27f69e2 100644
  }
  
 diff --git a/tests/maketest.py b/tests/maketest.py
-index e48ac02..0063a6d 100644
+index e48ac02..e74cb84 100644
 --- a/tests/maketest.py
 +++ b/tests/maketest.py
 @@ -61,8 +61,8 @@ RE_STUNNEL_VERSION = re.compile(
@@ -2173,8 +2200,8 @@ index e48ac02..0063a6d 100644
      r""" ^
 -    Compiled\/running\swith\sOpenSSL\s+
 -    (?P<version> (?: [0-3]\.[0-9]\.[0-9]* ) \S+)
-+    Compiled\/running\swith\s((OpenSSL)|(wolfSSL))\s+
-+    (?P<version> (?: [0-5]\.[0-9]\.[0-9]* ) \S+)
++    Compiled\/running\swith\s(?: OpenSSL | wolfSSL )\s+
++    (?P<version> [0-9]+ \. [0-9]+ \. [0-9]+ \S* )
      (?: \s .* )?
      $ """,
      re.X
@@ -2182,11 +2209,11 @@ index e48ac02..0063a6d 100644
      summary: pathlib.Path
      debug: int
      port: int
-+    plugin: str
++    plugin: Optional[str]
  
  
  class TestConnections(NamedTuple):
-@@ -1984,6 +1985,13 @@ def parse_args() -> Config:
+@@ -1984,7 +1985,24 @@ def parse_args() -> Config:
          help="OCSP responder port number"
          f"(default: {DEFAULT_PORT})"
      )
@@ -2198,9 +2225,20 @@ index e48ac02..0063a6d 100644
 +        "(default: All)",
 +    )
      args = parser.parse_args()
++    if args.plugin is not None:
++        available = sorted(
++            path.stem
++            for path in (pathlib.Path(__file__).parent / "plugins").glob("p*.py")
++        )
++        if args.plugin not in available:
++            parser.error(
++                f"unknown plugin '{args.plugin}'; "
++                f"available: {', '.join(available)}"
++            )
      utf8_env = dict(os.environ)
      # environment can only contain strings
-@@ -2013,7 +2021,8 @@ def parse_args() -> Config:
+     utf8_env.update({
+@@ -2013,7 +2031,8 @@ def parse_args() -> Config:
              results=os.path.join(args.logs, "results.log"),
              summary=os.path.join(args.logs, "summary.log"),
              debug=args.debug,
@@ -2211,32 +2249,32 @@ index e48ac02..0063a6d 100644
  
  
 diff --git a/tests/plugin_collection.py b/tests/plugin_collection.py
-index 8590d53..e1fa3dd 100644
+index 8590d53..b8b913d 100644
 --- a/tests/plugin_collection.py
 +++ b/tests/plugin_collection.py
-@@ -6,6 +6,7 @@ import inspect
- import os
- import posix
- import pkgutil
-+import time
- 
- 
- def err_msg(err: int) -> str:
-@@ -94,6 +95,9 @@ class PluginCollection():
+@@ -94,6 +94,9 @@ class PluginCollection():
              )
          )
          for plugin in self.plugins:
-+            if self.cfg.plugin is not None and plugin.__module__.replace('plugins.', '') != self.cfg.plugin:
-+                time.sleep(0.1)
++            if self.cfg.plugin is not None and \
++                    plugin.__module__.replace('plugins.', '') != self.cfg.plugin:
 +                continue
              await self.cfg.mainq.put(LogEvent(etype="log", level=20, log=""))
              await self.cfg.mainq.put(
                  LogEvent(
 diff --git a/tests/plugins/p08_ipv6.py b/tests/plugins/p08_ipv6.py
-index dbfb473..8b2208c 100644
+index dbfb473..4bdf861 100644
 --- a/tests/plugins/p08_ipv6.py
 +++ b/tests/plugins/p08_ipv6.py
-@@ -25,6 +25,9 @@ class IPv6Test(StunnelTest):
+@@ -3,6 +3,7 @@
+ import logging
+ import os
+ import pathlib
++import socket
+ from plugin_collection import Plugin, ERR_CONN_RESET
+ from maketest import (
+     Config,
+@@ -25,6 +26,9 @@ class IPv6Test(StunnelTest):
      def __init__(self, cfg: Config, logger: logging.Logger):
          super().__init__(cfg, logger)
          self.params.description = '081. Test IPv6 support'
@@ -2246,17 +2284,16 @@ index dbfb473..8b2208c 100644
          self.events.failure = [
              "peer did not return a certificate",
              "bad certificate",
-@@ -92,5 +95,13 @@ class StunnelClientTest(Plugin):
+@@ -92,5 +96,12 @@ class StunnelClientTest(Plugin):
  
      async def perform_operation(self, cfg: Config, logger: logging.Logger) -> None:
          """Run tests"""
 +        try:
-+            # check that ipv6 is supported
-+            import socket
-+            s = socket.socket(family=socket.AF_INET6)
-+            s.bind(('::1', 12345))
-+            s.close()
-+        except OSError:
++            # check that IPv6 is supported before exercising the test
++            with socket.socket(family=socket.AF_INET6) as sock:
++                sock.bind(('::1', 0))
++        except OSError as err:
++            logger.info("[p08_ipv6] IPv6 unavailable, skipping: %s", err)
 +            return
          stunnel = IPv6Test(cfg, logger)
          await stunnel.test_stunnel(cfg)
@@ -2300,68 +2337,22 @@ index e778d21..cb3d88a 100644
              "fips mode not supported",
              r"FIPS PROVIDER.*could not load the shared library",
              r"FIPS PROVIDER.*missing config data"
-diff --git a/tests/plugins/p16_redirect.py b/tests/plugins/p16_redirect.py
-index 4287f26..c39b35f 100644
---- a/tests/plugins/p16_redirect.py
-+++ b/tests/plugins/p16_redirect.py
-@@ -33,7 +33,7 @@ class RedirectWrongPeerCert(StunnelTest):
-         self.events.failure = [
-             "peer did not return a certificate",
-             "bad certificate",
--            "certificate verify failed",
-+            # "certificate verify failed",
-             "unsupported protocol",
-             "TLS accepted: previous session reused",
-             #"Redirecting connection",
-@@ -132,7 +132,7 @@ class NoRedirectCorrectPeerCert(StunnelTest):
-         self.events.failure = [
-             "peer did not return a certificate",
-             "bad certificate",
--            "certificate verify failed",
-+            # "certificate verify failed",
-             "unsupported protocol",
-             "TLS accepted: previous session reused",
-             "Redirecting connection",
-@@ -182,7 +182,7 @@ class RedirectWrongChainCert(StunnelTest):
-         self.events.failure = [
-             "peer did not return a certificate",
-             "bad certificate",
--            "certificate verify failed",
-+            # "certificate verify failed",
-             "unsupported protocol",
-             "TLS accepted: previous session reused",
-             #"Redirecting connection",
-diff --git a/tests/plugins/p17_redirect_proxy.py b/tests/plugins/p17_redirect_proxy.py
-index 716a965..52a4733 100644
---- a/tests/plugins/p17_redirect_proxy.py
-+++ b/tests/plugins/p17_redirect_proxy.py
-@@ -33,7 +33,7 @@ class RedirectProxyWrongPeerCert(StunnelTest):
-         self.events.failure = [
-             "peer did not return a certificate",
-             "bad certificate",
--            "certificate verify failed",
-+            # "certificate verify failed",
-             "unsupported protocol",
-             "TLS accepted: previous session reused",
-             #"Redirecting connection",
-diff --git a/tests/plugins/p18_redirect_resume.py b/tests/plugins/p18_redirect_resume.py
-index 97cd5aa..c09e9fe 100644
---- a/tests/plugins/p18_redirect_resume.py
-+++ b/tests/plugins/p18_redirect_resume.py
-@@ -39,7 +39,7 @@ class ResumeRedirectWrongCert(StunnelTest):
-         self.events.failure = [
-             "peer did not return a certificate",
-             "bad certificate",
--            "certificate verify failed",
-+            # "certificate verify failed",
-             "unsupported protocol",
-             #"TLS accepted: previous session reused",
-             #"Redirecting connection",
 diff --git a/tests/plugins/p27_ocsp.py b/tests/plugins/p27_ocsp.py
-index cf5e465..c0d6235 100644
+index cf5e465..62509fd 100644
 --- a/tests/plugins/p27_ocsp.py
 +++ b/tests/plugins/p27_ocsp.py
-@@ -33,6 +33,9 @@ class VerifyOCSPStapling(StunnelTest):
+@@ -1,5 +1,10 @@
+ """stunnel client-server tests"""
+ 
++# A wolfSSL build delegates OCSP to the wolfSSL built-in client and does not
++# implement TLS OCSP stapling, so none of these tests can observe stunnel's own
++# "OCSP:" verdicts. ocsp_init() logs the marker below for every service, which
++# makes all four tests skip on wolfSSL while leaving OpenSSL runs untouched.
++
+ import logging
+ import os
+ import pathlib
+@@ -33,6 +38,9 @@ class VerifyOCSPStapling(StunnelTest):
          self.events.success = [
              r"OCSP: Accepted \(good\)"
          ]
@@ -2371,7 +2362,7 @@ index cf5e465..c0d6235 100644
          self.events.failure = [
              "peer did not return a certificate",
              "bad certificate",
-@@ -103,6 +106,9 @@ class VerifyOCSPClientDriven(StunnelTest):
+@@ -103,6 +111,9 @@ class VerifyOCSPClientDriven(StunnelTest):
          self.events.success = [
              r"OCSP: Accepted \(good\)"
          ]
@@ -2381,7 +2372,7 @@ index cf5e465..c0d6235 100644
          self.events.failure = [
              "peer did not return a certificate",
              "bad certificate",
-@@ -175,6 +181,9 @@ class FailureVerifyOCSPStapling(StunnelTest):
+@@ -175,6 +186,9 @@ class FailureVerifyOCSPStapling(StunnelTest):
          self.events.success = [
              r"OCSP: Rejected \(revoked\)"
          ]
@@ -2391,7 +2382,7 @@ index cf5e465..c0d6235 100644
          self.events.failure = [
              "peer did not return a certificate",
              #"bad certificate",
-@@ -246,6 +255,9 @@ class FailureVerifyOCSPClientDriven(StunnelTest):
+@@ -246,6 +260,9 @@ class FailureVerifyOCSPClientDriven(StunnelTest):
          self.events.success = [
              "Rejected by OCSP at depth=0"
          ]
