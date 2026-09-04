@@ -40,7 +40,7 @@ Each project port included in this repository is contained in its own subdirecto
 | net-snmp | Simple Network Management Protocol | [Link](http://www.net-snmp.org/) | | [README](./net-snmp/README.md) |
 | ntp | Network Time Protocol | [Link](http://www.ntp.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-ntp/) | [README](./ntp/4.2.8p15/README.md) |
 | NXP SE05X Middleware | wolfSSL HostCrypto support patch | [Link](https://www.nxp.com/products/security-and-authentication/authentication/edgelock-se050-plug-trust-secure-element-family-enhanced-iot-security-with-high-flexibility:SE050) | | [README](./nxp-se05x-middleware/README.md) |
-| openldap | Open source lightweight directory access protocol | [Link](https://www.openldap.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-openldap/) | [README](./openldap/2.4.47/README.md) |
+| openldap | Open source lightweight directory access protocol | [Link](https://www.openldap.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-openldap/) | [README](./openldap/2.6.13/README.md) |
 | openpegasus  | Open source DMTF CIM and WBEM | [Link](https://collaboration.opengroup.org/pegasus/) | [Link](https://www.wolfssl.com/openpegasus-port-support-added-wolfssl/) | [README](./openpegasus/2.14.1/README.md) |
 | openresty | Nginx and LuaJIT-based web platform | [Link](https://openresty.org/en/) | | [README](./openresty/INSTRUCTIONS.md) |
 | openssh-patches | OpenSSH | [Link](https://www.openssh.com/) | [Link](https://www.wolfssl.com/wolfssl-openssh-expanded-openssl-compatibility/) | [README](./openssh-patches/README) |
