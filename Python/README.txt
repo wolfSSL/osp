@@ -205,3 +205,40 @@ $ export LD_LIBRARY_PATH=/usr/local/lib
 Run the ssl tests with:
 
 $ make test TESTOPTS="-v test_ssl"
+
+# 3.14 Patches
+
+These patches are for the Python 3.14.x series. The actively tested version
+is 3.14.5, which can be downloaded from
+
+https://www.python.org/ftp/python/3.14.5/Python-3.14.5.tar.xz
+
+The following wolfSSL configuration is required for Python 3.14.x (see
+build-wolfssl_py314.sh):
+
+$ cd wolfssl-master
+$ ./configure --enable-all --enable-tlsv10 CPPFLAGS="-DHAVE_SECRET_CALLBACK -DWOLFSSL_PYTHON"
+$ make check
+
+After compiling wolfSSL, install:
+
+$ sudo make install
+
+To build Python-3.14.5 with wolfSSL enabled:
+
+$ tar xvf Python-3.14.5.tar.xz
+$ cd Python-3.14.5
+$ patch -p1 < wolfssl-python-3.14.5.patch
+$ rm -f aclocal.m4
+$ autoreconf -if
+$ ./configure --with-wolfssl=/usr/local
+$ make
+
+If make fails with a shared object error, you may need to update your
+LD_LIBRARY_PATH first:
+
+$ export LD_LIBRARY_PATH=/usr/local/lib
+
+Run the ssl and crypto related tests with:
+
+$ make test TESTOPTS="-v test_ssl test.test_asyncio.test_ssl test.test_asyncio.test_sslproto test_hashlib test_hmac test_secrets test_ftplib test_imaplib test_poplib test_smtplib test_httplib test_urllib2_localnet test_xmlrpc test_docxmlrpc"
