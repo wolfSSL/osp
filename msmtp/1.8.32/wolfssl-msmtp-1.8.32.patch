@@ -1,5 +1,60 @@
+From 87080a09b4bf8c488f70e8321e13116e4de798f7 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 4 Sep 2026 11:09:11 +0000
+Subject: [PATCH] wolfSSL Patch
+
+This patch adds wolfSSL support to msmtp 1.8.32. It adds
+--with-tls=wolfssl to configure.ac (pkg-config probe, HAVE_LIBWOLFSSL,
+HAVE_WOLFSSL automake conditional) and reuses src/mtls-openssl.c
+through wolfSSL's OpenSSL compatibility layer.
+
+wolfSSL verifies the peer certificate during the handshake while OpenSSL
+leaves that to the application. msmtp does its own checking after the
+handshake, so verification is turned off for the tls_fingerprint and
+disabled tls_certcheck cases, which would otherwise abort the handshake.
+A configured tls_trust_file keeps wolfSSL's stricter default.
+
+Compile wolfSSL with:
+  ./configure --enable-opensslextra --enable-opensslall
+  make
+  make install
+
+Compile msmtp with:
+  patch -p1 < wolfssl-msmtp-1.8.32.patch
+  autoreconf -ivf
+  PKG_CONFIG_PATH=/usr/local/lib/pkgconfig ./configure --with-tls=wolfssl
+  make
+
+Run the tests with:
+  LD_LIBRARY_PATH=/usr/local/lib make check
+
+Tests passed:
+- tests/test-basic.sh
+- tests/test-auth-plain.sh
+- tests/test-header-handling.sh
+
+The tests do not use TLS: test-basic.sh only runs msmtp --version and
+--help, the other two exchange mail with msmtpd over plain SMTP. They
+bind msmtpd to ::1 and fail with "Address family not supported by
+protocol" on hosts without IPv6 loopback; they pass on IPv4 when ::1 is
+replaced by 127.0.0.1.
+
+TLS itself was checked by hand against a local TLS SMTP server:
+tls_trust_file, tls_fingerprint and a disabled tls_certcheck all
+connect, and a wrong CA, a wrong fingerprint and a hostname mismatch are
+all rejected, both with and without STARTTLS.
+
+Confirm the binary links against wolfSSL with:
+  ldd src/msmtp | grep wolfssl
+---
+ configure.ac       | 33 ++++++++++++++++++++++++++++++---
+ src/Makefile.am    |  3 +++
+ src/msmtp.c        |  2 ++
+ src/mtls-openssl.c | 22 +++++++++++++++++++++-
+ 4 files changed, 56 insertions(+), 4 deletions(-)
+
 diff --git a/configure.ac b/configure.ac
-index c76c460..39f1d36 100644
+index d180cd9..10a5e18 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -95,33 +95,44 @@ want_tls="yes"
@@ -81,7 +136,7 @@ index c76c460..39f1d36 100644
  AC_SUBST([tls_LIBS])
  
 diff --git a/src/Makefile.am b/src/Makefile.am
-index fcd18e3..0313014 100644
+index be9a60f..c27a82b 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
 @@ -32,6 +32,9 @@ endif
@@ -95,10 +150,10 @@ index fcd18e3..0313014 100644
  AM_CPPFLAGS = $(tls_CFLAGS) $(libgsasl_CFLAGS) $(libidn2_CFLAGS) $(libsecret_CFLAGS)
  
 diff --git a/src/msmtp.c b/src/msmtp.c
-index a0ce6a7..888aee9 100644
+index 2e7173f..fc95d6a 100644
 --- a/src/msmtp.c
 +++ b/src/msmtp.c
-@@ -2192,6 +2192,8 @@ void msmtp_print_version(void)
+@@ -2193,6 +2193,8 @@ void msmtp_print_version(void)
              "OpenSSL"
  #elif defined (HAVE_LIBTLS)
              "libtls"
@@ -157,3 +212,6 @@ index 976d72b..f1b0698 100644
      if (!(mtls->internals->ssl = SSL_new(mtls->internals->ssl_ctx)))
      {
          *errstr = xasprintf(_("cannot create a TLS structure: %s"),
+-- 
+2.43.0
+
