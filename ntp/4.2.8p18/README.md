@@ -1,7 +1,7 @@
 ## Build Instructions
 
 ### Build wolfSSL
-+ Configure wolfSSL with `./configure --enable-ntp`. Add `--enable-debug` if you want to enable the debug version of wolfSSL.
++ Configure wolfSSL with `./configure --enable-ntp CFLAGS="-DOPENSSL_EXTRA_BSD"`. NTP uses `MD5Init`/`MD5Update`/`MD5Final`, which wolfSSL only provides under `OPENSSL_EXTRA_BSD`. Add `--enable-debug` if you want to enable the debug version of wolfSSL.
 + Compile with `make`.
 + Install wolfSSL into /usr/local with `sudo make install`.
 
