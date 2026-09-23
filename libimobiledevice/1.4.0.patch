@@ -1,0 +1,268 @@
+From 14a9a96a71994fa5873b4e701cb246e5682148bc Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 4 Sep 2026 10:05:13 +0000
+Subject: [PATCH] Support for wolfSSL
+
+Compile wolfSSL with
+```
+./configure --enable-all
+make
+make install
+```
+
+libimobiledevice 1.4.0 needs libplist >= 2.6.0, libimobiledevice-glue
+>= 1.3.0, libusbmuxd >= 2.0.2 and libtatsu >= 1.0.3. The Ubuntu 24.04
+packages are too old (or missing), so build them from source into the
+same prefix as wolfSSL. None of them use OpenSSL or wolfSSL. Tested with
+libplist 2.7.0, libimobiledevice-glue 1.3.2, libusbmuxd 2.1.1 and
+libtatsu 1.0.5 (apt: libusb-1.0-0-dev libcurl4-openssl-dev).
+```
+export PKG_CONFIG_PATH=<prefix>/lib/pkgconfig
+for dep in libplist libimobiledevice-glue libusbmuxd libtatsu; do
+  (cd $dep && ./autogen.sh --prefix=<prefix> --without-cython && make && make install)
+done
+```
+
+Compile libimobiledevice with
+```
+patch -p1 < <path/to/patch/file>
+./autogen.sh --prefix=<prefix> --enable-wolfssl --without-cython
+make
+make install
+```
+
+libimobiledevice has no test suite (`make check` is a no-op) and
+pairing needs a real device. The wolfSSL CI workflow
+(.github/workflows/libimobiledevice.yml in the wolfSSL repository)
+checks that the library and tools link against wolfSSL, runs the tools
+without a device (with the usbmuxd daemon running so `idevice_id -l`
+succeeds with an empty list) and drives
+pair_record_generate_keys_and_certs() directly to verify that the
+generated RSA keys and X509 certificates are correct.
+
+Notes:
+- OPENSSL_VERSION_NUMBER is set to 0x10100000L (accepted by wolfSSL's
+  opensslv.h) so that the OpenSSL >= 1.1.0 code paths are used: the
+  chacha20-poly1305 EVP code in src/lockdown-cu.c (wireless pairing)
+  refuses to build with older version numbers, and src/idevice.c would
+  otherwise use TLSv1_method().
+- Serial number 0 is not allowed by wolfSSL (RFC 5280 4.1.2.2), so the
+  generated certificates use serial numbers 1-3.
+- X509V3_EXT_conf_nid() is a stub in wolfSSL, so X509_add_ext_helper()
+  builds the extensions with X509V3_EXT_nconf_nid(), which takes the same
+  value strings without the "critical" prefix. The subjectKeyIdentifier
+  "hash" has no configuration context to come from and is built from
+  X509_pubkey_digest() and X509V3_EXT_i2d(). That is the same key
+  identifier OpenSSL's "hash" produces: the SHA-1 of the subjectPublicKey
+  (RFC 5280 4.2.1.2 method 1).
+- Requires the wolfSSL implementation of ASN1_TIME_set() (previously a
+  stub), otherwise the generated certificates only have the default
+  validity period.
+---
+ 3rd_party/libsrp6a-sha512/Makefile.am |  4 ++
+ common/userpref.c                     | 66 ++++++++++++++++++++++++++-
+ configure.ac                          | 33 ++++++++++++++
+ 3 files changed, 101 insertions(+), 2 deletions(-)
+
+diff --git a/3rd_party/libsrp6a-sha512/Makefile.am b/3rd_party/libsrp6a-sha512/Makefile.am
+index bdacb5f..4c538ea 100644
+--- a/3rd_party/libsrp6a-sha512/Makefile.am
++++ b/3rd_party/libsrp6a-sha512/Makefile.am
+@@ -6,6 +6,9 @@ AM_CPPFLAGS = \
+         -Wno-incompatible-pointer-types
+ 
+ AM_CFLAGS = -DHAVE_CONFIG_H
++if HAVE_WOLFSSL
++AM_CFLAGS += -DOPENSSL=1 $(ssl_lib_CFLAGS)
++else
+ if HAVE_OPENSSL
+ AM_CFLAGS += -DOPENSSL=1 $(openssl_CFLAGS)
+ else
+@@ -17,6 +20,7 @@ AM_CFLAGS += -DMBEDTLS=1 $(mbedtls_CFLAGS)
+ endif
+ endif
+ endif
++endif
+ 
+ noinst_LTLIBRARIES = libsrp6a-sha512.la
+ 
+diff --git a/common/userpref.c b/common/userpref.c
+index 76945e1..08e0612 100644
+--- a/common/userpref.c
++++ b/common/userpref.c
+@@ -48,7 +48,7 @@
+ #include <openssl/rsa.h>
+ #include <openssl/x509.h>
+ #include <openssl/x509v3.h>
+-#if OPENSSL_VERSION_NUMBER < 0x1010000fL || \
++#if (!defined(HAVE_WOLFSSL) && OPENSSL_VERSION_NUMBER < 0x1010000fL) || \
+ 	(defined(LIBRESSL_VERSION_NUMBER) && (LIBRESSL_VERSION_NUMBER < 0x20700000L))
+ #define X509_set1_notBefore X509_set_notBefore
+ #define X509_set1_notAfter X509_set_notAfter
+@@ -364,9 +364,53 @@ userpref_error_t userpref_delete_pair_record(const char *udid)
+ }
+ 
+ #if defined(HAVE_OPENSSL)
++#ifdef HAVE_WOLFSSL
++/* subjectKeyIdentifier "hash": the digest of the certificate public key. */
++static X509_EXTENSION *X509_skid_hash_ext(X509 *cert)
++{
++	unsigned char md[EVP_MAX_MD_SIZE];
++	unsigned int mdlen = sizeof(md);
++	ASN1_OCTET_STRING *os;
++	X509_EXTENSION *ex = NULL;
++
++	if (!X509_pubkey_digest(cert, EVP_sha1(), md, &mdlen)) {
++		return NULL;
++	}
++	os = ASN1_OCTET_STRING_new();
++	if (!os) {
++		return NULL;
++	}
++	if (ASN1_OCTET_STRING_set(os, md, mdlen)) {
++		ex = X509V3_EXT_i2d(NID_subject_key_identifier, 0, os);
++	}
++	ASN1_OCTET_STRING_free(os);
++
++	return ex;
++}
++#endif
++
+ static int X509_add_ext_helper(X509 *cert, int nid, char *value)
+ {
+ 	X509_EXTENSION *ex;
++#ifdef HAVE_WOLFSSL
++	int crit = 0;
++
++	/* wolfSSL only stubs X509V3_EXT_conf_nid(). X509V3_EXT_nconf_nid() takes
++	 * the same values without the "critical" prefix and has no context to
++	 * compute the subjectKeyIdentifier hash from. */
++	if (!strncmp(value, "critical,", 9)) {
++		crit = 1;
++		value += 9;
++	}
++	if (nid == NID_subject_key_identifier && !strcmp(value, "hash")) {
++		ex = X509_skid_hash_ext(cert);
++	} else {
++		ex = X509V3_EXT_nconf_nid(NULL, NULL, nid, value);
++	}
++	if (ex && crit) {
++		X509_EXTENSION_set_critical(ex, 1);
++	}
++#else
+ 	X509V3_CTX ctx;
+ 
+ 	/* No configuration database */
+@@ -374,8 +418,9 @@ static int X509_add_ext_helper(X509 *cert, int nid, char *value)
+ 
+ 	X509V3_set_ctx(&ctx, NULL, cert, NULL, NULL, 0);
+ 	ex = X509V3_EXT_conf_nid(NULL, &ctx, nid, value);
++#endif
+ 	if (!ex) {
+-		debug_info("ERROR: X509V3_EXT_conf_nid(%d, %s) failed", nid, value);
++		debug_info("ERROR: extension %d (%s) failed", nid, value);
+ 		return 0;
+ 	}
+ 
+@@ -463,7 +508,14 @@ userpref_error_t pair_record_generate_keys_and_certs(plist_t pair_record, key_da
+ 	{
+ 		/* set serial number */
+ 		ASN1_INTEGER* sn = ASN1_INTEGER_new();
++#ifdef HAVE_WOLFSSL
++		/* wolfSSL doesn't permit using 0 for serial numbers, in accordance with
++		 * RFC 5280:
++		 * https://datatracker.ietf.org/doc/html/rfc5280#section-4.1.2.2. */
++		ASN1_INTEGER_set(sn, 1);
++#else
+ 		ASN1_INTEGER_set(sn, 0);
++#endif
+ 		X509_set_serialNumber(root_cert, sn);
+ 		ASN1_INTEGER_free(sn);
+ 
+@@ -493,7 +545,12 @@ userpref_error_t pair_record_generate_keys_and_certs(plist_t pair_record, key_da
+ 	{
+ 		/* set serial number */
+ 		ASN1_INTEGER* sn = ASN1_INTEGER_new();
++#ifdef HAVE_WOLFSSL
++		/* See note above on 0 serial numbers. */
++		ASN1_INTEGER_set(sn, 2);
++#else
+ 		ASN1_INTEGER_set(sn, 0);
++#endif
+ 		X509_set_serialNumber(host_cert, sn);
+ 		ASN1_INTEGER_free(sn);
+ 
+@@ -590,7 +647,12 @@ userpref_error_t pair_record_generate_keys_and_certs(plist_t pair_record, key_da
+ 	if (pubkey && dev_cert) {
+ 		/* generate device certificate */
+ 		ASN1_INTEGER* sn = ASN1_INTEGER_new();
++#ifdef HAVE_WOLFSSL
++		/* See note above on 0 serial numbers. */
++		ASN1_INTEGER_set(sn, 3);
++#else
+ 		ASN1_INTEGER_set(sn, 0);
++#endif
+ 		X509_set_serialNumber(dev_cert, sn);
+ 		ASN1_INTEGER_free(sn);
+ 		X509_set_version(dev_cert, 2);
+diff --git a/configure.ac b/configure.ac
+index 055fe04..83fb09c 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -173,6 +173,14 @@ AC_SUBST([CYTHON_SUB])
+ 
+ default_openssl=yes
+ 
++AC_ARG_ENABLE([wolfssl],
++            [AS_HELP_STRING([--enable-wolfssl],
++            [Use wolfSSL crypto])],
++            [use_wolfssl=$enableval],
++            [use_wolfssl=no])
++if test "x$use_wolfssl" = "xyes"; then
++  default_openssl=no
++fi
+ AC_ARG_WITH([mbedtls],
+             [AS_HELP_STRING([--without-mbedtls],
+             [Do not look for mbedtls])],
+@@ -221,6 +229,30 @@ if test "x$use_mbedtls" = "xyes"; then
+   ssl_provider="MbedTLS";
+   ssl_requires=""
+   AC_SUBST(ssl_requires)
++elif test "x$use_wolfssl" = "xyes"; then
++  AC_DEFINE(HAVE_WOLFSSL, 1, [Define if you have wolfSSL support])
++  AC_DEFINE(HAVE_OPENSSL, 1, [Defined to use wolfSSL compatibility layer])
++  PKG_CHECK_MODULES(
++    [wolfssl],
++    [wolfssl],
++    [],
++    [AC_MSG_ERROR([Could not find wolfSSL.])]
++  )
++  PKG_CHECK_VAR(
++    [wolfssl_includedir],
++    [wolfssl],
++    [includedir],
++    [],
++    [AC_MSG_ERROR([Could not find wolfSSL includedir variable.])]
++  )
++  wolfssl_CFLAGS="${wolfssl_CFLAGS} -DWOLFSSL_USE_OPTIONS_H -DEXTERNAL_OPTS_OPENVPN -DOPENSSL_VERSION_NUMBER=0x10100000L -I${wolfssl_includedir}/wolfssl"
++  ssl_lib_CFLAGS="$wolfssl_CFLAGS"
++  ssl_lib_LIBS="$wolfssl_LIBS"
++  AC_SUBST(ssl_lib_CFLAGS)
++  AC_SUBST(ssl_lib_LIBS)
++  ssl_provider="wolfSSL"
++  ssl_requires="wolfssl"
++  AC_SUBST(ssl_requires)
+ else
+   if test "x$use_openssl" = "xyes"; then
+     pkg_req_openssl="openssl >= 0.9.8"
+@@ -291,6 +323,7 @@ else
+ fi
+ AM_CONDITIONAL(HAVE_MBEDTLS, test "x$use_mbedtls" = "xyes")
+ AM_CONDITIONAL(HAVE_OPENSSL, test "x$use_openssl" = "xyes")
++AM_CONDITIONAL(HAVE_WOLFSSL, test "x$use_wolfssl" = "xyes")
+ AM_CONDITIONAL(HAVE_GCRYPT, test "x$use_gnutls" = "xyes")
+ 
+ AC_ARG_ENABLE([wireless-pairing],
+-- 
+2.43.0
+

@@ -2,3 +2,7 @@ This folder contains patches for Kerberos 5 to work with wolfSSL. Patches make i
 easier to add support for newer versions of a target library. Instructions for 
 applying each patch are included in the patch commit message.
 
+
+The newest patch, Patch-for-Kerberos-5-1.22.2.patch, is tested by the
+wolfSSL krb5 GitHub workflow (.github/workflows/krb5.yml) against
+krb5-1.22.2-final.
