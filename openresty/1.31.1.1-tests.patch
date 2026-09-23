@@ -1,0 +1,1566 @@
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/ocsp.t b/bundle/lua-resty-core-0.1.34rc3/t/ocsp.t
+index 8fc1d4b..f06653f 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/ocsp.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/ocsp.t
+@@ -8,6 +8,12 @@ use t::TestCore;
+ 
+ repeat_each(2);
+ 
++my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
++my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
++
+ plan tests => repeat_each() * (blocks() * 6 + 13);
+ 
+ no_long_string();
+@@ -1404,6 +1410,8 @@ OCSP response validation ok
+ 
+ === TEST 16: good status req from client
+ FIXME: check the OCSP staple actually received by the ssl client
++wolfSSL records the client's status_request only when OCSP stapling is enabled on the server, so ngx.ocsp.set_ocsp_status_resp() sees no request.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl-cert.t b/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl-cert.t
+index a19c23a..e263de8 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl-cert.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl-cert.t
+@@ -11,6 +11,9 @@ repeat_each(2);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "proxy_ssl_certificate_by_lua* is not built with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0|1\.0\.(?:0|1[^\d]|2[a-d]).*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.0.2e, was $1");
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl-verify.t b/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl-verify.t
+index 3c49646..138d72a 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl-verify.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl-verify.t
+@@ -11,6 +11,9 @@ repeat_each(2);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "proxy_ssl_verify_by_lua* needs SSL_set_retry_verify, not available with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need 1.1.1, was $1");
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl.t b/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl.t
+index ad6ebce..f1ce26c 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/proxy-ssl.t
+@@ -11,6 +11,9 @@ repeat_each(2);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "proxy_ssl_certificate_by_lua* is not built with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need 1.1.1, was $1");
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/socket-tcp-settrustedstore.t b/bundle/lua-resty-core-0.1.34rc3/t/socket-tcp-settrustedstore.t
+index 804a27d..908749f 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/socket-tcp-settrustedstore.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/socket-tcp-settrustedstore.t
+@@ -7,6 +7,9 @@ repeat_each(2);
+ 
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "FFI calls into libcrypto symbols that wolfSSL does not export");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need 1.1.1, was $1");
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/ssl-client-hello.t b/bundle/lua-resty-core-0.1.34rc3/t/ssl-client-hello.t
+index 8c6266e..424a879 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/ssl-client-hello.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/ssl-client-hello.t
+@@ -11,6 +11,9 @@ repeat_each(2);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "ssl_client_hello_by_lua* needs SSL_CTX_set_client_hello_cb, not available with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need 1.1.1, was $1");
+@@ -111,7 +114,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -212,7 +215,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -343,7 +346,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -445,7 +448,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -552,7 +555,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -658,7 +661,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/ssl-session-fetch.t b/bundle/lua-resty-core-0.1.34rc3/t/ssl-session-fetch.t
+index 801b83f..7296aa5 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/ssl-session-fetch.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/ssl-session-fetch.t
+@@ -11,6 +11,12 @@ use File::Basename;
+ 
+ repeat_each(2);
+ 
++my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
++my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
++
+ plan tests => repeat_each() * (blocks() * 6);
+ 
+ no_long_string();
+@@ -409,6 +415,8 @@ $/s,
+ 
+ 
+ === TEST 5: yield during doing handshake with client which uses low version OpenSSL
++Drives openssl s_client with -sess_out/-sess_in; fails with the OpenSSL 3 s_client on Ubuntu 24.04 whatever the server library.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- no_check_leak
+ --- http_config
+     lua_shared_dict done 16k;
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/ssl-session-store.t b/bundle/lua-resty-core-0.1.34rc3/t/ssl-session-store.t
+index f68e89c..36b091c 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/ssl-session-store.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/ssl-session-store.t
+@@ -10,6 +10,12 @@ use File::Basename;
+ 
+ repeat_each(2);
+ 
++my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
++my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
++
+ plan tests => repeat_each() * (blocks() * 6 + 2);
+ 
+ no_long_string();
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/ssl.t b/bundle/lua-resty-core-0.1.34rc3/t/ssl.t
+index fe3dd37..f78114f 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/ssl.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/ssl.t
+@@ -15,6 +15,9 @@ no_long_string();
+ 
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
+ 
+ if ($openssl_version =~ m/\bBoringSSL\b/) {
+     $ENV{TEST_NGINX_BORINGSSL} = 1;
+@@ -29,6 +32,8 @@ run_tests();
+ __DATA__
+ 
+ === TEST 1: clear certs
++wolfSSL sends a different alert than OpenSSL's handshake_failure (alert 40) for a server without a certificate.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -219,7 +224,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -318,7 +323,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -418,7 +423,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -534,7 +539,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -655,7 +660,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -774,7 +779,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -897,7 +902,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1024,7 +1029,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1350,6 +1355,8 @@ got TLS1 version: TLSv1.2,
+ 
+ 
+ === TEST 14: ngx.semaphore in ssl_certificate_by_lua*
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -1552,7 +1559,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1686,7 +1693,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1705,6 +1712,8 @@ lua ssl server name: "test.com"
+ 
+ 
+ === TEST 17: parse PEM cert and key to cdata (bad cert 0 in the chain)
++nginx logs wolfSSL handshake failures at [crit]: wolfSSL error codes are not the OpenSSL reasons nginx maps to [info].
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -1830,6 +1839,8 @@ qr/\[error\] .*? failed to parse pem cert: PEM_read_bio_X509_AUX\(\) failed/
+ 
+ 
+ === TEST 18: parse PEM cert and key to cdata (bad cert 2 in the chain)
++nginx logs wolfSSL handshake failures at [crit]: wolfSSL error codes are not the OpenSSL reasons nginx maps to [info].
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -1955,6 +1966,8 @@ qr/\[error\] .*? failed to parse pem cert: PEM_read_bio_X509\(\) failed/
+ 
+ 
+ === TEST 19: parse PEM cert and key to cdata (bad priv key)
++nginx logs wolfSSL handshake failures at [crit]: wolfSSL error codes are not the OpenSSL reasons nginx maps to [info].
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -2164,7 +2177,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2183,6 +2196,8 @@ client ip: 127.0.0.1
+ 
+ 
+ === TEST 21: yield during doing handshake with client which uses low version OpenSSL
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- no_check_leak
+ --- http_config
+     lua_shared_dict done 16k;
+@@ -2411,6 +2426,8 @@ client certificate subject: emailAddress=agentzh@gmail.com,CN=test.com
+ 
+ 
+ === TEST 24: verify client without CA certificates
++wolfSSL's certificate verify error text differs from OpenSSL's.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -2605,7 +2622,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2705,7 +2722,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2837,7 +2854,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2971,7 +2988,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -3077,7 +3094,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -3096,6 +3113,8 @@ client-random length: 32
+ 
+ 
+ === TEST 31: export_keying_material
++ngx.ssl.export_keying_material() needs OpenSSL >= 1.1.1a; wolfSSL reports OpenSSL 1.1.0 compatibility.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -3185,7 +3204,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -3291,7 +3310,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -3436,6 +3455,8 @@ SUCCESS
+ 
+ 
+ === TEST 35: get shared SSL ciphers
++ngx.ssl.get_shared_ssl_ciphers() needs OpenSSL >= 1.1.1a; wolfSSL reports OpenSSL 1.1.0 compatibility.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+     server {
+@@ -3629,7 +3650,7 @@ ssl pointer: cdata
+ ssl ctx: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -3733,7 +3754,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -3846,7 +3867,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 200 OK
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 51
+ received: Connection: close
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/stream/socket-tcp-settrustedstore.t b/bundle/lua-resty-core-0.1.34rc3/t/stream/socket-tcp-settrustedstore.t
+index cdc2c90..cb16290 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/stream/socket-tcp-settrustedstore.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/stream/socket-tcp-settrustedstore.t
+@@ -7,6 +7,9 @@ repeat_each(2);
+ 
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "FFI calls into libcrypto symbols that wolfSSL does not export");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need 1.1.1, was $1");
+diff --git a/bundle/lua-resty-core-0.1.34rc3/t/stream/ssl.t b/bundle/lua-resty-core-0.1.34rc3/t/stream/ssl.t
+index f08a31e..ac531a1 100644
+--- a/bundle/lua-resty-core-0.1.34rc3/t/stream/ssl.t
++++ b/bundle/lua-resty-core-0.1.34rc3/t/stream/ssl.t
+@@ -15,6 +15,9 @@ no_long_string();
+ 
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
+ 
+ if ($openssl_version =~ m/\bBoringSSL\b/) {
+     $ENV{TEST_NGINX_BORINGSSL} = 1;
+@@ -29,6 +32,8 @@ run_tests();
+ __DATA__
+ 
+ === TEST 1: clear certs
++wolfSSL sends a different alert than OpenSSL's handshake_failure (alert 40) for a server without a certificate.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -1071,6 +1076,8 @@ got TLS1 version: TLSv1.2,
+ 
+ 
+ === TEST 14: ngx.semaphore in ssl_certificate_by_lua*
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -1361,6 +1368,8 @@ lua ssl server name: "test.com"
+ 
+ 
+ === TEST 17: parse PEM cert and key to cdata (bad cert 0 in the chain)
++nginx logs wolfSSL handshake failures at [crit]: wolfSSL error codes are not the OpenSSL reasons nginx maps to [info].
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -1466,6 +1475,8 @@ qr/\[error\] .*? failed to parse pem cert: PEM_read_bio_X509_AUX\(\) failed/
+ 
+ 
+ === TEST 18: parse PEM cert and key to cdata (bad cert 2 in the chain)
++nginx logs wolfSSL handshake failures at [crit]: wolfSSL error codes are not the OpenSSL reasons nginx maps to [info].
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -1571,6 +1582,8 @@ qr/\[error\] .*? failed to parse pem cert: PEM_read_bio_X509\(\) failed/
+ 
+ 
+ === TEST 19: parse PEM cert and key to cdata (bad priv key)
++nginx logs wolfSSL handshake failures at [crit]: wolfSSL error codes are not the OpenSSL reasons nginx maps to [info].
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+@@ -1752,6 +1765,8 @@ client ip: 127.0.0.1
+ 
+ 
+ === TEST 21: yield during doing handshake with client which uses low version OpenSSL
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- no_check_leak
+ --- stream_config
+     lua_shared_dict done 16k;
+@@ -1959,6 +1974,8 @@ client certificate subject: emailAddress=agentzh@gmail.com,CN=test.com
+ 
+ 
+ === TEST 24: verify client without CA certificates
++wolfSSL's certificate verify error text differs from OpenSSL's.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -2346,6 +2363,8 @@ client-random length: 32
+ 
+ 
+ === TEST 29: get shared SSL ciphers
++ngx.ssl.get_shared_ssl_ciphers() needs OpenSSL >= 1.1.1a; wolfSSL reports OpenSSL 1.1.0 compatibility.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     lua_package_path "$TEST_NGINX_LUA_PACKAGE_PATH";
+ 
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/129-ssl-socket.t b/bundle/ngx_lua-0.10.31rc5/t/129-ssl-socket.t
+index 7782fcc..df58361 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/129-ssl-socket.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/129-ssl-socket.t
+@@ -1747,7 +1747,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1852,7 +1852,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2513,7 +2513,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/139-ssl-cert-by.t b/bundle/ngx_lua-0.10.31rc5/t/139-ssl-cert-by.t
+index d905cb3..805757c 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/139-ssl-cert-by.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/139-ssl-cert-by.t
+@@ -7,6 +7,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
+ if ($openssl_version =~ m/BoringSSL/) {
+     $ENV{TEST_NGINX_USE_BORINGSSL} = 1;
+ }
+@@ -107,7 +110,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -137,6 +140,8 @@ ssl_certificate_by_lua\(nginx.conf:28\):1: ssl cert by lua is running!,/
+ 
+ 
+ === TEST 2: sleep
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -216,7 +221,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -321,7 +326,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -340,6 +345,8 @@ my timer run!
+ 
+ 
+ === TEST 4: cosocket
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -439,7 +446,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -525,6 +532,8 @@ should never reached here
+ 
+ 
+ === TEST 6: ngx.exit(ngx.ERROR) - no yield
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 8:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -595,6 +604,8 @@ should never reached here
+ 
+ 
+ === TEST 7: ngx.exit(0) -  yield
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -664,6 +675,8 @@ should never reached here
+ 
+ 
+ === TEST 8: ngx.exit(ngx.ERROR) - yield
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 8:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -736,6 +749,8 @@ should never reached here
+ 
+ 
+ === TEST 9: lua exception - no yield
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 9:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -807,6 +822,8 @@ should never reached here
+ 
+ 
+ === TEST 10: lua exception - yield
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 8:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -941,6 +958,8 @@ get_phase: ssl_cert
+ 
+ 
+ === TEST 12: connection aborted prematurely
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1006,6 +1025,8 @@ ssl-cert-by-lua: after sleeping
+ 
+ 
+ === TEST 13: subrequests disabled
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1144,7 +1165,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1255,7 +1276,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1282,6 +1303,8 @@ lua ssl server name: "test.com"
+ 
+ 
+ === TEST 16: simple user thread wait with yielding
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 5:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1379,7 +1402,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1475,7 +1498,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1573,7 +1596,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1675,7 +1698,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 59 bytes.
+ received: HTTP/1.1 200 OK
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 2
+ received: Connection: close
+@@ -1695,6 +1718,8 @@ close: 1 nil
+ 
+ 
+ === TEST 20: some server {} block missing ssl_certificate_by_lua* handlers (literal server name)
++nginx logs wolfSSL handshake failures at [crit]: wolfSSL error codes are not the OpenSSL reasons nginx maps to [info].
++--- skip_eval: 4:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1790,6 +1815,8 @@ qr/\[info\] .*? SSL_do_handshake\(\) failed\b/,
+ 
+ 
+ === TEST 21: some server {} block missing ssl_certificate_by_lua* handlers (regex server name)
++nginx logs wolfSSL handshake failures at [crit]: wolfSSL error codes are not the OpenSSL reasons nginx maps to [info].
++--- skip_eval: 4:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1970,7 +1997,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2070,7 +2097,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2155,6 +2182,8 @@ qr/elapsed in ssl_certificate_by_lua\*: 0\.(?:09|1\d)\d+,/,
+ 
+ 
+ === TEST 25: cosocket (UDP)
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/140-ssl-c-api.t b/bundle/ngx_lua-0.10.31rc5/t/140-ssl-c-api.t
+index 466f85f..b37eb5f 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/140-ssl-c-api.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/140-ssl-c-api.t
+@@ -13,6 +13,9 @@ if ($openssl_version =~ m/built with OpenSSL (0|1\.0\.(?:0|1[^\d]|2[a-d]).*)/) {
+ } elsif ($openssl_version =~ m/BoringSSL/) {
+     $ENV{TEST_NGINX_USE_BORINGSSL} = 1;
+     plan tests => repeat_each() * (blocks() * 6 - 8);
++} elsif ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++    plan tests => repeat_each() * (blocks() * 5 - 5);
+ } else {
+     plan tests => repeat_each() * (blocks() * 5 - 5);
+     $ENV{TEST_NGINX_USE_OPENSSL} = 1;
+@@ -240,7 +243,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -394,7 +397,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -522,7 +525,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -673,7 +676,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -823,7 +826,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -916,6 +919,8 @@ client certificate subject: emailAddress=agentzh@gmail.com,CN=test.com
+ 
+ 
+ === TEST 7: verify client without CA certificates
++wolfSSL's certificate verify error text differs from OpenSSL's.
++--- skip_eval: 5:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1205,7 +1210,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1223,7 +1228,8 @@ lua ssl server name: "test.com"
+ 
+ 
+ === TEST 10: Raw SSL pointer
+---- skip_eval: 8:$ENV{TEST_NGINX_USE_BORINGSSL}
++FFI call to an OpenSSL symbol: wolfSSL only exports wolfSSL_ prefixed names.
++--- skip_eval: 5:$ENV{TEST_NGINX_USE_BORINGSSL} || $ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1330,7 +1336,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1480,7 +1486,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1621,7 +1627,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1793,7 +1799,8 @@ SUCCESS
+ 
+ 
+ === TEST 15: Get supported ciphers
+---- skip_eval: 8:$ENV{TEST_NGINX_USE_BORINGSSL}
++nginx's "SSL: TLSv1.2, cipher:" debug log line needs SSL_CIPHER_description(), which wolfSSL does not provide.
++--- skip_eval: 3:$ENV{TEST_NGINX_USE_BORINGSSL} || $ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1854,7 +1861,8 @@ TLSv1.2, cipher: "ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 Kx=ECDH Au=RSA Enc=AESGCM(
+ 
+ 
+ === TEST 16: SSL cipher API error handling (no SSL)
+---- skip_eval: 8:$ENV{TEST_NGINX_USE_BORINGSSL}
++nginx's "SSL: TLSv1.2, cipher:" debug log line needs SSL_CIPHER_description(), which wolfSSL does not provide.
++--- skip_eval: 4:$ENV{TEST_NGINX_USE_BORINGSSL} || $ENV{TEST_NGINX_USE_WOLFSSL}
+ --- config
+     location /t {
+         content_by_lua_block {
+@@ -1887,7 +1895,8 @@ err: bad request
+ 
+ 
+ === TEST 17: Buffer overflow handling
+---- skip_eval: 8:$ENV{TEST_NGINX_USE_BORINGSSL}
++nginx's "SSL: TLSv1.2, cipher:" debug log line needs SSL_CIPHER_description(), which wolfSSL does not provide.
++--- skip_eval: 3:$ENV{TEST_NGINX_USE_BORINGSSL} || $ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1949,7 +1958,7 @@ TLSv1.2, cipher: "ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 Kx=ECDH Au=RSA Enc=AESGCM(
+ 
+ 
+ === TEST 18: BORINGSSL error handling
+---- skip_eval: 8:$ENV{TEST_NGINX_USE_OPENSSL}
++--- skip_eval: 8:!$ENV{TEST_NGINX_USE_BORINGSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -2005,7 +2014,8 @@ Error: BoringSSL is not supported for SSL cipher operations
+ 
+ 
+ === TEST 19: Get supported ciphers with GREASE filtering
+---- skip_eval: 8:$ENV{TEST_NGINX_USE_BORINGSSL}
++nginx's "SSL: TLSv1.2, cipher:" debug log line needs SSL_CIPHER_description(), which wolfSSL does not provide.
++--- skip_eval: 3:$ENV{TEST_NGINX_USE_BORINGSSL} || $ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -2212,7 +2222,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2361,7 +2371,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/142-ssl-session-store.t b/bundle/ngx_lua-0.10.31rc5/t/142-ssl-session-store.t
+index 11deb83..024776e 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/142-ssl-session-store.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/142-ssl-session-store.t
+@@ -6,6 +6,12 @@ use File::Basename;
+ 
+ repeat_each(3);
+ 
++my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
++my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
++
+ plan tests => repeat_each() * (blocks() * 6 - 1);
+ 
+ $ENV{TEST_NGINX_HTML_DIR} ||= html_dir();
+@@ -622,6 +628,9 @@ get_phase: ssl_session_store
+ 
+ 
+ === TEST 9: inter-operation with ssl_certificate_by_lua
++Timing window widened as in the ngx_stream_lua twin: a 0.1 s sleep can take 0.12 s on a loaded runner.
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     ssl_session_store_by_lua_block { print("ssl store session by lua is running!") }
+     server {
+@@ -686,7 +695,7 @@ close: 1 nil
+ --- error_log eval
+ [
+ 'lua ssl server name: "test.com"',
+-qr/elapsed in ssl cert by lua: 0.(?:09|1[01])\d+,/,
++qr/elapsed in ssl cert by lua: 0.(?:09|1\d)\d+,/,
+ 'ssl_session_store_by_lua(nginx.conf:25):1: ssl store session by lua is running!',
+ ]
+ 
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/143-ssl-session-fetch.t b/bundle/ngx_lua-0.10.31rc5/t/143-ssl-session-fetch.t
+index 3fbb46e..f1a4aaa 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/143-ssl-session-fetch.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/143-ssl-session-fetch.t
+@@ -11,6 +11,9 @@ plan "no_plan";
+ 
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
+ if ($openssl_version =~ m/BoringSSL/) {
+     $ENV{TEST_NGINX_USE_BORINGSSL} = 1;
+ }
+@@ -1279,6 +1282,8 @@ GET /t
+ 
+ 
+ === TEST 15: ssl_session_fetch_by_lua* is skipped when session ticket is provided
++wolfSSL clients request session tickets only after wolfSSL_UseSessionTicket(); the cosocket client resumes by session ID, which consults ssl_session_fetch_by_lua*.
++--- skip_eval: 5:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- http_config
+     ssl_session_fetch_by_lua_block { ngx.log(ngx.ERR, "ssl_session_fetch_by_lua* is running!") }
+     server {
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/155-tls13.t b/bundle/ngx_lua-0.10.31rc5/t/155-tls13.t
+index 54379e4..7f4fc51 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/155-tls13.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/155-tls13.t
+@@ -7,6 +7,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.1.1, was $1");
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/166-ssl-client-hello.t b/bundle/ngx_lua-0.10.31rc5/t/166-ssl-client-hello.t
+index 4372d0d..b51da0c 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/166-ssl-client-hello.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/166-ssl-client-hello.t
+@@ -7,6 +7,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "ssl_client_hello_by_lua* needs SSL_CTX_set_client_hello_cb, not available with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.1.1, was $1");
+@@ -108,7 +111,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -217,7 +220,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -322,7 +325,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -440,7 +443,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1143,7 +1146,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1254,7 +1257,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1378,7 +1381,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1474,7 +1477,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1569,7 +1572,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1653,7 +1656,7 @@ GET /t
+ connected: 1
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1734,7 +1737,7 @@ GET /t
+ connected: 1
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1825,7 +1828,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -1910,7 +1913,7 @@ GET /t
+ connected: 1
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2013,7 +2016,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 57 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 5
+ received: Connection: close
+@@ -2111,7 +2114,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2216,7 +2219,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+@@ -2316,7 +2319,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/169-proxy-ssl-verify.t b/bundle/ngx_lua-0.10.31rc5/t/169-proxy-ssl-verify.t
+index 95ecc1f..9807afe 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/169-proxy-ssl-verify.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/169-proxy-ssl-verify.t
+@@ -7,6 +7,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "proxy_ssl_verify_by_lua* needs SSL_set_retry_verify, not available with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (\d+)\.(\d+)\.(\d+)/) {
+     my ($major, $minor, $patch) = ($1, $2, $3);
+@@ -1325,7 +1328,7 @@ simple logging return
+ connected: 1
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/170-proxy-ssl-cert.t b/bundle/ngx_lua-0.10.31rc5/t/170-proxy-ssl-cert.t
+index 798cfaf..677db41 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/170-proxy-ssl-cert.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/170-proxy-ssl-cert.t
+@@ -7,6 +7,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "proxy_ssl_certificate_by_lua* is not built with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/BoringSSL/) {
+     plan(skip_all => "does not support BoringSSL");
+@@ -1265,7 +1268,7 @@ simple logging return
+ connected: 1
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/187-ssl-two-verification.t b/bundle/ngx_lua-0.10.31rc5/t/187-ssl-two-verification.t
+index bea4aae..04c9bcc 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/187-ssl-two-verification.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/187-ssl-two-verification.t
+@@ -7,6 +7,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "ssl_client_hello_by_lua* needs SSL_CTX_set_client_hello_cb, not available with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.1.1, was $1");
+@@ -116,7 +119,7 @@ connected: 1
+ ssl handshake: cdata
+ sent http request: 56 bytes.
+ received: HTTP/1.1 201 Created
+-received: Server: nginx
++received: Server: openresty
+ received: Content-Type: text/plain
+ received: Content-Length: 4
+ received: Connection: close
+diff --git a/bundle/ngx_lua-0.10.31rc5/t/193-ssl-trusted-store.t b/bundle/ngx_lua-0.10.31rc5/t/193-ssl-trusted-store.t
+index 4b937b4..256fdaf 100644
+--- a/bundle/ngx_lua-0.10.31rc5/t/193-ssl-trusted-store.t
++++ b/bundle/ngx_lua-0.10.31rc5/t/193-ssl-trusted-store.t
+@@ -4,6 +4,12 @@ use Test::Nginx::Socket::Lua;
+ 
+ repeat_each(2);
+ 
++my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
++my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "FFI calls into libcrypto symbols that wolfSSL does not export");
++}
++
+ plan tests => repeat_each() * (blocks() * 6);
+ 
+ log_level 'debug';
+diff --git a/bundle/ngx_stream_lua-0.0.19rc4/t/139-ssl-cert-by.t b/bundle/ngx_stream_lua-0.0.19rc4/t/139-ssl-cert-by.t
+index 95e86a6..8664c2d 100644
+--- a/bundle/ngx_stream_lua-0.0.19rc4/t/139-ssl-cert-by.t
++++ b/bundle/ngx_stream_lua-0.0.19rc4/t/139-ssl-cert-by.t
+@@ -6,6 +6,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0|1\.0\.(?:0|1[^\d]|2[a-d]).*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.0.2e, was $1");
+@@ -107,6 +110,8 @@ reusable connection: 0
+ 
+ 
+ === TEST 2: sleep
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -256,6 +261,8 @@ my timer run!
+ 
+ 
+ === TEST 4: cosocket
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -403,6 +410,8 @@ should never reached here
+ 
+ 
+ === TEST 6: ngx.exit(ngx.ERROR) - no yield
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 8:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -462,6 +471,8 @@ should never reached here
+ 
+ 
+ === TEST 7: ngx.exit(0) -  yield
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 7:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -520,6 +531,8 @@ should never reached here
+ 
+ 
+ === TEST 8: ngx.exit(ngx.ERROR) - yield
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 8:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -581,6 +594,8 @@ should never reached here
+ 
+ 
+ === TEST 9: lua exception - no yield
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 9:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -641,6 +656,8 @@ should never reached here
+ 
+ 
+ === TEST 10: lua exception - yield
++wolfSSL reports a failed certificate callback with its own error text, not OpenSSL's "cert cb error".
++--- skip_eval: 8:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen 127.0.0.2:$TEST_NGINX_RAND_PORT_1 ssl;
+@@ -753,6 +770,8 @@ get_phase: ssl_cert
+ 
+ 
+ === TEST 12: connection aborted prematurely
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 6:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -975,6 +994,8 @@ lua ssl server name: "test.com"
+ 
+ 
+ === TEST 15: simple user thread wait with yielding
++wolfSSL's certificate callback cannot suspend the handshake, so yielding in ssl_certificate_by_lua* fails the handshake.
++--- skip_eval: 5:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+diff --git a/bundle/ngx_stream_lua-0.0.19rc4/t/140-ssl-c-api.t b/bundle/ngx_stream_lua-0.0.19rc4/t/140-ssl-c-api.t
+index 4f775b5..e98567f 100644
+--- a/bundle/ngx_stream_lua-0.0.19rc4/t/140-ssl-c-api.t
++++ b/bundle/ngx_stream_lua-0.0.19rc4/t/140-ssl-c-api.t
+@@ -6,6 +6,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    $ENV{TEST_NGINX_USE_WOLFSSL} = 1;
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0|1\.0\.(?:0|1[^\d]|2[a-d]).*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.0.2e, was $1");
+@@ -760,6 +763,8 @@ client certificate subject: emailAddress=agentzh@gmail.com,CN=test.com
+ 
+ 
+ === TEST 7: verify client without CA certificates
++wolfSSL's certificate verify error text differs from OpenSSL's.
++--- skip_eval: 5:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1381,6 +1386,8 @@ SUCCESS
+ 
+ 
+ === TEST 14: Get supported ciphers
++nginx's "SSL: TLSv1.2, cipher:" debug log line needs SSL_CIPHER_description(), which wolfSSL does not provide.
++--- skip_eval: 5:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock ssl;
+@@ -1512,6 +1519,8 @@ with_filter:
+ 
+ 
+ === TEST 16: SSL cipher API error handling (no SSL)
++nginx's "SSL: TLSv1.2, cipher:" debug log line needs SSL_CIPHER_description(), which wolfSSL does not provide.
++--- skip_eval: 4:$ENV{TEST_NGINX_USE_WOLFSSL}
+ --- stream_config
+     server {
+         listen unix:$TEST_NGINX_HTML_DIR/nginx.sock;
+diff --git a/bundle/ngx_stream_lua-0.0.19rc4/t/162-ssl-client-hello-by.t b/bundle/ngx_stream_lua-0.0.19rc4/t/162-ssl-client-hello-by.t
+index 8c6bcf6..120f0c0 100644
+--- a/bundle/ngx_stream_lua-0.0.19rc4/t/162-ssl-client-hello-by.t
++++ b/bundle/ngx_stream_lua-0.0.19rc4/t/162-ssl-client-hello-by.t
+@@ -6,6 +6,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "ssl_client_hello_by_lua* needs SSL_CTX_set_client_hello_cb, not available with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.1.1, was $1");
+diff --git a/bundle/ngx_stream_lua-0.0.19rc4/t/163-ssl-two-verification.t b/bundle/ngx_stream_lua-0.0.19rc4/t/163-ssl-two-verification.t
+index 394a43c..7cc502b 100644
+--- a/bundle/ngx_stream_lua-0.0.19rc4/t/163-ssl-two-verification.t
++++ b/bundle/ngx_stream_lua-0.0.19rc4/t/163-ssl-two-verification.t
+@@ -7,6 +7,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "ssl_client_hello_by_lua* needs SSL_CTX_set_client_hello_cb, not available with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0\S*|1\.0\S*|1\.1\.0\S*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.1.1, was $1");
+diff --git a/bundle/ngx_stream_lua-0.0.19rc4/t/164-proxy-ssl-verify-by.t b/bundle/ngx_stream_lua-0.0.19rc4/t/164-proxy-ssl-verify-by.t
+index 8436b6b..e382571 100644
+--- a/bundle/ngx_stream_lua-0.0.19rc4/t/164-proxy-ssl-verify-by.t
++++ b/bundle/ngx_stream_lua-0.0.19rc4/t/164-proxy-ssl-verify-by.t
+@@ -6,6 +6,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "proxy_ssl_verify_by_lua* needs SSL_set_retry_verify, not available with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (\d+)\.(\d+)\.(\d+)/) {
+     my ($major, $minor, $patch) = ($1, $2, $3);
+diff --git a/bundle/ngx_stream_lua-0.0.19rc4/t/165-proxy-ssl-cert-by.t b/bundle/ngx_stream_lua-0.0.19rc4/t/165-proxy-ssl-cert-by.t
+index d8a56a6..484dada 100644
+--- a/bundle/ngx_stream_lua-0.0.19rc4/t/165-proxy-ssl-cert-by.t
++++ b/bundle/ngx_stream_lua-0.0.19rc4/t/165-proxy-ssl-cert-by.t
+@@ -6,6 +6,9 @@ repeat_each(3);
+ # All these tests need to have new openssl
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "proxy_ssl_certificate_by_lua* is not built with wolfSSL");
++}
+ 
+ if ($openssl_version =~ m/built with OpenSSL (0|1\.0\.(?:0|1[^\d]|2[a-d]).*)/) {
+     plan(skip_all => "too old OpenSSL, need >= 1.0.2e, was $1");
+diff --git a/bundle/ngx_stream_lua-0.0.19rc4/t/171-ssl-trusted-store.t b/bundle/ngx_stream_lua-0.0.19rc4/t/171-ssl-trusted-store.t
+index 4e9863c..d284e40 100644
+--- a/bundle/ngx_stream_lua-0.0.19rc4/t/171-ssl-trusted-store.t
++++ b/bundle/ngx_stream_lua-0.0.19rc4/t/171-ssl-trusted-store.t
+@@ -6,10 +6,13 @@ use File::Basename;
+ 
+ repeat_each(2);
+ 
+-plan tests => repeat_each() * (blocks() * 5);
+-
+ my $NginxBinary = $ENV{'TEST_NGINX_BINARY'} || 'nginx';
+ my $openssl_version = eval { `$NginxBinary -V 2>&1` };
++if ($openssl_version =~ m/built with wolfSSL/) {
++    plan(skip_all => "FFI calls into libcrypto symbols that wolfSSL does not export");
++}
++
++plan tests => repeat_each() * (blocks() * 5);
+ 
+ if ($openssl_version =~ m/\bBoringSSL\b/) {
+     $ENV{TEST_NGINX_BORINGSSL} = 1;
