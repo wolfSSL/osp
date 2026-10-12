@@ -30,13 +30,13 @@ make tests
  Makefile.in                                 |   1 +
  cipher-aesctr.h                             |   4 +
  cipher.c                                    |   6 +
- configure.ac                                | 167 +++++++++++++++++++-
+ configure.ac                                | 165 +++++++++++++++++++-
  includes.h                                  |  12 ++
  log.c                                       |  56 +++++++
  openbsd-compat/openssl-compat.c             |   4 +
  regress/unittests/test_helper/test_helper.c |   6 +
  sshkey.c                                    |   8 +
- 9 files changed, 263 insertions(+), 1 deletion(-)
+ 9 files changed, 261 insertions(+), 1 deletion(-)
 
 diff --git a/Makefile.in b/Makefile.in
 index ffc13e0..e297999 100644
@@ -85,7 +85,7 @@ index 0697e55..6464f64 100644
  		/* compute tag (on encrypt) or verify tag (on decrypt) */
  		if (EVP_Cipher(cc->evp, NULL, NULL, 0) < 0)
 diff --git a/configure.ac b/configure.ac
-index bb4d065..8111d73 100644
+index bb4d065..81df3d6 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -678,6 +678,7 @@ SHLIBEXT=".so"
@@ -104,7 +104,7 @@ index bb4d065..8111d73 100644
  	dnl Target SUSv3/POSIX.1-2001 plus BSD specifics.
  	dnl _DEFAULT_SOURCE is the new name for _BSD_SOURCE
  	dnl _GNU_SOURCE is needed for setres*id prototypes.
-@@ -2950,6 +2952,143 @@ AC_CHECK_FUNCS([getpgrp],[
+@@ -2950,6 +2952,141 @@ AC_CHECK_FUNCS([getpgrp],[
  	)
  ])
  
@@ -164,8 +164,6 @@ index bb4d065..8111d73 100644
 +	# OpenSSL tests for these. Just assume these are present for wolfSSL.
 +	AC_DEFINE([HAVE_BN_IS_PRIME_EX], [1], [Defined if using WolfSSL])
 +	AC_DEFINE([HAVE_SHA256_UPDATE], [1], [Defined if using WolfSSL])
-+	AC_DEFINE([HAVE_CRYPT], [1], [Defined if using WolfSSL])
-+	AC_DEFINE([HAVE_DES_CRYPT], [1], [Defined if using WolfSSL])
 +	AC_DEFINE([HAVE_DSA_GENERATE_PARAMETERS_EX], [1], [Defined if using WolfSSL])
 +	AC_DEFINE([HAVE_EVP_DIGESTFINAL_EX], [1], [Defined if using WolfSSL])
 +	AC_DEFINE([HAVE_EVP_DIGESTINIT_EX], [1], [Defined if using WolfSSL])
@@ -248,7 +246,7 @@ index bb4d065..8111d73 100644
  # Search for OpenSSL
  saved_CPPFLAGS="$CPPFLAGS"
  saved_LDFLAGS="$LDFLAGS"
-@@ -3374,6 +3513,12 @@ if test "x$openssl" = "xyes" ; then
+@@ -3374,6 +3511,12 @@ if test "x$openssl" = "xyes" ; then
  
  fi
  
@@ -261,7 +259,7 @@ index bb4d065..8111d73 100644
  # PKCS11/U2F depend on OpenSSL and dlopen().
  enable_pkcs11=yes
  enable_sk=yes
-@@ -3381,6 +3526,12 @@ enable_sk=yes
+@@ -3381,6 +3524,12 @@ enable_sk=yes
  if test "x$openssl_impl" = "xaws-lc"; then
  	enable_pkcs11="disabled; PKCS#11 not supported with AWS-LC"
  fi
@@ -274,7 +272,7 @@ index bb4d065..8111d73 100644
  if test "x$ac_cv_func_dlopen" != "xyes" ; then
  	enable_pkcs11="disabled; missing dlopen(3)"
  	enable_sk="disabled; missing dlopen(3)"
-@@ -3599,12 +3750,19 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
+@@ -3599,12 +3748,19 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
  	AC_DEFINE([OPENSSL_PRNG_ONLY], [1],
  		[Define if you want the OpenSSL internally seeded PRNG only])
  	RAND_MSG="OpenSSL internal ONLY"
@@ -295,7 +293,7 @@ index bb4d065..8111d73 100644
  
  saved_LIBS="$LIBS"
  AC_CHECK_LIB([iaf], [ia_openinfo], [
-@@ -3646,6 +3804,10 @@ AC_ARG_WITH([pam],
+@@ -3646,6 +3802,10 @@ AC_ARG_WITH([pam],
  			PAM_MSG="yes"
  
  			SSHDLIBS="$SSHDLIBS -lpam"
@@ -306,7 +304,7 @@ index bb4d065..8111d73 100644
  			AC_DEFINE([USE_PAM], [1],
  				[Define if you want to enable PAM support])
  
-@@ -5882,6 +6044,9 @@ echo "         Solaris privilege support: $SPP_MSG"
+@@ -5882,6 +6042,9 @@ echo "         Solaris privilege support: $SPP_MSG"
  echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
  echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
  echo "                  BSD Auth support: $BSD_AUTH_MSG"
