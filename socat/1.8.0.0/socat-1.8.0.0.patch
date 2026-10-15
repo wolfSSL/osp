@@ -1756,6 +1756,18 @@ index 0c2aff3..509793e 100644
  #include <openssl/ssl.h>
  #include <openssl/err.h>
  #include <openssl/rand.h>
+diff --git a/xio-ip.c b/xio-ip.c
+--- a/xio-ip.c
++++ b/xio-ip.c
+@@ -727,7 +727,7 @@
+ 		      opt->value2.u_string/*param2*/,
+ 		      opt->value3.u_string/*ifindex*/);
+ 	} else {
+-		/*0 opt->value3.u_string = NULL; / * is NULL from init */
++		opt->value3.u_string = NULL;
+ 		Info3("setting option \"%s\" to {\"%s\",\"%s\"}",
+ 		      ent->desc->defname,
+ 		      opt->value.u_string/*multiaddr*/,
 diff --git a/xio-openssl.c b/xio-openssl.c
 index 0205146..ac04827 100644
 --- a/xio-openssl.c
