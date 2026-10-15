@@ -33,3 +33,8 @@ does not support DSA cipher suites.
 
 
 The configure.ac was updated to have `[ ]` instead of `[]` because of autoconf's expected format with AC_DEFINE.
+
+The patch also backports the `ip-add-membership` omitted-interface
+initialization from socat 1.8.0.3. Without it, a two-parameter option can
+read an uninitialized interface pointer, causing multicast group membership
+setup to fail or the process to crash.
