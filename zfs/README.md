@@ -13,7 +13,7 @@ This patch inserts only a modest line count for wolfCrypt API calls,
 while removing zfs internal crypto implementations:
 ```
 $ git diff --stat | tail -n1
- 42 files changed, 885 insertions(+), 28608 deletions(-)
+ 41 files changed, 1054 insertions(+), 28442 deletions(-)
 ```
 
 ### Patch layout (per distro / version)
@@ -59,6 +59,30 @@ In addition to the ICP routing, this revision folds in the FIPS-related fixes
 - Userspace key-derivation uses the provider-native `EVP_KDF "PBKDF2"` with a
   `RAND_bytes` salt, so it routes through an OpenSSL 3.x provider.
 - `MODULE_IMPORT_NS("WOLFSSL")` is quoted for kernel >= 6.13.
+
+### AES-GCM and SHA-512/256 compatibility
+
+When `WOLFSSL_AESGCM_STREAM` is enabled, AES-GCM retains the streaming
+wolfCrypt calls. When it is disabled, including FIPS v5 configurations that
+exclude streaming, the adapter buffers the atomic operation and uses
+`wc_AesGcmSetExtIV()` plus `wc_AesGcmEncrypt_ex()` for encryption and
+`wc_AesGcmDecrypt()` for decryption. These names resolve to FIPS wrappers in
+the licensed v5 headers. The adapter preserves the ZFS ciphertext/tag layout
+and caller-supplied IV, and releases plaintext only after authentication
+succeeds. This adaptation does not require enabling streaming or editing the
+wolfCrypt module source.
+
+ZFS `checksum=sha512` uses SHA-512/256. When wolfCrypt defines
+`WOLFSSL_NOSHA512_256`, the adapter retains the OpenZFS generic implementation
+for this checksum and emits a kernel notice when it is first used. That
+checksum implementation is outside the wolfCrypt FIPS module boundary. When
+wolfCrypt provides SHA-512/256, the checksum continues to use wolfCrypt.
+
+The compatibility paths require LinuxKM build and end-to-end encrypted ZFS
+verification with the intended commercial bundle and kernel before deployment.
+Calling FIPS wrappers does not by itself establish approved-service status or
+coverage of the operating environment; those depend on the applicable module
+security policy and deployment configuration.
 
 ![wolfZFS Architecture Diagram](doc/wolfzfs_diagram.png)
 
