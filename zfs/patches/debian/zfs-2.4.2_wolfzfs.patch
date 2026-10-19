@@ -53,7 +53,7 @@ are not part of the production data or key path.
  module/icp/algs/aes/aes_impl_x86-64.c      |   64 -
  module/icp/algs/aes/aes_modes.c            |   50 +-
  module/icp/algs/modes/ccm.c                |  914 ++---
- module/icp/algs/modes/gcm.c                | 1750 ++--------
+ module/icp/algs/modes/gcm.c                | 1752 ++--------
  module/icp/algs/modes/gcm_generic.c        |   84 -
  module/icp/algs/modes/modes.c              |   49 +-
  module/icp/algs/sha2/sha256_impl.c         |  156 -
@@ -81,7 +81,7 @@ are not part of the production data or key path.
  module/zfs/hkdf.c                          |  166 +-
  tests/zfs-tests/cmd/Makefile.am            |    4 +-
  tests/zfs-tests/cmd/crypto_test.c          |   27 +-
- 41 files changed, 1054 insertions(+), 28442 deletions(-)
+ 41 files changed, 1056 insertions(+), 28442 deletions(-)
 
 diff --git a/Makefile.am b/Makefile.am
 index f78c38edc..2fd258e97 100644
@@ -3257,7 +3257,7 @@ index 0a7a5091f..2fd3c2f95 100644
  }
  
 diff --git a/module/icp/algs/modes/gcm.c b/module/icp/algs/modes/gcm.c
-index ab2c5a49f..76aec9b66 100644
+index ab2c5a49f..1f6c08b20 100644
 --- a/module/icp/algs/modes/gcm.c
 +++ b/module/icp/algs/modes/gcm.c
 @@ -32,15 +32,8 @@
@@ -3277,7 +3277,7 @@ index ab2c5a49f..76aec9b66 100644
  
  /* Select GCM implementation */
  #define	IMPL_FASTEST	(UINT32_MAX)
-@@ -55,30 +48,77 @@
+@@ -55,30 +48,79 @@
  static uint32_t icp_gcm_impl = IMPL_FASTEST;
  static uint32_t user_sel_impl = IMPL_FASTEST;
  
@@ -3363,7 +3363,9 @@ index ab2c5a49f..76aec9b66 100644
 -#endif /* ifdef CAN_USE_GCM_ASM */
 +	if (ctx->gcm_work != NULL) {
 +		memcpy(new, ctx->gcm_work, ctx->gcm_saved);
-+		explicit_memset(ctx->gcm_work, 0, ctx->gcm_work_len);
++		memset(ctx->gcm_work, 0, ctx->gcm_work_len);
++		/* Keep the wipe, as in modes.c's file-local explicit_memset. */
++		__asm__ __volatile__("" :: "r"(ctx->gcm_work) : "memory");
 +		vmem_free(ctx->gcm_work, ctx->gcm_work_len);
 +	}
 +	memcpy(new + ctx->gcm_saved, data, length);
@@ -3375,7 +3377,7 @@ index ab2c5a49f..76aec9b66 100644
  
  /*
   * Encrypt multiple blocks of data in GCM mode.  Decrypt for GCM mode
-@@ -91,116 +131,54 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
+@@ -91,116 +133,54 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
      void (*copy_block)(uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
  {
@@ -3539,7 +3541,7 @@ index ab2c5a49f..76aec9b66 100644
  }
  
  int
-@@ -210,122 +188,82 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -210,122 +190,82 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
      void (*xor_block)(uint8_t *, uint8_t *))
  {
  	(void) copy_block;
@@ -3737,7 +3739,7 @@ index ab2c5a49f..76aec9b66 100644
  }
  
  int
-@@ -337,38 +275,11 @@ gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
+@@ -337,38 +277,11 @@ gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
  {
  	(void) out, (void) block_size, (void) encrypt_block, (void) copy_block,
  	    (void) xor_block;
@@ -3763,23 +3765,23 @@ index ab2c5a49f..76aec9b66 100644
 -		} else {
 -			ASSERT0(ctx->gcm_pt_buf_len);
 -		}
--
++        DEBUG_LOG("gcm_mode_decrypt_contiguous_blocks: data=%p, length=%zu\n",
++                  data, length);
+ 
 -		ctx->gcm_pt_buf = new;
 -		ctx->gcm_pt_buf_len = new_len;
 -		memcpy(&ctx->gcm_pt_buf[ctx->gcm_processed_data_len], data,
 -		    length);
 -		ctx->gcm_processed_data_len += length;
 -	}
-+        DEBUG_LOG("gcm_mode_decrypt_contiguous_blocks: data=%p, length=%zu\n",
-+                  data, length);
- 
+-
 -	ctx->gcm_remainder_len = 0;
 -	return (CRYPTO_SUCCESS);
 +        return (gcm_save_data(ctx, data, length));
  }
  
  int
-@@ -376,82 +287,80 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -376,82 +289,80 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
      int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
  {
@@ -3934,7 +3936,7 @@ index ab2c5a49f..76aec9b66 100644
  }
  
  static int
-@@ -482,118 +391,11 @@ gcm_validate_args(CK_AES_GCM_PARAMS *gcm_param)
+@@ -482,118 +393,11 @@ gcm_validate_args(CK_AES_GCM_PARAMS *gcm_param)
  	return (CRYPTO_SUCCESS);
  }
  
@@ -4054,7 +4056,7 @@ index ab2c5a49f..76aec9b66 100644
      size_t block_size, int (*encrypt_block)(const void *, const uint8_t *,
      uint8_t *), void (*copy_block)(uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
-@@ -601,6 +403,14 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
+@@ -601,6 +405,14 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
  	CK_AES_GCM_PARAMS *gcm_param;
  	int rv = CRYPTO_SUCCESS;
  	size_t tag_len, iv_len;
@@ -4069,7 +4071,7 @@ index ab2c5a49f..76aec9b66 100644
  
  	if (param != NULL) {
  		gcm_param = (CK_AES_GCM_PARAMS *)(void *)param;
-@@ -617,79 +427,61 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
+@@ -617,79 +429,61 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
  
  		gcm_ctx->gcm_tag_len = tag_len;
  		gcm_ctx->gcm_processed_data_len = 0;
@@ -4198,7 +4200,7 @@ index ab2c5a49f..76aec9b66 100644
  
  	return (rv);
  }
-@@ -711,12 +503,21 @@ static gcm_impl_ops_t gcm_fastest_impl = {
+@@ -711,12 +505,21 @@ static gcm_impl_ops_t gcm_fastest_impl = {
  	.name = "fastest"
  };
  
@@ -4224,7 +4226,7 @@ index ab2c5a49f..76aec9b66 100644
  };
  
  /* Indicate that benchmark has been completed */
-@@ -734,49 +535,10 @@ static gcm_impl_ops_t *gcm_supp_impl[ARRAY_SIZE(gcm_all_impl)];
+@@ -734,49 +537,10 @@ static gcm_impl_ops_t *gcm_supp_impl[ARRAY_SIZE(gcm_all_impl)];
  const gcm_impl_ops_t *
  gcm_impl_get_ops(void)
  {
@@ -4278,7 +4280,7 @@ index ab2c5a49f..76aec9b66 100644
  }
  
  /*
-@@ -787,6 +549,7 @@ gcm_impl_init(void)
+@@ -787,6 +551,7 @@ gcm_impl_init(void)
  {
  	gcm_impl_ops_t *curr_impl;
  	int i, c;
@@ -4286,7 +4288,7 @@ index ab2c5a49f..76aec9b66 100644
  
  	/* Move supported implementations into gcm_supp_impls */
  	for (i = 0, c = 0; i < ARRAY_SIZE(gcm_all_impl); i++) {
-@@ -797,46 +560,11 @@ gcm_impl_init(void)
+@@ -797,46 +562,11 @@ gcm_impl_init(void)
  	}
  	gcm_supp_impl_cnt = c;
  
@@ -4335,7 +4337,7 @@ index ab2c5a49f..76aec9b66 100644
  	/* Finish initialization */
  	atomic_swap_32(&icp_gcm_impl, user_sel_impl);
  	gcm_impl_initialized = B_TRUE;
-@@ -872,6 +600,11 @@ gcm_impl_set(const char *val)
+@@ -872,6 +602,11 @@ gcm_impl_set(const char *val)
  	char req_name[GCM_IMPL_NAME_MAX];
  	uint32_t impl = GCM_IMPL_READ(user_sel_impl);
  	size_t i;
@@ -4347,7 +4349,7 @@ index ab2c5a49f..76aec9b66 100644
  
  	/* sanitize input */
  	i = strnlen(val, GCM_IMPL_NAME_MAX);
-@@ -885,18 +618,6 @@ gcm_impl_set(const char *val)
+@@ -885,18 +620,6 @@ gcm_impl_set(const char *val)
  
  	/* Check mandatory options */
  	for (i = 0; i < ARRAY_SIZE(gcm_impl_opts); i++) {
@@ -4366,7 +4368,7 @@ index ab2c5a49f..76aec9b66 100644
  		if (strcmp(req_name, gcm_impl_opts[i].name) == 0) {
  			impl = gcm_impl_opts[i].sel;
  			err = 0;
-@@ -915,24 +636,6 @@ gcm_impl_set(const char *val)
+@@ -915,24 +638,6 @@ gcm_impl_set(const char *val)
  			}
  		}
  	}
@@ -4391,7 +4393,7 @@ index ab2c5a49f..76aec9b66 100644
  
  	if (err == 0) {
  		if (gcm_impl_initialized)
-@@ -949,6 +652,7 @@ gcm_impl_set(const char *val)
+@@ -949,6 +654,7 @@ gcm_impl_set(const char *val)
  static int
  icp_gcm_impl_set(const char *val, zfs_kernel_param_t *kp)
  {
@@ -4399,7 +4401,7 @@ index ab2c5a49f..76aec9b66 100644
  	return (gcm_impl_set(val));
  }
  
-@@ -958,21 +662,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
+@@ -958,21 +664,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
  	int i, cnt = 0;
  	char *fmt;
  	const uint32_t impl = GCM_IMPL_READ(icp_gcm_impl);
@@ -4422,7 +4424,7 @@ index ab2c5a49f..76aec9b66 100644
  		fmt = (impl == gcm_impl_opts[i].sel) ? "[%s] " : "%s ";
  		cnt += kmem_scnprintf(buffer + cnt, PAGE_SIZE - cnt, fmt,
  		    gcm_impl_opts[i].name);
-@@ -992,746 +685,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
+@@ -992,746 +687,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
      NULL, 0644);
  MODULE_PARM_DESC(icp_gcm_impl, "Select gcm implementation.");
  #endif /* defined(__KERNEL) */

@@ -13,7 +13,7 @@ This patch inserts only a modest line count for wolfCrypt API calls,
 while removing zfs internal crypto implementations:
 ```
 $ git diff --stat | tail -n1
- 41 files changed, 1054 insertions(+), 28442 deletions(-)
+ 41 files changed, 1056 insertions(+), 28442 deletions(-)
 ```
 
 ### Patch layout (per distro / version)
