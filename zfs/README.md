@@ -74,12 +74,35 @@ wolfCrypt module source.
 
 ZFS `checksum=sha512` uses SHA-512/256. When wolfCrypt defines
 `WOLFSSL_NOSHA512_256`, the adapter retains the OpenZFS generic implementation
-for this checksum and emits a kernel notice when it is first used. That
+for this checksum and emits a kernel notice. That
 checksum implementation is outside the wolfCrypt FIPS module boundary. When
 wolfCrypt provides SHA-512/256, the checksum continues to use wolfCrypt.
 
-The compatibility paths require LinuxKM build and end-to-end encrypted ZFS
-verification with the intended commercial bundle and kernel before deployment.
+The Proxmox path was tested in a disposable VM with a licensed wolfSSL 5.9.4 /
+wolfCrypt FIPS v5.2.4 bundle, OpenZFS 2.4.2-pve1, wolfProvider 1.2.1, and a
+freshly built 7.0.12-1+wolfcrng1-pve kernel. The customer LinuxKM configuration
+was:
+
+```sh
+./configure --enable-fips=v5.2.4 --enable-linuxkm --enable-wolfzfs=kernel \
+    --enable-linuxkm-lkcapi-register=stdrng-default --with-linux-source="$KSRC"
+```
+
+Licensed FIPS builds use the vendor bundle and its integrity-hash initialization
+workflow. Keep `libwolfssl.ko` unstripped when signing and installing it. The
+original manual-guide configuration without `--enable-wolfzfs=kernel` also
+compiled against the same fresh kernel. No wolfCrypt algorithm or wrapper
+source patches were used.
+
+Runtime checks passed with Secure Boot enabled and after booting with `fips=1`:
+all six native AES-GCM/CCM ciphers, raw and passphrase keys, key rejection and
+rotation, encrypted zvol I/O, concurrent writes, export/import, and clean scrubs.
+The same patch also passed a separate wolfSSL 5.9.1 FIPS Ready streaming build
+and reciprocal encrypted-data reads between Ready and commercial v5, including
+the SHA-512/256 checksum. The commercial kernel ICP test passed 168 cases and
+840 decryption checks covering templates, split buffers, aliasing, and tampering.
+
+Other bundle/kernel combinations require their own build and runtime checks.
 Calling FIPS wrappers does not by itself establish approved-service status or
 coverage of the operating environment; those depend on the applicable module
 security policy and deployment configuration.
@@ -237,12 +260,13 @@ cd ../
 ./scripts/zfs/build_wolfzfs
 ```
 
-4. Run zfs crypto test (should pass in 5 s or less):
+4. Run the ZFS crypto tests and check the results against the wolfCrypt
+   configuration being tested:
 ```
 ./scripts/test_zfs/run_crypto
 ```
 
-Expected output:
+Example output for a configuration supporting all of these test vectors:
 ```
 [2026-03-21T03:01:43.050005] Test: /home/.../zfs/tests/zfs-tests/tests/functional/crypto/icp_aes_ccm (run as root) [00:00] [PASS]
 [2026-03-21T03:01:43.138521] Test: /home/.../zfs/tests/zfs-tests/tests/functional/crypto/icp_aes_gcm (run as root) [00:00] [PASS]
@@ -253,6 +277,16 @@ PASS	   2
 Running Time:	00:00:00
 Percent passed:	100.0%
 ```
+
+The complete GCM vector file also contains valid IV lengths unsupported by
+the licensed wolfSSL 5.9.4 / wolfCrypt FIPS v5.2.4 configuration. With that
+bundle, the unfiltered 316-case GCM run returns nonzero: 261 cases pass and
+55 valid vectors with IV lengths outside the 12- or 16-byte test profile
+fail. Preserve and account for those failures; do not treat an arbitrary
+GCM failure as expected. The separately selected 12- or 16-byte-IV profile
+passes all 255 cases, and its native-ZFS 12-byte-IV subset passes all 197
+cases. CCM passes all 552 cases. Native ZFS uses 12-byte GCM IVs and 16-byte
+tags; a failure in that profile requires investigation.
 
 5. Next run zfs sanity test (could take 15-20 min):
 ```
