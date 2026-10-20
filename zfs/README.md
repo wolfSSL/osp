@@ -98,11 +98,11 @@ for this checksum and emits a kernel notice. That
 checksum implementation is outside the wolfCrypt FIPS module boundary. When
 wolfCrypt provides SHA-512/256, the checksum continues to use wolfCrypt.
 
-Before the buffer-reservation follow-up, the Proxmox path was tested in a
+The Proxmox path, including the buffer-reservation change, was tested in a
 disposable VM with a licensed wolfSSL 5.9.4 /
 wolfCrypt FIPS v5.2.4 bundle, OpenZFS 2.4.2-pve1, wolfProvider 1.2.1, and a
-freshly built 7.0.12-1+wolfcrng1-pve kernel. The customer LinuxKM configuration
-was:
+7.0.12-1+wolfcrng1-pve kernel built from the customer Proxmox sources. The
+customer LinuxKM configuration was:
 
 ```sh
 ./configure --enable-fips=v5.2.4 --enable-linuxkm --enable-wolfzfs=kernel \
@@ -115,13 +115,19 @@ original manual-guide configuration without `--enable-wolfzfs=kernel` also
 compiled against the same fresh kernel. No wolfCrypt algorithm or wrapper
 source patches were used.
 
-Runtime checks passed with Secure Boot enabled and after booting with `fips=1`:
+Runtime checks passed before and after reboot with Secure Boot enabled and `fips=1`:
 all six native AES-GCM/CCM ciphers, raw and passphrase keys, key rejection and
 rotation, encrypted zvol I/O, concurrent writes, export/import, and clean scrubs.
-The same patch also passed a separate wolfSSL 5.9.1 FIPS Ready streaming build
-and reciprocal encrypted-data reads between Ready and commercial v5, including
-the SHA-512/256 checksum. The commercial kernel ICP test passed 168 cases and
-840 decryption checks covering templates, split buffers, aliasing, and tampering.
+The current commercial kernel ICP test passed 192 cases and 960 decryption
+checks on both boots, covering templates, split buffers, aliasing, and tampering.
+This includes 24 cases using 4 KiB fragments with 4097-byte and 1 MiB inputs.
+The updated module also read the previous 89-file encrypted fixture and zvol;
+fresh native data, key cycles, scrubs and post-reboot writes passed.
+
+An earlier adapter revision passed a separate wolfSSL 5.9.1 FIPS Ready streaming
+build and reciprocal encrypted-data reads between Ready and commercial v5,
+including the SHA-512/256 checksum. Those Ready runtime checks predate the
+buffer-reservation change; the current host regressions cover both adapter modes.
 
 Other bundle/kernel combinations require their own build and runtime checks.
 Calling FIPS wrappers does not by itself establish approved-service status or
