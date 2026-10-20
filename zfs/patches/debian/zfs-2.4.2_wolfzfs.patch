@@ -23,7 +23,8 @@ rebased from the cd06f79e2 port to 2.4.2 and extended:
 - MODULE_IMPORT_NS("WOLFSSL") quoted for kernel >= 6.13.
 - gcm.c: retain streaming support where available; otherwise use the
   external-IV one-shot wolfCrypt APIs for FIPS v5 compatibility. Preserve
-  ciphertext/tag layout and authenticate before releasing plaintext.
+  ciphertext/tag layout and authenticate before releasing plaintext. Reserve
+  the known atomic input once, avoiding fragment-by-fragment buffer growth.
 - sha2_generic.c: use the OpenZFS generic SHA-512/256 checksum only when
   wolfCrypt lacks it; this checksum is outside the wolfCrypt FIPS boundary.
 
@@ -53,7 +54,7 @@ are not part of the production data or key path.
  module/icp/algs/aes/aes_impl_x86-64.c      |   64 -
  module/icp/algs/aes/aes_modes.c            |   50 +-
  module/icp/algs/modes/ccm.c                |  914 ++---
- module/icp/algs/modes/gcm.c                | 1752 ++--------
+ module/icp/algs/modes/gcm.c                | 1758 ++--------
  module/icp/algs/modes/gcm_generic.c        |   84 -
  module/icp/algs/modes/modes.c              |   49 +-
  module/icp/algs/sha2/sha256_impl.c         |  156 -
@@ -72,16 +73,16 @@ are not part of the production data or key path.
  module/icp/asm-x86_64/sha2/sha256-x86_64.S | 5122 ----------------------------
  module/icp/include/aes/aes_impl.h          |   93 +-
  module/icp/include/modes/gcm_impl.h        |    6 -
- module/icp/include/modes/modes.h           |   69 +-
+ module/icp/include/modes/modes.h           |   70 +-
  module/icp/include/sha2/sha2_impl.h        |    2 -
- module/icp/io/aes.c                        |   68 +-
+ module/icp/io/aes.c                        |   99 +-
  module/icp/io/sha2_mod.c                   |   21 +
  module/os/linux/zfs/zfs_ioctl_os.c         |   10 +-
  module/os/linux/zfs/zio_crypt.c            |    4 +-
  module/zfs/hkdf.c                          |  166 +-
  tests/zfs-tests/cmd/Makefile.am            |    4 +-
  tests/zfs-tests/cmd/crypto_test.c          |   27 +-
- 41 files changed, 1056 insertions(+), 28442 deletions(-)
+ 41 files changed, 1095 insertions(+), 28441 deletions(-)
 
 diff --git a/Makefile.am b/Makefile.am
 index f78c38edc..2fd258e97 100644
@@ -3257,7 +3258,7 @@ index 0a7a5091f..2fd3c2f95 100644
  }
  
 diff --git a/module/icp/algs/modes/gcm.c b/module/icp/algs/modes/gcm.c
-index ab2c5a49f..1f6c08b20 100644
+index ab2c5a49f..daf704edd 100644
 --- a/module/icp/algs/modes/gcm.c
 +++ b/module/icp/algs/modes/gcm.c
 @@ -32,15 +32,8 @@
@@ -3277,18 +3278,13 @@ index ab2c5a49f..1f6c08b20 100644
  
  /* Select GCM implementation */
  #define	IMPL_FASTEST	(UINT32_MAX)
-@@ -55,30 +48,79 @@
+@@ -55,30 +48,84 @@
  static uint32_t icp_gcm_impl = IMPL_FASTEST;
  static uint32_t user_sel_impl = IMPL_FASTEST;
  
 -#ifdef CAN_USE_GCM_ASM
 -/* Does the architecture we run on support the MOVBE instruction? */
 -boolean_t gcm_avx_can_use_movbe = B_FALSE;
--/*
-- * Whether to use the optimized openssl gcm and ghash implementations.
-- */
--static gcm_impl gcm_impl_used = GCM_IMPL_GENERIC;
--#define	GCM_IMPL_USED	(*(volatile gcm_impl *)&gcm_impl_used)
 +#define DO_NOTHING do {} while (0)
 +
 +#if defined(DEBUG_WOLFZFS)
@@ -3308,8 +3304,7 @@ index ab2c5a49f..1f6c08b20 100644
 +        #define ERR_LOG(fmt, ...)      printf(fmt, ##__VA_ARGS__)
 +    #endif
 +#endif
- 
--extern boolean_t ASMABI atomic_toggle_boolean_nv(volatile boolean_t *);
++
 +#if defined(DEBUG_WOLFZFS)
 +    #define GCM_DUMP_DATA(what, data, len)       \
 +        do {                                     \
@@ -3327,57 +3322,67 @@ index ab2c5a49f..1f6c08b20 100644
 +    #define GCM_DUMP_DATA(what, data, len)  \
 +        do { }  while (0)
 +#endif
++
+ /*
+- * Whether to use the optimized openssl gcm and ghash implementations.
++ * The atomic callers know the complete input length.  Reserve it once before
++ * gathering fragments, avoiding repeated copies and wipes of earlier input.
++ * wolfCrypt takes word32 lengths; crypto_put_output_data() takes an int.
+  */
+-static gcm_impl gcm_impl_used = GCM_IMPL_GENERIC;
+-#define	GCM_IMPL_USED	(*(volatile gcm_impl *)&gcm_impl_used)
+-
+-extern boolean_t ASMABI atomic_toggle_boolean_nv(volatile boolean_t *);
++int
++gcm_reserve_data(gcm_ctx_t *ctx, size_t length)
++{
++	uint8_t *work;
  
 -static inline boolean_t gcm_avx_will_work(void);
 -static inline boolean_t gcm_avx2_will_work(void);
 -static inline void gcm_use_impl(gcm_impl impl);
 -static inline gcm_impl gcm_toggle_impl(void);
-+/*
-+ * Buffer input for authenticated decryption and for non-streaming encryption.
-+ * Bound the total before allocation: wolfCrypt takes word32 lengths and
-+ * crypto_put_output_data() takes an int length.
-+ * The atomic ICP callers retain the IV and AAD until the final call.
-+ */
-+static int
-+gcm_save_data(gcm_ctx_t *ctx, const char *data, size_t length)
-+{
-+	uint8_t *new;
-+	size_t new_len;
++	if (length > INT_MAX)
++		return (CRYPTO_DATA_LEN_RANGE);
++	if (ctx->gcm_work != NULL || ctx->gcm_work_len != 0 ||
++	    ctx->gcm_saved != 0)
++		return (CRYPTO_ARGUMENTS_BAD);
++	if (length == 0)
++		return (CRYPTO_SUCCESS);
++	work = vmem_alloc(length, KM_SLEEP);
++	if (work == NULL)
++		return (CRYPTO_HOST_MEMORY);
  
 -static int gcm_mode_encrypt_contiguous_blocks_avx(gcm_ctx_t *, char *, size_t,
 -    crypto_data_t *, size_t);
-+	if (length == 0)
-+		return (CRYPTO_SUCCESS);
-+	if (ctx->gcm_saved > INT_MAX ||
-+	    length > INT_MAX - ctx->gcm_saved)
-+		return (CRYPTO_DATA_LEN_RANGE);
-+	new_len = ctx->gcm_saved + length;
-+	new = vmem_alloc(new_len, KM_SLEEP);
-+	if (new == NULL)
-+		return (CRYPTO_HOST_MEMORY);
++	ctx->gcm_work = work;
++	ctx->gcm_work_len = length;
++	return (CRYPTO_SUCCESS);
++}
  
 -static int gcm_encrypt_final_avx(gcm_ctx_t *, crypto_data_t *, size_t);
 -static int gcm_decrypt_final_avx(gcm_ctx_t *, crypto_data_t *, size_t);
 -static int gcm_init_avx(gcm_ctx_t *, const uint8_t *, size_t, const uint8_t *,
 -    size_t, size_t);
 -#endif /* ifdef CAN_USE_GCM_ASM */
-+	if (ctx->gcm_work != NULL) {
-+		memcpy(new, ctx->gcm_work, ctx->gcm_saved);
-+		memset(ctx->gcm_work, 0, ctx->gcm_work_len);
-+		/* Keep the wipe, as in modes.c's file-local explicit_memset. */
-+		__asm__ __volatile__("" :: "r"(ctx->gcm_work) : "memory");
-+		vmem_free(ctx->gcm_work, ctx->gcm_work_len);
++/* Append only within the complete atomic input reserved by the caller. */
++static int
++gcm_save_data(gcm_ctx_t *ctx, const char *data, size_t length)
++{
++	if (ctx->gcm_work_len > INT_MAX ||
++	    ctx->gcm_saved > ctx->gcm_work_len ||
++	    length > ctx->gcm_work_len - ctx->gcm_saved)
++		return (CRYPTO_DATA_LEN_RANGE);
++	if (length != 0) {
++		memcpy(ctx->gcm_work + ctx->gcm_saved, data, length);
++		ctx->gcm_saved += length;
 +	}
-+	memcpy(new + ctx->gcm_saved, data, length);
-+	ctx->gcm_work = new;
-+	ctx->gcm_saved = new_len;
-+	ctx->gcm_work_len = new_len;
 +	return (CRYPTO_SUCCESS);
 +}
  
  /*
   * Encrypt multiple blocks of data in GCM mode.  Decrypt for GCM mode
-@@ -91,116 +133,54 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
+@@ -91,116 +138,54 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
      void (*copy_block)(uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
  {
@@ -3541,7 +3546,7 @@ index ab2c5a49f..1f6c08b20 100644
  }
  
  int
-@@ -210,122 +190,82 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -210,122 +195,85 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
      void (*xor_block)(uint8_t *, uint8_t *))
  {
  	(void) copy_block;
@@ -3626,6 +3631,9 @@ index ab2c5a49f..1f6c08b20 100644
 +        int rc = 0;
 +        uint8_t auth_tag[WC_AES_BLOCK_SIZE];
 +        uint8_t iv_out[GCM_NONCE_MAX_SZ];
++
++        if (ctx->gcm_saved != ctx->gcm_work_len)
++            return (CRYPTO_DATA_LEN_RANGE);
 +
 +        /* crypto_put_output_data() does not check the RAW offset. */
 +        if (out->cd_format == CRYPTO_DATA_RAW &&
@@ -3739,7 +3747,7 @@ index ab2c5a49f..1f6c08b20 100644
  }
  
  int
-@@ -337,38 +277,11 @@ gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
+@@ -337,38 +285,11 @@ gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
  {
  	(void) out, (void) block_size, (void) encrypt_block, (void) copy_block,
  	    (void) xor_block;
@@ -3765,23 +3773,23 @@ index ab2c5a49f..1f6c08b20 100644
 -		} else {
 -			ASSERT0(ctx->gcm_pt_buf_len);
 -		}
-+        DEBUG_LOG("gcm_mode_decrypt_contiguous_blocks: data=%p, length=%zu\n",
-+                  data, length);
- 
+-
 -		ctx->gcm_pt_buf = new;
 -		ctx->gcm_pt_buf_len = new_len;
 -		memcpy(&ctx->gcm_pt_buf[ctx->gcm_processed_data_len], data,
 -		    length);
 -		ctx->gcm_processed_data_len += length;
 -	}
--
++        DEBUG_LOG("gcm_mode_decrypt_contiguous_blocks: data=%p, length=%zu\n",
++                  data, length);
+ 
 -	ctx->gcm_remainder_len = 0;
 -	return (CRYPTO_SUCCESS);
 +        return (gcm_save_data(ctx, data, length));
  }
  
  int
-@@ -376,82 +289,80 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+@@ -376,82 +297,80 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
      int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
  {
@@ -3936,7 +3944,7 @@ index ab2c5a49f..1f6c08b20 100644
  }
  
  static int
-@@ -482,118 +393,11 @@ gcm_validate_args(CK_AES_GCM_PARAMS *gcm_param)
+@@ -482,118 +401,11 @@ gcm_validate_args(CK_AES_GCM_PARAMS *gcm_param)
  	return (CRYPTO_SUCCESS);
  }
  
@@ -4056,7 +4064,7 @@ index ab2c5a49f..1f6c08b20 100644
      size_t block_size, int (*encrypt_block)(const void *, const uint8_t *,
      uint8_t *), void (*copy_block)(uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *))
-@@ -601,6 +405,14 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
+@@ -601,6 +413,14 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
  	CK_AES_GCM_PARAMS *gcm_param;
  	int rv = CRYPTO_SUCCESS;
  	size_t tag_len, iv_len;
@@ -4071,7 +4079,7 @@ index ab2c5a49f..1f6c08b20 100644
  
  	if (param != NULL) {
  		gcm_param = (CK_AES_GCM_PARAMS *)(void *)param;
-@@ -617,79 +429,61 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
+@@ -617,79 +437,61 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
  
  		gcm_ctx->gcm_tag_len = tag_len;
  		gcm_ctx->gcm_processed_data_len = 0;
@@ -4200,7 +4208,7 @@ index ab2c5a49f..1f6c08b20 100644
  
  	return (rv);
  }
-@@ -711,12 +505,21 @@ static gcm_impl_ops_t gcm_fastest_impl = {
+@@ -711,12 +513,21 @@ static gcm_impl_ops_t gcm_fastest_impl = {
  	.name = "fastest"
  };
  
@@ -4226,7 +4234,7 @@ index ab2c5a49f..1f6c08b20 100644
  };
  
  /* Indicate that benchmark has been completed */
-@@ -734,49 +537,10 @@ static gcm_impl_ops_t *gcm_supp_impl[ARRAY_SIZE(gcm_all_impl)];
+@@ -734,49 +545,10 @@ static gcm_impl_ops_t *gcm_supp_impl[ARRAY_SIZE(gcm_all_impl)];
  const gcm_impl_ops_t *
  gcm_impl_get_ops(void)
  {
@@ -4280,7 +4288,7 @@ index ab2c5a49f..1f6c08b20 100644
  }
  
  /*
-@@ -787,6 +551,7 @@ gcm_impl_init(void)
+@@ -787,6 +559,7 @@ gcm_impl_init(void)
  {
  	gcm_impl_ops_t *curr_impl;
  	int i, c;
@@ -4288,7 +4296,7 @@ index ab2c5a49f..1f6c08b20 100644
  
  	/* Move supported implementations into gcm_supp_impls */
  	for (i = 0, c = 0; i < ARRAY_SIZE(gcm_all_impl); i++) {
-@@ -797,46 +562,11 @@ gcm_impl_init(void)
+@@ -797,46 +570,11 @@ gcm_impl_init(void)
  	}
  	gcm_supp_impl_cnt = c;
  
@@ -4337,7 +4345,7 @@ index ab2c5a49f..1f6c08b20 100644
  	/* Finish initialization */
  	atomic_swap_32(&icp_gcm_impl, user_sel_impl);
  	gcm_impl_initialized = B_TRUE;
-@@ -872,6 +602,11 @@ gcm_impl_set(const char *val)
+@@ -872,6 +610,11 @@ gcm_impl_set(const char *val)
  	char req_name[GCM_IMPL_NAME_MAX];
  	uint32_t impl = GCM_IMPL_READ(user_sel_impl);
  	size_t i;
@@ -4349,7 +4357,7 @@ index ab2c5a49f..1f6c08b20 100644
  
  	/* sanitize input */
  	i = strnlen(val, GCM_IMPL_NAME_MAX);
-@@ -885,18 +620,6 @@ gcm_impl_set(const char *val)
+@@ -885,18 +628,6 @@ gcm_impl_set(const char *val)
  
  	/* Check mandatory options */
  	for (i = 0; i < ARRAY_SIZE(gcm_impl_opts); i++) {
@@ -4368,7 +4376,7 @@ index ab2c5a49f..1f6c08b20 100644
  		if (strcmp(req_name, gcm_impl_opts[i].name) == 0) {
  			impl = gcm_impl_opts[i].sel;
  			err = 0;
-@@ -915,24 +638,6 @@ gcm_impl_set(const char *val)
+@@ -915,24 +646,6 @@ gcm_impl_set(const char *val)
  			}
  		}
  	}
@@ -4393,7 +4401,7 @@ index ab2c5a49f..1f6c08b20 100644
  
  	if (err == 0) {
  		if (gcm_impl_initialized)
-@@ -949,6 +654,7 @@ gcm_impl_set(const char *val)
+@@ -949,6 +662,7 @@ gcm_impl_set(const char *val)
  static int
  icp_gcm_impl_set(const char *val, zfs_kernel_param_t *kp)
  {
@@ -4401,7 +4409,7 @@ index ab2c5a49f..1f6c08b20 100644
  	return (gcm_impl_set(val));
  }
  
-@@ -958,21 +664,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
+@@ -958,21 +672,10 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
  	int i, cnt = 0;
  	char *fmt;
  	const uint32_t impl = GCM_IMPL_READ(icp_gcm_impl);
@@ -4424,7 +4432,7 @@ index ab2c5a49f..1f6c08b20 100644
  		fmt = (impl == gcm_impl_opts[i].sel) ? "[%s] " : "%s ";
  		cnt += kmem_scnprintf(buffer + cnt, PAGE_SIZE - cnt, fmt,
  		    gcm_impl_opts[i].name);
-@@ -992,746 +687,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
+@@ -992,746 +695,3 @@ module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
      NULL, 0644);
  MODULE_PARM_DESC(icp_gcm_impl, "Select gcm implementation.");
  #endif /* defined(__KERNEL) */
@@ -30128,7 +30136,7 @@ index 238a4e27f..c654eb8e0 100644
   * Initializes fastest implementation
   */
 diff --git a/module/icp/include/modes/modes.h b/module/icp/include/modes/modes.h
-index de11d9eaf..7a753ff38 100644
+index de11d9eaf..4cdf323c9 100644
 --- a/module/icp/include/modes/modes.h
 +++ b/module/icp/include/modes/modes.h
 @@ -34,6 +34,9 @@ extern "C" {
@@ -30203,16 +30211,16 @@ index de11d9eaf..7a753ff38 100644
  	GCM_IMPL_MAX,
  } gcm_impl;
  #endif
-@@ -167,35 +171,34 @@ typedef struct gcm_ctx {
+@@ -167,36 +171,36 @@ typedef struct gcm_ctx {
  	struct common_ctx gcm_common;
  	size_t gcm_tag_len;
  	size_t gcm_processed_data_len;
 -	size_t gcm_pt_buf_len;
 -	uint32_t gcm_tmp[4];
 +        uint8_t   gcm_chunk[256];
-+        uint8_t * gcm_work; /* scratch space to buffer decrypt data */
-+        size_t    gcm_work_len;
-+	size_t    gcm_saved;
++        uint8_t * gcm_work; /* buffered atomic GCM input */
++        size_t    gcm_work_len; /* complete reserved input length */
++	size_t    gcm_saved; /* input bytes gathered so far */
 +#ifndef WOLFSSL_AESGCM_STREAM
  	/*
 -	 * The offset of gcm_Htable relative to gcm_ghash, (32), is hard coded
@@ -30252,9 +30260,11 @@ index de11d9eaf..7a753ff38 100644
 +
 +void ccm_clear_ctx(ccm_ctx_t *ctx);
  void gcm_clear_ctx(gcm_ctx_t *ctx);
++int gcm_reserve_data(gcm_ctx_t *, size_t);
  
  typedef struct aes_ctx {
-@@ -211,7 +214,6 @@ typedef struct aes_ctx {
+ 	union {
+@@ -211,7 +215,6 @@ typedef struct aes_ctx {
  #define	ac_keysched_len		acu.acu_ccm.ccm_common.cc_keysched_len
  #define	ac_iv			acu.acu_ccm.ccm_common.cc_iv
  #define	ac_lastp		acu.acu_ccm.ccm_common.cc_lastp
@@ -30262,7 +30272,7 @@ index de11d9eaf..7a753ff38 100644
  #define	ac_mac_len		acu.acu_ccm.ccm_mac_len
  #define	ac_data_len		acu.acu_ccm.ccm_data_len
  #define	ac_processed_mac_len	acu.acu_ccm.ccm_processed_mac_len
-@@ -264,14 +266,11 @@ extern int ccm_init_ctx(ccm_ctx_t *, char *, int, boolean_t, size_t,
+@@ -264,14 +267,11 @@ extern int ccm_init_ctx(ccm_ctx_t *, char *, int, boolean_t, size_t,
      int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
      void (*xor_block)(uint8_t *, uint8_t *));
  
@@ -30297,7 +30307,7 @@ index 2f516ec0e..68e144ec9 100644
  } sha512_ops_t;
  
 diff --git a/module/icp/io/aes.c b/module/icp/io/aes.c
-index ca586eaf9..556beca3a 100644
+index ca586eaf9..9ae9c043a 100644
 --- a/module/icp/io/aes.c
 +++ b/module/icp/io/aes.c
 @@ -151,8 +151,9 @@ aes_check_mech_param(crypto_mechanism_t *mechanism, aes_ctx_t **ctx)
@@ -30322,7 +30332,7 @@ index ca586eaf9..556beca3a 100644
  }
  
  /*
-@@ -190,7 +191,7 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
+@@ -190,13 +191,23 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
  	ret = aes_common_init_ctx(&aes_ctx, template, mechanism, key,
  	    KM_SLEEP, B_TRUE);
  	if (ret != CRYPTO_SUCCESS)
@@ -30331,7 +30341,39 @@ index ca586eaf9..556beca3a 100644
  
  	switch (mechanism->cm_type) {
  	case AES_CCM_MECH_INFO_TYPE:
-@@ -232,15 +233,13 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
+ 		length_needed = plaintext->cd_length + aes_ctx.ac_mac_len;
+ 		break;
+ 	case AES_GCM_MECH_INFO_TYPE:
++		if (plaintext->cd_length > SIZE_MAX - aes_ctx.ac_tag_len) {
++			ret = CRYPTO_DATA_LEN_RANGE;
++			goto out;
++		}
++#ifndef WOLFSSL_AESGCM_STREAM
++		if (plaintext->cd_length > INT_MAX) {
++			ret = CRYPTO_DATA_LEN_RANGE;
++			goto out;
++		}
++#endif
+ 		length_needed = plaintext->cd_length + aes_ctx.ac_tag_len;
+ 		break;
+ 	default:
+@@ -210,6 +221,15 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
+ 		goto out;
+ 	}
+ 
++#ifndef WOLFSSL_AESGCM_STREAM
++	if (mechanism->cm_type == AES_GCM_MECH_INFO_TYPE) {
++		ret = gcm_reserve_data((gcm_ctx_t *)&aes_ctx,
++		    plaintext->cd_length);
++		if (ret != CRYPTO_SUCCESS)
++			goto out;
++	}
++#endif
++
+ 	saved_offset = ciphertext->cd_offset;
+ 	saved_length = ciphertext->cd_length;
+ 
+@@ -232,15 +252,13 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
  	if (ret == CRYPTO_SUCCESS) {
  		if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
  			ret = ccm_encrypt_final((ccm_ctx_t *)&aes_ctx,
@@ -30349,7 +30391,7 @@ index ca586eaf9..556beca3a 100644
  			if (ret != CRYPTO_SUCCESS)
  				goto out;
  			ASSERT0(aes_ctx.ac_remainder_len);
-@@ -259,10 +258,13 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
+@@ -259,10 +277,13 @@ aes_encrypt_atomic(crypto_mechanism_t *mechanism,
  
  out:
  	if (aes_ctx.ac_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
@@ -30357,16 +30399,16 @@ index ca586eaf9..556beca3a 100644
 -		kmem_free(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
 +		aes_free_keysched(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
 +		aes_ctx.ac_keysched = NULL;
-+	}
-+	if (aes_ctx.ac_flags & CCM_MODE) {
-+		ccm_clear_ctx((ccm_ctx_t *)&aes_ctx);
  	}
 -	if (aes_ctx.ac_flags & GCM_MODE) {
++	if (aes_ctx.ac_flags & CCM_MODE) {
++		ccm_clear_ctx((ccm_ctx_t *)&aes_ctx);
++	}
 +	else if (aes_ctx.ac_flags & GCM_MODE) {
  		gcm_clear_ctx((gcm_ctx_t *)&aes_ctx);
  	}
  	return (ret);
-@@ -289,7 +291,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
+@@ -289,13 +310,18 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
  	ret = aes_common_init_ctx(&aes_ctx, template, mechanism, key,
  	    KM_SLEEP, B_FALSE);
  	if (ret != CRYPTO_SUCCESS)
@@ -30375,7 +30417,32 @@ index ca586eaf9..556beca3a 100644
  
  	switch (mechanism->cm_type) {
  	case AES_CCM_MECH_INFO_TYPE:
-@@ -335,8 +337,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
+ 		length_needed = aes_ctx.ac_data_len;
+ 		break;
+ 	case AES_GCM_MECH_INFO_TYPE:
++		if (ciphertext->cd_length < aes_ctx.ac_tag_len ||
++		    ciphertext->cd_length > INT_MAX) {
++			ret = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
++			goto out;
++		}
+ 		length_needed = ciphertext->cd_length - aes_ctx.ac_tag_len;
+ 		break;
+ 	default:
+@@ -309,6 +335,13 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
+ 		goto out;
+ 	}
+ 
++	if (mechanism->cm_type == AES_GCM_MECH_INFO_TYPE) {
++		ret = gcm_reserve_data((gcm_ctx_t *)&aes_ctx,
++		    ciphertext->cd_length);
++		if (ret != CRYPTO_SUCCESS)
++			goto out;
++	}
++
+ 	saved_offset = plaintext->cd_offset;
+ 	saved_length = plaintext->cd_length;
+ 
+@@ -335,8 +368,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
  			ASSERT(aes_ctx.ac_processed_mac_len
  			    == aes_ctx.ac_mac_len);
  			ret = ccm_decrypt_final((ccm_ctx_t *)&aes_ctx,
@@ -30385,7 +30452,7 @@ index ca586eaf9..556beca3a 100644
  			ASSERT0(aes_ctx.ac_remainder_len);
  			if ((ret == CRYPTO_SUCCESS) &&
  			    (ciphertext != plaintext)) {
-@@ -347,8 +348,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
+@@ -347,8 +379,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
  			}
  		} else if (mechanism->cm_type == AES_GCM_MECH_INFO_TYPE) {
  			ret = gcm_decrypt_final((gcm_ctx_t *)&aes_ctx,
@@ -30395,7 +30462,7 @@ index ca586eaf9..556beca3a 100644
  			ASSERT0(aes_ctx.ac_remainder_len);
  			if ((ret == CRYPTO_SUCCESS) &&
  			    (ciphertext != plaintext)) {
-@@ -366,14 +366,12 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
+@@ -366,14 +397,12 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
  
  out:
  	if (aes_ctx.ac_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
@@ -30413,7 +30480,7 @@ index ca586eaf9..556beca3a 100644
  	} else if (aes_ctx.ac_flags & GCM_MODE) {
  		gcm_clear_ctx((gcm_ctx_t *)&aes_ctx);
  	}
-@@ -404,9 +402,9 @@ aes_create_ctx_template(crypto_mechanism_t *mechanism, crypto_key_t *key,
+@@ -404,9 +433,9 @@ aes_create_ctx_template(crypto_mechanism_t *mechanism, crypto_key_t *key,
  	 * Initialize key schedule.  Key length information is stored
  	 * in the key.
  	 */
@@ -30426,7 +30493,7 @@ index ca586eaf9..556beca3a 100644
  		return (rv);
  	}
  
-@@ -425,10 +423,9 @@ aes_free_context(crypto_ctx_t *ctx)
+@@ -425,10 +454,9 @@ aes_free_context(crypto_ctx_t *ctx)
  	if (aes_ctx != NULL) {
  		if (aes_ctx->ac_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
  			ASSERT(aes_ctx->ac_keysched_len != 0);
@@ -30440,7 +30507,7 @@ index ca586eaf9..556beca3a 100644
  		}
  		crypto_free_mode_ctx(aes_ctx);
  		ctx->cc_provider_private = NULL;
-@@ -454,8 +451,9 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
+@@ -454,8 +482,9 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
  		 * Initialize key schedule.
  		 * Key length is stored in the key.
  		 */
@@ -30452,7 +30519,7 @@ index ca586eaf9..556beca3a 100644
  			return (rv);
  		}
  
-@@ -473,8 +471,7 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
+@@ -473,8 +502,7 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
  			return (CRYPTO_MECHANISM_PARAM_INVALID);
  		}
  		rv = ccm_init_ctx((ccm_ctx_t *)aes_ctx, mechanism->cm_param,
@@ -30462,7 +30529,7 @@ index ca586eaf9..556beca3a 100644
  		break;
  	case AES_GCM_MECH_INFO_TYPE:
  		if (mechanism->cm_param == NULL ||
-@@ -482,15 +479,14 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
+@@ -482,15 +510,14 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
  			return (CRYPTO_MECHANISM_PARAM_INVALID);
  		}
  		rv = gcm_init_ctx((gcm_ctx_t *)aes_ctx, mechanism->cm_param,

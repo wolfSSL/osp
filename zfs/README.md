@@ -13,7 +13,7 @@ This patch inserts only a modest line count for wolfCrypt API calls,
 while removing zfs internal crypto implementations:
 ```
 $ git diff --stat | tail -n1
- 41 files changed, 1056 insertions(+), 28442 deletions(-)
+ 41 files changed, 1095 insertions(+), 28441 deletions(-)
 ```
 
 ### Patch layout (per distro / version)
@@ -72,13 +72,34 @@ and caller-supplied IV, and releases plaintext only after authentication
 succeeds. This adaptation does not require enabling streaming or editing the
 wolfCrypt module source.
 
+The atomic caller reserves the complete buffered input once: plaintext for
+non-streaming encryption, or ciphertext including the tag for decryption.
+Fragments are copied into that allocation without reallocating or moving earlier
+input. The adapter rejects overfill and incomplete input, and wipes the complete
+reservation during cleanup. GCM still runs once per non-streaming operation.
+
+From this `zfs` directory, run the staging regression against an OpenZFS tree
+with this patch applied:
+
+```sh
+./scripts/test_zfs/gcm_buffering/run.sh /path/to/patched/zfs
+```
+
+It compiles the actual atomic entry points, input traversal, GCM and cleanup
+functions under ASan/UBSan with an OpenSSL test backend. A 1 MiB input fragmented
+into 4 KiB pieces requires one staging allocation and no buffer-growth copies.
+It also checks authentication failures, input bounds, allocation failure and full
+buffer wiping in both streaming and non-streaming configurations. These host
+tests exercise adapter behavior, not the licensed FIPS module.
+
 ZFS `checksum=sha512` uses SHA-512/256. When wolfCrypt defines
 `WOLFSSL_NOSHA512_256`, the adapter retains the OpenZFS generic implementation
 for this checksum and emits a kernel notice. That
 checksum implementation is outside the wolfCrypt FIPS module boundary. When
 wolfCrypt provides SHA-512/256, the checksum continues to use wolfCrypt.
 
-The Proxmox path was tested in a disposable VM with a licensed wolfSSL 5.9.4 /
+Before the buffer-reservation follow-up, the Proxmox path was tested in a
+disposable VM with a licensed wolfSSL 5.9.4 /
 wolfCrypt FIPS v5.2.4 bundle, OpenZFS 2.4.2-pve1, wolfProvider 1.2.1, and a
 freshly built 7.0.12-1+wolfcrng1-pve kernel. The customer LinuxKM configuration
 was:
