@@ -7,3 +7,7 @@
 + Regenerate the configure script with `autoreconf -ivf`.
 + Configure msmtp with `./configure --with-tls=wolfssl`.
 + Run `make` to compile.
++ Run `make check` to run the tests (`tests/test-basic.sh`, `tests/test-auth-plain.sh`, `tests/test-header-handling.sh`). All three are expected to pass. They do not exercise TLS: `test-basic.sh` only runs `msmtp --version` and `--help`, the other two exchange mail with `msmtpd` over plain SMTP. They also need an IPv6 loopback because `msmtpd` is bound to `::1`.
++ wolfSSL verifies the peer certificate during the handshake while OpenSSL leaves that to the application. msmtp does its own checking after the handshake, so the patch turns verification off for the `tls_fingerprint` and disabled `tls_certcheck` cases, which would otherwise abort the handshake, and turns it on explicitly for `tls_trust_file` accounts so that the result does not depend on the library default.
++ `msmtp --version` reports `TLS/SSL library: wolfSSL`.
++ TLS was verified by hand against a local TLS SMTP server: `tls_trust_file`, `tls_fingerprint` and a disabled `tls_certcheck` connect, while a wrong CA, a wrong fingerprint and a hostname mismatch are rejected, with and without STARTTLS.
