@@ -42,7 +42,7 @@ Each project port included in this repository is contained in its own subdirecto
 | NXP SE05X Middleware | wolfSSL HostCrypto support patch | [Link](https://www.nxp.com/products/security-and-authentication/authentication/edgelock-se050-plug-trust-secure-element-family-enhanced-iot-security-with-high-flexibility:SE050) | | [README](./nxp-se05x-middleware/README.md) |
 | openldap | Open source lightweight directory access protocol | [Link](https://www.openldap.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-openldap/) | [README](./openldap/2.4.47/README.md) |
 | openpegasus  | Open source DMTF CIM and WBEM | [Link](https://collaboration.opengroup.org/pegasus/) | [Link](https://www.wolfssl.com/openpegasus-port-support-added-wolfssl/) | [README](./openpegasus/2.14.1/README.md) |
-| openresty | Nginx and LuaJIT-based web platform | [Link](https://openresty.org/en/) | | [README](./openresty/INSTRUCTIONS.md) |
+| openresty | Nginx and LuaJIT-based web platform | [Link](https://openresty.org/en/) | | [README](./openresty/README.md) |
 | openssh-patches | OpenSSH | [Link](https://www.openssh.com/) | [Link](https://www.wolfssl.com/wolfssl-openssh-expanded-openssl-compatibility/) | [README](./openssh-patches/README) |
 | ppp | Paul's PPP Package | [Link](https://ppp.samba.org/) | | [README](./ppp/README) |
 | Python | Python language and interpreter | [Link](https://www.python.org/) | | [README](./Python/README.txt) |
