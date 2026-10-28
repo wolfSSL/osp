@@ -13,7 +13,7 @@ This patch inserts only a modest line count for wolfCrypt API calls,
 while removing zfs internal crypto implementations:
 ```
 $ git diff --stat | tail -n1
- 42 files changed, 885 insertions(+), 28608 deletions(-)
+ 41 files changed, 1095 insertions(+), 28441 deletions(-)
 ```
 
 ### Patch layout (per distro / version)
@@ -59,6 +59,80 @@ In addition to the ICP routing, this revision folds in the FIPS-related fixes
 - Userspace key-derivation uses the provider-native `EVP_KDF "PBKDF2"` with a
   `RAND_bytes` salt, so it routes through an OpenSSL 3.x provider.
 - `MODULE_IMPORT_NS("WOLFSSL")` is quoted for kernel >= 6.13.
+
+### AES-GCM and SHA-512/256 compatibility
+
+When `WOLFSSL_AESGCM_STREAM` is enabled, AES-GCM retains the streaming
+wolfCrypt calls. When it is disabled, including FIPS v5 configurations that
+exclude streaming, the adapter buffers the atomic operation and uses
+`wc_AesGcmSetExtIV()` plus `wc_AesGcmEncrypt_ex()` for encryption and
+`wc_AesGcmDecrypt()` for decryption. These names resolve to FIPS wrappers in
+the licensed v5 headers. The adapter preserves the ZFS ciphertext/tag layout
+and caller-supplied IV, and releases plaintext only after authentication
+succeeds. This adaptation does not require enabling streaming or editing the
+wolfCrypt module source.
+
+The atomic caller reserves the complete buffered input once: plaintext for
+non-streaming encryption, or ciphertext including the tag for decryption.
+Fragments are copied into that allocation without reallocating or moving earlier
+input. The adapter rejects overfill and incomplete input, and wipes the complete
+reservation during cleanup. GCM still runs once per non-streaming operation.
+
+From this `zfs` directory, run the staging regression against an OpenZFS tree
+with this patch applied:
+
+```sh
+./scripts/test_zfs/gcm_buffering/run.sh /path/to/patched/zfs
+```
+
+It compiles the actual atomic entry points, input traversal, GCM and cleanup
+functions under ASan/UBSan with an OpenSSL test backend. A 1 MiB input fragmented
+into 4 KiB pieces requires one staging allocation and no buffer-growth copies.
+It also checks authentication failures, input bounds, allocation failure and full
+buffer wiping in both streaming and non-streaming configurations. These host
+tests exercise adapter behavior, not the licensed FIPS module.
+
+ZFS `checksum=sha512` uses SHA-512/256. When wolfCrypt defines
+`WOLFSSL_NOSHA512_256`, the adapter retains the OpenZFS generic implementation
+for this checksum and emits a kernel notice. That
+checksum implementation is outside the wolfCrypt FIPS module boundary. When
+wolfCrypt provides SHA-512/256, the checksum continues to use wolfCrypt.
+
+The Proxmox path, including the buffer-reservation change, was tested in a
+disposable VM with a licensed wolfSSL 5.9.4 /
+wolfCrypt FIPS v5.2.4 bundle, OpenZFS 2.4.2-pve1, wolfProvider 1.2.1, and a
+7.0.12-1+wolfcrng1-pve kernel built from the customer Proxmox sources. The
+customer LinuxKM configuration was:
+
+```sh
+./configure --enable-fips=v5.2.4 --enable-linuxkm --enable-wolfzfs=kernel \
+    --enable-linuxkm-lkcapi-register=stdrng-default --with-linux-source="$KSRC"
+```
+
+Licensed FIPS builds use the vendor bundle and its integrity-hash initialization
+workflow. Keep `libwolfssl.ko` unstripped when signing and installing it. The
+original manual-guide configuration without `--enable-wolfzfs=kernel` also
+compiled against the same fresh kernel. No wolfCrypt algorithm or wrapper
+source patches were used.
+
+Runtime checks passed before and after reboot with Secure Boot enabled and `fips=1`:
+all six native AES-GCM/CCM ciphers, raw and passphrase keys, key rejection and
+rotation, encrypted zvol I/O, concurrent writes, export/import, and clean scrubs.
+The current commercial kernel ICP test passed 192 cases and 960 decryption
+checks on both boots, covering templates, split buffers, aliasing, and tampering.
+This includes 24 cases using 4 KiB fragments with 4097-byte and 1 MiB inputs.
+The updated module also read the previous 89-file encrypted fixture and zvol;
+fresh native data, key cycles, scrubs and post-reboot writes passed.
+
+An earlier adapter revision passed a separate wolfSSL 5.9.1 FIPS Ready streaming
+build and reciprocal encrypted-data reads between Ready and commercial v5,
+including the SHA-512/256 checksum. Those Ready runtime checks predate the
+buffer-reservation change; the current host regressions cover both adapter modes.
+
+Other bundle/kernel combinations require their own build and runtime checks.
+Calling FIPS wrappers does not by itself establish approved-service status or
+coverage of the operating environment; those depend on the applicable module
+security policy and deployment configuration.
 
 ![wolfZFS Architecture Diagram](doc/wolfzfs_diagram.png)
 
@@ -213,12 +287,13 @@ cd ../
 ./scripts/zfs/build_wolfzfs
 ```
 
-4. Run zfs crypto test (should pass in 5 s or less):
+4. Run the ZFS crypto tests and check the results against the wolfCrypt
+   configuration being tested:
 ```
 ./scripts/test_zfs/run_crypto
 ```
 
-Expected output:
+Example output for a configuration supporting all of these test vectors:
 ```
 [2026-03-21T03:01:43.050005] Test: /home/.../zfs/tests/zfs-tests/tests/functional/crypto/icp_aes_ccm (run as root) [00:00] [PASS]
 [2026-03-21T03:01:43.138521] Test: /home/.../zfs/tests/zfs-tests/tests/functional/crypto/icp_aes_gcm (run as root) [00:00] [PASS]
@@ -229,6 +304,16 @@ PASS	   2
 Running Time:	00:00:00
 Percent passed:	100.0%
 ```
+
+The complete GCM vector file also contains valid IV lengths unsupported by
+the licensed wolfSSL 5.9.4 / wolfCrypt FIPS v5.2.4 configuration. With that
+bundle, the unfiltered 316-case GCM run returns nonzero: 261 cases pass and
+55 valid vectors with IV lengths outside the 12- or 16-byte test profile
+fail. Preserve and account for those failures; do not treat an arbitrary
+GCM failure as expected. The separately selected 12- or 16-byte-IV profile
+passes all 255 cases, and its native-ZFS 12-byte-IV subset passes all 197
+cases. CCM passes all 552 cases. Native ZFS uses 12-byte GCM IVs and 16-byte
+tags; a failure in that profile requires investigation.
 
 5. Next run zfs sanity test (could take 15-20 min):
 ```
