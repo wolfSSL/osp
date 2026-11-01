@@ -35,7 +35,7 @@ Each project port included in this repository is contained in its own subdirecto
 | libspdm | Security Protocol and Data Model implementation | [Link](https://github.com/DMTF/libspdm) | | [README](./libspdm/1.0.0/README.md) |
 | libssh2 | client-side C library for SSH2 | [Link](https://www.libssh2.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-libssh2/) | [README](./libssh2/1.9.0/README.md) |
 | lighttpd | lighttpd web server | [Link](https://www.lighttpd.net/) | [Link](https://www.wolfssl.com/lighttpd-support-wolfssl/) | [README](./lighttpd/README) |
-| mariadb | MariaDB relational database | [Link](https://mariadb.org/) | | [README](./mariadb/10.5.11/README.md) |
+| mariadb | MariaDB relational database | [Link](https://mariadb.org/) | | [10.6.28](./mariadb/10.6.28/README.md), [10.5.11](./mariadb/10.5.11/README.md) |
 | mosquitto | Eclipse Mosquitto - An open source MQTT broker | [Link](https://mosquitto.org/) | | [README](./mosquitto/README.md) |
 | net-snmp | Simple Network Management Protocol | [Link](http://www.net-snmp.org/) | | [README](./net-snmp/README.md) |
 | ntp | Network Time Protocol | [Link](http://www.ntp.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-ntp/) | [README](./ntp/4.2.8p15/README.md) |
