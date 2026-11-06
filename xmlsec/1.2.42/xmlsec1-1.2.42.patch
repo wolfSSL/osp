@@ -1,0 +1,90 @@
+From 7badbed71810cfe220170cc958544dbabb9e182d Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Thu, 22 Oct 2026 18:39:16 +0000
+Subject: [PATCH] Add wolfSSL support
+
+All changes are under OPENSSL_IS_WOLFSSL. OpenSSL builds compile the
+same code as before.
+
+- Detect wolfSSL in configure.ac and turn off RIPEMD-160, which wolfSSL
+  does not implement. Run autoreconf -fi after applying this patch.
+- Use the OpenSSL 1.1.1 API: wolfSSL reports an older version number.
+- Work around APIs wolfSSL does not have: no password prompt
+  (EVP_read_pw_string, as with BoringSSL) and no engines
+  (DSA_get0_engine).
+---
+ configure.ac                    | 14 ++++++++++++++
+ include/xmlsec/openssl/crypto.h |  4 ++++
+ src/openssl/openssl_compat.h    | 16 ++++++++++++++++
+ 3 files changed, 34 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index 5738162..483fef5 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -848,6 +848,20 @@ if test "z$OPENSSL_FOUND" = "zyes" ; then
+         ])
+     fi
+ 
++    if test "z$OPENSSL_VERSION" = "z" ; then
++        AC_EGREP_CPP(greater-than-minvers, [
++            #include <openssl/opensslv.h>
++            #ifdef OPENSSL_IS_WOLFSSL
++            greater-than-minvers
++            #endif
++        ],[
++            OPENSSL_VERSION="wolfSSL"
++            enable_ripemd160=no
++        ],[
++            OPENSSL_VERSION=""
++        ])
++    fi
++
+     if test "z$OPENSSL_VERSION" = "z" ; then
+         AC_EGREP_CPP(greater-than-minvers, [
+             #include <openssl/opensslv.h>
+diff --git a/include/xmlsec/openssl/crypto.h b/include/xmlsec/openssl/crypto.h
+index 1214d16..3006e41 100644
+--- a/include/xmlsec/openssl/crypto.h
++++ b/include/xmlsec/openssl/crypto.h
+@@ -60,6 +60,10 @@ extern "C" {
+ #elif OPENSSL_VERSION_NUMBER >= 0x10101000L
+ #define XMLSEC_OPENSSL_API_111      1
+ #define XMLSEC_OPENSSL_API_110      1
++#elif defined(OPENSSL_IS_WOLFSSL)
++/* wolfSSL reports an older version number but implements the OpenSSL 1.1.1 API */
++#define XMLSEC_OPENSSL_API_111      1
++#define XMLSEC_OPENSSL_API_110      1
+ #elif OPENSSL_VERSION_NUMBER >= 0x10100000L
+ #define XMLSEC_OPENSSL_API_110      1
+ #if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
+diff --git a/src/openssl/openssl_compat.h b/src/openssl/openssl_compat.h
+index 87a5780..31a21e6 100644
+--- a/src/openssl/openssl_compat.h
++++ b/src/openssl/openssl_compat.h
+@@ -118,6 +118,22 @@ static inline int xmlSecOpenSSLCompatRand(unsigned char *buf, xmlSecSize size) {
+ 
+ #endif /* OPENSSL_IS_BORINGSSL */
+ 
++/******************************************************************************
++ *
++ * wolfSSL compatibility
++ *
++ *****************************************************************************/
++#ifdef OPENSSL_IS_WOLFSSL
++
++/* EVP_read_pw_string() is not built: no password prompt, as with BoringSSL */
++#undef EVP_read_pw_string
++#define EVP_read_pw_string(...)             (-1)
++
++/* no engines */
++#define DSA_get0_engine(dsa)                ((ENGINE*)NULL)
++
++#endif /* OPENSSL_IS_WOLFSSL */
++
+ /******************************************************************************
+  *
+  * LibreSSL 2.7 compatibility (implements most of OpenSSL 1.1 API)
+-- 
+2.43.0
+
