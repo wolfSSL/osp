@@ -1,0 +1,148 @@
+wolfSSL TLS sockets for Zephyr 4.5.0, patch set 2026.11
+https://github.com/wolfSSL/osp/tree/master/zephyr/4.5
+
+diff --git a/include/zephyr/net/tls_credentials.h b/include/zephyr/net/tls_credentials.h
+index 3ac4e75603b..29613521e1f 100644
+--- a/include/zephyr/net/tls_credentials.h
++++ b/include/zephyr/net/tls_credentials.h
+@@ -69,7 +69,21 @@ enum tls_credential_type {
+ 	 *  with a corresponding public certificate, in place of
+ 	 *  @ref TLS_CREDENTIAL_PRIVATE_KEY.
+ 	 */
+-	TLS_CREDENTIAL_PRIVATE_KEY_PSA
++	TLS_CREDENTIAL_PRIVATE_KEY_PSA,
++
++	/** Reference to a private key held by a cryptographic device, in
++	 *  whatever form that device's driver expects. Register it instead of
++	 *  TLS_CREDENTIAL_PRIVATE_KEY, together with the matching
++	 *  TLS_CREDENTIAL_PUBLIC_CERTIFICATE, when the key itself must not
++	 *  leave the device. The device is the one the crypto backend's build
++	 *  nominates as its default, and the reference is passed through
++	 *  uninterpreted. It is at most 32 bytes long.
++	 *
++	 *  Only supported on the wolfSSL backend with crypto callbacks
++	 *  (CONFIG_WOLFSSL_CRYPTO_CB); otherwise a sec tag list that holds it
++	 *  is refused with ENOTSUP.
++	 */
++	TLS_CREDENTIAL_PRIVATE_KEY_ID
+ };
+ 
+ /** Secure tag, a reference to TLS credential
+diff --git a/subsys/net/lib/sockets/sockets_tls.c b/subsys/net/lib/sockets/sockets_tls.c
+index 507cc3a066c..c648e64beec 100644
+--- a/subsys/net/lib/sockets/sockets_tls.c
++++ b/subsys/net/lib/sockets/sockets_tls.c
+@@ -85,6 +85,7 @@ LOG_MODULE_REGISTER(net_sock_tls, CONFIG_NET_SOCKETS_LOG_LEVEL);
+ #include <wolfssl/ssl.h>
+ #include <wolfssl/error-ssl.h>
+ #include <wolfssl/wolfcrypt/asn.h>
++#include <wolfssl/wolfcrypt/cryptocb.h>
+ #include <wolfssl/wolfcrypt/error-crypt.h>
+ #include <wolfssl/wolfcrypt/memory.h>
+ #include <zephyr/net/tls_verify.h>
+@@ -148,6 +149,15 @@ LOG_MODULE_REGISTER(net_sock_tls, CONFIG_NET_SOCKETS_LOG_LEVEL);
+ #define ZTLS_WOLFSSL_MAX_FRAGMENT
+ #endif
+ 
++#if defined(WOLF_PRIVATE_KEY_ID) && defined(WOLF_CRYPTO_CB) && !defined(WC_NO_DEFAULT_DEVID)
++#define ZTLS_WOLFSSL_KEY_ID
++#if defined(HAVE_ECC)
++#define ZTLS_WOLFSSL_KEY_ID_MAX_LEN ECC_MAX_ID_LEN
++#else
++#define ZTLS_WOLFSSL_KEY_ID_MAX_LEN RSA_MAX_ID_LEN
++#endif
++#endif
++
+ #if defined(CONFIG_NET_SOCKETS_ENABLE_DTLS) && defined(WOLFSSL_DTLS_CID)
+ #define ZTLS_WOLFSSL_DTLS_CID
+ /* Size of the CID the socket options keep; wolfSSL may allow fewer bytes */
+@@ -2972,6 +2982,28 @@ static int tls_set_private_key_psa(struct tls_context *tls,
+ #endif /* CONFIG_MBEDTLS_X509_CRT_PARSE_C && TLS_PRIV_KEY_PSA_ENABLED */
+ }
+ 
++#if defined(CONFIG_WOLFSSL) && defined(ZTLS_WOLFSSL_KEY_ID)
++static int tls_set_private_key_id(struct tls_context *tls,
++				  struct tls_credential *key_id)
++{
++	int dev_id = wc_CryptoCb_DefaultDevID();
++
++	if (dev_id == INVALID_DEVID) {
++		NET_ERR("No crypto device for the private key reference on tag %d", key_id->tag);
++		return -ENODEV;
++	}
++
++	if (wolfSSL_CTX_use_PrivateKey_Id(tls->ctx, key_id->buf, (long)key_id->len,
++					  dev_id) != WOLFSSL_SUCCESS) {
++		NET_ERR("Failed to install private key reference on tag %d",
++			key_id->tag);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++#endif /* CONFIG_WOLFSSL && ZTLS_WOLFSSL_KEY_ID */
++
+ static int tls_set_psk(struct tls_context *tls,
+ 		       struct tls_credential *psk,
+ 		       struct tls_credential *psk_id)
+@@ -3049,6 +3081,13 @@ static int tls_set_credential(struct tls_context *tls,
+ 		 */
+ 		break;
+ 
++	case TLS_CREDENTIAL_PRIVATE_KEY_ID:
++#if defined(CONFIG_WOLFSSL) && defined(ZTLS_WOLFSSL_KEY_ID)
++		return tls_set_private_key_id(tls, cred);
++#else
++		return -ENOTSUP;
++#endif /* CONFIG_WOLFSSL && ZTLS_WOLFSSL_KEY_ID */
++
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -4628,6 +4667,13 @@ static int tls_wolfssl_ctx_setup(struct tls_context *context, bool is_server)
+ 	}
+ #endif
+ 
++#if defined(WOLF_CRYPTO_CB) && defined(WC_USE_DEVID) && !defined(WC_NO_DEFAULT_DEVID)
++	/* A build that names its device offloads all TLS crypto to it */
++	if (wolfSSL_CTX_SetDevId(context->ctx, wc_CryptoCb_DefaultDevID()) != WOLFSSL_SUCCESS) {
++		return -ENODEV;
++	}
++#endif
++
+ 	ret = tls_set_credentials(context);
+ 	if (ret != 0) {
+ 		return ret;
+@@ -5235,6 +5281,18 @@ static int tls_check_credentials(const sec_tag_t *sec_tags, int sec_tag_count)
+ 				 * with PSK.
+ 				 */
+ 				break;
++			case TLS_CREDENTIAL_PRIVATE_KEY_ID:
++#if defined(CONFIG_WOLFSSL) && defined(ZTLS_WOLFSSL_KEY_ID)
++				if (cred->len > ZTLS_WOLFSSL_KEY_ID_MAX_LEN) {
++					err = -EINVAL;
++					goto exit;
++				}
++
++				break;
++#else
++				err = -ENOTSUP;
++				goto exit;
++#endif /* CONFIG_WOLFSSL && ZTLS_WOLFSSL_KEY_ID */
+ 			default:
+ 				return -EINVAL;
+ 			}
+diff --git a/subsys/net/lib/tls_credentials/tls_credentials_shell.c b/subsys/net/lib/tls_credentials/tls_credentials_shell.c
+index 6fcffd29747..66bbcd71396 100644
+--- a/subsys/net/lib/tls_credentials/tls_credentials_shell.c
++++ b/subsys/net/lib/tls_credentials/tls_credentials_shell.c
+@@ -57,6 +57,9 @@ static const struct cred_type_string type_strings[] = {
+ 	{"PRIVATE_KEY_PSA",	TLS_CREDENTIAL_PRIVATE_KEY_PSA},
+ 	{"PK_PSA",		TLS_CREDENTIAL_PRIVATE_KEY_PSA},
+ 
++	{"PRIVATE_KEY_ID",	TLS_CREDENTIAL_PRIVATE_KEY_ID},
++	{"PK_ID",		TLS_CREDENTIAL_PRIVATE_KEY_ID},
++
+ 	{"PRE_SHARED_KEY",	TLS_CREDENTIAL_PSK},
+ 	{"PSK",			TLS_CREDENTIAL_PSK},
+ 
