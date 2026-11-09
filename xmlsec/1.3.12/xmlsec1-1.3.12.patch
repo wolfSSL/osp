@@ -1,11 +1,12 @@
-From a9a1f1f51df91376fd26dadc5a37976fd42e72be Mon Sep 17 00:00:00 2001
+From d5123327215c46eff7a77598dda80c4cf325ac49 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Thu, 22 Oct 2026 17:23:51 +0000
 Subject: [PATCH] Add wolfSSL support
 
-All C changes are under OPENSSL_IS_WOLFSSL, and configure.ac and
-testrun.sh change only when they find wolfSSL. OpenSSL builds are the
-same as before. Run autoreconf -fi after applying this patch.
+All C changes are under OPENSSL_IS_WOLFSSL, and configure.ac,
+xmlsec1-openssl.pc and testrun.sh change only when they find wolfSSL.
+OpenSSL builds are the same as before. Run autoreconf -fi after
+applying this patch.
 
 - configure.ac: detect wolfSSL by OPENSSL_IS_WOLFSSL, before the version
   checks. wolfSSL reports a version number below the 1.1.1 minimum.
@@ -14,20 +15,31 @@ same as before. Run autoreconf -fi after applying this patch.
 - Work around APIs wolfSSL does not have, as for LibreSSL and
   BoringSSL: no OSSL_STORE, no sk_X509_deep_copy, no sk_X509_reserve
   (stacks are lists) and no password prompt (EVP_read_pw_string).
+- xmlsec1-openssl.pc: do not require the openssl pkg-config module
+  with wolfSSL. Libs already has OPENSSL_LIBS.
 - testrun.sh: add a wolfssl flavor that skips the OSSL_STORE key tests,
   as for LibreSSL and BoringSSL.
 ---
- configure.ac                    | 14 ++++++++++++++
+ configure.ac                    | 17 +++++++++++++++++
  include/xmlsec/openssl/crypto.h |  8 ++++++++
  src/openssl/openssl_compat.h    | 21 +++++++++++++++++++++
  tests/testrun.sh                |  3 +++
- 4 files changed, 46 insertions(+)
+ xmlsec-openssl.pc.in            |  2 +-
+ 5 files changed, 50 insertions(+), 1 deletion(-)
 
 diff --git a/configure.ac b/configure.ac
-index eb5071b..4c836b8 100644
+index eb5071b..6f996fc 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -857,6 +857,20 @@ if test "z$OPENSSL_FOUND" = "zyes" ; then
+@@ -691,6 +691,7 @@ XMLSEC_OPENSSL_VERSION=""
+ OPENSSL_INCLUDE_PATH=
+ OPENSSL_LIB_PATH=
+ OPENSSL_TEST_CONFIG=
++OPENSSL_PC_REQUIRES="openssl, "
+ OPENSSL_FOUND=no
+ AC_ARG_WITH([openssl], [AS_HELP_STRING([--with-openssl@<:@=PFX@:>@],[openssl location])])
+ 
+@@ -857,6 +858,21 @@ if test "z$OPENSSL_FOUND" = "zyes" ; then
          ])
      fi
  
@@ -39,6 +51,7 @@ index eb5071b..4c836b8 100644
 +            #endif
 +        ],[
 +            XMLSEC_OPENSSL_VERSION="wolfSSL"
++            OPENSSL_PC_REQUIRES=""
 +            enable_dh=no
 +        ],[
 +            XMLSEC_OPENSSL_VERSION=""
@@ -48,6 +61,14 @@ index eb5071b..4c836b8 100644
      if test "z$XMLSEC_OPENSSL_VERSION" = "z" ; then
          AC_EGREP_CPP(greater-than-minvers, [
              #include <openssl/opensslv.h>
+@@ -933,6 +949,7 @@ AC_SUBST(OPENSSL_CRYPTO_LIB)
+ AC_SUBST(OPENSSL_TEST_CONFIG)
+ AC_SUBST(OPENSSL_MIN_VERSION)
+ AC_SUBST(OPENSSL3_MIN_VERSION)
++AC_SUBST(OPENSSL_PC_REQUIRES)
+ AC_SUBST(XMLSEC_OPENSSL_VERSION)
+ 
+ dnl See if we should build OpenSSL 3+ with engines support
 diff --git a/include/xmlsec/openssl/crypto.h b/include/xmlsec/openssl/crypto.h
 index ba118d3..cbe467c 100644
 --- a/include/xmlsec/openssl/crypto.h
@@ -120,6 +141,19 @@ index 58741cb..8532c17 100755
  *)
      xmlsec_openssl_flavor="openssl"
      ;;
+diff --git a/xmlsec-openssl.pc.in b/xmlsec-openssl.pc.in
+index 15a4b23..121e44f 100644
+--- a/xmlsec-openssl.pc.in
++++ b/xmlsec-openssl.pc.in
+@@ -6,7 +6,7 @@ includedir=@includedir@
+ Name: xmlsec1-openssl
+ Version: @VERSION@
+ Description: XML Security Library implements XML Signature and XML Encryption standards
+-Requires: openssl, libxml-2.0 >= @LIBXML_MIN_VERSION@ @LIBXSLT_PC_FILE_COND@
++Requires: @OPENSSL_PC_REQUIRES@libxml-2.0 >= @LIBXML_MIN_VERSION@ @LIBXSLT_PC_FILE_COND@
+ Cflags: @XMLSEC_OPENSSL_CFLAGS@
+ Cflags.private: -DXMLSEC_STATIC
+ Libs: @XMLSEC_OPENSSL_LIBS@
 -- 
 2.43.0
 
