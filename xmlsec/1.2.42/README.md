@@ -10,8 +10,8 @@ libxslt 1.1.39).
 
 ### Build wolfSSL
 + wolfSSL master does not have all the compatibility fixes xmlsec needs yet.
-  Build the `xmlsec-compat` branch of https://github.com/julek-dev/wolfssl
-  (tested at commit 2364e16898).
+  Build wolfSSL from https://github.com/wolfSSL/wolfssl/pull/12041 (tested at
+  commit 130c52a015).
 + Configure wolfSSL with `./configure --enable-all`. On x86_64 also add
   `--enable-aesni`. To run the xmlsec test suite, see Testing below.
 + Compile with `make`.
@@ -46,12 +46,11 @@ libxslt 1.1.39).
   data; leave them out of production builds.
 + `make check` stops at the first failing script, so run
   `make check-keys`, `make check-dsig` and `make check-enc`.
-+ Expected totals (OK / failed / skipped): testKeys 7/0/0, testDSig 160/41/11,
++ Expected totals (OK / failed / skipped): testKeys 7/0/0, testDSig 169/32/11,
   testEnc 497/0/0.
-+ The 41 failed testDSig steps are 19 DSA tests. 10 of them load DSA private
-  keys from PKCS#12 files, and wolfSSL `PKCS12_parse()` only handles RSA and
-  ECC keys. 9 verify certificates signed by a DSA CA, and wolfSSL does not keep
-  a DSA CA's public key for chain verification.
++ The 32 failed testDSig steps are 16 DSA tests that load a DSA private key
+  from PKCS#12 or PKCS#8. wolfSSL `PKCS12_parse()` only handles RSA and ECC
+  keys, and wolfSSL does not load DSA keys from PKCS#8.
 + The skipped tests use gost and MD5 transforms (off in xmlsec by default) and
   RIPEMD-160.
 

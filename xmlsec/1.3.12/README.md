@@ -10,8 +10,8 @@ libxslt 1.1.39).
 
 ### Build wolfSSL
 + wolfSSL master does not have all the compatibility fixes xmlsec needs yet.
-  Build the `xmlsec-compat` branch of https://github.com/julek-dev/wolfssl
-  (tested at commit 2364e16898).
+  Build wolfSSL from https://github.com/wolfSSL/wolfssl/pull/12041 (tested at
+  commit 130c52a015).
 + Configure wolfSSL with `./configure --enable-all`. On x86_64 also add
   `--enable-aesni`. To run the xmlsec test suite, see Testing below.
 + Compile with `make`.
@@ -52,13 +52,11 @@ libxslt 1.1.39).
   `make check-unit-tests`, `make check-keys`, `make check-dsig` and
   `make check-enc`.
 + Expected totals (OK / failed / skipped): unit tests 194/0, testKeys 33/5/20,
-  testDSig 390/47/42, testEnc 666/0/66.
+  testDSig 399/38/42, testEnc 666/0/66.
 + All failed steps use DSA keys. The 5 failed testKeys steps and 38 failed
   testDSig steps (19 tests) load a DSA private key from PKCS#12 or PKCS#8.
   wolfSSL `PKCS12_parse()` only handles RSA and ECC keys, and wolfSSL does
   not load DSA keys from PKCS#8.
-+ The other 9 failed testDSig steps verify certificates signed by a DSA CA.
-  wolfSSL does not keep a DSA CA's public key for chain verification.
 + Skipped with wolfSSL only: Camellia, DH and the key derivations (ConcatKDF,
   PBKDF2, HKDF, so also ECDH-ES and DH-ES), which xmlsec has only for the
   OpenSSL 3 `EVP_KDF` API. The other tests are skipped with OpenSSL 3.0 too.
