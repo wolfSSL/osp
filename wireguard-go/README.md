@@ -1,6 +1,8 @@
 # WolfGuard-go
 
-This directory contains to patches that can be applied to WireGuard-go to form WolfGuard-go, a VPN that leverages the FIPS 140-3 certified wolfCrypt as a crypto engine. This can run on a Linux, macOS or Windows machine and requires a Go version > 1.20. See https://github.com/wolfssl/wolfguard for the linux kernel WolfGuard.
+This directory contains to patches that can be applied to WireGuard-go to form WolfGuard-go, a VPN that leverages the FIPS 140-3 certified wolfCrypt as a crypto engine. This can run on a Linux, macOS, Windows or FreeBSD machine and requires a Go version > 1.20. See https://github.com/wolfssl/wolfguard for the linux kernel WolfGuard.
+
+To run WolfGuard-go on pfSense, including a pfSense package that manages tunnels from the web interface, see [pfsense/README.md](pfsense/README.md).
 
 ## Patches
 - `Wireguard-Go-wolfCrypt-Port.patch` : This patch simply ports the cryptography to use the go-wolfssl wrapper and wolfSSL. The underlying algorithms used in wireguard are the same.
