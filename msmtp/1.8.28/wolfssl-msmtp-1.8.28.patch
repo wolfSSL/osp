@@ -94,8 +94,21 @@ index fcd18e3..0313014 100644
  
  AM_CPPFLAGS = $(tls_CFLAGS) $(libgsasl_CFLAGS) $(libidn2_CFLAGS) $(libsecret_CFLAGS)
  
+diff --git a/src/msmtp.c b/src/msmtp.c
+index a0ce6a7..888aee9 100644
+--- a/src/msmtp.c
++++ b/src/msmtp.c
+@@ -2192,6 +2192,8 @@ void msmtp_print_version(void)
+             "OpenSSL"
+ #elif defined (HAVE_LIBTLS)
+             "libtls"
++#elif defined (HAVE_LIBWOLFSSL)
++            "wolfSSL"
+ #else
+             _("none")
+ #endif
 diff --git a/src/mtls-openssl.c b/src/mtls-openssl.c
-index 976d72b..9c05351 100644
+index 976d72b..f1b0698 100644
 --- a/src/mtls-openssl.c
 +++ b/src/mtls-openssl.c
 @@ -41,9 +41,13 @@
@@ -121,3 +134,26 @@ index 976d72b..9c05351 100644
      SSL_load_error_strings();
      SSL_library_init();
  #endif
+@@ -754,6 +758,22 @@ int mtls_init(mtls_t *mtls,
+         memcpy(mtls->fingerprint, md5_fingerprint, 16);
+         mtls->have_md5_fingerprint = 1;
+     }
++#ifdef HAVE_LIBWOLFSSL
++    /* wolfSSL verifies the peer certificate during the handshake, OpenSSL does
++     * not. Turn that off where msmtp does its own checking afterwards, so that
++     * tls_fingerprint and a disabled tls_certcheck keep working. */
++    if (no_certcheck || mtls->have_sha256_fingerprint
++            || mtls->have_sha1_fingerprint || mtls->have_md5_fingerprint)
++    {
++        SSL_CTX_set_verify(mtls->internals->ssl_ctx, SSL_VERIFY_NONE, NULL);
++    }
++    else
++    {
++        /* Do not depend on the library default: a tls_trust_file account
++         * must be verified during the handshake. */
++        SSL_CTX_set_verify(mtls->internals->ssl_ctx, SSL_VERIFY_PEER, NULL);
++    }
++#endif
+     if (!(mtls->internals->ssl = SSL_new(mtls->internals->ssl_ctx)))
+     {
+         *errstr = xasprintf(_("cannot create a TLS structure: %s"),
