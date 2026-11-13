@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<pfsensepkgs>
+	<package>
+		<name>wolfGuard</name>
+		<descr><![CDATA[wolfGuard VPN using wolfguard-go, a userspace WireGuard-style daemon whose cryptography is provided by wolfCrypt (ECC P-256, AES-256-GCM, SHA-256). Interoperates with the wolfGuard Linux kernel module and other wolfGuard peers, not with WireGuard.]]></descr>
+		<pkginfolink>https://github.com/wolfSSL/osp/tree/master/wireguard-go/pfsense</pkginfolink>
+		<version>%%PKGVERSION%%</version>
+		<configurationfile>wolfguard.xml</configurationfile>
+	</package>
+</pfsensepkgs>
