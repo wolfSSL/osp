@@ -1,8 +1,9 @@
 # Overview
 
 This is a patch for [encrypted-session-nginx-module](https://github.com/openresty/encrypted-session-nginx-module)
-version 0.08. It's intended to be used with nginx/OpenResty built with wolfSSL
-FIPS. The patch makes it so that SHA-256 will be used for digests instead of
+version 0.08. It also applies unchanged to version 0.09, which is bundled with
+OpenResty 1.31.1.1. It's intended to be used with nginx/OpenResty built with
+wolfSSL FIPS. The patch makes it so that SHA-256 will be used for digests instead of
 MD5, which isn't a FIPS-compliant algorithm.
 
 # Building
