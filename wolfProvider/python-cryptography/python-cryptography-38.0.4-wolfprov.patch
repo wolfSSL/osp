@@ -1,0 +1,45 @@
+diff --git a/src/cryptography/hazmat/bindings/openssl/binding.py b/src/cryptography/hazmat/bindings/openssl/binding.py
+index 2b4c574b4..c5acb761f 100644
+--- a/src/cryptography/hazmat/bindings/openssl/binding.py
++++ b/src/cryptography/hazmat/bindings/openssl/binding.py
+@@ -123,7 +123,6 @@ class Binding:
+     ffi = ffi
+     _lib_loaded = False
+     _init_lock = threading.Lock()
+-    _legacy_provider: typing.Any = None
+     _default_provider: typing.Any = None
+
+     def __init__(self):
+@@ -170,14 +169,9 @@ class Binding:
+                 # are ugly legacy, but we aren't going to get rid of them
+                 # any time soon.
+                 if cls.lib.CRYPTOGRAPHY_OPENSSL_300_OR_GREATER:
+-                    cls._legacy_provider = cls.lib.OSSL_PROVIDER_load(
+-                        cls.ffi.NULL, b"legacy"
+-                    )
+-                    _openssl_assert(
+-                        cls.lib, cls._legacy_provider != cls.ffi.NULL
+-                    )
++                    # Always load libwolfprov instead of default provider
+                     cls._default_provider = cls.lib.OSSL_PROVIDER_load(
+-                        cls.ffi.NULL, b"default"
++                        cls.ffi.NULL, b"libwolfprov"
+                     )
+                     _openssl_assert(
+                         cls.lib, cls._default_provider != cls.ffi.NULL
+diff --git a/tests/hazmat/backends/test_openssl_memleak.py b/tests/hazmat/backends/test_openssl_memleak.py
+index 2605566bd..fbe565826 100644
+--- a/tests/hazmat/backends/test_openssl_memleak.py
++++ b/tests/hazmat/backends/test_openssl_memleak.py
+@@ -97,8 +97,8 @@ def main(argv):
+         gc.collect()
+
+         if lib.CRYPTOGRAPHY_OPENSSL_300_OR_GREATER:
+-            lib.OSSL_PROVIDER_unload(backend._binding._legacy_provider)
+-            lib.OSSL_PROVIDER_unload(backend._binding._default_provider)
++            if backend._binding._default_provider is not None:
++                lib.OSSL_PROVIDER_unload(backend._binding._default_provider)
+
+         if lib.Cryptography_HAS_OPENSSL_CLEANUP:
+             lib.OPENSSL_cleanup()
+
