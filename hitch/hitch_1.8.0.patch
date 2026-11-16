@@ -201,10 +201,41 @@ index 9051f4c..abe264e 100644
  	$(SSL_CFLAGS)
  
  libforeign_a_SOURCES = \
+diff --git a/src/foreign/miniobj.h b/src/foreign/miniobj.h
+index 3de4091..e687d2a 100644
+--- a/src/foreign/miniobj.h
++++ b/src/foreign/miniobj.h
+@@ -13,7 +13,7 @@
+ 
+ #define ALLOC_OBJ(to, type_magic)					\
+ 	do {								\
+-		(to) = calloc(sizeof *(to), 1);				\
++		(to) = calloc(1, sizeof *(to));				\
+ 		if ((to) != NULL)					\
+ 			(to)->magic = (type_magic);			\
+ 	} while (0)
 diff --git a/src/hitch.c b/src/hitch.c
-index a499c98..8f4da3a 100644
+index a499c98..42f4162 100644
 --- a/src/hitch.c
 +++ b/src/hitch.c
+@@ -756,7 +756,7 @@ sni_match(const sni_name *sn, const char *srvname)
+ 	if (!sn->is_wildcard)
+ 		return (strcasecmp(srvname, sn->sni_key) == 0);
+ 	else {
+-		char *s = strchr(srvname, '.');
++		const char *s = strchr(srvname, '.');
+ 		if (s == NULL)
+ 			return (0);
+ 		return (strcasecmp(s, sn->sni_key + 1) == 0);
+@@ -773,7 +773,7 @@ sni_lookup(const char *sni_key, const sni_name *sn_tab)
+ 
+ 	HASH_FIND_STR(sn_tab, sni_key, sn);
+ 	if (sn == NULL) {
+-		char *s;
++		const char *s;
+ 		/* attempt another lookup for wildcard matches */
+ 		s = strchr(sni_key, '.');
+ 		if (s != NULL)
 @@ -1332,6 +1332,7 @@ init_openssl(void)
  	SSL_load_error_strings();
  	OpenSSL_add_all_digests();
