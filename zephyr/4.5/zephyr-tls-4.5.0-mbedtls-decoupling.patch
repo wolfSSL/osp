@@ -1,22 +1,11 @@
-diff --git a/lib/uuid/Kconfig b/lib/uuid/Kconfig
-index 040b7c7768c..8b36580f360 100644
---- a/lib/uuid/Kconfig
-+++ b/lib/uuid/Kconfig
-@@ -19,8 +19,7 @@ config UUID_V4
- config UUID_V5
- 	bool "UUID version 5 generation support"
- 	depends on UUID
--	depends on MBEDTLS
--	depends on MBEDTLS_PSA_CRYPTO_C
-+	depends on PSA_CRYPTO_CLIENT
- 	depends on PSA_WANT_ALG_SHA_1
- 	# When TF-M is enabled, Mbed TLS's MD module (which is used to generate
- 	# v5 UUIDs) will dispacth hash operations to TF-M. Unfortunately TF-M
+wolfSSL TLS sockets for Zephyr 4.5.0, patch set 2026.11
+https://github.com/wolfSSL/osp/tree/master/zephyr/4.5
+
 diff --git a/subsys/mgmt/mcumgr/transport/Kconfig.udp b/subsys/mgmt/mcumgr/transport/Kconfig.udp
-index 4d93f47aaba..194ab493255 100644
+index 11c2f42f026..700c677db73 100644
 --- a/subsys/mgmt/mcumgr/transport/Kconfig.udp
 +++ b/subsys/mgmt/mcumgr/transport/Kconfig.udp
-@@ -64,8 +64,8 @@ config MCUMGR_TRANSPORT_UDP_MTU
+@@ -65,8 +65,8 @@ config MCUMGR_TRANSPORT_UDP_MTU
  
  config MCUMGR_TRANSPORT_UDP_DTLS
  	bool "DTLS"
@@ -28,7 +17,7 @@ index 4d93f47aaba..194ab493255 100644
  	select NET_SOCKETS_ENABLE_DTLS
  	select TLS_CREDENTIALS
 diff --git a/subsys/mgmt/updatehub/Kconfig b/subsys/mgmt/updatehub/Kconfig
-index dca7aa44936..2dc89ae75fb 100644
+index fcb633d4173..3f0d0acd201 100644
 --- a/subsys/mgmt/updatehub/Kconfig
 +++ b/subsys/mgmt/updatehub/Kconfig
 @@ -72,8 +72,8 @@ config UPDATEHUB_SHELL
@@ -42,27 +31,37 @@ index dca7aa44936..2dc89ae75fb 100644
  	select NET_SOCKETS_SOCKOPT_TLS
  	select NET_SOCKETS_ENABLE_DTLS
  	help
+diff --git a/subsys/net/lib/lwm2m/Kconfig b/subsys/net/lib/lwm2m/Kconfig
+index b5e0df761c2..bd7593a5efb 100644
+--- a/subsys/net/lib/lwm2m/Kconfig
++++ b/subsys/net/lib/lwm2m/Kconfig
+@@ -71,7 +71,7 @@ menu "Engine features"
+ 
+ config LWM2M_DTLS_SUPPORT
+ 	bool "DTLS support in the LwM2M client"
+-	select MBEDTLS
++	select MBEDTLS if !WOLFSSL
+ 
+ config LWM2M_DNS_SUPPORT
+ 	bool "DNS support in the LwM2M client"
 diff --git a/subsys/net/lib/lwm2m/lwm2m_engine.c b/subsys/net/lib/lwm2m/lwm2m_engine.c
-index 5ab89498c07..de9ddd98536 100644
+index 4c1ac29b5ed..b2a5d3e543a 100644
 --- a/subsys/net/lib/lwm2m/lwm2m_engine.c
 +++ b/subsys/net/lib/lwm2m/lwm2m_engine.c
-@@ -36,7 +36,14 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+@@ -36,7 +36,11 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
  
  #if defined(CONFIG_LWM2M_DTLS_SUPPORT)
  #include <zephyr/net/tls_credentials.h>
 -#include <mbedtls/ssl_ciphersuites.h>
 +
-+/* IANA TLS cipher-suite identifiers, defined locally so the LwM2M ciphersuite
-+ * list does not pull in an mbedTLS header. The DTLS handshake itself runs
-+ * through the TLS socket layer, which may be backed by mbedTLS or wolfSSL.
-+ */
++/* IANA IDs, so the list does not need an mbedTLS header */
 +#define LWM2M_TLS_PSK_WITH_AES_128_CCM_8              0xC0A8
 +#define LWM2M_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8      0xC0AE
 +#define LWM2M_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 0xC02B
  #endif
  #if defined(CONFIG_DNS_RESOLVER)
  #include <zephyr/net/dns_resolve.h>
-@@ -1060,12 +1067,12 @@ static int lwm2m_load_tls_credentials(struct lwm2m_ctx *ctx)
+@@ -1062,12 +1066,12 @@ static int lwm2m_load_tls_credentials(struct lwm2m_ctx *ctx)
  }
  
  static const int cipher_list_psk[] = {
@@ -79,31 +78,27 @@ index 5ab89498c07..de9ddd98536 100644
  
  #endif /* CONFIG_LWM2M_DTLS_SUPPORT */
 diff --git a/subsys/net/lib/wireguard/crypto/crypto.h b/subsys/net/lib/wireguard/crypto/crypto.h
-index c81d8e74cc0..9a142dc5875 100644
+index c81d8e74cc0..a5de75be4c9 100644
 --- a/subsys/net/lib/wireguard/crypto/crypto.h
 +++ b/subsys/net/lib/wireguard/crypto/crypto.h
-@@ -11,8 +11,6 @@
+@@ -11,7 +11,9 @@
  #include <stdint.h>
  #include <stdbool.h>
  
--#include <mbedtls/constant_time.h>
--
++#if defined(CONFIG_MBEDTLS)
+ #include <mbedtls/constant_time.h>
++#endif
+ 
  /*
   * BLAKE2S IMPLEMENTATION
-  * Note: BLAKE2s is not available in PSA Crypto API, so we always use
-@@ -82,7 +80,33 @@
+@@ -82,7 +84,32 @@
  		(p)[0] = U8V((v) >> 56);                                                           \
  	} while (0)
  
--#define crypto_zero(dest, len) mbedtls_platform_zeroize(dest, len)
--#define crypto_equal(a, b, n) (mbedtls_ct_memcmp(a, b, n) == 0 ? true : false)
-+/*
-+ * Constant-time helpers, provided locally so WireGuard does not depend on
-+ * mbedTLS. crypto_equal MUST run in constant time - it compares message
-+ * authentication tags, where a data-dependent early exit would leak timing.
-+ * crypto_zero clears secrets through a volatile pointer so the stores are not
-+ * optimized away.
-+ */
++#if defined(CONFIG_MBEDTLS)
+ #define crypto_zero(dest, len) mbedtls_platform_zeroize(dest, len)
+ #define crypto_equal(a, b, n) (mbedtls_ct_memcmp(a, b, n) == 0 ? true : false)
++#else
 +static inline void crypto_zero(void *dest, size_t len)
 +{
 +	volatile uint8_t *p = (volatile uint8_t *)dest;
@@ -113,6 +108,7 @@ index c81d8e74cc0..9a142dc5875 100644
 +	}
 +}
 +
++/* Compares authentication tags, so it runs in constant time */
 +static inline bool crypto_equal(const void *a, const void *b, size_t n)
 +{
 +	const volatile uint8_t *pa = (const volatile uint8_t *)a;
@@ -125,5 +121,6 @@ index c81d8e74cc0..9a142dc5875 100644
 +
 +	return diff == 0U;
 +}
++#endif /* CONFIG_MBEDTLS */
  
  #endif /* _CRYPTO_H_ */

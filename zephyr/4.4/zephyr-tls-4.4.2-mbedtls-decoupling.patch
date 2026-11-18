@@ -1,10 +1,25 @@
+wolfSSL TLS sockets for Zephyr 4.4.2, patch set 2026.11
+https://github.com/wolfSSL/osp/tree/master/zephyr/4.4
+
+diff --git a/lib/uuid/CMakeLists.txt b/lib/uuid/CMakeLists.txt
+index fa0b91ac5c5..4d44eaa9897 100644
+--- a/lib/uuid/CMakeLists.txt
++++ b/lib/uuid/CMakeLists.txt
+@@ -2,4 +2,6 @@
+ 
+ zephyr_sources_ifdef(CONFIG_UUID uuid.c)
+ 
+-zephyr_library_link_libraries_ifdef(CONFIG_UUID_V5 mbedTLS)
++if(CONFIG_UUID_V5)
++  zephyr_library_link_libraries_ifdef(CONFIG_MBEDTLS mbedTLS)
++endif()
 diff --git a/lib/uuid/Kconfig b/lib/uuid/Kconfig
-index 8e1be8ff511..e3feb6d53ac 100644
+index 040b7c7768c..8b36580f360 100644
 --- a/lib/uuid/Kconfig
 +++ b/lib/uuid/Kconfig
-@@ -22,8 +22,7 @@ config UUID_V5
- 	bool "UUID version 5 generation support [EXPERIMENTAL]"
- 	select EXPERIMENTAL
+@@ -19,8 +19,7 @@ config UUID_V4
+ config UUID_V5
+ 	bool "UUID version 5 generation support"
  	depends on UUID
 -	depends on MBEDTLS
 -	depends on MBEDTLS_PSA_CRYPTO_C
@@ -13,7 +28,7 @@ index 8e1be8ff511..e3feb6d53ac 100644
  	# When TF-M is enabled, Mbed TLS's MD module (which is used to generate
  	# v5 UUIDs) will dispacth hash operations to TF-M. Unfortunately TF-M
 diff --git a/subsys/mgmt/mcumgr/transport/Kconfig.udp b/subsys/mgmt/mcumgr/transport/Kconfig.udp
-index 19de5cf3ce5..51f3ba474f2 100644
+index 4d93f47aaba..194ab493255 100644
 --- a/subsys/mgmt/mcumgr/transport/Kconfig.udp
 +++ b/subsys/mgmt/mcumgr/transport/Kconfig.udp
 @@ -64,8 +64,8 @@ config MCUMGR_TRANSPORT_UDP_MTU
@@ -43,26 +58,23 @@ index dca7aa44936..2dc89ae75fb 100644
  	select NET_SOCKETS_ENABLE_DTLS
  	help
 diff --git a/subsys/net/lib/lwm2m/lwm2m_engine.c b/subsys/net/lib/lwm2m/lwm2m_engine.c
-index b4dc1d7f536..44dfbbbc4e9 100644
+index 5ab89498c07..4452017c6ba 100644
 --- a/subsys/net/lib/lwm2m/lwm2m_engine.c
 +++ b/subsys/net/lib/lwm2m/lwm2m_engine.c
-@@ -37,7 +37,14 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+@@ -36,7 +36,11 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
  
  #if defined(CONFIG_LWM2M_DTLS_SUPPORT)
  #include <zephyr/net/tls_credentials.h>
 -#include <mbedtls/ssl_ciphersuites.h>
 +
-+/* IANA TLS cipher-suite identifiers, defined locally so the LwM2M ciphersuite
-+ * list does not pull in an mbedTLS header. The DTLS handshake itself runs
-+ * through the TLS socket layer, which may be backed by mbedTLS or wolfSSL.
-+ */
++/* IANA IDs, so the list does not need an mbedTLS header */
 +#define LWM2M_TLS_PSK_WITH_AES_128_CCM_8              0xC0A8
 +#define LWM2M_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8      0xC0AE
 +#define LWM2M_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 0xC02B
  #endif
  #if defined(CONFIG_DNS_RESOLVER)
  #include <zephyr/net/dns_resolve.h>
-@@ -1061,12 +1068,12 @@ static int lwm2m_load_tls_credentials(struct lwm2m_ctx *ctx)
+@@ -1060,12 +1064,12 @@ static int lwm2m_load_tls_credentials(struct lwm2m_ctx *ctx)
  }
  
  static const int cipher_list_psk[] = {
@@ -78,3 +90,50 @@ index b4dc1d7f536..44dfbbbc4e9 100644
  };
  
  #endif /* CONFIG_LWM2M_DTLS_SUPPORT */
+diff --git a/subsys/net/lib/wireguard/crypto/crypto.h b/subsys/net/lib/wireguard/crypto/crypto.h
+index c81d8e74cc0..a5de75be4c9 100644
+--- a/subsys/net/lib/wireguard/crypto/crypto.h
++++ b/subsys/net/lib/wireguard/crypto/crypto.h
+@@ -11,7 +11,9 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ 
++#if defined(CONFIG_MBEDTLS)
+ #include <mbedtls/constant_time.h>
++#endif
+ 
+ /*
+  * BLAKE2S IMPLEMENTATION
+@@ -82,7 +84,32 @@
+ 		(p)[0] = U8V((v) >> 56);                                                           \
+ 	} while (0)
+ 
++#if defined(CONFIG_MBEDTLS)
+ #define crypto_zero(dest, len) mbedtls_platform_zeroize(dest, len)
+ #define crypto_equal(a, b, n) (mbedtls_ct_memcmp(a, b, n) == 0 ? true : false)
++#else
++static inline void crypto_zero(void *dest, size_t len)
++{
++	volatile uint8_t *p = (volatile uint8_t *)dest;
++
++	while (len--) {
++		*p++ = 0U;
++	}
++}
++
++/* Compares authentication tags, so it runs in constant time */
++static inline bool crypto_equal(const void *a, const void *b, size_t n)
++{
++	const volatile uint8_t *pa = (const volatile uint8_t *)a;
++	const volatile uint8_t *pb = (const volatile uint8_t *)b;
++	uint8_t diff = 0U;
++
++	while (n--) {
++		diff |= (uint8_t)(*pa++ ^ *pb++);
++	}
++
++	return diff == 0U;
++}
++#endif /* CONFIG_MBEDTLS */
+ 
+ #endif /* _CRYPTO_H_ */

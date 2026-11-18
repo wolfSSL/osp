@@ -1,0 +1,310 @@
+wolfSSL TLS sockets for Zephyr 4.5.0, patch set 2026.11
+https://github.com/wolfSSL/osp/tree/master/zephyr/4.5
+
+diff --git a/tests/net/socket/tls_ext/CMakeLists.txt b/tests/net/socket/tls_ext/CMakeLists.txt
+index 6cb97e75708..94cd7c2b580 100644
+--- a/tests/net/socket/tls_ext/CMakeLists.txt
++++ b/tests/net/socket/tls_ext/CMakeLists.txt
+@@ -39,7 +39,7 @@ if(${CONFIG_TLS_CREDENTIALS})
+     ${gen_dir}/client_privkey.inc
+   )
+ 
+-  if(CONFIG_NET_SOCKETS_TLS_WOLFSSL_OCSP_STAPLING)
++  if(CONFIG_NET_SOCKETS_TLS_WOLFSSL_OCSP_STAPLING OR CONFIG_WOLFSSL_CRYPTO_CB)
+     foreach(f ocsp_ca ocsp_server ocsp_server_key ocsp_good)
+       generate_inc_file_for_target(app ${CMAKE_CURRENT_SOURCE_DIR}/src/ocsp/${f}.der
+         ${gen_dir}/${f}.inc)
+diff --git a/tests/net/socket/tls_ext/src/main.c b/tests/net/socket/tls_ext/src/main.c
+index b0f92f6b91c..3661a6c6098 100644
+--- a/tests/net/socket/tls_ext/src/main.c
++++ b/tests/net/socket/tls_ext/src/main.c
+@@ -19,6 +19,10 @@
+ #include <zephyr/net/tls_verify.h>
+ 
+ struct WOLFSSL *ztls_get_wolfssl_context(int fd);
++#if defined(CONFIG_WOLFSSL_CRYPTO_CB)
++#include <wolfssl/wolfcrypt/cryptocb.h>
++#include <wolfssl/wolfcrypt/ecc.h>
++#endif
+ #else
+ #include <mbedtls/x509.h>
+ #include <mbedtls/x509_crt.h>
+@@ -83,6 +87,9 @@ enum tls_tag {
+ 	CLIENT_AUTH_TAG,
+ 	/** The PSK of the external PSK and REQUIRED client resumption tests */
+ 	EXT_PSK_TAG,
++	/** The CA and server of the private key id tests */
++	KEY_ID_CA_TAG,
++	KEY_ID_SERVER_TAG,
+ 	/** The clients of the untrusted chain CA tests and their shared key */
+ 	CHAIN_A_TAG,
+ 	CHAIN_B_TAG,
+@@ -151,7 +158,7 @@ static const unsigned char client_privkey[] = {
+ #include "client_privkey.inc"
+ };
+ 
+-#if defined(CONFIG_NET_SOCKETS_TLS_WOLFSSL_OCSP_STAPLING)
++#if defined(CONFIG_NET_SOCKETS_TLS_WOLFSSL_OCSP_STAPLING) || defined(CONFIG_WOLFSSL_CRYPTO_CB)
+ static const unsigned char ocsp_ca[] = {
+ #include "ocsp_ca.inc"
+ };
+@@ -163,7 +170,9 @@ static const unsigned char ocsp_server[] = {
+ static const unsigned char ocsp_server_key[] = {
+ #include "ocsp_server_key.inc"
+ };
++#endif
+ 
++#if defined(CONFIG_NET_SOCKETS_TLS_WOLFSSL_OCSP_STAPLING)
+ static const unsigned char ocsp_good[] = {
+ #include "ocsp_good.inc"
+ };
+@@ -2488,6 +2497,206 @@ ZTEST(net_socket_tls_api_extension, test_dtls_client_ctx_rebuild_failure)
+ 	zassert_ok(zsock_close(server_fd), "close() failed (%d)", errno);
+ #endif
+ }
++
++static const uint8_t key_id_ref[] __maybe_unused = { 'k', 'e', 'y', '-', 'i', 'd' };
++
++#if defined(CONFIG_WOLFSSL_CRYPTO_CB)
++#define KEY_ID_DEVID 7
++#define ZTLS_TEST_KEY_ID_MAX_LEN 32
++#if defined(WC_USE_DEVID)
++BUILD_ASSERT(WC_USE_DEVID == KEY_ID_DEVID, "WC_USE_DEVID must name the test's device");
++#endif
++
++static int key_id_other_pk;
++static int key_id_signs;
++
++/* Stands in for a secure element: signs with ocsp_server_key for the reference only */
++static int key_id_crypto_cb(int dev_id, wc_CryptoInfo *info, void *ctx)
++{
++	ecc_key *ref_key;
++	ecc_key key;
++	word32 idx = 0;
++	int ret;
++
++	ARG_UNUSED(dev_id);
++	ARG_UNUSED(ctx);
++
++	if (info->algo_type != WC_ALGO_TYPE_PK) {
++		return CRYPTOCB_UNAVAILABLE;
++	}
++
++	ref_key = info->pk.type == WC_PK_TYPE_ECDSA_SIGN ? info->pk.eccsign.key : NULL;
++	if (ref_key == NULL || ref_key->idLen != sizeof(key_id_ref) ||
++	    memcmp(ref_key->id, key_id_ref, sizeof(key_id_ref)) != 0) {
++		key_id_other_pk++;
++		return CRYPTOCB_UNAVAILABLE;
++	}
++
++	ret = wc_ecc_init_ex(&key, NULL, INVALID_DEVID);
++	if (ret != 0) {
++		return ret;
++	}
++
++	ret = wc_EccPrivateKeyDecode(ocsp_server_key, &idx, &key, sizeof(ocsp_server_key));
++	if (ret == 0) {
++		ret = wc_ecc_sign_hash(info->pk.eccsign.in, info->pk.eccsign.inlen,
++				       info->pk.eccsign.out, info->pk.eccsign.outlen,
++				       info->pk.eccsign.rng, &key);
++	}
++	wc_ecc_free(&key);
++
++	if (ret == 0) {
++		key_id_signs++;
++	}
++
++	return ret;
++}
++#endif /* CONFIG_WOLFSSL_CRYPTO_CB */
++
++/* A server whose private key is only a reference signs through the crypto device */
++ZTEST(net_socket_tls_api_extension, test_tls_private_key_id)
++{
++#if !defined(CONFIG_WOLFSSL_CRYPTO_CB) || defined(WC_NO_DEFAULT_DEVID)
++	ztest_test_skip();
++#else
++	static const sec_tag_t server_tags[] = { KEY_ID_SERVER_TAG };
++	static const sec_tag_t client_tags[] = { KEY_ID_CA_TAG };
++	k_tid_t server_thread_id;
++	struct net_sockaddr_in sa;
++	uint8_t rx_buf[16];
++	int server_fd, client_fd = -1, r;
++
++	zassert_ok(wc_CryptoCb_RegisterDevice(KEY_ID_DEVID, key_id_crypto_cb, NULL));
++	key_id_other_pk = 0;
++	key_id_signs = 0;
++
++	zassert_ok(tls_credential_add(KEY_ID_CA_TAG, TLS_CREDENTIAL_CA_CERTIFICATE, ocsp_ca,
++				      sizeof(ocsp_ca)));
++	zassert_ok(tls_credential_add(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PRIVATE_KEY_ID,
++				      key_id_ref, sizeof(key_id_ref)));
++	zassert_ok(tls_credential_add(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PUBLIC_CERTIFICATE,
++				      ocsp_server, sizeof(ocsp_server)));
++
++	server_fd = test_configure_server_ex(&server_thread_id, ZSOCK_TLS_PEER_VERIFY_NONE,
++					     false, false, server_tags, sizeof(server_tags),
++					     false, server_thread_echo_twice_fn);
++
++	/* The second accept reuses the listener's WOLFSSL_CTX */
++	for (int i = 0; i < 2; i++) {
++		client_fd = test_configure_client(&sa, false, "localhost");
++		r = zsock_setsockopt(client_fd, ZSOCK_SOL_TLS, ZSOCK_TLS_SEC_TAG_LIST, client_tags,
++				     sizeof(client_tags));
++		zassert_ok(r, "failed to set ZSOCK_TLS_SEC_TAG_LIST (%d)", errno);
++
++		r = zsock_connect(client_fd, (struct net_sockaddr *)&sa, sizeof(sa));
++		zassert_not_equal(r, -1, "failed to connect (%d)", errno);
++		r = zsock_send(client_fd, SECRET, SECRET_SIZE, 0);
++		zassert_equal(r, SECRET_SIZE, "send() failed (%d)", errno);
++		r = zsock_recv(client_fd, rx_buf, sizeof(rx_buf), 0);
++		zassert_equal(r, SECRET_SIZE, "recv() failed (%d)", errno);
++		zassert_equal(key_id_signs, i + 1, "handshake %d was not signed by the device", i);
++
++		if (i == 0) {
++			zassert_ok(zsock_close(client_fd), "close() failed (%d)", errno);
++		}
++	}
++
++	test_shutdown(client_fd, server_fd, server_thread_id);
++
++#if defined(WC_USE_DEVID)
++	/* The build names the device, so the rest of the handshake goes there too */
++	zassert_true(key_id_other_pk > 0, "the other public key operations stayed off the device");
++#else
++	zassert_equal(key_id_other_pk, 0, "%d other public key operations reached the device",
++		      key_id_other_pk);
++#endif
++#endif
++}
++
++/* Without a registered crypto device, a listener holding a key reference cannot accept */
++ZTEST(net_socket_tls_api_extension, test_tls_private_key_id_no_device)
++{
++#if !defined(CONFIG_WOLFSSL_CRYPTO_CB) || defined(WC_USE_DEVID) || defined(WC_NO_DEFAULT_DEVID)
++	ztest_test_skip();
++#else
++	static const sec_tag_t server_tags[] = { KEY_ID_SERVER_TAG };
++	static const sec_tag_t client_tags[] = { KEY_ID_CA_TAG };
++	k_tid_t server_thread_id;
++	struct net_sockaddr_in sa;
++	int server_fd, client_fd, r;
++
++	zassert_ok(tls_credential_add(KEY_ID_CA_TAG, TLS_CREDENTIAL_CA_CERTIFICATE, ocsp_ca,
++				      sizeof(ocsp_ca)));
++	zassert_ok(tls_credential_add(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PRIVATE_KEY_ID,
++				      key_id_ref, sizeof(key_id_ref)));
++	zassert_ok(tls_credential_add(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PUBLIC_CERTIFICATE,
++				      ocsp_server, sizeof(ocsp_server)));
++
++	server_fd = test_configure_server_ex(&server_thread_id, ZSOCK_TLS_PEER_VERIFY_NONE,
++					     false, true, server_tags, sizeof(server_tags),
++					     false, server_thread_fn);
++	client_fd = test_configure_client(&sa, false, "localhost");
++	r = zsock_setsockopt(client_fd, ZSOCK_SOL_TLS, ZSOCK_TLS_SEC_TAG_LIST, client_tags,
++			     sizeof(client_tags));
++	zassert_ok(r, "failed to set ZSOCK_TLS_SEC_TAG_LIST (%d)", errno);
++
++	r = zsock_connect(client_fd, (struct net_sockaddr *)&sa, sizeof(sa));
++	zassert_equal(r, -1, "connected to a server without its signing device");
++
++	test_shutdown(client_fd, server_fd, server_thread_id);
++#endif
++}
++
++/* Without crypto callbacks, and on mbedTLS, the sec tag list holding the reference is refused */
++ZTEST(net_socket_tls_api_extension, test_tls_private_key_id_unsupported)
++{
++#if defined(CONFIG_WOLFSSL) && defined(WOLF_PRIVATE_KEY_ID) && defined(WOLF_CRYPTO_CB) && \
++	!defined(WC_NO_DEFAULT_DEVID)
++	ztest_test_skip();
++#else
++	static const sec_tag_t tags[] = { KEY_ID_SERVER_TAG };
++	int fd, r;
++
++	zassert_ok(tls_credential_add(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PUBLIC_CERTIFICATE,
++				      server, sizeof(server)));
++	zassert_ok(tls_credential_add(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PRIVATE_KEY_ID,
++				      key_id_ref, sizeof(key_id_ref)));
++
++	fd = zsock_socket(NET_AF_INET, NET_SOCK_STREAM, NET_IPPROTO_TLS_1_2);
++	zassert_not_equal(fd, -1, "failed to create socket (%d)", errno);
++	r = zsock_setsockopt(fd, ZSOCK_SOL_TLS, ZSOCK_TLS_SEC_TAG_LIST, tags, sizeof(tags));
++	zassert_equal(r, -1, "a private key id was accepted");
++	zassert_equal(errno, ENOTSUP, "unexpected errno %d", errno);
++	zassert_ok(zsock_close(fd), "close() failed (%d)", errno);
++
++	(void)tls_credential_delete(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PRIVATE_KEY_ID);
++	(void)tls_credential_delete(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PUBLIC_CERTIFICATE);
++#endif
++}
++
++/* wolfSSL-only: a reference longer than a wolfCrypt key id is refused */
++ZTEST(net_socket_tls_api_extension, test_tls_private_key_id_too_long)
++{
++#if !defined(CONFIG_WOLFSSL_CRYPTO_CB) || defined(WC_NO_DEFAULT_DEVID)
++	ztest_test_skip();
++#else
++	static const uint8_t long_ref[ZTLS_TEST_KEY_ID_MAX_LEN + 1] = { 'k' };
++	static const sec_tag_t tags[] = { KEY_ID_SERVER_TAG };
++	int fd, r;
++
++	zassert_ok(tls_credential_add(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PUBLIC_CERTIFICATE,
++				      server, sizeof(server)));
++	zassert_ok(tls_credential_add(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PRIVATE_KEY_ID,
++				      long_ref, sizeof(long_ref)));
++
++	fd = zsock_socket(NET_AF_INET, NET_SOCK_STREAM, NET_IPPROTO_TLS_1_2);
++	zassert_not_equal(fd, -1, "failed to create socket (%d)", errno);
++	r = zsock_setsockopt(fd, ZSOCK_SOL_TLS, ZSOCK_TLS_SEC_TAG_LIST, tags, sizeof(tags));
++	zassert_equal(r, -1, "a %zu byte key reference was accepted", sizeof(long_ref));
++	zassert_equal(errno, EINVAL, "unexpected errno %d", errno);
++	zassert_ok(zsock_close(fd), "close() failed (%d)", errno);
++#endif
++}
+ #endif /* CONFIG_TLS_CREDENTIALS */
+ 
+ /* Without TLS_HOSTNAME, REQUIRED has no name to check, so the handshake fails */
+@@ -3491,6 +3700,12 @@ static void tls_ext_after(void *fixture)
+ 	(void)tls_credential_delete(IP_SAN_CA_TAG, TLS_CREDENTIAL_CA_CERTIFICATE);
+ 	(void)tls_credential_delete(IP_SAN_SERVER_TAG, TLS_CREDENTIAL_PUBLIC_CERTIFICATE);
+ 	(void)tls_credential_delete(IP_SAN_SERVER_TAG, TLS_CREDENTIAL_PRIVATE_KEY);
++	(void)tls_credential_delete(KEY_ID_CA_TAG, TLS_CREDENTIAL_CA_CERTIFICATE);
++	(void)tls_credential_delete(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PRIVATE_KEY_ID);
++	(void)tls_credential_delete(KEY_ID_SERVER_TAG, TLS_CREDENTIAL_PUBLIC_CERTIFICATE);
++#if defined(CONFIG_WOLFSSL_CRYPTO_CB) && defined(CONFIG_TLS_CREDENTIALS)
++	(void)wc_CryptoCb_UnRegisterDevice(KEY_ID_DEVID);
++#endif
+ 	tls_proto = NET_IPPROTO_TLS_1_2;
+ }
+ 
+diff --git a/tests/net/socket/tls_ext/tests.yaml b/tests/net/socket/tls_ext/tests.yaml
+index a9c4ac48d74..e0041fb6901 100644
+--- a/tests/net/socket/tls_ext/tests.yaml
++++ b/tests/net/socket/tls_ext/tests.yaml
+@@ -17,6 +17,25 @@ tests:
+     extra_args:
+       - EXTRA_CONF_FILE=overlay-wolfssl.conf
+ 
++  net.socket.tls.ext.wolfssl.key_id:
++    platform_allow:
++      - native_sim
++      - native_sim/native/64
++    tags: wolfssl
++    extra_args:
++      - EXTRA_CONF_FILE=overlay-wolfssl.conf
++    extra_configs:
++      - CONFIG_WOLFSSL_CRYPTO_CB=y
++  net.socket.tls.ext.wolfssl.key_id_offload:
++    platform_allow:
++      - native_sim
++      - native_sim/native/64
++    tags: wolfssl
++    extra_args:
++      - EXTRA_CONF_FILE=overlay-wolfssl.conf
++    extra_configs:
++      - CONFIG_WOLFSSL_CRYPTO_CB=y
++      - CONFIG_COMPILER_OPT="-DWC_USE_DEVID=7"
+   net.socket.tls.ext.wolfssl.tls13_only:
+     platform_allow:
+       - native_sim

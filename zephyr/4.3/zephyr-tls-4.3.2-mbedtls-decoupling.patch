@@ -1,0 +1,92 @@
+wolfSSL TLS sockets for Zephyr 4.3.2, patch set 2026.11
+https://github.com/wolfSSL/osp/tree/master/zephyr/4.3
+
+diff --git a/lib/uuid/CMakeLists.txt b/lib/uuid/CMakeLists.txt
+index fa0b91ac5c5..4d44eaa9897 100644
+--- a/lib/uuid/CMakeLists.txt
++++ b/lib/uuid/CMakeLists.txt
+@@ -2,4 +2,6 @@
+ 
+ zephyr_sources_ifdef(CONFIG_UUID uuid.c)
+ 
+-zephyr_library_link_libraries_ifdef(CONFIG_UUID_V5 mbedTLS)
++if(CONFIG_UUID_V5)
++  zephyr_library_link_libraries_ifdef(CONFIG_MBEDTLS mbedTLS)
++endif()
+diff --git a/lib/uuid/Kconfig b/lib/uuid/Kconfig
+index 8e1be8ff511..e3feb6d53ac 100644
+--- a/lib/uuid/Kconfig
++++ b/lib/uuid/Kconfig
+@@ -22,8 +22,7 @@ config UUID_V5
+ 	bool "UUID version 5 generation support [EXPERIMENTAL]"
+ 	select EXPERIMENTAL
+ 	depends on UUID
+-	depends on MBEDTLS
+-	depends on MBEDTLS_PSA_CRYPTO_C
++	depends on PSA_CRYPTO_CLIENT
+ 	depends on PSA_WANT_ALG_SHA_1
+ 	# When TF-M is enabled, Mbed TLS's MD module (which is used to generate
+ 	# v5 UUIDs) will dispacth hash operations to TF-M. Unfortunately TF-M
+diff --git a/subsys/mgmt/mcumgr/transport/Kconfig.udp b/subsys/mgmt/mcumgr/transport/Kconfig.udp
+index 19de5cf3ce5..51f3ba474f2 100644
+--- a/subsys/mgmt/mcumgr/transport/Kconfig.udp
++++ b/subsys/mgmt/mcumgr/transport/Kconfig.udp
+@@ -64,8 +64,8 @@ config MCUMGR_TRANSPORT_UDP_MTU
+ 
+ config MCUMGR_TRANSPORT_UDP_DTLS
+ 	bool "DTLS"
+-	select MBEDTLS
+-	select MBEDTLS_ENABLE_HEAP
++	select MBEDTLS if !WOLFSSL
++	select MBEDTLS_ENABLE_HEAP if !WOLFSSL
+ 	select NET_SOCKETS_SOCKOPT_TLS
+ 	select NET_SOCKETS_ENABLE_DTLS
+ 	select TLS_CREDENTIALS
+diff --git a/subsys/mgmt/updatehub/Kconfig b/subsys/mgmt/updatehub/Kconfig
+index dca7aa44936..2dc89ae75fb 100644
+--- a/subsys/mgmt/updatehub/Kconfig
++++ b/subsys/mgmt/updatehub/Kconfig
+@@ -72,8 +72,8 @@ config UPDATEHUB_SHELL
+ 
+ config UPDATEHUB_DTLS
+ 	bool "Activate communication CoAPS/DTLS"
+-	select MBEDTLS
+-	select MBEDTLS_ENABLE_HEAP
++	select MBEDTLS if !WOLFSSL
++	select MBEDTLS_ENABLE_HEAP if !WOLFSSL
+ 	select NET_SOCKETS_SOCKOPT_TLS
+ 	select NET_SOCKETS_ENABLE_DTLS
+ 	help
+diff --git a/subsys/net/lib/lwm2m/lwm2m_engine.c b/subsys/net/lib/lwm2m/lwm2m_engine.c
+index b4dc1d7f536..cccdd660e61 100644
+--- a/subsys/net/lib/lwm2m/lwm2m_engine.c
++++ b/subsys/net/lib/lwm2m/lwm2m_engine.c
+@@ -37,7 +37,11 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+ 
+ #if defined(CONFIG_LWM2M_DTLS_SUPPORT)
+ #include <zephyr/net/tls_credentials.h>
+-#include <mbedtls/ssl_ciphersuites.h>
++
++/* IANA IDs, so the list does not need an mbedTLS header */
++#define LWM2M_TLS_PSK_WITH_AES_128_CCM_8              0xC0A8
++#define LWM2M_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8      0xC0AE
++#define LWM2M_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 0xC02B
+ #endif
+ #if defined(CONFIG_DNS_RESOLVER)
+ #include <zephyr/net/dns_resolve.h>
+@@ -1061,12 +1065,12 @@ static int lwm2m_load_tls_credentials(struct lwm2m_ctx *ctx)
+ }
+ 
+ static const int cipher_list_psk[] = {
+-	MBEDTLS_TLS_PSK_WITH_AES_128_CCM_8,
++	LWM2M_TLS_PSK_WITH_AES_128_CCM_8,
+ };
+ 
+ static const int cipher_list_cert[] = {
+-	MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
+-	MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
++	LWM2M_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
++	LWM2M_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+ };
+ 
+ #endif /* CONFIG_LWM2M_DTLS_SUPPORT */
