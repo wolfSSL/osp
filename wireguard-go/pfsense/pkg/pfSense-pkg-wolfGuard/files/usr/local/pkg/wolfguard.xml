@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE packagegui SYSTEM "../schema/packages.dtd">
+<?xml-stylesheet type="text/xsl" href="../xsl/package.xsl"?>
+<packagegui>
+	<copyright>
+	<![CDATA[
+/*
+ * wolfguard.xml
+ *
+ * Copyright (C) 2026 wolfSSL Inc.
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+	]]>
+	</copyright>
+	<name>wolfguard</name>
+	<version>%%PKGVERSION%%</version>
+	<title>VPN/wolfGuard</title>
+	<include_file>/usr/local/pkg/wolfguard/wolfguard.inc</include_file>
+	<menu>
+		<name>wolfGuard</name>
+		<section>VPN</section>
+		<url>/wolfguard/vpn_wolfguard_tunnels.php</url>
+	</menu>
+	<menu>
+		<name>wolfGuard</name>
+		<section>Status</section>
+		<url>/wolfguard/status_wolfguard.php</url>
+	</menu>
+	<service>
+		<name>wolfguard</name>
+		<rcfile>wolfguard.sh</rcfile>
+		<executable>wolfguard-go</executable>
+		<description>wolfGuard VPN (wolfguard-go)</description>
+	</service>
+	<custom_php_install_command>
+		wolfguard_install();
+	</custom_php_install_command>
+	<custom_php_pre_deinstall_command>
+		wolfguard_deinstall();
+	</custom_php_pre_deinstall_command>
+	<custom_php_resync_config_command>
+		wolfguard_resync();
+	</custom_php_resync_config_command>
+</packagegui>
