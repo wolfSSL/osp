@@ -1,0 +1,217 @@
+From 87080a09b4bf8c488f70e8321e13116e4de798f7 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 4 Sep 2026 11:09:11 +0000
+Subject: [PATCH] wolfSSL Patch
+
+This patch adds wolfSSL support to msmtp 1.8.32. It adds
+--with-tls=wolfssl to configure.ac (pkg-config probe, HAVE_LIBWOLFSSL,
+HAVE_WOLFSSL automake conditional) and reuses src/mtls-openssl.c
+through wolfSSL's OpenSSL compatibility layer.
+
+wolfSSL verifies the peer certificate during the handshake while OpenSSL
+leaves that to the application. msmtp does its own checking after the
+handshake, so verification is turned off for the tls_fingerprint and
+disabled tls_certcheck cases, which would otherwise abort the handshake.
+A configured tls_trust_file keeps wolfSSL's stricter default.
+
+Compile wolfSSL with:
+  ./configure --enable-opensslextra --enable-opensslall
+  make
+  make install
+
+Compile msmtp with:
+  patch -p1 < wolfssl-msmtp-1.8.32.patch
+  autoreconf -ivf
+  PKG_CONFIG_PATH=/usr/local/lib/pkgconfig ./configure --with-tls=wolfssl
+  make
+
+Run the tests with:
+  LD_LIBRARY_PATH=/usr/local/lib make check
+
+Tests passed:
+- tests/test-basic.sh
+- tests/test-auth-plain.sh
+- tests/test-header-handling.sh
+
+The tests do not use TLS: test-basic.sh only runs msmtp --version and
+--help, the other two exchange mail with msmtpd over plain SMTP. They
+bind msmtpd to ::1 and fail with "Address family not supported by
+protocol" on hosts without IPv6 loopback; they pass on IPv4 when ::1 is
+replaced by 127.0.0.1.
+
+TLS itself was checked by hand against a local TLS SMTP server:
+tls_trust_file, tls_fingerprint and a disabled tls_certcheck all
+connect, and a wrong CA, a wrong fingerprint and a hostname mismatch are
+all rejected, both with and without STARTTLS.
+
+Confirm the binary links against wolfSSL with:
+  ldd src/msmtp | grep wolfssl
+---
+ configure.ac       | 33 ++++++++++++++++++++++++++++++---
+ src/Makefile.am    |  3 +++
+ src/msmtp.c        |  2 ++
+ src/mtls-openssl.c | 22 +++++++++++++++++++++-
+ 4 files changed, 56 insertions(+), 4 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index d180cd9..10a5e18 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -95,33 +95,44 @@ want_tls="yes"
+ want_gnutls="yes"
+ want_openssl="no"
+ want_libtls="no"
++want_wolfssl="no"
+ tls_CFLAGS=""
+ tls_LIBS=""
+ with_ssl_was_used=no
+-AC_ARG_WITH([tls], [AS_HELP_STRING([--with-tls=[gnutls|openssl|libtls|no]],
+-    [TLS support: GnuTLS (default), OpenSSL (discouraged), libtls, or none.])],
++AC_ARG_WITH([tls], [AS_HELP_STRING([--with-tls=[gnutls|openssl|wolfssl|libtls|no]],
++    [TLS support: GnuTLS (default), OpenSSL (discouraged), wolfSSL, libtls, or none.])],
+     if test "$withval" = "gnutls"; then
+ 	want_tls=yes
+ 	want_gnutls=yes
+ 	want_openssl=no
+ 	want_libtls=no
++	want_wolfssl=no
+     elif test "$withval" = "openssl"; then
+ 	want_tls=yes
+ 	want_gnutls=no
+ 	want_openssl=yes
+ 	want_libtls=no
++	want_wolfssl=no
++    elif test "$withval" = "wolfssl"; then
++	want_tls=yes
++	want_gnutls=no
++	want_openssl=no
++	want_libtls=no
++	want_wolfssl=yes
+     elif test "$withval" = "libtls"; then
+ 	want_tls=yes
+ 	want_gnutls=no
+ 	want_openssl=no
+ 	want_libtls=yes
++	want_wolfssl=no
+     elif test "$withval" = "no"; then
+ 	want_tls=no
+ 	want_gnutls=no
+ 	want_openssl=no
+ 	want_libtls=no
++	want_wolfssl=no
+     else
+-	AC_MSG_ERROR([Use --with-tls=gnutls or --with-tls=openssl or --with-tls=libtls or --with-tls=no])
++	AC_MSG_ERROR([Use --with-tls=gnutls or --with-tls=openssl or --with-tls=wolfssl or --with-tls=libtls or --with-tls=no])
+     fi)
+ if test "$want_gnutls" = "yes"; then
+     PKG_CHECK_MODULES([libgnutls], [gnutls >= 3.7.2], [HAVE_LIBGNUTLS=1], [HAVE_LIBGNUTLS=0])
+@@ -166,6 +177,21 @@ if test "$want_libtls" = "yes" -a "$have_tls" = "no"; then
+ 	AC_DEFINE([HAVE_LIBTLS], [1], [Define to 1 if libtls is available])
+     fi
+ fi
++if test "$want_wolfssl" = "yes" -a "$have_tls" = "no"; then
++    PKG_CHECK_MODULES([libwolfssl], [wolfssl >= 0.0], [HAVE_LIBWOLFSSL=1], [HAVE_LIBWOLFSSL=0])
++    if test "$HAVE_LIBWOLFSSL" != "1"; then
++        AC_MSG_WARN([library libwolfssl not found:])
++        AC_MSG_WARN([$libwolfssl_PKG_ERRORS])
++        AC_MSG_WARN([libwolfssl is provided by wolfSSL])
++    else
++	have_tls="yes"
++	tls_lib="wolfSSL"
++	wolfssl_includedir=`$PKG_CONFIG --variable=includedir wolfssl`
++	tls_CFLAGS="$libwolfssl_CFLAGS -I${wolfssl_includedir}/wolfssl -DWOLFSSL_USE_OPTIONS_H"
++	tls_LIBS="$libwolfssl_LIBS"
++	AC_DEFINE([HAVE_LIBWOLFSSL], [1], [Define to 1 if libwolfssl is available])
++    fi
++fi
+ if test "$have_tls" = "yes"; then
+     AC_DEFINE([HAVE_TLS], [1], [Define to 1 to build with TLS/SSL support])
+ elif test "$want_tls" = "yes"; then
+@@ -175,6 +201,7 @@ AM_CONDITIONAL([HAVE_TLS], [test "$have_tls" = "yes"])
+ AM_CONDITIONAL([HAVE_GNUTLS], [test "$tls_lib" = "GnuTLS"])
+ AM_CONDITIONAL([HAVE_OPENSSL], [test "$tls_lib" = "OpenSSL"])
+ AM_CONDITIONAL([HAVE_LIBTLS], [test "$tls_lib" = "libtls"])
++AM_CONDITIONAL([HAVE_WOLFSSL], [test "$tls_lib" = "wolfSSL"])
+ AC_SUBST([tls_CFLAGS])
+ AC_SUBST([tls_LIBS])
+ 
+diff --git a/src/Makefile.am b/src/Makefile.am
+index be9a60f..c27a82b 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -32,6 +32,9 @@ endif
+ if HAVE_LIBTLS
+ msmtp_SOURCES += mtls-libtls.c
+ endif
++if HAVE_WOLFSSL
++msmtp_SOURCES += mtls-openssl.c
++endif
+ 
+ AM_CPPFLAGS = $(tls_CFLAGS) $(libgsasl_CFLAGS) $(libidn2_CFLAGS) $(libsecret_CFLAGS)
+ 
+diff --git a/src/msmtp.c b/src/msmtp.c
+index 2e7173f..fc95d6a 100644
+--- a/src/msmtp.c
++++ b/src/msmtp.c
+@@ -2193,6 +2193,8 @@ void msmtp_print_version(void)
+             "OpenSSL"
+ #elif defined (HAVE_LIBTLS)
+             "libtls"
++#elif defined (HAVE_LIBWOLFSSL)
++            "wolfSSL"
+ #else
+             _("none")
+ #endif
+diff --git a/src/mtls-openssl.c b/src/mtls-openssl.c
+index 976d72b..f1b0698 100644
+--- a/src/mtls-openssl.c
++++ b/src/mtls-openssl.c
+@@ -41,9 +41,13 @@
+ #include <openssl/rand.h>
+ #include <openssl/evp.h>
+ #if OPENSSL_VERSION_NUMBER < 0x10100000L
++#ifndef X509_get0_notBefore
+ #define X509_get0_notBefore X509_get_notBefore
++#endif
++#ifndef X509_get0_notAfter
+ #define X509_get0_notAfter X509_get_notAfter
+ #endif
++#endif
+ 
+ #ifdef HAVE_LIBIDN
+ # include <idn2.h>
+@@ -139,7 +143,7 @@ int mtls_lib_init(char **errstr)
+ {
+     int e;
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x10100000L
++#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(HAVE_LIBWOLFSSL)
+     SSL_load_error_strings();
+     SSL_library_init();
+ #endif
+@@ -754,6 +758,22 @@ int mtls_init(mtls_t *mtls,
+         memcpy(mtls->fingerprint, md5_fingerprint, 16);
+         mtls->have_md5_fingerprint = 1;
+     }
++#ifdef HAVE_LIBWOLFSSL
++    /* wolfSSL verifies the peer certificate during the handshake, OpenSSL does
++     * not. Turn that off where msmtp does its own checking afterwards, so that
++     * tls_fingerprint and a disabled tls_certcheck keep working. */
++    if (no_certcheck || mtls->have_sha256_fingerprint
++            || mtls->have_sha1_fingerprint || mtls->have_md5_fingerprint)
++    {
++        SSL_CTX_set_verify(mtls->internals->ssl_ctx, SSL_VERIFY_NONE, NULL);
++    }
++    else
++    {
++        /* Do not depend on the library default: a tls_trust_file account
++         * must be verified during the handshake. */
++        SSL_CTX_set_verify(mtls->internals->ssl_ctx, SSL_VERIFY_PEER, NULL);
++    }
++#endif
+     if (!(mtls->internals->ssl = SSL_new(mtls->internals->ssl_ctx)))
+     {
+         *errstr = xasprintf(_("cannot create a TLS structure: %s"),
+-- 
+2.43.0
+

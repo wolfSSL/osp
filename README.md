@@ -32,7 +32,7 @@ Each project port included in this repository is contained in its own subdirecto
 | libest | Cisco EST stack written in C | [Link](https://github.com/cisco/libest) | [Link](https://www.wolfssl.com/wolfssl-cisco-libest-port/) | [README](./libest/README) |
 | libimobiledevice | Library to communicate with services on iOS devices | [Link](https://libimobiledevice.org/) | | [README](./libimobiledevice/README) |
 | libsignal-protocol-c | Signal Protocol C Library | [Link](https://github.com/signalapp/libsignal-protocol-c) | [Link](https://www.wolfssl.com/wolfssl-use-with-signal/) | [README](./libsignal-protocol-c/README.md) |
-| libspdm | Security Protocol and Data Model implementation | [Link](https://github.com/DMTF/libspdm) | | [README](./libspdm/1.0.0/README.md) |
+| libspdm | Security Protocol and Data Model implementation | [Link](https://github.com/DMTF/libspdm) | | [README](./libspdm/3.8.2/README.md) |
 | libssh2 | client-side C library for SSH2 | [Link](https://www.libssh2.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-libssh2/) | [README](./libssh2/1.9.0/README.md) |
 | lighttpd | lighttpd web server | [Link](https://www.lighttpd.net/) | [Link](https://www.wolfssl.com/lighttpd-support-wolfssl/) | [README](./lighttpd/README) |
 | mariadb | MariaDB relational database | [Link](https://mariadb.org/) | | [README](./mariadb/10.5.11/README.md) |
@@ -40,7 +40,7 @@ Each project port included in this repository is contained in its own subdirecto
 | net-snmp | Simple Network Management Protocol | [Link](http://www.net-snmp.org/) | | [README](./net-snmp/README.md) |
 | ntp | Network Time Protocol | [Link](http://www.ntp.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-ntp/) | [README](./ntp/4.2.8p15/README.md) |
 | NXP SE05X Middleware | wolfSSL HostCrypto support patch | [Link](https://www.nxp.com/products/security-and-authentication/authentication/edgelock-se050-plug-trust-secure-element-family-enhanced-iot-security-with-high-flexibility:SE050) | | [README](./nxp-se05x-middleware/README.md) |
-| openldap | Open source lightweight directory access protocol | [Link](https://www.openldap.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-openldap/) | [README](./openldap/2.4.47/README.md) |
+| openldap | Open source lightweight directory access protocol | [Link](https://www.openldap.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-openldap/) | [README](./openldap/2.6.13/README.md) |
 | openpegasus  | Open source DMTF CIM and WBEM | [Link](https://collaboration.opengroup.org/pegasus/) | [Link](https://www.wolfssl.com/openpegasus-port-support-added-wolfssl/) | [README](./openpegasus/2.14.1/README.md) |
 | openresty | Nginx and LuaJIT-based web platform | [Link](https://openresty.org/en/) | | [README](./openresty/INSTRUCTIONS.md) |
 | openssh-patches | OpenSSH | [Link](https://www.openssh.com/) | [Link](https://www.wolfssl.com/wolfssl-openssh-expanded-openssl-compatibility/) | [README](./openssh-patches/README) |
@@ -50,9 +50,9 @@ Each project port included in this repository is contained in its own subdirecto
 | rsyslog | rocket-fast Syslog Server | [Link](https://www.rsyslog.com/) | [Link](https://www.wolfssl.com/wolfssl-ported-rsyslog-8-2106-0/) | [README](./rsyslog/8.2106.0/README.md) |
 | realm-core | Database that runs on phones, tablets or wearables | [Link](https://github.com/realm/realm-core/) | | [README](./realm/README.md) |
 | sblim-sfcb | SBLIM Small-footprint CIM Broker | [Link](http://sblim.sourceforge.net/wiki/index.php/Sfcb) | | [README](./sblim-sfcb/1.4.9/README.md) |
-| socat | socat Multipurpose relay | [Link](http://www.dest-unreach.org/socat/) | [Link](https://www.wolfssl.com/open-source-project-ports-socat/) | 1.7.3.4 [README](./socat/1.7.3.4/README.md)<br/>1.7.4.1 [README](./socat/1.7.4.1/README.md) |
+| socat | socat Multipurpose relay | [Link](http://www.dest-unreach.org/socat/) | [Link](https://www.wolfssl.com/open-source-project-ports-socat/) | 1.7.3.4 [README](./socat/1.7.3.4/README.md)<br/>1.7.4.1 [README](./socat/1.7.4.1/README.md)<br/>1.8.1.1 [README](./socat/1.8.1.1/README.md) |
 | stunnel | stunnel Proxy | [Link](https://www.stunnel.org/) | [Link](https://www.wolfssl.com/securing-stunnel-tls-1-3/) | 5.57 Unix [README](./stunnel/5.57/README_UNIX.md)<br/>5.57 Windows [README](./stunnel/5.57/README_WIN.md) |
-| tcpdump | command-line packet analyzer | [Link](https://www.tcpdump.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-tcpdump/) | [README](./tcpdump/4.9.3/README.md) |
+| tcpdump | command-line packet analyzer | [Link](https://www.tcpdump.org/) | [Link](https://www.wolfssl.com/open-source-project-ports-tcpdump/) | [README](./tcpdump/4.99.6/README.md) |
 | urllib3 | urllib3 HTTP client for Python | [Link](https://github.com/urllib3/urllib3) | | [README](./urllib3/README.rst) |
 | websocket-client | WebSocket client for python | [Link](https://github.com/websocket-client/websocket-client) | | [README](./websocket-client/README.rst) |
 | websocketpp | WebSocket++ | [Link](https://www.zaphoyd.com/projects/websocketpp/) | [Link](https://www.wolfssl.com/building-websocket-wolfssl-support/) | [README](websocketpp/readme.md) |

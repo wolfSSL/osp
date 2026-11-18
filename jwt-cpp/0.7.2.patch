@@ -1,0 +1,61 @@
+From 0a9e068c8e31de9ec10aa0813bea200d3983ce87 Mon Sep 17 00:00:00 2001
+From: Juliusz Sosinowicz <juliusz@wolfssl.com>
+Date: Fri, 4 Sep 2026 11:04:53 +0000
+Subject: [PATCH] wolfSSL Patch
+
+Adjust the Ed25519 certificate tests for wolfSSL 5.9.2 and newer. Since
+5.9.2 wolfSSL decodes Ed25519 certificates in the OpenSSL compatibility
+layer, so the tests now expect the same error codes as with OpenSSL and
+the PEM reference test is enabled. wolfSSL does not use BIO_ctrl in
+BIO_get_mem_data, so that entry is dropped like in the other tests.
+
+Compile wolfSSL with:
+  ./configure --enable-all
+  make
+  make install
+
+Compile jwt-cpp with:
+  patch -p1 < <path/to/osp>/jwt-cpp/0.7.2.patch
+  PKG_CONFIG_PATH=<wolfssl install prefix>/lib/pkgconfig \
+    cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -B build \
+    -DJWT_SSL_LIBRARY:STRING=wolfSSL -DJWT_BUILD_TESTS=ON .
+  make -C build
+
+Run the tests with:
+  ./build/tests/jwt-cpp-test
+
+All 146 tests pass. The tests already disabled upstream for wolfSSL
+(ed25519 traits, HMAC mock for wolfSSL <= 5.7.0) are unchanged.
+---
+ tests/OpenSSLErrorTest.cpp | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/tests/OpenSSLErrorTest.cpp b/tests/OpenSSLErrorTest.cpp
+index 71440b3..74f0932 100644
+--- a/tests/OpenSSLErrorTest.cpp
++++ b/tests/OpenSSLErrorTest.cpp
+@@ -692,7 +692,8 @@ TEST(OpenSSLErrorTest, ConvertCertBase64DerToPemReference) {
+ }
+ #endif
+ 
+-#ifndef LIBWOLFSSL_VERSION_HEX /* wolfSSL: limited ed support in compatibility layer */
++/* wolfSSL: Ed25519 certificates are supported in the compatibility layer since 5.9.2 */
++#if !defined(LIBWOLFSSL_VERSION_HEX) || LIBWOLFSSL_VERSION_HEX >= 0x05009002
+ TEST(OpenSSLErrorTest, ConvertEcdsaCertBase64DerToPemReference) {
+ 	std::error_code ec;
+ 	auto res = jwt::helper::convert_base64_der_to_pem(ed25519_certificate_base64_der, ec);
+@@ -918,7 +919,11 @@ TEST(OpenSSLErrorTest, ConvertEcdsaCertBase64DerToPem) {
+ #ifndef LIBWOLFSSL_VERSION_HEX
+ 										 {&fail_PEM_write_bio_cert, 1, jwt::error::rsa_error::write_cert_failed},
+ 										 {&fail_BIO_ctrl, 1, jwt::error::rsa_error::convert_to_pem_failed}
++#elif LIBWOLFSSL_VERSION_HEX >= 0x05009002
++										 /* wolfSSL does not use BIO_ctrl in BIO_get_mem_data */
++										 {&fail_PEM_write_bio_cert, 1, jwt::error::rsa_error::write_cert_failed}
+ #else
++										 /* Ed25519 certificate can not be decoded */
+ 										 {&fail_PEM_write_bio_cert, 1, jwt::error::rsa_error::create_mem_bio_failed},
+ 										 {&fail_BIO_ctrl, 1, jwt::error::rsa_error::create_mem_bio_failed}
+ #endif
+-- 
+2.43.0
+
